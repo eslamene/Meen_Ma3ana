@@ -3,7 +3,7 @@
 ## 1. Introduction
 
 ### 1.1. Project Overview
-"Meen-Ma3ana" is a comprehensive charity platform designed to help people in need through community-driven financial support. The application serves as a centralized platform where administrators create charity cases (one-time or recurring) and recurring projects for individuals or families requiring assistance. Donors contribute through financial shares to help reach case goals, with support for ongoing monthly assistance and cyclic project-based fundraising. The system will be built using Supabase as the backend, providing a robust and scalable foundation.
+"Meen-Ma3ana" is a comprehensive charity platform designed to help people in need through community-driven financial support. The application serves as a centralized platform where administrators create charity cases (one-time or recurring) and recurring projects for individuals or families requiring assistance. Donors contribute through financial shares to help reach case goals, with support for ongoing monthly assistance and cyclic project-based fundraising. The system will be built using Next.js for the frontend, Supabase as the backend infrastructure, and Drizzle ORM with PostgreSQL for database management, providing a robust and scalable foundation.
 
 ### 1.2. Goals and Objectives
 - To provide a transparent platform for helping people in need through organized charity cases and recurring projects.
@@ -12,7 +12,9 @@
 - To enable cyclic project-based fundraising through recurring projects with defined contribution cycles.
 - To ensure accountability and transparency in the charity process through proof-based donations.
 - To facilitate community support through open or predefined financial contributions.
-- To leverage Supabase for authentication, database management, and storage.
+- To leverage Next.js for a modern, performant frontend with server-side rendering capabilities.
+- To utilize Supabase for authentication, real-time features, and storage services.
+- To implement Drizzle ORM with PostgreSQL for type-safe database operations and schema management.
 
 ### 1.3. Scope
 - **In Scope:**
@@ -27,10 +29,15 @@
     - Automated recurring case period and project cycle management.
     - Real-time case/project progress tracking and reporting.
     - Automatic case reopening when sponsorship ends.
+    - Multi-language support (English and Arabic) for all user-facing content.
+    - Right-to-left (RTL) layout support for Arabic language interface.
+    - Localized date, time, and number formatting.
+    - Localized currency display and formatting.
 - **Out of Scope:**
     - Direct payment processing (donors provide proof of external payments).
     - Volunteer and event management (can be considered for future versions).
     - Direct integration with third-party accounting software.
+    - Additional languages beyond English and Arabic (can be considered for future versions).
 
 ### 1.4. Target Audience
 - **Donors:** Individuals and organizations looking to help people in need through financial contributions.
@@ -130,7 +137,35 @@
     - Sponsored cases bypass regular contribution tracking
     - Public contribution system remains active for non-sponsored cases
 
-### 2.6. Reporting and Analytics
+### 2.6. Localization and Internationalization
+- **Language Support:**
+    - Complete interface translation in English and Arabic
+    - User-selectable language preference with automatic detection
+    - Persistent language settings per user account
+    - Dynamic content translation for case descriptions, project details, and system messages
+    - Localized email notifications and communication templates
+- **Right-to-Left (RTL) Layout:**
+    - Full RTL support for Arabic language interface
+    - Proper text alignment, navigation, and form layouts for RTL
+    - RTL-compatible icons, buttons, and interactive elements
+    - Responsive design that adapts to RTL layout requirements
+- **Localized Formatting:**
+    - Date and time formatting according to locale standards
+    - Number formatting with appropriate decimal separators and grouping
+    - Currency display in local format with proper symbol placement
+    - Address and contact information formatting for regional standards
+- **Content Localization:**
+    - Case descriptions and project details in both languages
+    - Admin-created content with multi-language support
+    - Localized help text, tooltips, and error messages
+    - Cultural adaptation of UI elements and terminology
+- **Language Management:**
+    - Admin interface for managing translation content
+    - Ability to update and maintain translations without code changes
+    - Fallback to English for untranslated content
+    - Support for regional variations and dialects
+
+### 2.7. Reporting and Analytics
 - **Admin Dashboard:** Real-time analytics showing:
     - Active cases (one-time, recurring) and their progress by funding type (public, sponsored)
     - Active project cycles and recurring project performance
@@ -181,11 +216,25 @@
 ## 4. System Requirements
 
 ### 4.1. Frontend
-- A modern JavaScript framework (e.g., React, Vue.js) for a dynamic user experience.
+- **Next.js Framework:**
+    - React-based framework for server-side rendering and static site generation
+    - App Router for modern routing and layout management
+    - Built-in API routes for backend functionality
+    - Optimized performance with automatic code splitting and image optimization
+    - TypeScript support for type-safe development
+- **Internationalization (i18n):**
+    - Next.js internationalization features for multi-language functionality
+    - Dynamic locale routing and content localization
+    - RTL layout support with CSS Grid/Flexbox for responsive design
+    - Localization utilities for date, time, number, and currency formatting
+- **UI/UX Components:**
+    - Modern component library (e.g., shadcn/ui, Mantine, or custom components)
+    - Responsive design with mobile-first approach
+    - Accessibility compliance (WCAG 2.1) for inclusive user experience
 
 ### 4.2. Backend
-- **Supabase:**
-    - **Database:** PostgreSQL for data storage including:
+- **Supabase Infrastructure:**
+    - **Database:** PostgreSQL with Drizzle ORM for type-safe database operations including:
         - Cases (one-time, recurring) with period tracking and sponsorship status
         - Recurring projects with cycle management
         - Contributions linked to specific periods/cycles
@@ -194,12 +243,21 @@
         - Sponsor-beneficiary communication logs and feedback
         - Historical period/cycle performance data
         - Case transition history (public ↔ sponsored)
-    - **Authentication:** Supabase Auth for user management and role-based access control.
+        - Localization data and translation content
+        - User language preferences and locale settings
+    - **Authentication:** Supabase Auth for user management and role-based access control
     - **Storage:** Supabase Storage for:
         - Case supporting documents (images, medical reports, legal documents)
         - Donation proof attachments (payment receipts, transfer confirmations)
         - User avatars and profile images
-    - **Edge Functions:** For custom server-side logic including:
+    - **Real-time Features:** Supabase Realtime for live updates on case progress and contributions
+- **Database Management:**
+    - **Drizzle ORM:** Type-safe database schema definition and query building
+    - **PostgreSQL:** Robust relational database with advanced features
+    - **Schema Migrations:** Version-controlled database schema changes
+    - **Type Safety:** End-to-end type safety from database to frontend
+- **Server-side Logic:**
+    - **Next.js API Routes:** Custom server-side logic for:
         - Automatic case closure when target amount is reached
         - Contribution validation and approval workflows
         - Notification systems for case updates and approvals
@@ -211,7 +269,8 @@
         - Scheduled tasks for period/cycle transitions
         - Sponsorship monitoring and review scheduling
         - Automated reporting and analytics updates
-    - **Row Level Security:** To ensure proper access control for sensitive case information and financial data.
+    - **Supabase Edge Functions:** For complex background processing and scheduled tasks
+    - **Row Level Security:** To ensure proper access control for sensitive case information and financial data
 
 ## 5. Assumptions and Constraints
 
@@ -223,9 +282,12 @@
 - Sponsors and beneficiaries will engage in constructive communication and provide regular feedback.
 - Users will have access to devices capable of uploading files (proof of payments, case documents).
 - Contact information sharing between sponsors and beneficiaries is acceptable to both parties.
+- Users will primarily use either English or Arabic as their preferred language.
+- Content creators (admins) will provide case descriptions and project details in both languages.
+- The platform will serve users from regions where English and Arabic are commonly used languages.
 
 ### 5.2. Constraints
-- The project will be developed using the specified technology stack (Supabase backend).
+- The project will be developed using the specified technology stack (Next.js, Supabase, Drizzle ORM).
 - The platform will not directly process payments but rely on proof-based verification system.
 - File upload sizes will be limited by Supabase Storage constraints.
 - The initial development will focus on the features outlined in this BRD.
@@ -233,5 +295,11 @@
 - Contact information sharing in sponsorship requires careful privacy and security considerations.
 - Sponsorship communication monitoring adds complexity to data management and privacy compliance.
 - Recurring case and project management adds complexity to data structure and automation requirements.
-- Automated period/cycle transitions depend on reliable scheduling mechanisms within Supabase Edge Functions.
-- Sponsorship relationship management requires robust workflow systems for approval, monitoring, and termination processes. 
+- Automated period/cycle transitions depend on reliable scheduling mechanisms within Next.js API routes and Supabase Edge Functions.
+- Sponsorship relationship management requires robust workflow systems for approval, monitoring, and termination processes.
+- Localization implementation requires additional development effort for RTL support and translation management.
+- Content management complexity increases with multi-language support requirements.
+- UI/UX design must accommodate both LTR and RTL layouts effectively.
+- Translation maintenance requires ongoing administrative effort and content management processes.
+- Drizzle ORM schema management requires careful version control and migration planning.
+- Next.js App Router and server-side rendering add complexity to state management and data fetching patterns. 
