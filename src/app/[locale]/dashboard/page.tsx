@@ -5,8 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useAuth } from '@/components/auth/AuthProvider'
-import { useUserRole } from '@/components/auth/PermissionGuard'
-import { getRoleDisplayName, getRoleDescription } from '@/lib/rbac'
+import { usePermissions } from '@/lib/hooks/usePermissions'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import ContributionHistory from '@/components/profile/ContributionHistory'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +31,41 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
+// Role display functions
+const getRoleDisplayName = (role: string) => {
+  switch (role) {
+    case 'admin':
+      return 'Administrator'
+    case 'moderator':
+      return 'Moderator'
+    case 'sponsor':
+      return 'Sponsor'
+    case 'volunteer':
+      return 'Volunteer'
+    case 'donor':
+      return 'Donor'
+    default:
+      return 'User'
+  }
+}
+
+const getRoleDescription = (role: string) => {
+  switch (role) {
+    case 'admin':
+      return 'Full system access with all administrative privileges'
+    case 'moderator':
+      return 'Can manage cases and contributions with approval rights'
+    case 'sponsor':
+      return 'Can create sponsorship requests and support cases'
+    case 'volunteer':
+      return 'Can help with case management and project updates'
+    case 'donor':
+      return 'Can make contributions and view cases'
+    default:
+      return 'Basic user access'
+  }
+}
+
 interface DashboardStats {
   totalContributions: number
   totalAmount: number
@@ -44,7 +78,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const params = useParams()
   const { user, signOut } = useAuth()
-  const userRole = useUserRole()
+  const { userRole } = usePermissions()
   const [stats, setStats] = useState<DashboardStats>({
     totalContributions: 0,
     totalAmount: 0,
@@ -180,7 +214,7 @@ export default function DashboardPage() {
       icon: Settings,
       color: 'from-red-500 to-rose-600',
       hoverColor: 'from-red-600 to-rose-700',
-      permission: 'admin:access',
+      permission: 'admin:dashboard',
       action: () => router.push(`/${params.locale}/admin`)
     }
   ]
@@ -395,7 +429,7 @@ export default function DashboardPage() {
                           Create cases
                         </div>
                       </PermissionGuard>
-                      <PermissionGuard permission="admin:access">
+                      <PermissionGuard permission="admin:dashboard">
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           Admin access
@@ -479,7 +513,7 @@ export default function DashboardPage() {
               </Card>
             </PermissionGuard>
 
-            <PermissionGuard permission="admin:reports">
+            <PermissionGuard permission="admin:analytics">
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">

@@ -38,6 +38,9 @@ interface Case {
   created_at: string
   created_by: string
   image_url?: string
+  // Calculated fields
+  approved_amount?: number
+  total_contributions?: number
 }
 
 export default function AdminCasesPage() {
@@ -72,19 +75,68 @@ export default function AdminCasesPage() {
 
       if (error) throw error
 
-      setCases(data || [])
+      // Fetch contribution amounts for each case
+      const casesWithAmounts = await Promise.all(
+        (data || []).map(async (case_) => {
+          const { approved_amount, total_contributions } = await fetchCaseContributions(case_.id)
+          return {
+            ...case_,
+            approved_amount,
+            total_contributions
+          }
+        })
+      )
+
+      setCases(casesWithAmounts)
       
       // Calculate stats
-      const total = data?.length || 0
-      const active = data?.filter(c => c.status === 'active').length || 0
-      const completed = data?.filter(c => c.status === 'completed').length || 0
-      const paused = data?.filter(c => c.status === 'paused').length || 0
+      const total = casesWithAmounts?.length || 0
+      const active = casesWithAmounts?.filter(c => c.status === 'active').length || 0
+      const completed = casesWithAmounts?.filter(c => c.status === 'completed').length || 0
+      const paused = casesWithAmounts?.filter(c => c.status === 'paused').length || 0
 
       setStats({ total, active, completed, paused })
     } catch (error) {
       console.error('Error fetching cases:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCaseContributions = async (caseId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('contributions')
+        .select(`
+          amount,
+          contribution_approval_status!contribution_id(status)
+        `)
+        .eq('case_id', caseId)
+
+      if (error) {
+        console.error('Error fetching contributions for case:', caseId, error)
+        return { approved_amount: 0, total_contributions: 0 }
+      }
+
+      let approved_amount = 0
+      let total_contributions = 0
+
+      ;(data || []).forEach((contribution) => {
+        const amount = parseFloat(contribution.amount || 0)
+        total_contributions += amount
+
+        const approvalStatuses = contribution.contribution_approval_status || []
+        const latestStatus = approvalStatuses.length > 0 ? approvalStatuses[0].status : 'none'
+        
+        if (latestStatus === 'approved') {
+          approved_amount += amount
+        }
+      })
+
+      return { approved_amount, total_contributions }
+    } catch (error) {
+      console.error('Error calculating contributions for case:', caseId, error)
+      return { approved_amount: 0, total_contributions: 0 }
     }
   }
 
@@ -136,6 +188,7 @@ export default function AdminCasesPage() {
   }
 
   const getProgressPercentage = (current: number, target: number) => {
+    if (!target || target <= 0) return 0
     return Math.min((current / target) * 100, 100)
   }
 
@@ -330,12 +383,12 @@ export default function AdminCasesPage() {
                           <div className="mb-3">
                             <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
                               <span>Progress</span>
-                              <span>{getProgressPercentage(case_.current_amount, case_.target_amount).toFixed(1)}%</span>
+                              <span>{getProgressPercentage(case_.approved_amount || 0, case_.target_amount).toFixed(1)}%</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                               <div
                                 className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${getProgressPercentage(case_.current_amount, case_.target_amount)}%` }}
+                                style={{ width: `${getProgressPercentage(case_.approved_amount || 0, case_.target_amount)}%` }}
                               ></div>
                             </div>
                           </div>
@@ -344,13 +397,21 @@ export default function AdminCasesPage() {
                           <div className="flex items-center gap-6 text-sm text-gray-600">
                             <div className="flex items-center gap-1">
                               <DollarSign className="h-4 w-4 text-green-600" />
-                              <span>{formatAmount(case_.current_amount)} / {formatAmount(case_.target_amount)}</span>
+                              <span>{formatAmount(case_.approved_amount || 0)} / {formatAmount(case_.target_amount)}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="h-4 w-4 text-gray-400" />
                               <span>{formatDate(case_.created_at)}</span>
                             </div>
                           </div>
+
+                          {/* Admin Disclaimer */}
+                          {case_.total_contributions && case_.approved_amount && 
+                           case_.total_contributions !== case_.approved_amount && (
+                            <div className="mt-2 text-xs text-amber-600">
+                              ⚠️ Total contributions: {formatAmount(case_.total_contributions)} (includes pending/rejected)
+                            </div>
+                          )}
                         </div>
 
                         {/* Actions */}

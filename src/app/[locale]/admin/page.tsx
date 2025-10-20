@@ -5,8 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import PermissionGuard from '@/components/auth/PermissionGuard'
-import { useUserRole } from '@/components/auth/PermissionGuard'
-import { getRoleDisplayName } from '@/lib/rbac'
+import { usePermissions } from '@/lib/hooks/usePermissions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +31,24 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
+// Role display function
+const getRoleDisplayName = (role: string) => {
+  switch (role) {
+    case 'admin':
+      return 'Administrator'
+    case 'moderator':
+      return 'Moderator'
+    case 'sponsor':
+      return 'Sponsor'
+    case 'volunteer':
+      return 'Volunteer'
+    case 'donor':
+      return 'Donor'
+    default:
+      return 'User'
+  }
+}
+
 interface SystemStats {
   totalUsers: number
   totalContributions: number
@@ -55,7 +72,7 @@ export default function AdminPage() {
   const t = useTranslations('admin')
   const router = useRouter()
   const params = useParams()
-  const userRole = useUserRole()
+  const { userRole } = usePermissions()
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
     totalContributions: 0,
@@ -215,7 +232,7 @@ export default function AdminPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="admin:access">
+      <PermissionGuard permission="admin:dashboard">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}

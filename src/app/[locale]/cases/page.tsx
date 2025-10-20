@@ -29,6 +29,8 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import CaseCard from '@/components/cases/CaseCard'
 import FilterSidebar from '@/components/cases/FilterSidebar'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermissions } from '@/lib/hooks/usePermissions'
 
 interface Case {
   id: string
@@ -62,6 +64,7 @@ export default function CasesPage() {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
+  const { canCreateCase } = usePermissions()
 
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
@@ -275,13 +278,15 @@ export default function CasesPage() {
               </div>
             </div>
             
-            <Button 
-              onClick={handleCreateCase} 
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-lg"
-            >
-              <Plus className="h-5 w-5" />
-              {t('createCase')}
-            </Button>
+            <PermissionGuard allowedRoles={['admin', 'moderator']}>
+              <Button 
+                onClick={handleCreateCase} 
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-lg"
+              >
+                <Plus className="h-5 w-5" />
+                {t('createCase')}
+              </Button>
+            </PermissionGuard>
           </div>
         </div>
 
@@ -395,13 +400,15 @@ export default function CasesPage() {
                   <p className="text-gray-600 mb-6">
                     {t('noCasesFoundDescription')}
                   </p>
-                  <Button 
-                    onClick={handleCreateCase}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t('createCase')}
-                  </Button>
+                  <PermissionGuard allowedRoles={['admin', 'moderator']}>
+                    <Button 
+                      onClick={handleCreateCase}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t('createCase')}
+                    </Button>
+                  </PermissionGuard>
                 </CardContent>
               </Card>
             ) : (

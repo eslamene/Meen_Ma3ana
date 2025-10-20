@@ -1,121 +1,85 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useAuth } from './AuthProvider'
-import { hasPermission, Permission, UserRole } from '@/lib/rbac'
-import { createClient } from '@/lib/supabase/client'
+import { ReactNode } from 'react'
+import { usePermissions } from '@/lib/hooks/usePermissions'
+import { Permission, UserRole } from '@/lib/rbac/permissions'
 
 interface PermissionGuardProps {
-  children: React.ReactNode
-  permission: Permission
-  fallback?: React.ReactNode
-  resourceOwnerId?: string
+  children: ReactNode
+  // Use either permission-based or role-based access control
+  permission?: Permission
+  permissions?: Permission[]
+  requireAll?: boolean // For permissions array: require all (AND) or any (OR)
+  allowedRoles?: UserRole[]
+  // Fallback content when access is denied
+  fallback?: ReactNode
+  // Show loading state
+  showLoading?: boolean
+  loadingComponent?: ReactNode
 }
 
-// Shared hook for fetching user role from database
-function useUserRoleFromDB(): { userRole: UserRole; loading: boolean } {
-  const { user } = useAuth()
-  const [userRole, setUserRole] = useState<UserRole>('donor')
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (user) {
-      fetchUserRole()
-    } else {
-      setLoading(false)
-    }
-  }, [user])
-
-  const fetchUserRole = async () => {
-    try {
-      const supabase = createClient()
-      
-      // First try to get role from user metadata (for backward compatibility)
-      let role = (user?.user_metadata?.role as UserRole) || 'donor'
-      
-      // Then fetch the latest role from the database
-      const { data, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user?.id)
-        .single()
-
-      if (!error && data?.role) {
-        role = data.role as UserRole
-        
-        // Update the session metadata if it's different
-        if (role !== user?.user_metadata?.role) {
-          await supabase.auth.updateUser({
-            data: { role: role }
-          })
-        }
-      }
-      
-      setUserRole(role)
-    } catch (error) {
-      console.error('Error fetching user role:', error)
-      setUserRole('donor')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return { userRole, loading }
-}
-
-export default function PermissionGuard({ 
-  children, 
-  permission, 
+/**
+ * Permission Guard Component
+ * Conditionally renders children based on user permissions or roles
+ */
+export default function PermissionGuard({
+  children,
+  permission,
+  permissions,
+  requireAll = false,
+  allowedRoles,
   fallback = null,
-  resourceOwnerId 
+  showLoading = true,
+  loadingComponent = <div className="animate-pulse">Loading...</div>
 }: PermissionGuardProps) {
-  const { user } = useAuth()
-  const { userRole, loading } = useUserRoleFromDB()
-
-  if (loading) {
-    return <div>Loading...</div>
-  }
-
-  if (!user) {
-    return fallback
-  }
-
-  // Check if user has permission
-  const hasAccess = hasPermission(userRole, permission)
+  const {
+    loading,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    isRoleAllowed
+  } = usePermissions()
   
-  if (!hasAccess) {
-    return fallback
+  // Show loading state
+  if (loading && showLoading) {
+    return <>{loadingComponent}</>
   }
-
-  // If resourceOwnerId is provided, check ownership
-  if (resourceOwnerId && resourceOwnerId !== user.id) {
-    // For certain permissions, users can only access their own resources
-    const ownerOnlyPermissions: Permission[] = [
-      'contributions:update',
-      'sponsorships:update',
-      'communications:update',
-    ]
-    
-    if (ownerOnlyPermissions.includes(permission)) {
-      return fallback
-    }
+  
+  // Check permissions
+  let hasAccess = false
+  
+  if (permission) {
+    // Single permission check
+    hasAccess = hasPermission(permission)
+  } else if (permissions && permissions.length > 0) {
+    // Multiple permissions check
+    hasAccess = requireAll 
+      ? hasAllPermissions(permissions)
+      : hasAnyPermission(permissions)
+  } else if (allowedRoles && allowedRoles.length > 0) {
+    // Role-based check
+    hasAccess = isRoleAllowed(allowedRoles)
+  } else {
+    // No restrictions specified, allow access
+    hasAccess = true
   }
-
-  return <>{children}</>
+  
+  // Render children if access is granted, otherwise render fallback
+  return hasAccess ? <>{children}</> : <>{fallback}</>
 }
 
-// Hook for checking permissions in components
-export function usePermission(permission: Permission): boolean {
-  const { user } = useAuth()
-  const { userRole, loading } = useUserRoleFromDB()
-
-  if (!user || loading) return false
-  
-  return hasPermission(userRole, permission)
+/**
+ * Higher-order component version of PermissionGuard
+ */
+export function withPermissionGuard<P extends object>(
+  Component: React.ComponentType<P>,
+  guardProps: Omit<PermissionGuardProps, 'children'>
+) {
+  return function WrappedComponent(props: P) {
+    return (
+      <PermissionGuard {...guardProps}>
+        <Component {...props} />
+      </PermissionGuard>
+    )
+  }
 }
-
-// Hook for getting user role
-export function useUserRole(): UserRole {
-  const { userRole } = useUserRoleFromDB()
-  return userRole
-} 

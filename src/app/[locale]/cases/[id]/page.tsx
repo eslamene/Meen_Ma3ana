@@ -45,6 +45,7 @@ import { realtimeCaseUpdates, CaseProgressUpdate, CaseUpdateNotification } from 
 import { CaseUpdate } from '@/lib/case-updates'
 
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
+import { usePermissions } from '@/lib/hooks/usePermissions'
 
 interface Case {
   id: string
@@ -115,12 +116,14 @@ export default function CaseDetailPage() {
   
   // Use centralized hook for approved contributions
   const { contributions: approvedContributions, totalAmount: approvedTotal, isLoading: contributionsLoading, refetch: refetchContributions } = useApprovedContributions(caseId)
+  const { hasPermission } = usePermissions()
   const [error, setError] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'contributions' | 'updates'>('overview')
   const [realTimeProgress, setRealTimeProgress] = useState<CaseProgressUpdate | null>(null)
   const [canCreateUpdates, setCanCreateUpdates] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [totalContributions, setTotalContributions] = useState(0)
 
   const supabase = createClient()
 
@@ -128,6 +131,7 @@ export default function CaseDetailPage() {
     fetchCaseDetails()
     fetchContributions()
     fetchUpdates()
+    fetchTotalContributions()
     checkUserPermissions()
     setupRealtimeSubscriptions()
 
@@ -313,6 +317,29 @@ export default function CaseDetailPage() {
       setContributions(formattedContributions)
     } catch (error) {
       console.error('Error fetching contributions:', error)
+    }
+  }
+
+  const fetchTotalContributions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contributions')
+        .select('amount')
+        .eq('case_id', caseId)
+
+      if (error) {
+        console.error('Error fetching total contributions:', error)
+        return
+      }
+
+      // Calculate total of ALL contributions (including pending/rejected)
+      const total = (data || []).reduce((sum, contribution) => {
+        return sum + parseFloat(contribution.amount || 0)
+      }, 0)
+
+      setTotalContributions(total)
+    } catch (error) {
+      console.error('Error calculating total contributions:', error)
     }
   }
 
@@ -594,6 +621,21 @@ export default function CaseDetailPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Admin Disclaimer for Total Contributions */}
+                  {hasPermission('contributions:read') && totalContributions !== approvedTotal && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <span className="text-sm text-amber-800 font-medium">
+                          ⚠️ Total contributions: {formatAmount(totalContributions)} EGP (includes pending/rejected)
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-700 mt-1 ml-6">
+                        Displayed amounts show only approved contributions. Total includes all contribution statuses.
+                      </p>
+                    </div>
+                  )}
                                     
                   {/* Enhanced Progress Stats */}
                   <div className="grid grid-cols-3 gap-4">

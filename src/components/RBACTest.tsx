@@ -3,22 +3,57 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/components/auth/AuthProvider'
-import { useUserRole, usePermission } from '@/components/auth/PermissionGuard'
-import { getRoleDisplayName, getRoleDescription, UserRole } from '@/lib/rbac'
+import { usePermissions } from '@/lib/hooks/usePermissions'
+import { UserRole } from '@/lib/rbac/permissions'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+
+// Role display functions
+const getRoleDisplayName = (role: string) => {
+  switch (role) {
+    case 'admin':
+      return 'Administrator'
+    case 'moderator':
+      return 'Moderator'
+    case 'sponsor':
+      return 'Sponsor'
+    case 'volunteer':
+      return 'Volunteer'
+    case 'donor':
+      return 'Donor'
+    default:
+      return 'User'
+  }
+}
+
+const getRoleDescription = (role: string) => {
+  switch (role) {
+    case 'admin':
+      return 'Full system access with all administrative privileges'
+    case 'moderator':
+      return 'Can manage cases and contributions with approval rights'
+    case 'sponsor':
+      return 'Can create sponsorship requests and support cases'
+    case 'volunteer':
+      return 'Can help with case management and project updates'
+    case 'donor':
+      return 'Can make contributions and view cases'
+    default:
+      return 'Basic user access'
+  }
+}
 
 export default function RBACTest() {
   const { user } = useAuth()
-  const userRole = useUserRole()
+  const { userRole, hasPermission } = usePermissions()
   const [selectedRole, setSelectedRole] = useState<UserRole>(userRole)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
   // Test different permissions
-  const canReadCases = usePermission('cases:read')
-  const canCreateCases = usePermission('cases:create')
-  const canReadContributions = usePermission('contributions:read')
-  const canCreateContributions = usePermission('contributions:create')
+  const canReadCases = hasPermission('cases:read')
+  const canCreateCases = hasPermission('cases:create')
+  const canReadContributions = hasPermission('contributions:read')
+  const canCreateContributions = hasPermission('contributions:create')
 
   // Update selected role when user role changes
   useEffect(() => {
@@ -186,7 +221,7 @@ export default function RBACTest() {
                 </div>
               </PermissionGuard>
 
-              <PermissionGuard permission="admin:access">
+              <PermissionGuard permission="admin:dashboard">
                 <div className="p-3 bg-red-50 border border-red-200 rounded">
                   <h4 className="font-medium text-red-800">Admin Panel</h4>
                   <p className="text-red-700 text-sm">This section is only visible to administrators.</p>
