@@ -1,0 +1,11 @@
+# Task ID: 20
+# Title: Develop Admin Dashboard with Analytics
+# Status: pending
+# Dependencies: 14, 17, 19
+# Priority: medium
+# Description: Build the admin dashboard with real-time analytics and reporting.
+# Details:
+Create admin dashboard with key metrics overview. Implement data visualization for case progress, contributions, and sponsorships. Build filtering and date range selection for analytics. Add export functionality for reports. Implement real-time updates for dashboard metrics.
+
+# Test Strategy:
+Test dashboard with various data scenarios. Verify visualizations accurately reflect database data. Test filtering and date range functionality. Ensure exported reports contain correct information.

@@ -1,0 +1,11 @@
+# Task ID: 23
+# Title: Implement Real-time Notification System
+# Status: pending
+# Dependencies: 2, 5
+# Priority: medium
+# Description: Develop a comprehensive notification system using Supabase Realtime.
+# Details:
+Create notification infrastructure using Supabase Realtime. Implement in-app notification center. Build email notification integration. Add notification preferences management. Implement different notification types (case updates, contributions, messages, etc.).
+
+# Test Strategy:
+Test real-time notification delivery for various events. Verify email notifications are sent correctly. Test notification preferences affect delivery appropriately. Ensure notification center displays all relevant notifications.

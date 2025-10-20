@@ -1,0 +1,230 @@
+# Task ID: 24
+# Title: Implement Security and Privacy Features
+# Status: pending
+# Dependencies: 3, 6
+# Priority: high
+# Description: Enhance security with Row Level Security and privacy protection for sensitive data.
+# Details:
+Implement Row Level Security (RLS) policies for all tables. Create data anonymization for sensitive information. Build privacy controls for user data. Implement secure file upload validation and scanning. Add audit logging for security-relevant actions.
+
+# Test Strategy:
+Test RLS policies by attempting unauthorized data access. Verify sensitive data is properly anonymized in public views. Test file upload security with various file types. Ensure audit logs capture all security-relevant actions.
+
+# Subtasks:
+## 1. Implement Row Level Security (RLS) Policies [done]
+### Dependencies: None
+### Description: Create and apply Row Level Security policies to restrict data access based on user roles and permissions across all database tables.
+### Details:
+Implementation steps:
+1. Identify all tables requiring RLS protection
+2. Define security predicates for each table based on user roles
+3. Create RLS policies using CREATE POLICY statements
+4. Apply policies with ALTER TABLE statements
+5. Set up security context functions to determine user access rights
+6. Test policies by creating test users with different roles
+7. Verify data visibility is properly restricted based on user context
+
+Testing approach: Create test cases with different user roles and verify they can only access authorized rows. Include edge cases like null values and special permissions.
+
+<info added on 2025-08-02T20:31:37.355Z>
+## RLS Implementation Details
+
+### SQL Implementation Examples:
+
+```sql
+-- Enable RLS on tables
+ALTER TABLE public.cases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contributions ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for cases table
+CREATE POLICY "Public users can view published cases" ON public.cases
+    FOR SELECT USING (is_published = true);
+    
+CREATE POLICY "Users can manage their own cases" ON public.cases
+    FOR ALL USING (auth.uid() = creator_id);
+    
+CREATE POLICY "Admins can manage all cases" ON public.cases
+    FOR ALL USING (auth.role() = 'admin');
+```
+
+### Security Context Functions:
+
+```typescript
+// src/lib/security/rls.ts
+export class SecurityService {
+  static setSecurityContext(req: NextRequest): void {
+    // Extract JWT and set RLS context via Supabase client
+    const token = extractJwtFromRequest(req);
+    supabase.auth.setAuth(token);
+  }
+  
+  static async validateResourceAccess(resourceType: string, resourceId: string, userId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from(resourceType)
+      .select('id')
+      .eq('id', resourceId)
+      .single();
+      
+    return !!data && !error;
+  }
+}
+```
+
+### Performance Considerations:
+
+1. **Index Creation for RLS Predicates**:
+   ```sql
+   CREATE INDEX idx_cases_creator_id ON public.cases(creator_id);
+   CREATE INDEX idx_contributions_user_id ON public.contributions(user_id);
+   ```
+
+2. **Caching Strategy**: Implement Redis caching for frequently accessed permission checks to reduce database load.
+
+### Security Testing Framework:
+
+```typescript
+// Example test case structure
+describe('Row Level Security', () => {
+  it('Regular users cannot access other users data', async () => {
+    // Setup test with regular user JWT
+    // Attempt to access unauthorized data
+    // Verify 403 or empty result set
+  });
+  
+  it('Admins can access all data', async () => {
+    // Setup test with admin JWT
+    // Verify complete data access
+  });
+});
+```
+
+### Audit Log Structure:
+
+```sql
+CREATE TABLE security_audit_log (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id),
+  action VARCHAR(255) NOT NULL,
+  resource_type VARCHAR(255) NOT NULL,
+  resource_id UUID,
+  ip_address INET,
+  user_agent TEXT,
+  timestamp TIMESTAMPTZ DEFAULT NOW(),
+  details JSONB
+);
+```
+</info added on 2025-08-02T20:31:37.355Z>
+
+## 2. Develop Data Anonymization System [done]
+### Dependencies: 24.1
+### Description: Create a system to anonymize sensitive personal information in database queries and exports while preserving data utility for analysis.
+### Details:
+Implementation steps:
+1. Identify all sensitive data fields requiring anonymization (PII, financial data, etc.)
+2. Implement data masking functions for different data types (emails, names, addresses, etc.)
+3. Create database views that automatically apply anonymization
+4. Develop API endpoints that return anonymized data based on user permissions
+5. Implement configuration system to control anonymization levels
+6. Add export functionality with anonymization options
+
+Testing approach: Verify original data remains intact while anonymized versions are properly transformed. Test with various data types and edge cases. Ensure anonymized data maintains referential integrity where needed.
+
+<info added on 2025-08-02T20:32:58.512Z>
+## Data Anonymization System Implementation Details
+
+### Technical Implementation Specifics:
+
+1. **Anonymization Algorithms**:
+   - Implemented k-anonymity algorithm with k=5 for demographic data
+   - Used SHA-256 hashing with salt for consistent pseudonymization
+   - Implemented differential privacy with ε=2.0 for aggregate queries
+   - Created format-preserving encryption for structured fields (credit cards, SSNs)
+
+2. **Performance Optimizations**:
+   - Added Redis caching layer for frequently accessed anonymized views
+   - Implemented batch processing for large dataset anonymization (>10K records)
+   - Created database indexes on commonly queried anonymized fields
+   - Added asynchronous processing for export operations
+
+3. **Code Structure**:
+   ```typescript
+   // Example anonymization function for emails
+   function anonymizeEmail(email: string, level: AnonymizationLevel): string {
+     const [username, domain] = email.split('@');
+     
+     switch(level) {
+       case 'none':
+         return email;
+       case 'partial':
+         return `${username.charAt(0)}${'*'.repeat(username.length-1)}@${domain}`;
+       case 'full':
+         return `user_${createHash(email)}@${domain}`;
+       default:
+         throw new Error('Invalid anonymization level');
+     }
+   }
+   ```
+
+4. **Configuration System**:
+   - JSON schema-based configuration for field-specific anonymization rules
+   - Environment-specific settings (dev/staging/production)
+   - Role-based anonymization policies (researchers see more data than external users)
+
+5. **Edge Cases Handled**:
+   - International character support in anonymization functions
+   - Preservation of referential integrity across related anonymized tables
+   - Special handling for time-series data to maintain trend analysis capability
+   - Fallback mechanisms for malformed or unexpected data formats
+
+6. **Compliance Features**:
+   - GDPR Article 25 (Privacy by Design) implementation documentation
+   - HIPAA-compliant anonymization for health-related fields
+   - Audit trail of all anonymization operations with timestamps and user IDs
+</info added on 2025-08-02T20:32:58.512Z>
+
+## 3. Build User Privacy Control Center [pending]
+### Dependencies: 24.2
+### Description: Develop a user interface and backend functionality allowing users to view and manage their privacy settings and personal data.
+### Details:
+Implementation steps:
+1. Design database schema for storing user privacy preferences
+2. Create API endpoints for retrieving and updating privacy settings
+3. Implement user interface for privacy dashboard
+4. Add functionality for users to download their personal data
+5. Implement data deletion requests with appropriate verification
+6. Create consent management system for tracking user permissions
+7. Add notification system for privacy policy changes
+
+Testing approach: Test all privacy controls with different user scenarios. Verify data export contains all required information. Test deletion requests properly remove or anonymize user data across the system.
+
+## 4. Implement Secure File Upload System [pending]
+### Dependencies: None
+### Description: Create a secure file upload system with validation, virus scanning, and proper storage of user-uploaded files.
+### Details:
+Implementation steps:
+1. Implement file type validation using both extension and content type checking
+2. Add file size restrictions and quota management
+3. Integrate with virus scanning service (ClamAV or similar)
+4. Implement secure file storage with proper permissions
+5. Create sanitization for potentially dangerous file types
+6. Add metadata stripping for uploaded images
+7. Implement secure download mechanism with proper headers
+
+Testing approach: Test with various file types including malicious files, oversized files, and files with incorrect extensions. Verify scanning works correctly and rejected files are properly handled.
+
+## 5. Develop Security Audit Logging System [pending]
+### Dependencies: 24.1, 24.4
+### Description: Implement comprehensive audit logging for security-relevant actions across the application with secure storage and analysis capabilities.
+### Details:
+Implementation steps:
+1. Define security-relevant events requiring audit logging
+2. Design audit log schema with essential fields (timestamp, user, action, etc.)
+3. Implement logging middleware/interceptors for automatic capture
+4. Create secure storage for audit logs with tamper protection
+5. Implement log rotation and retention policies
+6. Add admin interface for log review and analysis
+7. Create alerting system for suspicious activities
+8. Implement export functionality for compliance reporting
+
+Testing approach: Verify all security-relevant actions are properly logged. Test with high volume to ensure performance. Check log integrity and verify admin interfaces correctly display and filter log data.
+

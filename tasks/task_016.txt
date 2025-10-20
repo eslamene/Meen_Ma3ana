@@ -1,0 +1,11 @@
+# Task ID: 16
+# Title: Develop Sponsorship Request System
+# Status: pending
+# Dependencies: 8, 9
+# Priority: medium
+# Description: Build the interface for users to request sponsorship of specific cases.
+# Details:
+Create sponsorship request form with case selection. Implement sponsorship commitment options (full/partial, duration). Build sponsorship terms agreement process. Add notification system for sponsorship requests. Implement sponsorship status tracking.
+
+# Test Strategy:
+Test sponsorship request submission with various options. Verify notifications are sent to admins. Test status tracking throughout the request lifecycle. Ensure terms agreement is properly recorded.

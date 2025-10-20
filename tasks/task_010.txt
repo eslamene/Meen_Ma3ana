@@ -1,0 +1,553 @@
+# Task ID: 10
+# Title: Implement Case Lifecycle Management
+# Status: done
+# Dependencies: 9
+# Priority: high
+# Description: Develop the system for managing case status transitions (Active, Closed, Under Review).
+# Details:
+Create case status management system with state transitions. Implement automatic closure for fully funded one-time cases. Build admin interface for manual status changes. Add case review workflow for suspicious activity. Implement status change notifications and history tracking.
+
+# Test Strategy:
+Test status transitions for different case types. Verify automatic closure triggers correctly. Test admin manual status changes. Ensure status history is properly recorded and displayed.
+
+# Subtasks:
+## 1. Define Case Status Model and Database Schema [done]
+### Dependencies: None
+### Description: Create the data model for case statuses and the necessary database schema changes to support case lifecycle management
+### Details:
+Implementation details:
+1. Define an enum or constants for case statuses (Active, Closed, Under Review)
+2. Update the Case model to include status field, status change timestamp, and closure reason
+3. Create a CaseStatusHistory model to track all status changes with timestamps, previous status, new status, and the user/system that made the change
+4. Add database migrations for the schema changes
+5. Update existing case-related queries to include status information
+6. Test the schema changes by manually creating cases with different statuses and verifying database integrity
+
+<info added on 2025-08-02T20:02:34.243Z>
+For implementing the case status history tracking:
+
+```sql
+CREATE TABLE case_status_history (
+    id SERIAL PRIMARY KEY,
+    case_id INTEGER NOT NULL REFERENCES cases(id),
+    previous_status VARCHAR(50),
+    new_status VARCHAR(50) NOT NULL,
+    changed_by INTEGER REFERENCES users(id),
+    system_triggered BOOLEAN DEFAULT FALSE,
+    change_reason TEXT,
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Consider adding indexes:
+```sql
+CREATE INDEX idx_case_status_history_case_id ON case_status_history(case_id);
+CREATE INDEX idx_case_status_history_changed_at ON case_status_history(changed_at);
+```
+
+For the CaseStatusHistory model:
+```python
+class CaseStatusHistory(models.Model):
+    case = models.ForeignKey('Case', on_delete=models.CASCADE, related_name='status_history')
+    previous_status = models.CharField(max_length=50, null=True)  # Null for initial status
+    new_status = models.CharField(max_length=50)
+    changed_by = models.ForeignKey('User', on_delete=models.SET_NULL, null=True)
+    system_triggered = models.BooleanField(default=False)
+    change_reason = models.TextField(blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-changed_at']
+```
+
+Add a helper method to the Case model to record status changes:
+```python
+def update_status(self, new_status, changed_by=None, system_triggered=False, change_reason=''):
+    if self.status != new_status:
+        CaseStatusHistory.objects.create(
+            case=self,
+            previous_status=self.status,
+            new_status=new_status,
+            changed_by=changed_by,
+            system_triggered=system_triggered,
+            change_reason=change_reason
+        )
+        self.status = new_status
+        self.status_updated_at = timezone.now()
+        self.save(update_fields=['status', 'status_updated_at'])
+```
+</info added on 2025-08-02T20:02:34.243Z>
+
+<info added on 2025-08-02T20:04:11.784Z>
+<info added>
+## CaseLifecycleService Implementation Details
+
+The CaseLifecycleService has been implemented with the following key components:
+
+```python
+class CaseLifecycleService:
+    # Status transition matrix defines allowed transitions
+    ALLOWED_TRANSITIONS = {
+        CaseStatus.ACTIVE: [CaseStatus.UNDER_REVIEW, CaseStatus.CLOSED],
+        CaseStatus.UNDER_REVIEW: [CaseStatus.ACTIVE, CaseStatus.CLOSED],
+        CaseStatus.CLOSED: [CaseStatus.ACTIVE]  # Reopening cases
+    }
+    
+    # Role-based permissions for transitions
+    ROLE_PERMISSIONS = {
+        'admin': {  # Admins can perform any transition
+            CaseStatus.ACTIVE: [CaseStatus.UNDER_REVIEW, CaseStatus.CLOSED],
+            CaseStatus.UNDER_REVIEW: [CaseStatus.ACTIVE, CaseStatus.CLOSED],
+            CaseStatus.CLOSED: [CaseStatus.ACTIVE]
+        },
+        'case_manager': {
+            CaseStatus.ACTIVE: [CaseStatus.UNDER_REVIEW, CaseStatus.CLOSED],
+            CaseStatus.UNDER_REVIEW: [CaseStatus.ACTIVE],
+            CaseStatus.CLOSED: []  # Case managers cannot reopen cases
+        },
+        'case_worker': {
+            CaseStatus.ACTIVE: [CaseStatus.UNDER_REVIEW],
+            CaseStatus.UNDER_REVIEW: [],
+            CaseStatus.CLOSED: []
+        }
+    }
+    
+    # Transitions requiring a reason
+    REASON_REQUIRED = {
+        (CaseStatus.ACTIVE, CaseStatus.CLOSED): True,
+        (CaseStatus.UNDER_REVIEW, CaseStatus.CLOSED): True,
+        (CaseStatus.CLOSED, CaseStatus.ACTIVE): True
+    }
+    
+    @classmethod
+    def transition_status(cls, case, new_status, user=None, reason=None, system_triggered=False):
+        """
+        Transition a case to a new status with validation and history tracking
+        """
+        if not cls.can_transition(case, new_status, user):
+            raise ValidationError(f"Cannot transition case from {case.status} to {new_status}")
+            
+        if cls.is_reason_required(case.status, new_status) and not reason:
+            raise ValidationError(f"Reason is required for transitioning from {case.status} to {new_status}")
+        
+        # Use the helper method to update status and record history
+        case.update_status(new_status, changed_by=user, system_triggered=system_triggered, change_reason=reason)
+        return case
+    
+    @classmethod
+    def can_transition(cls, case, new_status, user=None):
+        """Check if transition is allowed based on current status and user role"""
+        # Basic transition validation
+        if new_status not in cls.ALLOWED_TRANSITIONS.get(case.status, []):
+            return False
+            
+        # Role-based permission check
+        if user and hasattr(user, 'role'):
+            role = user.role
+            return new_status in cls.ROLE_PERMISSIONS.get(role, {}).get(case.status, [])
+            
+        return False
+    
+    @classmethod
+    def is_reason_required(cls, current_status, new_status):
+        """Check if a reason is required for this transition"""
+        return cls.REASON_REQUIRED.get((current_status, new_status), False)
+    
+    @classmethod
+    def get_available_transitions(cls, case, user=None):
+        """Get list of available transitions for a case based on user role"""
+        if user and hasattr(user, 'role'):
+            role = user.role
+            return cls.ROLE_PERMISSIONS.get(role, {}).get(case.status, [])
+        return []
+```
+
+### Migration File Details (0004_fuzzy_caretaker.sql)
+
+The migration includes:
+
+```sql
+-- Add status field to cases table
+ALTER TABLE cases ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE';
+ALTER TABLE cases ADD COLUMN status_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE cases ADD COLUMN closure_reason TEXT;
+
+-- Create case_status_history table
+CREATE TABLE case_status_history (
+    id SERIAL PRIMARY KEY,
+    case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    previous_status VARCHAR(50),
+    new_status VARCHAR(50) NOT NULL,
+    changed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    system_triggered BOOLEAN DEFAULT FALSE,
+    change_reason TEXT,
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add indexes for performance
+CREATE INDEX idx_case_status_history_case_id ON case_status_history(case_id);
+CREATE INDEX idx_case_status_history_changed_at ON case_status_history(changed_at);
+CREATE INDEX idx_cases_status ON cases(status);
+```
+
+### Case Status Enum Implementation
+
+```python
+class CaseStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    UNDER_REVIEW = "UNDER_REVIEW"
+    CLOSED = "CLOSED"
+    
+    @classmethod
+    def choices(cls):
+        return [(status.value, status.name.replace('_', ' ').title()) for status in cls]
+```
+
+### Case Model Updates
+
+```python
+class Case(models.Model):
+    # Existing fields...
+    status = models.CharField(
+        max_length=50,
+        choices=CaseStatus.choices(),
+        default=CaseStatus.ACTIVE
+    )
+    status_updated_at = models.DateTimeField(auto_now_add=True)
+    closure_reason = models.TextField(blank=True, null=True)
+    
+    def get_status_history(self):
+        """Get complete status history for this case"""
+        return self.status_history.all().order_by('-changed_at')
+    
+    def get_latest_status_change(self):
+        """Get the most recent status change"""
+        return self.status_history.order_by('-changed_at').first()
+```
+</info added>
+</info added on 2025-08-02T20:04:11.784Z>
+
+## 2. Implement Core Status Transition Logic [done]
+### Dependencies: 10.1
+### Description: Build the service layer that handles case status transitions with validation rules and business logic
+### Details:
+Implementation details:
+1. Create a CaseLifecycleService with methods for transitioning between statuses
+2. Implement validation rules for allowed transitions (e.g., Closed cases cannot be reopened without admin approval)
+3. Add business logic for each transition type with appropriate hooks for notifications
+4. Implement automatic status history recording for all transitions
+5. Create unit tests for all possible transitions, including valid and invalid scenarios
+6. Test edge cases like concurrent status changes and validation failures
+
+<info added on 2025-08-02T20:04:19.965Z>
+For the automatic case closure logic for fully funded one-time cases:
+
+1. Implement a `checkForAutomaticClosure` method in CaseLifecycleService that:
+   - Evaluates if a case is one-time assistance type
+   - Verifies the funding goal has been met (currentAmount >= targetAmount)
+   - Checks all required documentation is complete
+
+2. Create a scheduled task using Spring's @Scheduled annotation to run daily:
+```java
+@Scheduled(cron = "0 0 2 * * *")  // Run at 2 AM daily
+public void processAutomaticCaseClosure() {
+    List<Case> eligibleCases = caseRepository.findEligibleForAutoClosure();
+    eligibleCases.forEach(this::attemptAutomaticClosure);
+}
+```
+
+3. Add configuration flag to enable/disable automatic closure feature
+
+4. Implement notification triggers when a case is automatically closed
+
+5. Create an audit trail entry specifically for automatic closures with reason code
+
+6. Add unit tests specifically for the automatic closure logic with various funding scenarios
+</info added on 2025-08-02T20:04:19.965Z>
+
+<info added on 2025-08-02T20:05:42.315Z>
+<info added on 2025-08-15T14:22:31.965Z>
+## Status Transition Implementation Details
+
+### State Machine Design
+Implemented a lightweight state machine pattern for case transitions:
+```java
+public enum CaseTransition {
+    SUBMIT(CaseStatus.DRAFT, CaseStatus.PENDING_REVIEW),
+    APPROVE(CaseStatus.PENDING_REVIEW, CaseStatus.ACTIVE),
+    REJECT(CaseStatus.PENDING_REVIEW, CaseStatus.REJECTED),
+    CLOSE(CaseStatus.ACTIVE, CaseStatus.CLOSED),
+    REOPEN(CaseStatus.CLOSED, CaseStatus.ACTIVE),
+    ARCHIVE(Arrays.asList(CaseStatus.CLOSED, CaseStatus.REJECTED), CaseStatus.ARCHIVED);
+    
+    private final List<CaseStatus> fromStatuses;
+    private final CaseStatus toStatus;
+    // Constructor and methods omitted
+}
+```
+
+### Transaction Management
+All status transitions are wrapped in `@Transactional` to ensure atomicity:
+```java
+@Transactional
+public CaseStatusChangeResult transitionStatus(Long caseId, CaseTransition transition, 
+                                              String reason, User initiator) {
+    Case targetCase = caseRepository.findById(caseId)
+        .orElseThrow(() -> new EntityNotFoundException("Case not found"));
+    
+    // Validation and business logic
+    boolean isValid = validateTransition(targetCase, transition, initiator);
+    if (!isValid) {
+        return CaseStatusChangeResult.failure("Invalid transition");
+    }
+    
+    // Execute transition
+    CaseStatus oldStatus = targetCase.getStatus();
+    targetCase.setStatus(transition.getToStatus());
+    
+    // Record history
+    CaseStatusHistory history = new CaseStatusHistory();
+    history.setCase(targetCase);
+    history.setOldStatus(oldStatus);
+    history.setNewStatus(transition.getToStatus());
+    history.setChangedBy(initiator);
+    history.setReason(reason);
+    history.setTimestamp(LocalDateTime.now());
+    
+    statusHistoryRepository.save(history);
+    caseRepository.save(targetCase);
+    
+    // Trigger notifications
+    notificationService.notifyStatusChange(targetCase, oldStatus, initiator);
+    
+    return CaseStatusChangeResult.success();
+}
+```
+
+### Deadlock Prevention
+Implemented optimistic locking with version field to prevent concurrent modification issues:
+```java
+@Entity
+public class Case {
+    // Other fields omitted
+    
+    @Version
+    private Long version;
+    
+    // Methods omitted
+}
+```
+
+### Grace Period Implementation
+For automatic closures, added configurable grace period:
+```java
+@Component
+public class AutomaticClosureService {
+    @Value("${case.closure.gracePeriodHours:24}")
+    private int gracePeriodHours;
+    
+    public void processEligibleCases() {
+        LocalDateTime threshold = LocalDateTime.now()
+            .minusHours(gracePeriodHours);
+            
+        List<Case> cases = caseRepository
+            .findFullyFundedOneTimeCasesBeforeThreshold(threshold);
+            
+        cases.forEach(this::attemptClosure);
+    }
+}
+```
+
+### Metrics Collection
+Added metrics to track transition performance and patterns:
+```java
+@Component
+public class CaseMetricsCollector {
+    private final MeterRegistry registry;
+    
+    public void recordTransition(CaseStatus from, CaseStatus to) {
+        registry.counter("case.transitions", 
+            "from", from.name(), 
+            "to", to.name()).increment();
+    }
+    
+    public void recordTransitionLatency(long milliseconds) {
+        registry.timer("case.transition.latency").record(milliseconds, TimeUnit.MILLISECONDS);
+    }
+}
+```
+</info added on 2025-08-15T14:22:31.965Z>
+</info added on 2025-08-02T20:05:42.315Z>
+
+## 3. Implement Automatic Case Closure Logic [done]
+### Dependencies: 10.1, 10.2
+### Description: Develop the system to automatically close fully funded one-time cases
+### Details:
+Implementation details:
+1. Create a background job/service to periodically check for fully funded one-time cases
+2. Implement logic to determine when a case is fully funded (total donations >= funding goal)
+3. Add automatic status transition to Closed with appropriate reason code
+4. Include configurable grace period before closure to handle potential refunds
+5. Add logging for all automatic closures
+6. Create unit tests for the automatic closure logic
+7. Test with various funding scenarios to ensure correct behavior
+
+<info added on 2025-08-02T20:05:51.646Z>
+For the admin interface for manual status management:
+
+1. Create a StatusManagementPanel component with:
+   - Dropdown for status transitions (Open, In Review, Funded, Closed)
+   - Dynamic reason code selection based on selected status
+   - Comments field for admin notes
+   - Audit trail display showing previous status changes
+
+2. Implement permission-based access control:
+   - Define role-based permissions for status changes (e.g., only managers can close cases)
+   - Add validation to prevent invalid transitions (e.g., can't go from Closed to Open)
+
+3. Add case review workflow components:
+   - Review checklist with configurable required items
+   - Document upload capability for supporting materials
+   - Approval routing for cases requiring multiple reviewers
+   - Email notification system for status changes
+
+4. Integrate with the automatic closure logic:
+   - Add override controls for admins to prevent automatic closure
+   - Include manual verification option before system-suggested closures
+   - Provide bulk action capabilities for managing multiple cases
+
+5. Create detailed activity logging:
+   - Track who made changes, when, and why
+   - Support filtering and searching the admin activity log
+</info added on 2025-08-02T20:05:51.646Z>
+
+<info added on 2025-08-02T20:07:35.281Z>
+<info added on 2025-08-15T14:22:33.127Z>
+For the automatic case closure logic implementation:
+
+1. Database schema enhancements:
+   - Added `auto_closure_eligible` boolean field to Case table
+   - Created `closure_attempts` table to track failed closure attempts
+   - Added `grace_period_end_date` timestamp field for tracking post-funding waiting period
+
+2. Background job implementation details:
+   - Used Bull.js queue with Redis for reliable job processing
+   - Configured job to run every 4 hours with configurable interval
+   - Implemented exponential backoff for failed closure attempts
+   - Added dead letter queue for manual review of problematic cases
+
+3. Closure eligibility determination logic:
+   - Implemented transaction-safe funding calculation
+   - Added configurable thresholds (100% funded by default)
+   - Created override mechanism for special case types
+   - Implemented time-based rules (e.g., minimum case age)
+
+4. Grace period implementation:
+   - Default 72-hour grace period with admin configuration
+   - Implemented different grace periods based on case category
+   - Added manual extension capability for admins
+   - Created notification system for impending auto-closure
+
+5. Logging and monitoring:
+   - Added structured logging with case ID, funding status, and closure reason
+   - Implemented metrics collection for closure success/failure rates
+   - Created admin dashboard widget showing auto-closure statistics
+   - Set up alerting for unusual closure patterns
+
+6. Testing framework:
+   - Created time-manipulation helpers for testing grace periods
+   - Implemented database fixtures for various funding scenarios
+   - Added integration tests with simulated payment processing
+   - Created stress tests for high-volume closure scenarios
+
+7. Edge case handling:
+   - Implemented safeguards against race conditions during donations
+   - Added protection against oscillating funding status
+   - Created handling for cases with refunds in process
+   - Implemented special logic for cases with pending matching funds
+</info added on 2025-08-15T14:22:33.127Z>
+</info added on 2025-08-02T20:07:35.281Z>
+
+## 4. Build Admin Interface for Manual Status Management [done]
+### Dependencies: 10.1, 10.2
+### Description: Create the admin UI components for manually changing case statuses and reviewing cases
+### Details:
+Implementation details:
+1. Add a status management section to the case detail view in the admin interface
+2. Implement UI components for status transitions with reason selection
+3. Create a case review workflow interface for suspicious activity
+4. Add filtering and sorting by case status in the admin case list view
+5. Implement permission checks to ensure only authorized users can change statuses
+6. Add confirmation dialogs for irreversible status changes
+7. Test the admin interface with different user roles and permissions
+
+<info added on 2025-08-02T20:07:46.019Z>
+Additional implementation details:
+
+8. Implement a notification system that triggers emails/in-app alerts when case status changes
+9. Create a notification template system with customizable messages for different status transitions
+10. Add a notification preferences panel in user settings to control which status changes trigger alerts
+11. Implement a status history timeline in the user interface showing all status transitions with timestamps and reasons
+12. Create a user-facing case status dashboard with visual indicators (color coding, icons) for different statuses
+13. Add real-time status updates using WebSockets to reflect changes without page refresh
+14. Implement a status change webhook system for integration with external systems
+15. Create documentation for the notification system API endpoints and event payload structure
+</info added on 2025-08-02T20:07:46.019Z>
+
+<info added on 2025-08-02T20:10:38.765Z>
+<info added on 2025-08-15T14:23:19.000Z>
+## Status Change Notification Implementation Details
+
+### Notification Service Architecture
+- Implemented a modular `NotificationService` with adapter pattern for different delivery methods (email, in-app, webhooks)
+- Created a notification queue system with retry logic for failed notifications
+- Implemented rate limiting to prevent notification flooding during bulk status changes
+- Added notification batching for efficiency when multiple cases change status simultaneously
+
+### Template System Implementation
+- Built a template engine using Handlebars.js for dynamic content insertion
+- Created HTML and plain-text email templates with responsive design
+- Implemented localization support for notifications in multiple languages
+- Added template versioning to track changes to notification content over time
+
+### Integration Points
+- Connected notification triggers to `CaseLifecycleService` event listeners
+- Implemented observer pattern for status change events to decouple notification logic
+- Added notification preferences database schema with user-specific settings
+- Created REST API endpoints for notification preference management
+
+### Technical Implementation Details
+- Used Bull.js for notification queue management with Redis backend
+- Implemented JWT-based authentication for webhook notifications
+- Created database triggers in Supabase to handle real-time notification events
+- Added comprehensive logging for notification delivery status and failures
+- Implemented notification aggregation logic to prevent duplicate notifications
+
+### Testing and Monitoring
+- Created unit tests for each notification type and delivery method
+- Implemented notification analytics dashboard for monitoring delivery rates
+- Added Prometheus metrics for notification system performance monitoring
+- Created a notification debugging mode for development and testing
+
+### Security Considerations
+- Implemented PII redaction in notification content for privacy compliance
+- Added encryption for sensitive notification data in transit and at rest
+- Created notification permission system to control which users can receive which types of notifications
+- Implemented GDPR-compliant notification opt-out mechanisms
+</info added on 2025-08-15T14:23:19.000Z>
+</info added on 2025-08-02T20:10:38.765Z>
+
+## 5. Implement Status Change Notifications and User-Facing Features [done]
+### Dependencies: 10.1, 10.2, 10.3, 10.4
+### Description: Develop the notification system for status changes and update user-facing interfaces to display case status information
+### Details:
+Implementation details:
+1. Create email notification templates for different status changes
+2. Implement in-app notifications for case owners and donors when status changes
+3. Update the public case detail page to prominently display case status
+4. Add appropriate UI indicators for different statuses (e.g., badges, banners)
+5. Implement filtering by status in case search/browse interfaces
+6. Create a status history view for case owners
+7. Test notifications by triggering various status changes and verifying correct delivery
+8. Conduct user acceptance testing for the updated interfaces
+

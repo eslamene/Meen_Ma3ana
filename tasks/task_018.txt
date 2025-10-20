@@ -1,0 +1,11 @@
+# Task ID: 18
+# Title: Develop Sponsor-Beneficiary Communication Platform
+# Status: pending
+# Dependencies: 17
+# Priority: low
+# Description: Build the messaging system for sponsors and beneficiaries to communicate.
+# Details:
+Create messaging interface for sponsors and beneficiaries. Implement message threading and history. Add file attachment capabilities for sharing documents. Build notification system for new messages. Implement admin moderation capabilities for communications.
+
+# Test Strategy:
+Test message sending and receiving between different user types. Verify file attachments work correctly. Test notifications for new messages. Ensure admin moderation tools function properly.
