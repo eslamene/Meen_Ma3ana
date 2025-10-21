@@ -202,7 +202,7 @@ export default function AdminAnalyticsPage() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <PermissionGuard permission="admin:analytics">
+        <PermissionGuard allowedPermissions={["admin:analytics", "admin:dashboard"]} requireAll={false}>
           <div className="min-h-screen bg-gray-50 flex items-center justify-center">
             <div className="text-center">
               <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
@@ -216,7 +216,7 @@ export default function AdminAnalyticsPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="admin:analytics">
+      <PermissionGuard allowedPermissions={["admin:analytics", "admin:dashboard"]} requireAll={false}>
         <div className="min-h-screen bg-gray-50">
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div className="px-4 py-6 sm:px-0">

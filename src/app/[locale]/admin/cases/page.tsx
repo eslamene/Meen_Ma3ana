@@ -163,6 +163,13 @@ export default function AdminCasesPage() {
             Paused
           </Badge>
         )
+      case 'draft':
+        return (
+          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+            <Edit className="h-3 w-3 mr-1" />
+            Draft
+          </Badge>
+        )
       default:
         return (
           <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200">
@@ -201,7 +208,7 @@ export default function AdminCasesPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="cases:read">
+      <PermissionGuard allowedPermissions={["admin:dashboard", "cases:update", "cases:delete"]} requireAll={false}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}

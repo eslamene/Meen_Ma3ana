@@ -27,9 +27,112 @@ import {
   Shield,
   Calendar,
   FileText,
-  ArrowRight
+  ArrowRight,
+  Info
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
+
+// Admin Quick Actions Component
+interface AdminQuickActionsSectionProps {
+  router: any
+  params: any
+  t: (key: string) => string
+}
+
+function AdminQuickActionsSection({ router, params, t }: AdminQuickActionsSectionProps) {
+  const { hasAnyPermission } = useDatabaseRBAC()
+  
+  // Define all possible admin actions with their permissions
+  const allActions = [
+    {
+      id: 'manage-cases',
+      title: 'Manage Cases',
+      description: 'Create, edit, and monitor donation cases',
+      icon: Target,
+      color: 'from-blue-500 to-indigo-600',
+      permission: 'cases:update',
+      action: () => router.push(`/${params.locale}/admin/cases`),
+      buttonText: 'View Cases'
+    },
+    {
+      id: 'review-contributions',
+      title: 'Review Contributions',
+      description: 'Approve, reject, and manage donations',
+      icon: Heart,
+      color: 'from-green-500 to-emerald-600',
+      permission: 'contributions:approve',
+      action: () => router.push(`/${params.locale}/admin/contributions`),
+      buttonText: 'View Contributions'
+    },
+    {
+      id: 'view-analytics',
+      title: 'View Analytics',
+      description: 'Track performance and insights',
+      icon: BarChart3,
+      color: 'from-purple-500 to-violet-600',
+      permission: 'admin:analytics',
+      action: () => router.push(`/${params.locale}/admin/analytics`),
+      buttonText: 'View Reports'
+    },
+    {
+      id: 'manage-sponsorships',
+      title: 'Manage Sponsorships',
+      description: 'Handle sponsorship requests and approvals',
+      icon: UserCheck,
+      color: 'from-red-500 to-rose-600',
+      permission: 'admin:dashboard', // Using general admin permission for sponsorships
+      action: () => router.push(`/${params.locale}/admin/sponsorships`),
+      buttonText: 'View Sponsorships'
+    }
+  ]
+  
+  // Filter actions based on permissions
+  const visibleActions = allActions.filter(action => 
+    hasAnyPermission([action.permission])
+  )
+  
+  // Don't render if no actions are visible
+  if (visibleActions.length === 0) {
+    return null
+  }
+  
+  return (
+    <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-6">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+          <Settings className="h-4 w-4 text-blue-600" />
+          Quick Actions
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-3">
+          {visibleActions.map((action) => (
+            <button
+              key={action.id}
+              onClick={action.action}
+              className={`group w-full flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r ${action.color} text-white transition-all duration-200 hover:shadow-md hover:scale-[1.02]`}
+            >
+              <div className="flex-shrink-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+                  <action.icon className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="flex-1 text-left">
+                <h3 className="font-medium text-base mb-1">{action.title}</h3>
+                <p className="text-sm opacity-90 leading-tight">{action.description}</p>
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <span className="text-sm font-medium">{action.buttonText}</span>
+                <ArrowRight className="h-4 w-4 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 // Role display function
 const getRoleDisplayName = (role: string) => {
@@ -232,7 +335,7 @@ export default function AdminPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="admin:dashboard">
+      <PermissionGuard allowedPermissions={["admin:dashboard"]}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}
@@ -389,102 +492,12 @@ export default function AdminPage() {
               </Card>
             </div>
 
-            {/* Quick Actions */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-8">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-blue-600" />
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Manage Cases */}
-                  <div 
-                    className="group cursor-pointer"
-                    onClick={() => router.push(`/${params.locale}/admin/cases`)}
-                  >
-                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-6 text-white transition-all duration-300 hover:scale-105 hover:shadow-xl">
-                      <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10"></div>
-                      <div className="relative z-10">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                          <Target className="h-6 w-6" />
-                        </div>
-                        <h3 className="mb-2 text-lg font-semibold">Manage Cases</h3>
-                        <p className="text-sm text-blue-100">Create, edit, and monitor donation cases</p>
-                        <div className="mt-4 flex items-center text-sm font-medium">
-                          <span>View Cases</span>
-                          <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Review Contributions */}
-                  <div 
-                    className="group cursor-pointer"
-                    onClick={() => router.push(`/${params.locale}/admin/contributions`)}
-                  >
-                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-6 text-white transition-all duration-300 hover:scale-105 hover:shadow-xl">
-                      <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10"></div>
-                      <div className="relative z-10">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                          <Heart className="h-6 w-6" />
-                        </div>
-                        <h3 className="mb-2 text-lg font-semibold">Review Contributions</h3>
-                        <p className="text-sm text-green-100">Approve, reject, and manage donations</p>
-                        <div className="mt-4 flex items-center text-sm font-medium">
-                          <span>View Contributions</span>
-                          <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* View Analytics */}
-                  <div 
-                    className="group cursor-pointer"
-                    onClick={() => router.push(`/${params.locale}/admin/analytics`)}
-                  >
-                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 p-6 text-white transition-all duration-300 hover:scale-105 hover:shadow-xl">
-                      <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10"></div>
-                      <div className="relative z-10">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                          <BarChart3 className="h-6 w-6" />
-                        </div>
-                        <h3 className="mb-2 text-lg font-semibold">View Analytics</h3>
-                        <p className="text-sm text-purple-100">Track performance and insights</p>
-                        <div className="mt-4 flex items-center text-sm font-medium">
-                          <span>View Reports</span>
-                          <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Manage Sponsorships */}
-                  <div 
-                    className="group cursor-pointer"
-                    onClick={() => router.push(`/${params.locale}/admin/sponsorships`)}
-                  >
-                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-6 text-white transition-all duration-300 hover:scale-105 hover:shadow-xl">
-                      <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10"></div>
-                      <div className="relative z-10">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                          <UserCheck className="h-6 w-6" />
-                        </div>
-                        <h3 className="mb-2 text-lg font-semibold">Manage Sponsorships</h3>
-                        <p className="text-sm text-red-100">Handle sponsorship requests and approvals</p>
-                        <div className="mt-4 flex items-center text-sm font-medium">
-                          <span>View Sponsorships</span>
-                          <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Quick Actions - Dynamic Layout */}
+            <AdminQuickActionsSection 
+              router={router}
+              params={params}
+              t={t}
+            />
 
             {/* Recent Activity */}
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">

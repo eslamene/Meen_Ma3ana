@@ -456,6 +456,8 @@
     "high": "High",
     "medium": "Medium",
     "low": "Low",
+    "critical": "Critical",
+    "urgent": "Urgent",
     "one-time": "One-time",
     "recurring": "Recurring",
     "type": "Type",
@@ -490,7 +492,9 @@
       "titleTooShort": "Title must be at least 10 characters"
     },
     "viewDetails": "View Details",
-    "viewMode": "View Mode"
+    "viewMode": "View Mode",    
+    "editCase": "Edit Case",
+    "adminActions": "Admin Actions"
   },
   "common": {
     "about": "About",
@@ -642,7 +646,8 @@
     "notifications": "Notifications",
     "profile": "Profile",
     "projects": "Projects",
-    "register": "Register"
+    "register": "Register",
+    "signOut": "Sign Out"
   },
   "notifications": {
     "loading": "Loading notifications...",

@@ -27,9 +27,72 @@ import {
   ArrowRight,
   Plus,
   Eye,
-  RefreshCw
+  RefreshCw,
+  Info
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
+
+// Dynamic Quick Actions Component
+interface QuickActionsSectionProps {
+  quickActions: Array<{
+    title: string
+    description: string
+    icon: any
+    color: string
+    hoverColor: string
+    permission: string
+    action: () => void
+  }>
+  t: (key: string) => string
+}
+
+function QuickActionsSection({ quickActions, t }: QuickActionsSectionProps) {
+  const { hasAnyPermission } = useDatabaseRBAC()
+  
+  // Filter actions based on permissions
+  const visibleActions = quickActions.filter(action => 
+    hasAnyPermission([action.permission])
+  )
+  
+  // Don't render the section if no actions are visible
+  if (visibleActions.length === 0) {
+    return null
+  }
+  
+  return (
+    <Card className="mb-6 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+          <TrendingUp className="h-4 w-4 text-blue-600" />
+          {t('quickActions')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-3">
+          {visibleActions.map((action, index) => (
+            <button
+              key={index}
+              onClick={action.action}
+              className={`group w-full flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r ${action.color} hover:${action.hoverColor} text-white transition-all duration-200 hover:shadow-md`}
+            >
+              <div className="flex-shrink-0">
+                <action.icon className="h-5 w-5" />
+              </div>
+              <div className="flex-1 text-left">
+                <h3 className="font-medium text-base mb-1">{action.title}</h3>
+                <p className="text-sm opacity-90 leading-tight">{action.description}</p>
+              </div>
+              <div className="flex-shrink-0">
+                <ArrowRight className="h-4 w-4 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 // Role display functions
 const getRoleDisplayName = (role: string) => {
@@ -328,34 +391,11 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Quick Actions */}
-          <Card className="mb-8 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl font-semibold text-gray-800">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
-                {t('quickActions')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {quickActions.map((action, index) => (
-                  <PermissionGuard key={index} permission={action.permission}>
-                    <button
-                      onClick={action.action}
-                      className={`group relative p-6 rounded-xl bg-gradient-to-r ${action.color} hover:${action.hoverColor} text-white transition-all duration-300 transform hover:scale-105 hover:shadow-lg`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <action.icon className="h-6 w-6" />
-                        <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <h3 className="font-semibold text-lg mb-1">{action.title}</h3>
-                      <p className="text-sm opacity-90">{action.description}</p>
-                    </button>
-                  </PermissionGuard>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Quick Actions - Dynamic Layout */}
+          <QuickActionsSection 
+            quickActions={quickActions}
+            t={t}
+          />
 
           {/* User Information */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -417,19 +457,19 @@ export default function DashboardPage() {
                   <div className="space-y-2">
                     <h4 className="font-medium text-gray-900">Permissions:</h4>
                     <div className="space-y-1">
-                      <PermissionGuard permission="contributions:create">
+                      <PermissionGuard allowedPermissions={["contributions:create"]}>
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           Create contributions
                         </div>
                       </PermissionGuard>
-                      <PermissionGuard permission="cases:create">
+                      <PermissionGuard allowedPermissions={["cases:create"]}>
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           Create cases
                         </div>
                       </PermissionGuard>
-                      <PermissionGuard permission="admin:dashboard">
+                      <PermissionGuard allowedPermissions={["admin:dashboard"]}>
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           Admin access
@@ -485,7 +525,7 @@ export default function DashboardPage() {
 
           {/* Role-specific sections */}
           <div className="mt-8 space-y-6">
-            <PermissionGuard permission="contributions:read">
+            <PermissionGuard allowedPermissions={["contributions:read"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
@@ -499,7 +539,7 @@ export default function DashboardPage() {
               </Card>
             </PermissionGuard>
 
-            <PermissionGuard permission="sponsorships:read">
+            <PermissionGuard allowedPermissions={["sponsorships:read"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
@@ -513,7 +553,7 @@ export default function DashboardPage() {
               </Card>
             </PermissionGuard>
 
-            <PermissionGuard permission="admin:analytics">
+            <PermissionGuard allowedPermissions={["admin:analytics"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">

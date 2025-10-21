@@ -211,7 +211,7 @@ export default function AdminContributionsPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="contributions:read">
+      <PermissionGuard allowedPermissions={["admin:dashboard", "contributions:approve"]} requireAll={false}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Header */}

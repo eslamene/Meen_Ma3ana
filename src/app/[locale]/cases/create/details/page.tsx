@@ -16,8 +16,8 @@ import { ArrowLeft, ArrowRight, Upload, Image as ImageIcon, X } from 'lucide-rea
 import ImageUpload from '@/components/cases/ImageUpload'
 
 type CaseType = 'one-time' | 'recurring'
-type Priority = 'low' | 'medium' | 'high' | 'urgent'
-type Frequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+type Priority = '' | 'low' | 'medium' | 'high' | 'critical'
+type Frequency = '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 
 interface UploadedImage {
   id: string
@@ -57,7 +57,7 @@ export default function CaseDetailsPage() {
     description: '',
     targetAmount: '',
     category: '',
-    priority: 'medium',
+    priority: '',
     location: '',
     beneficiaryName: '',
     beneficiaryContact: '',
@@ -398,6 +398,7 @@ export default function CaseDetailsPage() {
                     <SelectValue placeholder={t('selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Not specified</SelectItem>
                     <SelectItem value="medical">Medical</SelectItem>
                     <SelectItem value="education">Education</SelectItem>
                     <SelectItem value="housing">Housing</SelectItem>
@@ -423,10 +424,11 @@ export default function CaseDetailsPage() {
                     <SelectValue placeholder={t('selectPriority')} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Not specified</SelectItem>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.priority && (
@@ -499,6 +501,7 @@ export default function CaseDetailsPage() {
                         <SelectValue placeholder={t('selectFrequency')} />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="">Not specified</SelectItem>
                         <SelectItem value="weekly">Weekly</SelectItem>
                         <SelectItem value="monthly">Monthly</SelectItem>
                         <SelectItem value="quarterly">Quarterly</SelectItem>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,7 +37,8 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Bell
+  Bell,
+  Edit
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import ProgressBar from '@/components/cases/ProgressBar'
@@ -917,6 +919,22 @@ export default function CaseDetailPage() {
                     <Share2 className="h-4 w-4 mr-3 text-gray-500 group-hover:text-green-600 transition-colors" />
                     <span className="font-medium">{t('shareCase')}</span>
                 </Button>
+
+                  {/* Admin Actions */}
+                  {hasPermission('cases:update') && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-500 mb-3 px-1 font-medium uppercase tracking-wide">{t('adminActions')}</p>
+                      <Link href={`/${params.locale}/cases/${caseData.id}/edit`}>
+                        <Button 
+                          variant="ghost" 
+                          className="w-full h-11 text-amber-700 hover:text-amber-800 hover:bg-amber-50 border border-amber-200 hover:border-amber-300 transition-all duration-200 group justify-start px-6 bg-gradient-to-r from-amber-50 to-orange-50"
+                        >
+                          <Edit className="h-4 w-4 mr-3 text-amber-600 group-hover:text-amber-700 transition-colors" />
+                          <span className="font-medium">{t('editCase')}</span>
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </div>
 
                 {/* Quick Stats */}
@@ -1005,22 +1023,43 @@ export default function CaseDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Case Published */}
-                  <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
-                    <div className="flex-shrink-0 w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-green-600" />
-                          <span className="font-medium text-gray-800">{t('casePublished')}</span>
-                  </div>
-                        <span className="text-sm text-gray-500">{formatRelativeDate(caseData.created_at)}</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Case was published and made available for contributions
-                      </p>
+                  {/* Case Published - Only show for published cases */}
+                  {caseData.status !== 'draft' && (
+                    <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
+                      <div className="flex-shrink-0 w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-gray-800">{t('casePublished')}</span>
                     </div>
-                  </div>
+                          <span className="text-sm text-gray-500">{formatRelativeDate(caseData.created_at)}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Case was published and made available for contributions
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Case Draft Status - Show for draft cases */}
+                  {caseData.status === 'draft' && (
+                    <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border border-yellow-100">
+                      <div className="flex-shrink-0 w-3 h-3 bg-yellow-500 rounded-full mt-1.5"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Edit className="h-4 w-4 text-yellow-600" />
+                            <span className="font-medium text-gray-800">Case Created (Draft)</span>
+                    </div>
+                          <span className="text-sm text-gray-500">{formatRelativeDate(caseData.created_at)}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Case is in draft mode and not yet available for contributions
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* First Contribution */}
                   {getApprovedContributions().length > 0 && (

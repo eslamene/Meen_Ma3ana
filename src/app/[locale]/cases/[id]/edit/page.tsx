@@ -261,7 +261,7 @@ export default function CaseEditPage() {
   }
 
   return (
-    <PermissionGuard permission="cases:update" fallback={
+    <PermissionGuard allowedPermissions={["cases:update"]} fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
@@ -411,9 +411,10 @@ export default function CaseEditPage() {
                     </label>
                     <select
                       value={case_.category || ''}
-                      onChange={(e) => handleInputChange('category', e.target.value)}
+                      onChange={(e) => handleInputChange('category', e.target.value || null)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                      <option value="">Not specified</option>
                       <option value="medical">Medical</option>
                       <option value="education">Education</option>
                       <option value="emergency">Emergency</option>
@@ -429,9 +430,10 @@ export default function CaseEditPage() {
                     </label>
                     <select
                       value={case_.priority || ''}
-                      onChange={(e) => handleInputChange('priority', e.target.value)}
+                      onChange={(e) => handleInputChange('priority', e.target.value || null)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                      <option value="">Not specified</option>
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
                       <option value="high">High</option>

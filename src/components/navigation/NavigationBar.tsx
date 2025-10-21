@@ -10,6 +10,12 @@ import { createClient } from '@/lib/supabase/client'
 import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
+import { useUnifiedRBAC } from '@/lib/hooks/useUnifiedRBAC'
+import { useModularRBAC } from '@/lib/hooks/useModularRBAC'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import GuestPermissionGuard from '@/components/auth/GuestPermissionGuard'
+import { ModularNavigationItem } from './ModularNavigationItem'
 
 export default function NavigationBar() {
   const t = useTranslations('navigation')
@@ -24,6 +30,9 @@ export default function NavigationBar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const supabase = createClient()
+  const { hasAnyPermission, refreshUserRoles } = useDatabaseRBAC()
+  const unifiedRBAC = useUnifiedRBAC()
+  const { modules, loading: modulesLoading } = useModularRBAC()
 
   useEffect(() => {
     fetchUserAndNotifications()
@@ -33,6 +42,8 @@ export default function NavigationBar() {
       if (session?.user) {
         setUser(session.user)
         fetchUnreadNotifications(session.user.id)
+        // Refresh permissions when user changes
+        refreshUserRoles()
       } else {
         setUser(null)
         setUnreadNotifications(0)
@@ -41,7 +52,48 @@ export default function NavigationBar() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [refreshUserRoles])
+
+  // Listen for window focus to refresh permissions (when coming back from RBAC page)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user) {
+        console.log('Window focused - refreshing user permissions')
+        refreshUserRoles()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [user, refreshUserRoles])
+
+  // Listen for storage events (in case permissions are updated in another tab)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'rbac_updated' && user) {
+        console.log('RBAC updated in another tab - refreshing permissions')
+        refreshUserRoles()
+        // Clear the flag
+        localStorage.removeItem('rbac_updated')
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [user, refreshUserRoles])
+
+  // Listen for custom RBAC update events
+  useEffect(() => {
+    const handleRBACUpdate = () => {
+      if (user) {
+        console.log('RBAC updated - refreshing navigation permissions')
+        refreshUserRoles()
+      }
+    }
+
+    window.addEventListener('rbac-updated', handleRBACUpdate)
+    return () => window.removeEventListener('rbac-updated', handleRBACUpdate)
+  }, [user, refreshUserRoles])
 
   const fetchUserAndNotifications = async () => {
     try {
@@ -114,12 +166,14 @@ export default function NavigationBar() {
               {t('home')}
             </Link>
             
-            <Link 
-              href={`/${locale}/cases`}
-              className={`${getNavLinkClass('/cases')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
-            >
-              {t('cases')}
-            </Link>
+            <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
+              <Link 
+                href={`/${locale}/cases`}
+                className={`${getNavLinkClass('/cases')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
+              >
+                {t('cases')}
+              </Link>
+            </GuestPermissionGuard>
             
             <Link 
               href={`/${locale}/projects`}
@@ -127,6 +181,15 @@ export default function NavigationBar() {
             >
               {t('projects')}
             </Link>
+
+            {/* Modular Navigation */}
+            {!modulesLoading && modules.map((module) => (
+              <ModularNavigationItem
+                key={module.id}
+                module={module}
+                isMobile={false}
+              />
+            ))}
 
             {user && (
               <>
@@ -137,113 +200,7 @@ export default function NavigationBar() {
                   {t('dashboard')}
                 </Link>
 
-                {/* Sponsorship Navigation for sponsors and admins */}
-                {(user.user_metadata?.role === 'sponsor' || user.user_metadata?.role === 'admin') && (
-                  <div className="relative group">
-                    <Button variant="ghost" size="sm" className="flex items-center space-x-2 text-gray-800 hover:text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-lg mx-1 transition-all duration-200">
-                      <span className="text-sm font-medium">Sponsorships</span>
-                      <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </Button>
 
-                    {/* Sponsorship Dropdown Menu */}
-                    <div className="absolute left-0 mt-2 w-56 bg-white rounded-xl shadow-xl py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-100">
-                      <Link 
-                        href={`/${locale}/sponsor/dashboard`}
-                        className="block px-4 py-3 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors mx-2 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                          <span>My Sponsorships</span>
-                        </div>
-                      </Link>
-                      <Link 
-                        href={`/${locale}/sponsor/request`}
-                        className="block px-4 py-3 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors mx-2 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                          <span>New Request</span>
-                        </div>
-                      </Link>
-                      <Link 
-                        href={`/${locale}/sponsor/communications`}
-                        className="block px-4 py-3 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors mx-2 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                          </svg>
-                          <span>Communications</span>
-                        </div>
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                {user.user_metadata?.role === 'admin' && (
-                  <div className="relative group">
-                    <Button variant="ghost" size="sm" className="flex items-center space-x-2 text-gray-800 hover:text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-lg mx-1 transition-all duration-200">
-                      <span className="text-sm font-medium">{t('admin')}</span>
-                      <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </Button>
-
-                    {/* Admin Dropdown Menu */}
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-100">
-                      <Link 
-                        href={`/${locale}/admin`}
-                        className="block px-4 py-3 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors mx-2 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                          <span>Dashboard</span>
-                        </div>
-                      </Link>
-                      <Link 
-                        href={`/${locale}/admin/analytics`}
-                        className="block px-4 py-3 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors mx-2 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                          <span>Analytics</span>
-                        </div>
-                      </Link>
-                      <Link 
-                        href={`/${locale}/admin/contributions`}
-                        className="block px-4 py-3 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors mx-2 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                          </svg>
-                          <span>Contributions</span>
-                        </div>
-                      </Link>
-                      <Link 
-                        href={`/${locale}/admin/sponsorships`}
-                        className="block px-4 py-3 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors mx-2 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          <span>Sponsorships</span>
-                        </div>
-                      </Link>
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -360,13 +317,15 @@ export default function NavigationBar() {
                 {t('home')}
               </Link>
               
-              <Link 
-                href={`/${locale}/cases`}
-                className={`${getNavLinkClass('/cases')} block px-3 py-2 text-base font-medium`}
-                onClick={closeMobileMenu}
-              >
-                {t('cases')}
-              </Link>
+              <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
+                <Link 
+                  href={`/${locale}/cases`}
+                  className={`${getNavLinkClass('/cases')} block px-3 py-2 text-base font-medium`}
+                  onClick={closeMobileMenu}
+                >
+                  {t('cases')}
+                </Link>
+              </GuestPermissionGuard>
 
               {user && (
                 <>
@@ -378,32 +337,15 @@ export default function NavigationBar() {
                     {t('dashboard')}
                   </Link>
 
-                  {/* Sponsorship Navigation for sponsors and admins */}
-                  {(user.user_metadata?.role === 'sponsor' || user.user_metadata?.role === 'admin') && (
-                    <>
-                      <Link 
-                        href={`/${locale}/sponsor/dashboard`}
-                        className={`${getNavLinkClass('/sponsor/dashboard')} block px-3 py-2 text-base font-medium`}
-                        onClick={closeMobileMenu}
-                      >
-                        My Sponsorships
-                      </Link>
-                      <Link 
-                        href={`/${locale}/sponsor/request`}
-                        className={`${getNavLinkClass('/sponsor/request')} block px-3 py-2 text-base font-medium`}
-                        onClick={closeMobileMenu}
-                      >
-                        New Sponsorship Request
-                      </Link>
-                      <Link 
-                        href={`/${locale}/sponsor/communications`}
-                        className={`${getNavLinkClass('/sponsor/communications')} block px-3 py-2 text-base font-medium`}
-                        onClick={closeMobileMenu}
-                      >
-                        Communications
-                      </Link>
-                    </>
-                  )}
+                  {/* Modular Navigation - Mobile */}
+                  {!modulesLoading && modules.map((module) => (
+                    <ModularNavigationItem
+                      key={module.id}
+                      module={module}
+                      isMobile={true}
+                      onItemClick={closeMobileMenu}
+                    />
+                  ))}
 
                   <Link 
                     href={`/${locale}/notifications`}
@@ -420,38 +362,6 @@ export default function NavigationBar() {
                     </div>
                   </Link>
 
-                  {user.user_metadata?.role === 'admin' && (
-                    <>
-                      <Link 
-                        href={`/${locale}/admin`}
-                        className={`${getNavLinkClass('/admin')} block px-3 py-2 text-base font-medium`}
-                        onClick={closeMobileMenu}
-                      >
-                        Admin - Dashboard
-                      </Link>
-                      <Link 
-                        href={`/${locale}/admin/analytics`}
-                        className={`${getNavLinkClass('/admin/analytics')} block px-3 py-2 text-base font-medium`}
-                        onClick={closeMobileMenu}
-                      >
-                        Admin - Analytics
-                      </Link>
-                      <Link 
-                        href={`/${locale}/admin/contributions`}
-                        className={`${getNavLinkClass('/admin/contributions')} block px-3 py-2 text-base font-medium`}
-                        onClick={closeMobileMenu}
-                      >
-                        Admin - Contributions
-                      </Link>
-                      <Link 
-                        href={`/${locale}/admin/sponsorships`}
-                        className={`${getNavLinkClass('/admin/sponsorships')} block px-3 py-2 text-base font-medium`}
-                        onClick={closeMobileMenu}
-                      >
-                        Admin - Sponsorships
-                      </Link>
-                    </>
-                  )}
 
                   <div className="border-t pt-4 mt-4">
                     <div className="px-3 py-2 text-sm text-gray-500">

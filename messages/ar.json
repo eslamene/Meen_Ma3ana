@@ -450,6 +450,8 @@
     "high": "عالية",
     "medium": "متوسطة",
     "low": "منخفضة",
+    "critical": "حرجة",
+    "urgent": "عاجلة",
     "one-time": "مرة واحدة",
     "recurring": "متكرر",
     "type": "النوع",
@@ -486,7 +488,9 @@
     "viewDetails": "عرض التفاصيل",
     "viewMode": "وضع العرض",
     "showMore": "عرض المزيد",
-    "showLess": "عرض أقل"
+    "showLess": "عرض أقل",
+    "editCase": "تعديل الحالة",
+    "adminActions": "إجراءات الإدارة"
   },
   "common": {
     "about": "عن",
@@ -638,7 +642,8 @@
     "notifications": "الإشعارات",
     "profile": "الملف الشخصي",
     "projects": "المشاريع",
-    "register": "إنشاء حساب"
+    "register": "إنشاء حساب",
+    "signOut": "تسجيل الخروج"
   },
   "notifications": {
     "loading": "جاري تحميل الإشعارات...",
