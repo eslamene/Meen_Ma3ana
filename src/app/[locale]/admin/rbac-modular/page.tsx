@@ -43,7 +43,7 @@ import {
   User,
   Package
 } from 'lucide-react'
-import { useToast } from '@/components/ui/toast'
+import { useToast } from '@/hooks/use-toast'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 
 // Icon mapping for modules

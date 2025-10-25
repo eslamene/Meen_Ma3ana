@@ -106,32 +106,53 @@ export default function CaseImagesPage() {
     }
   }
 
-  const uploadImages = async (): Promise<string[]> => {
+  const uploadImages = async (caseId: string): Promise<string[]> => {
     const supabase = createClient()
     const uploadedUrls: string[] = []
     
     const allImages = [images.primary, ...images.additional].filter(Boolean) as File[]
+    console.log('📊 Total images to upload:', allImages.length)
     
-    for (const image of allImages) {
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${image.name}`
+    for (let i = 0; i < allImages.length; i++) {
+      const image = allImages[i]
+      console.log(`📤 Uploading image ${i + 1}/${allImages.length}: ${image.name}`)
+      
+      // Sanitize filename: remove special characters and keep only alphanumeric, dots, hyphens, underscores
+      const sanitizedName = image.name
+        .replace(/[^\w\s.-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/--+/g, '-') // Replace multiple hyphens with single
+        .toLowerCase()
+      
+      console.log(`📝 Sanitized filename: ${sanitizedName}`)
+      
+      // Include case ID in the path for better organization
+      const fileName = `case-${caseId}/${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`
+      console.log(`📂 Upload path: ${fileName}`)
+      
       const { data, error } = await supabase.storage
         .from('case-images')
         .upload(fileName, image)
       
       if (error) {
+        console.error(`❌ Upload error for ${image.name}:`, error)
         if (error.message.includes('Bucket not found')) {
           throw new Error(`Storage bucket 'case-images' not found. Please create it in your Supabase dashboard under Storage.`)
         }
         throw new Error(`Failed to upload ${image.name}: ${error.message}`)
       }
       
+      console.log(`✅ Upload successful for ${image.name}:`, data)
+      
       const { data: { publicUrl } } = supabase.storage
         .from('case-images')
         .getPublicUrl(fileName)
       
+      console.log(`🔗 Public URL: ${publicUrl}`)
       uploadedUrls.push(publicUrl)
     }
     
+    console.log('✅ All images uploaded:', uploadedUrls)
     return uploadedUrls
   }
 
@@ -140,24 +161,98 @@ export default function CaseImagesPage() {
       setUploading(true)
       setErrors([])
       
-      if (!images.primary && images.additional.length === 0) {
-        setErrors(['Please upload at least one image'])
+      console.log('🚀 Starting case submission...')
+      
+      // Get form data from session storage
+      const formDataString = sessionStorage.getItem('caseFormData')
+      console.log('📦 Form data from session:', formDataString ? 'Found' : 'Not found')
+      
+      if (!formDataString) {
+        setErrors(['Case data not found. Please go back and fill the form again.'])
+        setUploading(false)
         return
       }
       
-      const imageUrls = await uploadImages()
+      const formData = JSON.parse(formDataString)
+      console.log('📝 Parsed form data:', formData)
       
-      // Store image URLs in session storage for the next step
-      sessionStorage.setItem('caseImages', JSON.stringify(imageUrls))
+      // Step 1: Create the case first to get an ID
+      console.log('📤 Creating case with data:', formData)
+      const createResponse = await fetch('/api/cases', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          status: 'published', // or 'draft' depending on your needs
+        }),
+      })
+
+      console.log('📥 Create response status:', createResponse.status)
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json().catch(() => ({}))
+        console.error('❌ Failed to create case:', errorData)
+        throw new Error(errorData.error || 'Failed to create case')
+      }
+
+      const createResult = await createResponse.json()
+      console.log('✅ Create result:', createResult)
       
-      // Navigate to the next step (review page)
-      router.push(`/${params.locale}/cases/create/review?type=${type}`)
+      const caseId = createResult.case?.id
+
+      if (!caseId) {
+        console.error('❌ No case ID in response')
+        throw new Error('No case ID returned from server')
+      }
+
+      console.log('🆔 Case created with ID:', caseId)
+      
+      // Step 2: Upload images if any
+      if (images.primary || images.additional.length > 0) {
+        console.log('📸 Uploading images...')
+        const imageUrls = await uploadImages(caseId)
+        console.log('✅ Images uploaded:', imageUrls)
+        
+        // Step 3: Update the case with image URLs
+        console.log('📤 Updating case with images...')
+        const updateResponse = await fetch(`/api/cases/${caseId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            images: imageUrls, // First image will be marked as primary automatically
+          }),
+        })
+        
+        console.log('📥 Update response status:', updateResponse.status)
+        
+        if (!updateResponse.ok) {
+          const errorData = await updateResponse.json().catch(() => ({}))
+          console.error('❌ Failed to update case with images:', errorData)
+          throw new Error(errorData.error || 'Failed to update case with images')
+        }
+        
+        console.log('✅ Case updated with images')
+      }
+      
+      console.log('🧹 Clearing session storage...')
+      // Clear session storage
+      sessionStorage.removeItem('caseFormData')
+      sessionStorage.removeItem('caseImages')
+      
+      console.log('✅ Success! Navigating to cases page...')
+      // Navigate to the case view page or cases list
+      router.push(`/${params.locale}/admin/cases`)
       
     } catch (error) {
-      console.error('Error uploading images:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to upload images. Please try again.'
+      console.error('❌ Error creating case:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create case. Please try again.'
       setErrors([errorMessage])
     } finally {
+      console.log('🔄 Setting uploading to false')
       setUploading(false)
     }
   }

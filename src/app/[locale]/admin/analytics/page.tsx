@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import { 
   BarChart3, 
   TrendingUp, 
@@ -69,57 +70,63 @@ export default function AdminAnalyticsPage() {
   const [customEndDate, setCustomEndDate] = useState('')
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState(30)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Fetch real data from API
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) {
+      setIsRefreshing(true)
+    } else {
       setLoading(true)
-      
-      try {
-        // Build query parameters
-        const params = new URLSearchParams({
-          dateRange,
-          ...(dateRange === 'customRange' && customStartDate && { startDate: customStartDate }),
-          ...(dateRange === 'customRange' && customEndDate && { endDate: customEndDate })
-        })
-
-        const response = await fetch(`/api/admin/analytics?${params}`)
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch analytics data')
-        }
-
-        const data = await response.json()
-        
-        setMetrics(data.metrics)
-        setRecentActivity(data.recentActivity)
-      } catch (error) {
-        console.error('Error fetching analytics data:', error)
-        // Fallback to empty data on error
-        setMetrics({
-          totalCases: 0,
-          activeCases: 0,
-          completedCases: 0,
-          totalContributions: 0,
-          totalAmount: 0,
-          averageContribution: 0,
-          totalSponsorships: 0,
-          activeSponsorships: 0,
-          totalUsers: 0,
-          newUsers: 0,
-          activeUsers: 0,
-          totalProjects: 0,
-          activeProjects: 0,
-          completionRate: 0,
-          successRate: 0,
-          pendingApprovals: 0
-        })
-        setRecentActivity([])
-      } finally {
-        setLoading(false)
-      }
     }
+    
+    try {
+      // Build query parameters
+      const params = new URLSearchParams({
+        dateRange,
+        ...(dateRange === 'customRange' && customStartDate && { startDate: customStartDate }),
+        ...(dateRange === 'customRange' && customEndDate && { endDate: customEndDate })
+      })
 
+      const response = await fetch(`/api/admin/analytics?${params}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics data')
+      }
+
+      const data = await response.json()
+      
+      setMetrics(data.metrics)
+      setRecentActivity(data.recentActivity)
+    } catch (error) {
+      console.error('Error fetching analytics data:', error)
+      // Fallback to empty data on error
+      setMetrics({
+        totalCases: 0,
+        activeCases: 0,
+        completedCases: 0,
+        totalContributions: 0,
+        totalAmount: 0,
+        averageContribution: 0,
+        totalSponsorships: 0,
+        activeSponsorships: 0,
+        totalUsers: 0,
+        newUsers: 0,
+        activeUsers: 0,
+        totalProjects: 0,
+        activeProjects: 0,
+        completionRate: 0,
+        successRate: 0,
+        pendingApprovals: 0
+      })
+      setRecentActivity([])
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
+    }
+  }
+
+  useEffect(() => {
     fetchData()
   }, [dateRange, customStartDate, customEndDate])
 
@@ -128,12 +135,12 @@ export default function AdminAnalyticsPage() {
     if (!autoRefresh) return
 
     const interval = setInterval(() => {
-      // Refresh data
-      console.log('Auto-refreshing data...')
+      console.log('Auto-refreshing analytics data...')
+      fetchData(true) // Use refresh indicator for auto-refresh
     }, refreshInterval * 1000)
 
     return () => clearInterval(interval)
-  }, [autoRefresh, refreshInterval])
+  }, [autoRefresh, refreshInterval, dateRange, customStartDate, customEndDate])
 
   const formatCurrency = (amount: number) => {
     return `EGP ${amount.toLocaleString('en-US', {
@@ -193,22 +200,101 @@ export default function AdminAnalyticsPage() {
   }
 
   const handleRefresh = () => {
-    // Trigger a re-fetch by updating the date range
-    const currentDateRange = dateRange
-    setDateRange('')
-    setTimeout(() => setDateRange(currentDateRange), 100)
+    fetchData(true) // Use refresh indicator for manual refresh
   }
+
+  // Skeleton loading component
+  const AnalyticsSkeleton = () => (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          {/* Header Skeleton */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center">
+              <div>
+                <Skeleton className="h-8 w-64 mb-2" />
+                <Skeleton className="h-4 w-96" />
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-10 w-32" />
+              </div>
+            </div>
+          </div>
+
+          {/* Filters Skeleton */}
+          <Card className="mb-6">
+            <CardHeader>
+              <Skeleton className="h-6 w-32" />
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Metrics Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-4" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-3 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Tabs Skeleton */}
+          <div className="space-y-6">
+            <div className="flex space-x-1 bg-muted p-1 rounded-lg w-fit">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-8 w-24" />
+              ))}
+            </div>
+            
+            {/* Content Skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[1, 2].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-6 w-32" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-12" />
+                      </div>
+                      <Skeleton className="h-2 w-full" />
+                      <div className="flex justify-between">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   if (loading) {
     return (
       <ProtectedRoute>
         <PermissionGuard allowedPermissions={["admin:analytics", "admin:dashboard"]} requireAll={false}>
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div className="text-center">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
-              <p>{t('dashboard.loading')}</p>
-            </div>
-          </div>
+          <AnalyticsSkeleton />
         </PermissionGuard>
       </ProtectedRoute>
     )
@@ -235,10 +321,10 @@ export default function AdminAnalyticsPage() {
                     <Button
                       variant="outline"
                       onClick={handleRefresh}
-                      disabled={loading}
+                      disabled={loading || isRefreshing}
                     >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                      {t('dashboard.refresh')}
+                      <RefreshCw className={`h-4 w-4 mr-2 ${(loading || isRefreshing) ? 'animate-spin' : ''}`} />
+                      {isRefreshing ? 'Refreshing...' : t('dashboard.refresh')}
                     </Button>
                     <Button variant="outline">
                       <Download className="h-4 w-4 mr-2" />

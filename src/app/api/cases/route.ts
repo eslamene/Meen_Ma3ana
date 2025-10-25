@@ -20,6 +20,31 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient()
 
+    // Get category ID if filtering by category
+    let categoryId = null
+    if (category && category !== 'all') {
+      // Capitalize the first letter to match database format
+      const capitalizedCategory = category.charAt(0).toUpperCase() + category.slice(1)
+      console.log('Filtering by category:', category, '-> capitalized:', capitalizedCategory)
+      
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('case_categories')
+        .select('id')
+        .eq('name', capitalizedCategory)
+        .single()
+      
+      if (categoryError) {
+        console.error('Error fetching category:', categoryError)
+      }
+      
+      if (categoryData) {
+        categoryId = categoryData.id
+        console.log('Found category ID:', categoryId)
+      } else {
+        console.log('No category found for:', capitalizedCategory)
+      }
+    }
+
     // Start with base query - use left join to include cases without categories
     let query = supabase
       .from('cases')
@@ -45,9 +70,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('type', type)
     }
     
-    // Apply category filter
-    if (category && category !== 'all') {
-      query = query.eq('case_categories.name', category)
+    // Apply category filter using category_id
+    if (categoryId) {
+      query = query.eq('category_id', categoryId)
     }
     
     // Apply amount filters
@@ -78,6 +103,8 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    console.log('API Response - Total cases found:', count, 'Category filter:', category, 'Category ID:', categoryId)
 
     // Transform snake_case field names to camelCase for frontend compatibility
     const transformedCases = await Promise.all((data || []).map(async (caseItem: {

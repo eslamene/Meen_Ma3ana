@@ -25,7 +25,7 @@ import {
   X,
   Info
 } from 'lucide-react'
-import { useToast } from '@/components/ui/toast'
+import { useToast } from '@/hooks/use-toast'
 
 interface ApprovalStatus {
   id: string

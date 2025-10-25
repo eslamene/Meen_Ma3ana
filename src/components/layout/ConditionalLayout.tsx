@@ -4,9 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import NavigationBar from '@/components/navigation/NavigationBar'
-import SidebarNavigation from '@/components/navigation/SidebarNavigation'
-import { Button } from '@/components/ui/button'
-import { Menu } from 'lucide-react'
+import SidebarNavigationNew from '@/components/navigation/SidebarNavigationNew'
 
 interface ConditionalLayoutProps {
   children: React.ReactNode
@@ -15,7 +13,6 @@ interface ConditionalLayoutProps {
 export default function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const supabase = createClient()
 
@@ -38,19 +35,10 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null)
       setLoading(false)
-      
-      // Close sidebar when user logs out
-      if (!session?.user) {
-        setSidebarOpen(false)
-      }
     })
 
     return () => subscription.unsubscribe()
   }, [supabase])
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen)
-  }
 
   if (loading) {
     return (
@@ -74,31 +62,12 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
 
   // Show sidebar navigation for authenticated users
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <SidebarNavigation isOpen={sidebarOpen} onToggle={toggleSidebar} />
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* New Sidebar - handles its own mobile menu */}
+      <SidebarNavigationNew />
       
       {/* Main Content */}
-      <div className="lg:ml-64">
-        {/* Top Bar for Mobile */}
-        <div className="lg:hidden bg-white shadow-sm border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleSidebar}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          
-          <h1 className="text-lg font-semibold text-gray-900">
-            Meen Ma3ana
-          </h1>
-          
-          <div className="w-8" /> {/* Spacer for centering */}
-        </div>
-
-        {/* Page Content */}
+      <div className="flex-1">
         <main className="min-h-screen">
           {children}
         </main>

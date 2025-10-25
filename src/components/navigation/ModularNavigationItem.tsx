@@ -5,92 +5,16 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { NavigationModule } from '@/lib/hooks/useModularRBAC'
-import { PermissionGuard } from '@/components/auth/PermissionGuard'
+import { getIconWithFallback } from '@/lib/icons/registry'
+import { 
+  getModuleNavigationItems,
+  filterNavigationItemsByPermissions
+} from '@/lib/navigation/config'
 
-// Icon mapping for modules
-const iconMap: Record<string, React.ComponentType<any>> = {
-  Settings: require('lucide-react').Settings,
-  Heart: require('lucide-react').Heart,
-  DollarSign: require('lucide-react').DollarSign,
-  Users: require('lucide-react').Users,
-  Bell: require('lucide-react').Bell,
-  BarChart3: require('lucide-react').BarChart3,
-  FileText: require('lucide-react').FileText,
-  CreditCard: require('lucide-react').CreditCard,
-  User: require('lucide-react').User,
-}
-
-// Navigation items for each module
-const moduleNavigationItems: Record<string, Array<{
-  label: string
-  href: string
-  permissions: string[]
-  requireAll?: boolean
-}>> = {
-  admin: [
-    {
-      label: 'Dashboard',
-      href: '/admin',
-      permissions: ['admin:dashboard']
-    },
-    {
-      label: 'Analytics',
-      href: '/admin/analytics',
-      permissions: ['admin:analytics', 'admin:dashboard'],
-      requireAll: false
-    },
-    {
-      label: 'RBAC Management',
-      href: '/admin/rbac',
-      permissions: ['admin:rbac']
-    }
-  ],
-  cases: [
-    {
-      label: 'All Cases',
-      href: '/admin/cases',
-      permissions: ['cases:update', 'cases:delete', 'admin:dashboard'],
-      requireAll: false
-    },
-    {
-      label: 'Create Case',
-      href: '/cases/create',
-      permissions: ['cases:create']
-    }
-  ],
-  contributions: [
-    {
-      label: 'All Contributions',
-      href: '/admin/contributions',
-      permissions: ['admin:dashboard', 'contributions:approve'],
-      requireAll: false
-    },
-    {
-      label: 'My Contributions',
-      href: '/contributions',
-      permissions: ['contributions:read']
-    }
-  ],
-  users: [
-    {
-      label: 'Manage Users',
-      href: '/admin/users',
-      permissions: ['admin:users', 'users:update'],
-      requireAll: false
-    }
-  ],
-  profile: [
-    {
-      label: 'My Profile',
-      href: '/profile',
-      permissions: ['profile:read']
-    },
-    {
-      label: 'Settings',
-      href: '/profile/settings',
-      permissions: ['profile:update']
-    }
-  ]
+// Helper function to get user permissions from module
+const getUserPermissionsFromModule = (module: NavigationModule): string[] => {
+  if (!module.permissions) return []
+  return module.permissions.map(p => p.name)
 }
 
 interface ModularNavigationItemProps {
@@ -108,16 +32,12 @@ export function ModularNavigationItem({
   const params = useParams()
   const locale = params.locale as string
 
-  const IconComponent = iconMap[module.icon]
-  const navigationItems = moduleNavigationItems[module.name] || []
+  const IconComponent = getIconWithFallback(module.icon || 'Settings')
+  const navigationItems = getModuleNavigationItems(module.name)
+  const userPermissions = getUserPermissionsFromModule(module)
+  const filteredItems = filterNavigationItemsByPermissions(navigationItems, userPermissions)
 
-  // Filter items based on permissions
-  const visibleItems = navigationItems.filter(item => {
-    // This will be handled by PermissionGuard, but we pre-filter for performance
-    return true
-  })
-
-  if (visibleItems.length === 0) {
+  if (filteredItems.length === 0) {
     return null
   }
 
@@ -164,25 +84,20 @@ export function ModularNavigationItem({
             : 'absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50'
           }
         `}>
-          {navigationItems.map((item, index) => (
-            <PermissionGuard
+          {filteredItems.map((item, index) => (
+            <Link
               key={index}
-              allowedPermissions={item.permissions}
-              requireAll={item.requireAll}
-              showLoading={false}
+              href={`/${locale}${item.href}`}
+              onClick={handleItemClick}
+              title={item.description}
+              className={`
+                block px-3 py-2 text-sm text-gray-600 hover:text-gray-900 
+                hover:bg-gray-50 rounded-md transition-colors duration-200
+                ${isMobile ? '' : 'border-b border-gray-100 last:border-b-0'}
+              `}
             >
-              <Link
-                href={`/${locale}${item.href}`}
-                onClick={handleItemClick}
-                className={`
-                  block px-3 py-2 text-sm text-gray-600 hover:text-gray-900 
-                  hover:bg-gray-50 rounded-md transition-colors duration-200
-                  ${isMobile ? '' : 'border-b border-gray-100 last:border-b-0'}
-                `}
-              >
-                {item.label}
-              </Link>
-            </PermissionGuard>
+              {item.label}
+            </Link>
           ))}
         </div>
       )}

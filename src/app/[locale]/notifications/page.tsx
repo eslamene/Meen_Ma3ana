@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target, XCircle, AlertTriangle, Heart, RefreshCw, Copy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/components/ui/toast'
+import { useToast } from '@/hooks/use-toast'
 
 interface Notification {
   id: string

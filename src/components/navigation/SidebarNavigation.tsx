@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -10,9 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
-import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
 import { useModularRBAC } from '@/lib/hooks/useModularRBAC'
-import PermissionGuard from '@/components/auth/PermissionGuard'
 import { 
   Menu, 
   X, 
@@ -20,101 +18,21 @@ import {
   User as UserIcon, 
   Bell, 
   LogOut, 
-  Settings,
-  Heart,
-  DollarSign,
-  Users,
-  BarChart3,
-  FileText,
-  CreditCard,
   ChevronDown,
-  ChevronRight
-} from 'lucide-react'
-
-// Icon mapping for modules
-const iconMap: Record<string, React.ComponentType<any>> = {
-  Settings,
+  ChevronRight,
   Heart,
-  DollarSign,
-  Users,
-  Bell,
-  BarChart3,
-  FileText,
-  CreditCard,
-  User: UserIcon,
-}
+  BarChart3
+} from 'lucide-react'
+import { getIconWithFallback } from '@/lib/icons/registry'
+import { 
+  getModuleNavigationItems,
+  filterNavigationItemsByPermissions
+} from '@/lib/navigation/config'
 
-// Navigation items for each module
-const moduleNavigationItems: Record<string, Array<{
-  label: string
-  href: string
-  permissions: string[]
-  requireAll?: boolean
-}>> = {
-  admin: [
-    {
-      label: 'Dashboard',
-      href: '/admin',
-      permissions: ['admin:dashboard']
-    },
-    {
-      label: 'Analytics',
-      href: '/admin/analytics',
-      permissions: ['admin:analytics', 'admin:dashboard'],
-      requireAll: false
-    },
-    {
-      label: 'RBAC Management',
-      href: '/admin/rbac',
-      permissions: ['admin:rbac']
-    }
-  ],
-  cases: [
-    {
-      label: 'All Cases',
-      href: '/admin/cases',
-      permissions: ['cases:update', 'cases:delete', 'admin:dashboard'],
-      requireAll: false
-    },
-    {
-      label: 'Create Case',
-      href: '/cases/create',
-      permissions: ['cases:create']
-    }
-  ],
-  contributions: [
-    {
-      label: 'All Contributions',
-      href: '/admin/contributions',
-      permissions: ['admin:dashboard', 'contributions:approve'],
-      requireAll: false
-    },
-    {
-      label: 'My Contributions',
-      href: '/contributions',
-      permissions: ['contributions:read']
-    }
-  ],
-  users: [
-    {
-      label: 'Manage Users',
-      href: '/admin/users',
-      permissions: ['admin:users', 'users:update'],
-      requireAll: false
-    }
-  ],
-  profile: [
-    {
-      label: 'My Profile',
-      href: '/profile',
-      permissions: ['profile:read']
-    },
-    {
-      label: 'Settings',
-      href: '/profile/settings',
-      permissions: ['profile:update']
-    }
-  ]
+// Helper function to get user permissions as array
+const getUserPermissions = (userRoles: { permissions?: { name: string }[] } | null): string[] => {
+  if (!userRoles?.permissions) return []
+  return userRoles.permissions.map((p) => p.name)
 }
 
 interface SidebarNavigationProps {
@@ -133,10 +51,26 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
   const [loading, setLoading] = useState(true)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
+  const [canScrollDown, setCanScrollDown] = useState(false)
+  const [canScrollUp, setCanScrollUp] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const supabase = createClient()
-  const { hasAnyPermission, refreshUserRoles } = useDatabaseRBAC()
-  const { modules, loading: modulesLoading } = useModularRBAC()
+  
+  // Use ONLY useModularRBAC - it already includes useDatabaseRBAC internally
+  // Using both hooks creates duplicate instances with separate loading states!
+  const { 
+    modules, 
+    loading: modulesLoading, 
+    refreshModules,
+    userRoles,
+    userPermissions 
+  } = useModularRBAC()
+  
+  // Memoize the refresh function to prevent unnecessary re-renders
+  const handleRefreshRoles = useCallback(async () => {
+    await refreshModules()
+  }, [refreshModules])
 
   useEffect(() => {
     fetchUserAndNotifications()
@@ -146,7 +80,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
       if (session?.user) {
         setUser(session.user)
         fetchUnreadNotifications(session.user.id)
-        refreshUserRoles()
+        handleRefreshRoles()
       } else {
         setUser(null)
         setUnreadNotifications(0)
@@ -155,22 +89,30 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     })
 
     return () => subscription.unsubscribe()
-  }, [refreshUserRoles])
+  }, [handleRefreshRoles])
 
   // Auto-expand module based on current path
   useEffect(() => {
-    if (!modulesLoading && modules.length > 0) {
-      const currentModule = modules.find(module => {
-        const navigationItems = moduleNavigationItems[module.name] || []
-        return navigationItems.some(item => 
-          pathname === `/${locale}${item.href}` || 
-          (item.href !== '/' && pathname.startsWith(`/${locale}${item.href}`))
-        )
-      })
-      
-      if (currentModule && !expandedModules.has(currentModule.id)) {
-        setExpandedModules(prev => new Set([...prev, currentModule.id]))
+    try {
+      if (!modulesLoading && modules.length > 0 && pathname && locale) {
+        const currentModule = modules.find(module => {
+          if (!module?.name) return false
+          const navigationItems = getModuleNavigationItems(module.name)
+          if (!navigationItems || navigationItems.length === 0) return false
+          
+          return navigationItems.some(item => {
+            if (!item?.href) return false
+            return pathname === `/${locale}${item.href}` || 
+                   (item.href !== '/' && pathname.startsWith(`/${locale}${item.href}`))
+          })
+        })
+        
+        if (currentModule && !expandedModules.has(currentModule.id)) {
+          setExpandedModules(prev => new Set([...prev, currentModule.id]))
+        }
       }
+    } catch (error) {
+      console.error('Error in SidebarNavigation useEffect:', error)
     }
   }, [pathname, locale, modules, modulesLoading, expandedModules])
 
@@ -178,13 +120,13 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
   useEffect(() => {
     const handleRBACUpdate = () => {
       if (user) {
-        refreshUserRoles()
+        handleRefreshRoles()
       }
     }
 
     window.addEventListener('rbac-updated', handleRBACUpdate)
     return () => window.removeEventListener('rbac-updated', handleRBACUpdate)
-  }, [user, refreshUserRoles])
+  }, [user, handleRefreshRoles])
 
   const fetchUserAndNotifications = async () => {
     try {
@@ -218,13 +160,14 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     }
   }
 
-  const getNavLinkClass = (path: string) => {
+  // Memoize navigation link class calculation to prevent unnecessary re-renders
+  const getNavLinkClass = useCallback((path: string) => {
     const isActive = pathname === `/${locale}${path}` || 
                     (path !== '/' && pathname.startsWith(`/${locale}${path}`))
     return isActive 
       ? 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-r-4 border-blue-600 shadow-sm' 
       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-  }
+  }, [pathname, locale])
 
   const toggleModule = (moduleId: string) => {
     const newExpanded = new Set(expandedModules)
@@ -235,6 +178,36 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     }
     setExpandedModules(newExpanded)
   }
+
+  // Check scroll position to show/hide scroll indicators
+  const checkScrollPosition = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const { scrollTop, scrollHeight, clientHeight } = container
+    setCanScrollUp(scrollTop > 0)
+    setCanScrollDown(scrollTop < scrollHeight - clientHeight - 1)
+  }, [])
+
+  // Add scroll event listener
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const handleScroll = () => checkScrollPosition()
+    container.addEventListener('scroll', handleScroll)
+    
+    // Check initial scroll position
+    checkScrollPosition()
+
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [checkScrollPosition])
+
+  // Recheck scroll position when modules change
+  useEffect(() => {
+    const timer = setTimeout(checkScrollPosition, 100)
+    return () => clearTimeout(timer)
+  }, [modules, expandedModules, checkScrollPosition])
 
   if (loading) {
     return (
@@ -259,12 +232,12 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 flex flex-col ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       } lg:translate-x-0`}>
         
-        {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+        {/* Header - Fixed */}
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 flex-shrink-0">
           <Link href={`/${locale}`} className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <Heart className="w-5 h-5 text-white" />
@@ -282,9 +255,23 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
           </Button>
         </div>
 
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto py-4">
-          <nav className="px-2 space-y-1">
+        {/* Navigation - Scrollable */}
+        <div className="flex-1 relative min-h-0">
+          {/* Scroll Up Indicator */}
+          {canScrollUp && (
+            <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-white via-white/80 to-transparent z-10 pointer-events-none transition-opacity duration-300" />
+          )}
+          
+          <div 
+            ref={scrollContainerRef}
+            className="h-full overflow-y-auto py-4 scroll-smooth"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#d1d5db #f3f4f6',
+              WebkitOverflowScrolling: 'touch' // Smooth scrolling on iOS
+            }}
+          >
+            <nav className="px-2 space-y-1">
             
             {/* Main Navigation Items */}
             <Link
@@ -305,11 +292,15 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
 
             {/* Modular Navigation */}
             {!modulesLoading && modules.map((module) => {
-              const IconComponent = iconMap[module.icon]
-              const navigationItems = moduleNavigationItems[module.name] || []
+              const IconComponent = getIconWithFallback(module.icon)
+              if (!module.name) return null // Ensure module name is present for navigation item retrieval
+
+              const navigationItems = getModuleNavigationItems(module.name) || [] // Ensure navigation items is an array
+              // userPermissions is now memoized above
+              const filteredItems = filterNavigationItemsByPermissions(navigationItems, userPermissions?.map(p => p.name) || [])
               const isExpanded = expandedModules.has(module.id)
 
-              if (navigationItems.length === 0) return null
+              if (filteredItems.length === 0) return null
 
               return (
                 <div key={module.id} className="space-y-1">
@@ -319,9 +310,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
                     className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
                   >
                     <div className="flex items-center">
-                      {IconComponent && (
-                        <IconComponent className="mr-3 h-4 w-4" />
-                      )}
+                      <IconComponent className="mr-3 h-4 w-4" />
                       <span>{module.display_name}</span>
                     </div>
                     {isExpanded ? (
@@ -335,28 +324,23 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
                   <div className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${
                     isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                   }`}>
-                    {navigationItems.map((item, index) => (
-                      <PermissionGuard
+                    {filteredItems.map((item, index) => (
+                      <Link
                         key={index}
-                        allowedPermissions={item.permissions}
-                        requireAll={item.requireAll}
-                        showLoading={false}
+                        href={`/${locale}${item.href}`}
+                        className={`${getNavLinkClass(item.href)} block px-3 py-2 text-sm rounded-md transition-all duration-200 transform hover:translate-x-1`}
+                        title={item.description}
                       >
-                        <Link
-                          href={`/${locale}${item.href}`}
-                          className={`${getNavLinkClass(item.href)} block px-3 py-2 text-sm rounded-md transition-all duration-200 transform hover:translate-x-1`}
-                        >
-                          <div className="flex items-center">
-                            <div className={`w-2 h-2 rounded-full mr-3 transition-colors duration-200 ${
-                              pathname === `/${locale}${item.href}` || 
-                              (item.href !== '/' && pathname.startsWith(`/${locale}${item.href}`))
-                                ? 'bg-blue-600' 
-                                : 'bg-gray-300'
-                            }`} />
-                            {item.label}
-                          </div>
-                        </Link>
-                      </PermissionGuard>
+                        <div className="flex items-center">
+                          <div className={`w-2 h-2 rounded-full mr-3 transition-colors duration-200 ${
+                            pathname === `/${locale}${item.href}` || 
+                            (item.href !== '/' && pathname.startsWith(`/${locale}${item.href}`))
+                              ? 'bg-blue-600' 
+                              : 'bg-gray-300'
+                          }`} />
+                          {item.label}
+                        </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -379,11 +363,17 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
               )}
             </Link>
 
-          </nav>
+            </nav>
+          </div>
+          
+          {/* Scroll Down Indicator */}
+          {canScrollDown && (
+            <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white via-white/80 to-transparent z-10 pointer-events-none transition-opacity duration-300" />
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 p-4">
+        {/* Footer - Fixed */}
+        <div className="border-t border-gray-200 p-4 flex-shrink-0">
           {/* Language Switcher */}
           <div className="mb-4">
             <LanguageSwitcher />

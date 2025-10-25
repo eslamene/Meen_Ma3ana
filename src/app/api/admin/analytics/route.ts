@@ -5,6 +5,10 @@ import { db } from '@/lib/db'
 import { cases, contributions, sponsorships, users, projects, projectCycles } from '@/drizzle/schema'
 import { eq, and, gte, lte, desc, sql, count, sum, avg } from 'drizzle-orm'
 
+// Simple in-memory cache for analytics data
+const analyticsCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -47,6 +51,16 @@ export async function GET(request: NextRequest) {
     const dateRange = searchParams.get('dateRange') || 'last30Days'
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    
+    // Create cache key based on parameters
+    const cacheKey = `analytics_${dateRange}_${startDate}_${endDate}_${user.id}`
+    
+    // Check cache first
+    const cachedData = analyticsCache.get(cacheKey)
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+      console.log('📊 Returning cached analytics data')
+      return NextResponse.json(cachedData.data)
+    }
 
     // Calculate date range
     let fromDate: Date
@@ -77,175 +91,178 @@ export async function GET(request: NextRequest) {
         fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     }
 
-    // Fetch metrics
+    // Optimized metrics queries - combine related queries to reduce database round trips
     const [
-      totalCases,
-      activeCases,
-      completedCases,
-      totalContributions,
-      totalContributionsAmount,
-      avgContribution,
-      totalSponsorships,
-      activeSponsorships,
-      totalUsers,
-      newUsers,
-      totalProjects,
-      activeProjects,
-      pendingApprovals
+      caseMetrics,
+      contributionMetrics,
+      sponsorshipMetrics,
+      userMetrics,
+      projectMetrics
     ] = await Promise.all([
-      // Total cases
-      db.select({ count: count() }).from(cases),
+      // Combined case metrics in a single query
+      db.select({
+        total: count(),
+        published: count(sql`CASE WHEN ${cases.status} = 'published' THEN 1 END`),
+        closed: count(sql`CASE WHEN ${cases.status} = 'closed' THEN 1 END`),
+        completed: count(sql`CASE WHEN ${cases.status} = 'completed' THEN 1 END`)
+      }).from(cases),
       
-      // Active cases (published)
-      db.select({ count: count() }).from(cases).where(eq(cases.status, 'published')),
+      // Combined contribution metrics in a single query
+      db.select({
+        total: count(),
+        totalAmount: sum(contributions.amount),
+        avgAmount: avg(contributions.amount),
+        pending: count(sql`CASE WHEN ${contributions.status} = 'pending' THEN 1 END`),
+        approved: count(sql`CASE WHEN ${contributions.status} = 'approved' THEN 1 END`)
+      }).from(contributions),
       
-      // Completed cases (closed)
-      db.select({ count: count() }).from(cases).where(eq(cases.status, 'closed')),
+      // Combined sponsorship metrics in a single query
+      db.select({
+        total: count(),
+        approved: count(sql`CASE WHEN ${sponsorships.status} = 'approved' THEN 1 END`),
+        pending: count(sql`CASE WHEN ${sponsorships.status} = 'pending' THEN 1 END`)
+      }).from(sponsorships),
       
-      // Total contributions
-      db.select({ count: count() }).from(contributions),
+      // Combined user metrics in a single query
+      db.select({
+        total: count(),
+        newUsers: count(sql`CASE WHEN ${users.created_at} >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)} THEN 1 END`)
+      }).from(users),
       
-      // Total contributions amount
-      db.select({ total: sum(contributions.amount) }).from(contributions),
-      
-      // Average contribution
-      db.select({ avg: avg(contributions.amount) }).from(contributions),
-      
-      // Total sponsorships
-      db.select({ count: count() }).from(sponsorships),
-      
-      // Active sponsorships
-      db.select({ count: count() }).from(sponsorships).where(eq(sponsorships.status, 'approved')),
-      
-      // Total users
-      db.select({ count: count() }).from(users),
-      
-      // New users (last 30 days)
-      db.select({ count: count() }).from(users).where(gte(users.created_at, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))),
-      
-      // Total projects
-      db.select({ count: count() }).from(projects),
-      
-      // Active projects (published)
-      db.select({ count: count() }).from(projects).where(eq(projects.status, 'active')),
-      
-      // Pending approvals (contributions + sponsorships)
-      Promise.all([
-        db.select({ count: count() }).from(contributions).where(eq(contributions.status, 'pending')),
-        db.select({ count: count() }).from(sponsorships).where(eq(sponsorships.status, 'pending'))
-      ]).then(([contribPending, sponsorPending]) => ({
-        count: (contribPending[0]?.count || 0) + (sponsorPending[0]?.count || 0)
-      }))
+      // Combined project metrics in a single query
+      db.select({
+        total: count(),
+        active: count(sql`CASE WHEN ${projects.status} = 'active' THEN 1 END`)
+      }).from(projects)
     ])
 
     // Calculate completion rate
-    const completionRate = totalCases[0]?.count ? 
-      Math.round((completedCases[0]?.count || 0) / totalCases[0].count * 100) : 0
+    const completionRate = caseMetrics[0]?.total ? 
+      Math.round(((caseMetrics[0]?.closed || 0) + (caseMetrics[0]?.completed || 0)) / caseMetrics[0].total * 100) : 0
 
     // Calculate success rate (active projects / total projects)
-    const successRate = totalProjects[0]?.count ? 
-      Math.round((activeProjects[0]?.count || 0) / totalProjects[0].count * 100) : 0
+    const successRate = projectMetrics[0]?.total ? 
+      Math.round((projectMetrics[0]?.active || 0) / projectMetrics[0].total * 100) : 0
 
-    // Fetch recent activity
-    const recentActivity = await Promise.all([
-      // Recent contributions
-      db.select({
-        id: contributions.id,
-        type: sql`'contribution'`,
-        title: sql`'New Contribution'`,
-        description: sql`CONCAT('Contribution to Case #', cases.id, ' - ', cases.title)`,
-        amount: contributions.amount,
-        status: contributions.status,
-        timestamp: contributions.created_at,
-        user: users.email
-      })
-      .from(contributions)
-      .leftJoin(cases, eq(contributions.case_id, cases.id))
-      .leftJoin(users, eq(contributions.donor_id, users.id))
-      .orderBy(desc(contributions.created_at))
-      .limit(5),
+    // Optimized recent activity - use a single UNION query for better performance
+    const recentActivity = await db.execute(sql`
+      (
+        SELECT 
+          ${contributions.id} as id,
+          'contribution' as type,
+          'New Contribution' as title,
+          CONCAT('Contribution to Case - ', COALESCE(${cases.title}, 'Unknown Case')) as description,
+          ${contributions.amount} as amount,
+          ${contributions.status} as status,
+          ${contributions.created_at} as timestamp,
+          ${users.email} as user
+        FROM ${contributions}
+        LEFT JOIN ${cases} ON ${contributions.case_id} = ${cases.id}
+        LEFT JOIN ${users} ON ${contributions.donor_id} = ${users.id}
+        WHERE ${contributions.created_at} >= ${fromDate}
+        ORDER BY ${contributions.created_at} DESC
+        LIMIT 3
+      )
+      UNION ALL
+      (
+        SELECT 
+          ${sponsorships.id} as id,
+          'sponsorship' as type,
+          'Sponsorship Request' as title,
+          CONCAT('Sponsorship for Case - ', COALESCE(${cases.title}, 'Unknown Case')) as description,
+          ${sponsorships.amount} as amount,
+          ${sponsorships.status} as status,
+          ${sponsorships.created_at} as timestamp,
+          ${users.email} as user
+        FROM ${sponsorships}
+        LEFT JOIN ${cases} ON ${sponsorships.case_id} = ${cases.id}
+        LEFT JOIN ${users} ON ${sponsorships.sponsor_id} = ${users.id}
+        WHERE ${sponsorships.created_at} >= ${fromDate}
+        ORDER BY ${sponsorships.created_at} DESC
+        LIMIT 3
+      )
+      UNION ALL
+      (
+        SELECT 
+          ${cases.id} as id,
+          'case' as type,
+          'Case Status Update' as title,
+          CONCAT('Case - ', ${cases.title}, ' (', ${cases.status}, ')') as description,
+          NULL as amount,
+          ${cases.status} as status,
+          ${cases.created_at} as timestamp,
+          NULL as user
+        FROM ${cases}
+        WHERE ${cases.created_at} >= ${fromDate}
+        ORDER BY ${cases.created_at} DESC
+        LIMIT 2
+      )
+      UNION ALL
+      (
+        SELECT 
+          ${users.id} as id,
+          'user' as type,
+          'New User Registration' as title,
+          CONCAT('New user registered: ', ${users.email}) as description,
+          NULL as amount,
+          'active' as status,
+          ${users.created_at} as timestamp,
+          ${users.email} as user
+        FROM ${users}
+        WHERE ${users.created_at} >= ${fromDate}
+        ORDER BY ${users.created_at} DESC
+        LIMIT 2
+      )
+      ORDER BY timestamp DESC
+      LIMIT 10
+    `)
 
-      // Recent sponsorships
-      db.select({
-        id: sponsorships.id,
-        type: sql`'sponsorship'`,
-        title: sql`'Sponsorship Request'`,
-        description: sql`CONCAT('Sponsorship for Case #', cases.id, ' - ', cases.title)`,
-        amount: sponsorships.amount,
-        status: sponsorships.status,
-        timestamp: sponsorships.created_at,
-        user: users.email
-      })
-      .from(sponsorships)
-      .leftJoin(cases, eq(sponsorships.case_id, cases.id))
-      .leftJoin(users, eq(sponsorships.sponsor_id, users.id))
-      .orderBy(desc(sponsorships.created_at))
-      .limit(5),
+    // Recent activity is already sorted and limited by the UNION query
+    const allActivity = recentActivity.rows || []
 
-      // Recent cases
-      db.select({
-        id: cases.id,
-        type: sql`'case'`,
-        title: sql`'Case Status Update'`,
-        description: sql`CONCAT('Case #', cases.id, ' - ', cases.title, ' ', cases.status)`,
-        status: cases.status,
-        timestamp: cases.created_at
-      })
-      .from(cases)
-      .orderBy(desc(cases.created_at))
-      .limit(5),
-
-      // Recent users
-      db.select({
-        id: users.id,
-        type: sql`'user'`,
-        title: sql`'New User Registration'`,
-        description: sql`CONCAT('New user registered: ', users.email)`,
-        status: sql`'active'`,
-        timestamp: users.created_at,
-        user: users.email
-      })
-      .from(users)
-      .orderBy(desc(users.created_at))
-      .limit(5)
-    ])
-
-    // Combine and sort recent activity
-    const allActivity = [
-      ...recentActivity[0].map(item => ({ ...item, type: 'contribution' as const })),
-      ...recentActivity[1].map(item => ({ ...item, type: 'sponsorship' as const })),
-      ...recentActivity[2].map(item => ({ ...item, type: 'case' as const })),
-      ...recentActivity[3].map(item => ({ ...item, type: 'user' as const }))
-    ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 10)
-
-    // Prepare metrics response
+    // Prepare metrics response using optimized data
     const metrics = {
-      totalCases: totalCases[0]?.count || 0,
-      activeCases: activeCases[0]?.count || 0,
-      completedCases: completedCases[0]?.count || 0,
-      totalContributions: totalContributions[0]?.count || 0,
-      totalAmount: parseFloat(totalContributionsAmount[0]?.total || '0'),
-      averageContribution: parseFloat(avgContribution[0]?.avg || '0'),
-      totalSponsorships: totalSponsorships[0]?.count || 0,
-      activeSponsorships: activeSponsorships[0]?.count || 0,
-      totalUsers: totalUsers[0]?.count || 0,
-      newUsers: newUsers[0]?.count || 0,
-      activeUsers: totalUsers[0]?.count || 0, // Simplified for now
-      totalProjects: totalProjects[0]?.count || 0,
-      activeProjects: activeProjects[0]?.count || 0,
+      totalCases: caseMetrics[0]?.total || 0,
+      activeCases: caseMetrics[0]?.published || 0,
+      completedCases: (caseMetrics[0]?.closed || 0) + (caseMetrics[0]?.completed || 0),
+      totalContributions: contributionMetrics[0]?.total || 0,
+      totalAmount: parseFloat(contributionMetrics[0]?.totalAmount || '0'),
+      averageContribution: parseFloat(contributionMetrics[0]?.avgAmount || '0'),
+      totalSponsorships: sponsorshipMetrics[0]?.total || 0,
+      activeSponsorships: sponsorshipMetrics[0]?.approved || 0,
+      totalUsers: userMetrics[0]?.total || 0,
+      newUsers: userMetrics[0]?.newUsers || 0,
+      activeUsers: userMetrics[0]?.total || 0, // Simplified for now
+      totalProjects: projectMetrics[0]?.total || 0,
+      activeProjects: projectMetrics[0]?.active || 0,
       completionRate,
       successRate,
-      pendingApprovals: pendingApprovals.count || 0
+      pendingApprovals: (contributionMetrics[0]?.pending || 0) + (sponsorshipMetrics[0]?.pending || 0)
     }
 
-    return NextResponse.json({
+    const responseData = {
       metrics,
       recentActivity: allActivity,
       dateRange: {
         from: fromDate.toISOString(),
         to: toDate.toISOString()
       }
+    }
+    
+    // Cache the response
+    analyticsCache.set(cacheKey, {
+      data: responseData,
+      timestamp: Date.now()
     })
+    
+    // Clean up old cache entries (simple cleanup)
+    if (analyticsCache.size > 100) {
+      const oldestKey = analyticsCache.keys().next().value
+      analyticsCache.delete(oldestKey)
+    }
+    
+    console.log('📊 Analytics data computed and cached')
+    return NextResponse.json(responseData)
 
   } catch (error) {
     console.error('Analytics API error:', error)

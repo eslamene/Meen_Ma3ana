@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -11,9 +11,6 @@ import {
   Calendar, 
   DollarSign, 
   Eye, 
-  Download, 
-  Heart, 
-  Target, 
   Clock, 
   CheckCircle, 
   XCircle, 
@@ -26,7 +23,11 @@ import {
   Copy,
   Check,
   X,
-  MoreVertical
+  MoreVertical,
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import ContributionDetailsModal from './ContributionDetailsModal'
 import ContributionRevisionModal from './ContributionRevisionModal'
@@ -77,6 +78,7 @@ interface Filters {
   search: string
   dateFrom: string
   dateTo: string
+  sortOrder: 'asc' | 'desc'
 }
 
 interface ContributionsListProps {
@@ -115,6 +117,25 @@ export default function ContributionsList({
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false)
   const [openMenuForId, setOpenMenuForId] = useState<string | null>(null)
+  const [collapsedItems, setCollapsedItems] = useState<Set<string>>(new Set())
+
+  // Initialize all items as collapsed by default when contributions change
+  useEffect(() => {
+    const allIds = new Set(contributions.map(c => c.id))
+    setCollapsedItems(allIds)
+  }, [contributions])
+
+  const toggleCollapse = (contributionId: string) => {
+    setCollapsedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(contributionId)) {
+        newSet.delete(contributionId)
+      } else {
+        newSet.add(contributionId)
+      }
+      return newSet
+    })
+  }
 
   const formatAmount = (amount: number) => {
     return `EGP ${amount.toLocaleString('en-US', {
@@ -438,12 +459,33 @@ ${contribution.anonymous ? 'Anonymous Contribution' : `Donor: ${contribution.don
   })
 
   const groups = Object.entries(threads)
-    .map(([key, g]) => ({ key, ...g }))
-    .sort((a, b) => {
-      const maxA = [a.parent?.createdAt, ...a.children.map(c => c.createdAt)].filter(Boolean).sort().pop() || '1970'
-      const maxB = [b.parent?.createdAt, ...b.children.map(c => c.createdAt)].filter(Boolean).sort().pop() || '1970'
-      return new Date(maxB).getTime() - new Date(maxA).getTime()
-    })
+    .map(([key, g]) => ({ 
+      key, 
+      ...g,
+      type: 'thread' as const,
+      // Get the latest date from all items in the thread for sorting
+      latestDate: [g.parent?.createdAt, ...g.children.map(c => c.createdAt)]
+        .filter(Boolean)
+        .sort()
+        .pop() || '1970'
+    }))
+  
+  // Add standalone contributions with a type marker and their date
+  const standaloneItems = standalone.map(contribution => ({
+    type: 'standalone' as const,
+    contribution,
+    latestDate: contribution.createdAt
+  }))
+  
+  // Merge and sort all items (threads + standalone) by date
+  const allItems = [...groups, ...standaloneItems].sort((a, b) => {
+    const timeA = new Date(a.latestDate).getTime()
+    const timeB = new Date(b.latestDate).getTime()
+    // Respect the sortOrder filter
+    return filters.sortOrder === 'desc' 
+      ? timeB - timeA  // Newest first
+      : timeA - timeB  // Oldest first
+  })
 
   const renderContribution = (contribution: Contribution, nested = false, isParent = false) => (
     <Card 
@@ -520,7 +562,49 @@ ${contribution.anonymous ? 'Anonymous Contribution' : `Donor: ${contribution.don
                     </Badge>
                   )}
                 </div>
-                <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+              <div className="flex items-center gap-1">
+                <DollarSign className="h-4 w-4 text-green-600" />
+                <span className="font-semibold text-gray-900">{formatAmount(contribution.amount)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4 text-gray-400" />
+                <span>{getTimeAgo(contribution.createdAt)}</span>
+              </div>
+              
+              {/* Collapse/Expand Button */}
+              {(contribution.message || (contribution.notes && contribution.notes.startsWith('REVISION:')) || 
+                (isParent && contribution.approval_status?.[0]?.rejection_reason) || isAdmin) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleCollapse(contribution.id)
+                  }}
+                  className="ml-auto text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1 text-xs"
+                >
+                  {collapsedItems.has(contribution.id) ? (
+                    <>
+                      <span>Show details</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Hide details</span>
+                      <ChevronUp className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Collapsible Content */}
+            {!collapsedItems.has(contribution.id) && (
+              <div className="space-y-3">
+                {/* Transaction ID and Donor Info */}
+                <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-gray-400"></span>
                     Transaction ID: <span className="font-mono text-gray-600">{truncateId(contribution.id)}</span>
@@ -535,65 +619,54 @@ ${contribution.anonymous ? 'Anonymous Contribution' : `Donor: ${contribution.don
                       <Copy className="h-3.5 w-3.5" />
                     </div>
                   </span>
-                  {isAdmin && (
+                  {isAdmin && contribution.donorEmail && (
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-blue-400"></span>
                       Donor: <span className="font-mono text-gray-600">{contribution.donorEmail}</span>
                     </span>
                   )}
                 </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-              <div className="flex items-center gap-1">
-                <DollarSign className="h-4 w-4 text-green-600" />
-                <span className="font-semibold text-gray-900">{formatAmount(contribution.amount)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Calendar className="h-4 w-4 text-gray-400" />
-                <span>{getTimeAgo(contribution.createdAt)}</span>
-              </div>
-            </div>
 
-            {contribution.message && (
-              <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                <p className="text-sm text-gray-700 italic">
-                  &ldquo;{contribution.message}&rdquo;
-                </p>
-              </div>
-            )}
-
-            {contribution.notes && contribution.notes.startsWith('REVISION:') && (
-              <div className="bg-blue-100 rounded-lg p-3 mb-3 border-l-4 border-blue-400 shadow-sm">
-                <div className="flex items-start gap-2">
-                  <RefreshCw className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-blue-800 mb-1">Revision Details</p>
-                    <p className="text-sm text-blue-700">
-                      {contribution.notes.replace('REVISION: ', '')}
+                {contribution.message && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-sm text-gray-700 italic">
+                      &ldquo;{contribution.message}&rdquo;
                     </p>
                   </div>
-                </div>
-              </div>
-            )}
-            
-            {isParent && contribution.approval_status?.[0]?.rejection_reason && (
-              <div className="bg-red-100 rounded-lg p-3 mb-3 border-l-4 border-red-400 shadow-sm">
-                <div className="flex items-start gap-2">
-                  <XCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-red-800 mb-1">Rejection Reason</p>
-                    <p className="text-sm text-red-700">
-                      {contribution.approval_status[0].rejection_reason}
-                    </p>
-                    {contribution.approval_status[0].admin_comment && (
-                      <p className="text-sm text-red-600 mt-1 italic">
-                        Admin: {contribution.approval_status[0].admin_comment}
-                      </p>
-                    )}
+                )}
+
+                {contribution.notes && contribution.notes.startsWith('REVISION:') && (
+                  <div className="bg-blue-100 rounded-lg p-3 border-l-4 border-blue-400 shadow-sm">
+                    <div className="flex items-start gap-2">
+                      <RefreshCw className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-blue-800 mb-1">Revision Details</p>
+                        <p className="text-sm text-blue-700">
+                          {contribution.notes.replace('REVISION: ', '')}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+                
+                {isParent && contribution.approval_status?.[0]?.rejection_reason && (
+                  <div className="bg-red-100 rounded-lg p-3 border-l-4 border-red-400 shadow-sm">
+                    <div className="flex items-start gap-2">
+                      <XCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-red-800 mb-1">Rejection Reason</p>
+                        <p className="text-sm text-red-700">
+                          {contribution.approval_status[0].rejection_reason}
+                        </p>
+                        {contribution.approval_status[0].admin_comment && (
+                          <p className="text-sm text-red-600 mt-1 italic">
+                            Admin: {contribution.approval_status[0].admin_comment}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -715,9 +788,9 @@ ${contribution.anonymous ? 'Anonymous Contribution' : `Donor: ${contribution.don
           </div>
         </CardHeader>
         <CardContent className="pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
             {/* Search */}
-            <div className="relative md:col-span-5">
+            <div className="relative flex-1">
               <label className="sr-only" htmlFor="contrib-search">Search</label>
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <div className="flex gap-2">
@@ -739,7 +812,7 @@ ${contribution.anonymous ? 'Anonymous Contribution' : `Donor: ${contribution.don
             </div>
 
             {/* Status Filter */}
-            <div className="md:col-span-3">
+            <div className="w-full md:w-40">
               <label className="sr-only" htmlFor="status-filter">Status</label>
               <Select
                 value={filters.status}
@@ -758,7 +831,7 @@ ${contribution.anonymous ? 'Anonymous Contribution' : `Donor: ${contribution.don
             </div>
 
             {/* Date From */}
-            <div className="md:col-span-2">
+            <div className="w-full md:w-40">
               <label className="sr-only" htmlFor="date-from">Date From</label>
               <Input
                 id="date-from"
@@ -770,7 +843,7 @@ ${contribution.anonymous ? 'Anonymous Contribution' : `Donor: ${contribution.don
             </div>
 
             {/* Date To */}
-            <div className="md:col-span-2">
+            <div className="w-full md:w-40">
               <label className="sr-only" htmlFor="date-to">Date To</label>
               <Input
                 id="date-to"
@@ -780,52 +853,74 @@ ${contribution.anonymous ? 'Anonymous Contribution' : `Donor: ${contribution.don
                 className="h-11"
               />
             </div>
+
+            {/* Sort Order - Icon Button */}
+            <div className="flex items-center">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => onFilterChange('sortOrder', filters.sortOrder === 'desc' ? 'asc' : 'desc')}
+                className="h-11 w-11 shrink-0"
+                title={filters.sortOrder === 'desc' ? 'Newest First (click for Oldest First)' : 'Oldest First (click for Newest First)'}
+              >
+                {filters.sortOrder === 'desc' ? (
+                  <ArrowDown className="h-4 w-4" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Contributions List */}
       <div className="space-y-4">
-        {/* Render grouped threads */}
-        {groups.map((g) => (
-          <div key={g.key} className="space-y-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              <span className="text-sm font-semibold text-gray-700">Transaction Thread</span>
-              <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
-                {g.children.length + 1} items
-              </Badge>
-            </div>
-            {g.parent ? (
-              <div className="relative">
-                {g.children.length > 0 && (
-                  <div className="absolute left-6 top-16 w-0.5 h-4 bg-red-300"></div>
-                )}
-                {renderContribution(g.parent, false, true)}
-                {g.children.map((child, index) => (
-                  <div key={child.id} className="relative">
-                    {index < g.children.length - 1 && (
-                      <div className="absolute left-6 top-16 w-0.5 h-4 bg-blue-300"></div>
-                    )}
-                    {renderContribution(child, true, false)}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              g.children.map((child, index) => (
-                <div key={child.id} className="relative">
-                  {index < g.children.length - 1 && (
-                    <div className="absolute left-6 top-16 w-0.5 h-4 bg-blue-300"></div>
-                  )}
-                  {renderContribution(child, true, false)}
+        {/* Render all items (threads and standalone) in sorted order */}
+        {allItems.map((item) => {
+          if (item.type === 'thread') {
+            const g = item
+            return (
+              <div key={g.key} className="space-y-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-sm font-semibold text-gray-700">Transaction Thread</span>
+                  <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                    {g.children.length + 1} items
+                  </Badge>
                 </div>
-              ))
-            )}
-          </div>
-        ))}
-
-        {/* Render standalone contributions */}
-        {standalone.map((contribution) => renderContribution(contribution, false, false))}
+                {g.parent ? (
+                  <div className="relative">
+                    {g.children.length > 0 && (
+                      <div className="absolute left-6 top-16 w-0.5 h-4 bg-red-300"></div>
+                    )}
+                    {renderContribution(g.parent, false, true)}
+                    {g.children.map((child, index) => (
+                      <div key={child.id} className="relative">
+                        {index < g.children.length - 1 && (
+                          <div className="absolute left-6 top-16 w-0.5 h-4 bg-blue-300"></div>
+                        )}
+                        {renderContribution(child, true, false)}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  g.children.map((child, index) => (
+                    <div key={child.id} className="relative">
+                      {index < g.children.length - 1 && (
+                        <div className="absolute left-6 top-16 w-0.5 h-4 bg-blue-300"></div>
+                      )}
+                      {renderContribution(child, true, false)}
+                    </div>
+                  ))
+                )}
+              </div>
+            )
+          } else {
+            // Render standalone contribution
+            return renderContribution(item.contribution, false, false)
+          }
+        })}
       </div>
 
       {/* Pagination */}

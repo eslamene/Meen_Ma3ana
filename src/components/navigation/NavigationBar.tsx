@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -11,9 +11,7 @@ import { contributionNotificationService } from '@/lib/notifications/contributio
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
-import { useUnifiedRBAC } from '@/lib/hooks/useUnifiedRBAC'
 import { useModularRBAC } from '@/lib/hooks/useModularRBAC'
-import PermissionGuard from '@/components/auth/PermissionGuard'
 import GuestPermissionGuard from '@/components/auth/GuestPermissionGuard'
 import { ModularNavigationItem } from './ModularNavigationItem'
 
@@ -25,14 +23,48 @@ export default function NavigationBar() {
   const locale = params.locale as string
   
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const supabase = createClient()
-  const { hasAnyPermission, refreshUserRoles } = useDatabaseRBAC()
-  const unifiedRBAC = useUnifiedRBAC()
-  const { modules, loading: modulesLoading } = useModularRBAC()
+  
+  // Optimize RBAC usage - useModularRBAC already includes useDatabaseRBAC
+  // So we only need useModularRBAC, and extract refreshUserRoles from it
+  const { modules, loading: modulesLoading, refreshModules } = useModularRBAC()
+  
+  // Get refreshUserRoles only when needed, with memoization
+  const { refreshUserRoles } = useDatabaseRBAC()
+  
+  // Memoize the refresh function to prevent unnecessary re-renders
+  const handleRefreshRoles = useCallback(async () => {
+    await Promise.all([
+      refreshUserRoles(),
+      refreshModules()
+    ])
+  }, [refreshUserRoles, refreshModules])
+
+  const fetchUnreadNotifications = useCallback(async (userId: string) => {
+    try {
+      const count = await contributionNotificationService.getUnreadNotificationCount(userId)
+      setUnreadNotifications(count)
+    } catch (error) {
+      console.error('Error fetching unread notifications:', error)
+      // Don't set error state, just keep count at 0
+      setUnreadNotifications(0)
+    }
+  }, [])
+
+  const fetchUserAndNotifications = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUser(user)
+        await fetchUnreadNotifications(user.id)
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error)
+    }
+  }, [supabase.auth, fetchUnreadNotifications])
 
   useEffect(() => {
     fetchUserAndNotifications()
@@ -43,36 +75,35 @@ export default function NavigationBar() {
         setUser(session.user)
         fetchUnreadNotifications(session.user.id)
         // Refresh permissions when user changes
-        refreshUserRoles()
+        handleRefreshRoles()
       } else {
         setUser(null)
         setUnreadNotifications(0)
       }
-      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
-  }, [refreshUserRoles])
+  }, [handleRefreshRoles, supabase.auth, fetchUserAndNotifications, fetchUnreadNotifications])
 
   // Listen for window focus to refresh permissions (when coming back from RBAC page)
   useEffect(() => {
     const handleFocus = () => {
       if (user) {
         console.log('Window focused - refreshing user permissions')
-        refreshUserRoles()
+        handleRefreshRoles()
       }
     }
 
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [user, refreshUserRoles])
+  }, [user, handleRefreshRoles])
 
   // Listen for storage events (in case permissions are updated in another tab)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'rbac_updated' && user) {
         console.log('RBAC updated in another tab - refreshing permissions')
-        refreshUserRoles()
+        handleRefreshRoles()
         // Clear the flag
         localStorage.removeItem('rbac_updated')
       }
@@ -80,45 +111,21 @@ export default function NavigationBar() {
 
     window.addEventListener('storage', handleStorageChange)
     return () => window.removeEventListener('storage', handleStorageChange)
-  }, [user, refreshUserRoles])
+  }, [user, handleRefreshRoles])
 
   // Listen for custom RBAC update events
   useEffect(() => {
     const handleRBACUpdate = () => {
       if (user) {
         console.log('RBAC updated - refreshing navigation permissions')
-        refreshUserRoles()
+        handleRefreshRoles()
       }
     }
 
     window.addEventListener('rbac-updated', handleRBACUpdate)
     return () => window.removeEventListener('rbac-updated', handleRBACUpdate)
-  }, [user, refreshUserRoles])
+  }, [user, handleRefreshRoles])
 
-  const fetchUserAndNotifications = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUser(user)
-        await fetchUnreadNotifications(user.id)
-      }
-    } catch (error) {
-      console.error('Error fetching user:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchUnreadNotifications = async (userId: string) => {
-    try {
-      const count = await contributionNotificationService.getUnreadNotificationCount(userId)
-      setUnreadNotifications(count)
-    } catch (error) {
-      console.error('Error fetching unread notifications:', error)
-      // Don't set error state, just keep count at 0
-      setUnreadNotifications(0)
-    }
-  }
 
   const handleSignOut = async () => {
     try {
@@ -137,11 +144,12 @@ export default function NavigationBar() {
     setIsMobileMenuOpen(false)
   }
 
-  const getNavLinkClass = (path: string) => {
+  // Memoize navigation link class calculation to prevent unnecessary re-renders
+  const getNavLinkClass = useCallback((path: string) => {
     return pathname.includes(path) 
       ? 'text-blue-700 font-semibold bg-blue-50 border-b-2 border-blue-600' 
       : 'text-gray-800 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200'
-  }
+  }, [pathname])
 
   return (
     <nav className="bg-white shadow-lg border-b border-gray-200">

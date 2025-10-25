@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Heart, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/components/ui/toast'
+import { useToast } from '@/hooks/use-toast'
 import ContributionsList from '@/components/contributions/ContributionsList'
 
 interface Contribution {
@@ -57,13 +57,19 @@ interface Filters {
   search: string
   dateFrom: string
   dateTo: string
+  sortOrder: 'asc' | 'desc'
 }
 
 export default function AdminContributionsPage() {
   const t = useTranslations('admin')
   const router = useRouter()
   const params = useParams()
-  const { addToast } = useToast()
+  const searchParams = useSearchParams()
+  const { toast } = useToast()
+  
+  // Get status from URL query parameter
+  const urlStatus = searchParams.get('status') || 'all'
+  
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -76,10 +82,11 @@ export default function AdminContributionsPage() {
     hasPreviousPage: false
   })
   const [filters, setFilters] = useState<Filters>({
-    status: 'all',
+    status: urlStatus, // Initialize from URL
     search: '',
     dateFrom: '',
-    dateTo: ''
+    dateTo: '',
+    sortOrder: 'desc' // Default: newest first
   })
   const [stats, setStats] = useState({
     total: 0,
@@ -89,6 +96,12 @@ export default function AdminContributionsPage() {
   })
 
   const supabase = createClient()
+  
+  // Update filter when URL changes
+  useEffect(() => {
+    const statusFromUrl = searchParams.get('status') || 'all'
+    setFilters(prev => ({ ...prev, status: statusFromUrl }))
+  }, [searchParams])
 
   const fetchContributions = useCallback(async () => {
     try {
@@ -99,7 +112,7 @@ export default function AdminContributionsPage() {
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         sortBy: 'created_at',
-        sortOrder: 'desc',
+        sortOrder: filters.sortOrder, // Use filter's sort order
         admin: 'true' // This tells the API to show all contributions (admin view)
       })
 
@@ -153,6 +166,18 @@ export default function AdminContributionsPage() {
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }))
     setPagination(prev => ({ ...prev, page: 1 }))
+    
+    // Update URL when status filter changes
+    if (key === 'status') {
+      const newSearchParams = new URLSearchParams(searchParams.toString())
+      if (value === 'all') {
+        newSearchParams.delete('status')
+      } else {
+        newSearchParams.set('status', value)
+      }
+      const newUrl = `/${params.locale}/admin/contributions${newSearchParams.toString() ? '?' + newSearchParams.toString() : ''}`
+      router.push(newUrl, { scroll: false })
+    }
   }
 
   const handleClearFilters = () => {
@@ -160,7 +185,8 @@ export default function AdminContributionsPage() {
       status: 'all',
       search: '',
       dateFrom: '',
-      dateTo: ''
+      dateTo: '',
+      sortOrder: 'desc' // Reset to default
     })
     setPagination(prev => ({ ...prev, page: 1 }))
   }
@@ -191,21 +217,21 @@ export default function AdminContributionsPage() {
         throw new Error(errorData.error || 'Failed to update status')
       }
 
-             addToast({
-         title: 'Success',
-         message: `Contribution ${status} successfully`,
-         type: 'success'
-       })
+      toast({
+        title: 'Success',
+        description: `Contribution ${status} successfully`,
+        type: 'success'
+      })
 
       // Refresh the contributions list
       await fetchContributions()
     } catch (error) {
       console.error('Error updating contribution status:', error)
-             addToast({
-         title: 'Error',
-         message: error instanceof Error ? error.message : 'Failed to update status',
-         type: 'error'
-       })
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update status',
+        type: 'error'
+      })
     }
   }
 

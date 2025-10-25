@@ -165,7 +165,10 @@ export default function ImageUpload({
         
         try {
           // Upload to Supabase Storage
-          const fileExt = image.file.name.split('.').pop()
+          // Sanitize file extension
+          const fileExt = (image.file.name.split('.').pop() || 'jpg')
+            .replace(/[^\w]/g, '') // Remove any special characters from extension
+            .toLowerCase()
           const fileName = `case-images/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
           
           const { data, error } = await supabase.storage

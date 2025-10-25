@@ -8,6 +8,9 @@ export async function GET(request: NextRequest) {
     
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const search = searchParams.get('search')
+    const dateFrom = searchParams.get('dateFrom')
+    const dateTo = searchParams.get('dateTo')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const sortBy = searchParams.get('sortBy') || 'created_at'
@@ -73,7 +76,47 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Apply search filter
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim()
+      contributions = contributions.filter(contribution => {
+        // Search in case title
+        const caseTitle = contribution.cases?.title?.toLowerCase() || ''
+        // Search in transaction ID
+        const transactionId = contribution.id?.toLowerCase() || ''
+        // Search in donor email
+        const donorEmail = contribution.users?.email?.toLowerCase() || ''
+        // Search in donor name
+        const donorName = `${contribution.users?.first_name || ''} ${contribution.users?.last_name || ''}`.toLowerCase().trim()
+        
+        return caseTitle.includes(searchLower) || 
+               transactionId.includes(searchLower) ||
+               donorEmail.includes(searchLower) ||
+               donorName.includes(searchLower)
+      })
+    }
+
+    // Apply date filters
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom)
+      fromDate.setHours(0, 0, 0, 0)
+      contributions = contributions.filter(contribution => {
+        const contributionDate = new Date(contribution.created_at)
+        return contributionDate >= fromDate
+      })
+    }
+
+    if (dateTo) {
+      const toDate = new Date(dateTo)
+      toDate.setHours(23, 59, 59, 999)
+      contributions = contributions.filter(contribution => {
+        const contributionDate = new Date(contribution.created_at)
+        return contributionDate <= toDate
+      })
+    }
+
     // Apply pagination after filtering
+    const totalAfterFiltering = contributions.length
     const startIndex = offset
     const endIndex = offset + limit
     contributions = contributions.slice(startIndex, endIndex)
@@ -159,7 +202,8 @@ export async function GET(request: NextRequest) {
       if (approvalStatus === 'approved') {
         stats.approved++
         stats.totalAmount += contribution.amount || 0
-      } else if (approvalStatus === 'rejected') {
+      } else if (approvalStatus === 'rejected' || approvalStatus === 'revised') {
+        // Include both rejected and revised (revised means it was originally rejected)
         stats.rejected++
       } else {
         stats.pending++
@@ -213,9 +257,9 @@ export async function GET(request: NextRequest) {
       pagination: {
         page,
         limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit),
-        hasNextPage: page < Math.ceil(totalCount / limit),
+        total: totalAfterFiltering, // Use filtered count for accurate pagination
+        totalPages: Math.ceil(totalAfterFiltering / limit),
+        hasNextPage: page < Math.ceil(totalAfterFiltering / limit),
         hasPreviousPage: page > 1
       },
       stats

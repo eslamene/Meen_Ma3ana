@@ -99,8 +99,8 @@ export default function CasesPage() {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: '12',
-        sortBy: 'created_at',
-        sortOrder: 'desc'
+        sortBy: filters.sortBy || 'createdAt',
+        sortOrder: filters.sortOrder || 'desc'
       })
 
       if (filters.search) {
@@ -278,7 +278,7 @@ export default function CasesPage() {
               </div>
             </div>
             
-            <PermissionGuard allowedRoles={['admin', 'moderator']}>
+            {canCreateCase && (
               <Button 
                 onClick={handleCreateCase} 
                 className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-lg"
@@ -286,7 +286,7 @@ export default function CasesPage() {
                 <Plus className="h-5 w-5" />
                 {t('createCase')}
               </Button>
-            </PermissionGuard>
+            )}
           </div>
         </div>
 
@@ -400,7 +400,7 @@ export default function CasesPage() {
                   <p className="text-gray-600 mb-6">
                     {t('noCasesFoundDescription')}
                   </p>
-                  <PermissionGuard allowedRoles={['admin', 'moderator']}>
+                  {canCreateCase && (
                     <Button 
                       onClick={handleCreateCase}
                       className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
@@ -408,7 +408,7 @@ export default function CasesPage() {
                       <Plus className="h-4 w-4 mr-2" />
                       {t('createCase')}
                     </Button>
-                  </PermissionGuard>
+                  )}
                 </CardContent>
               </Card>
             ) : (

@@ -41,7 +41,7 @@ import { useTranslations } from 'next-intl'
 import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
 import { dbRBAC, Role, Permission, UserWithRoles } from '@/lib/rbac/database-rbac'
 import { PermissionGuard } from '@/components/auth/PermissionGuard'
-import { useToast } from '@/components/ui/toast'
+import { useToast } from '@/hooks/use-toast'
 
 interface RoleFormData {
   name: string

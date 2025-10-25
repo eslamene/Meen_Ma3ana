@@ -157,7 +157,7 @@ export default function FilterSidebar({
                 <SelectContent>
                   <SelectItem value="all">{t('allStatuses')}</SelectItem>
                   <SelectItem value="published">{t('published')}</SelectItem>
-                  <SelectItem value="under_review">{t('underReview')}</SelectItem>
+                  <SelectItem value="completed">{t('completed')}</SelectItem>
                   <SelectItem value="closed">{t('closed')}</SelectItem>
                 </SelectContent>
               </Select>
@@ -178,37 +178,37 @@ export default function FilterSidebar({
                   <SelectItem value="medical">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('medical')}
-                      {t('medical')}
+                      Medical
                     </div>
                   </SelectItem>
                   <SelectItem value="education">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('education')}
-                      {t('education')}
+                      Education
                     </div>
                   </SelectItem>
                   <SelectItem value="housing">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('housing')}
-                      {t('housing')}
+                      Housing
                     </div>
                   </SelectItem>
                   <SelectItem value="food">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('food')}
-                      {t('food')}
+                      Food
                     </div>
                   </SelectItem>
                   <SelectItem value="emergency">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('emergency')}
-                      {t('emergency')}
+                      Emergency
                     </div>
                   </SelectItem>
                   <SelectItem value="other">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('other')}
-                      {t('other')}
+                      Other
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -322,19 +322,6 @@ export default function FilterSidebar({
                 >
                   <GraduationCap className="h-4 w-4 mr-2 text-blue-500" />
                   {t('educationCases')}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start h-11 border-2 border-yellow-200 hover:border-yellow-300 hover:bg-yellow-50 transition-all duration-200"
-                  onClick={() => {
-                    onFilterChange('status', 'under_review')
-                    onFilterChange('sortBy', 'createdAt')
-                    onFilterChange('sortOrder', 'desc')
-                  }}
-                >
-                  <Eye className="h-4 w-4 mr-2 text-yellow-500" />
-                  {t('underReviewCases')}
                 </Button>
               </div>
             </div>

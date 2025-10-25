@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { dbRBAC, UserWithRoles, Role, Permission } from '@/lib/rbac/database-rbac'
+import { User } from '@supabase/supabase-js'
 
 interface UseRBACReturn {
-  user: any
+  user: User | null
   userRoles: UserWithRoles | null
   roles: Role[]
   permissions: Permission[]
@@ -32,7 +33,7 @@ interface UseRBACReturn {
 }
 
 export function useDatabaseRBAC(): UseRBACReturn {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [userRoles, setUserRoles] = useState<UserWithRoles | null>(null)
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
@@ -47,7 +48,7 @@ export function useDatabaseRBAC(): UseRBACReturn {
       const userRolesData = await dbRBAC.getUserRolesAndPermissions(userId)
       setUserRoles(userRolesData)
     } catch (err) {
-      console.error('Error fetching user roles:', err)
+      console.error('❌ Error fetching user roles:', err)
       setError('Failed to fetch user roles')
     }
   }, [])
@@ -71,43 +72,24 @@ export function useDatabaseRBAC(): UseRBACReturn {
   useEffect(() => {
     let mounted = true
     let timeoutId: NodeJS.Timeout
+    let refreshIntervalId: NodeJS.Timeout | null = null
 
     const initializeAuth = async () => {
       try {
-        setLoading(true)
-        setError(null)
-
-        // Set a timeout to prevent infinite loading
-        timeoutId = setTimeout(() => {
-          if (mounted) {
-            console.warn('RBAC initialization timeout - using fallback')
-            setLoading(false)
-            setError('Permission loading timeout - some features may be limited')
-          }
-        }, 10000) // 10 second timeout
-
-        const { data: { user: currentUser } } = await supabase.auth.getUser()
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
         
         if (mounted) {
           setUser(currentUser)
           
           if (currentUser) {
-            // Only fetch user roles for faster loading
             await fetchUserRoles(currentUser.id)
-            
-            // Fetch roles and permissions in background (non-blocking)
-            fetchRolesAndPermissions().catch(err => {
-              console.warn('Background fetch failed:', err)
-            })
+            fetchRolesAndPermissions().catch(() => {}) // Background fetch, ignore errors
           }
-          
-          clearTimeout(timeoutId)
         }
       } catch (err) {
         if (mounted) {
-          console.error('Error initializing auth:', err)
+          console.error('Error initializing RBAC:', err)
           setError('Failed to initialize authentication')
-          clearTimeout(timeoutId)
         }
       } finally {
         if (mounted) {
@@ -130,17 +112,69 @@ export function useDatabaseRBAC(): UseRBACReturn {
           } else {
             setUserRoles(null)
           }
+          
+          // Ensure loading is false after auth state change
+          setLoading(false)
         }
       }
     )
 
+    // Periodic session refresh to prevent expiration
+    // Refresh session every 5 minutes (Supabase default is 60 minutes)
+    refreshIntervalId = setInterval(async () => {
+      if (mounted) {
+        try {
+          // Refresh the session
+          const { data: { session }, error } = await supabase.auth.refreshSession()
+          
+          if (error) {
+            console.warn('Session refresh failed:', error)
+            // If refresh fails, try to get current user
+            const { data: { user: currentUser } } = await supabase.auth.getUser()
+            if (currentUser) {
+              // Session is still valid, refresh roles
+              await fetchUserRoles(currentUser.id)
+            } else {
+              // Session expired, clear state
+              setUser(null)
+              setUserRoles(null)
+            }
+          } else if (session?.user) {
+            // Session refreshed successfully, update roles
+            await fetchUserRoles(session.user.id)
+          }
+        } catch (err) {
+          console.error('Error during periodic refresh:', err)
+        }
+      }
+    }, 5 * 60 * 1000) // 5 minutes
+
+    // Listen for window focus to refresh permissions
+    const handleWindowFocus = async () => {
+      if (mounted) {
+        try {
+          // Check if session is still valid
+          const { data: { user: currentUser } } = await supabase.auth.getUser()
+          if (currentUser) {
+            await fetchUserRoles(currentUser.id)
+          }
+        } catch (err) {
+          console.error('Error refreshing on window focus:', err)
+        }
+      }
+    }
+
+    window.addEventListener('focus', handleWindowFocus)
+
     return () => {
       mounted = false
       subscription.unsubscribe()
-      if (timeoutId) {
-        clearTimeout(timeoutId)
+      if (refreshIntervalId) {
+        clearInterval(refreshIntervalId)
       }
+      window.removeEventListener('focus', handleWindowFocus)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchUserRoles, fetchRolesAndPermissions])
 
   // Permission check functions
@@ -164,14 +198,14 @@ export function useDatabaseRBAC(): UseRBACReturn {
     return userRoles.roles.some(r => roleList.includes(r.name))
   }, [userRoles])
 
-  // Convenience permission checks
-  const canCreateCase = hasPermission('cases:create')
-  const canEditCase = hasPermission('cases:update')
-  const canDeleteCase = hasPermission('cases:delete')
-  const canManageUsers = hasPermission('admin:users')
-  const canAccessAdmin = hasPermission('admin:dashboard')
-  const canManageRBAC = hasPermission('admin:rbac')
-  const canApproveContributions = hasPermission('contributions:approve')
+  // Memoized convenience permission checks to prevent unnecessary recalculations
+  const canCreateCase = useMemo(() => hasPermission('cases:create'), [hasPermission])
+  const canEditCase = useMemo(() => hasPermission('cases:update'), [hasPermission])
+  const canDeleteCase = useMemo(() => hasPermission('cases:delete'), [hasPermission])
+  const canManageUsers = useMemo(() => hasPermission('admin:users'), [hasPermission])
+  const canAccessAdmin = useMemo(() => hasPermission('admin:dashboard'), [hasPermission])
+  const canManageRBAC = useMemo(() => hasPermission('admin:rbac'), [hasPermission])
+  const canApproveContributions = useMemo(() => hasPermission('contributions:approve'), [hasPermission])
 
   // Refresh user roles
   const refreshUserRoles = useCallback(async () => {

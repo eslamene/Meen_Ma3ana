@@ -28,7 +28,7 @@ import {
   Eye
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/components/ui/toast'
+import { useToast } from '@/hooks/use-toast'
 
 interface ContributionFormProps {
   caseId: string

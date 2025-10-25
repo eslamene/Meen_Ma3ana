@@ -10,24 +10,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, ArrowRight, Upload, Image as ImageIcon, X } from 'lucide-react'
-import ImageUpload from '@/components/cases/ImageUpload'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 type CaseType = 'one-time' | 'recurring'
 type Priority = '' | 'low' | 'medium' | 'high' | 'critical'
 type Frequency = '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
-
-interface UploadedImage {
-  id: string
-  file: File
-  preview: string
-  isPrimary: boolean
-  uploaded: boolean
-  uploadProgress: number
-  error?: string
-}
 
 interface CaseFormData {
   title: string
@@ -46,11 +34,13 @@ interface CaseFormData {
 
 export default function CaseDetailsPage() {
   const t = useTranslations('cases')
+  const tAuth = useTranslations('auth')
   const router = useRouter()
   const searchParams = useSearchParams()
   const params = useParams()
   const locale = params.locale as string
   const caseType = searchParams.get('type') as CaseType
+  const { toast } = useToast()
 
   const [formData, setFormData] = useState<CaseFormData>({
     title: '',
@@ -68,8 +58,8 @@ export default function CaseDetailsPage() {
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [images, setImages] = useState<UploadedImage[]>([])
   const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
   const [user, setUser] = useState<User | null>(null)
@@ -104,7 +94,7 @@ export default function CaseDetailsPage() {
   const handleInputChange = (field: keyof CaseFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     
-    // Real-time validation
+    // Real-time validation (only for required fields)
     const newErrors = { ...errors }
     
     // Clear existing error
@@ -112,7 +102,7 @@ export default function CaseDetailsPage() {
       delete newErrors[field]
     }
     
-    // Validate the changed field
+    // Validate the changed field (ONLY REQUIRED FIELDS)
     if (field === 'title') {
       if (!value.trim()) {
         newErrors.title = t('validation.titleRequired')
@@ -137,17 +127,9 @@ export default function CaseDetailsPage() {
       } else if (parseFloat(value) > 1000000) {
         newErrors.targetAmount = t('validation.targetAmountTooHigh')
       }
-    } else if (field === 'location') {
-      if (!value.trim()) {
-        newErrors.location = t('validation.locationRequired')
-      }
-    } else if (field === 'beneficiaryName') {
-      if (!value.trim()) {
-        newErrors.beneficiaryName = t('validation.beneficiaryNameRequired')
-      }
-    } else if (field === 'beneficiaryContact') {
-      if (!value.trim()) {
-        newErrors.beneficiaryContact = t('validation.beneficiaryContactRequired')
+    } else if (field === 'category') {
+      if (!value) {
+        newErrors.category = t('validation.categoryRequired')
       }
     } else if (field === 'duration' && caseType === 'one-time') {
       if (!value) {
@@ -158,6 +140,7 @@ export default function CaseDetailsPage() {
         newErrors.duration = t('validation.durationTooLong')
       }
     }
+    // Optional fields (location, beneficiaryName, beneficiaryContact, category, priority) - no validation
     
     setErrors(newErrors)
   }
@@ -165,7 +148,7 @@ export default function CaseDetailsPage() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    // Title validation
+    // Title validation (REQUIRED)
     if (!formData.title.trim()) {
       newErrors.title = t('validation.titleRequired')
     } else if (formData.title.trim().length < 10) {
@@ -174,7 +157,7 @@ export default function CaseDetailsPage() {
       newErrors.title = t('validation.titleTooLong')
     }
 
-    // Description validation
+    // Description validation (REQUIRED)
     if (!formData.description.trim()) {
       newErrors.description = t('validation.descriptionRequired')
     } else if (formData.description.trim().length < 50) {
@@ -183,7 +166,7 @@ export default function CaseDetailsPage() {
       newErrors.description = t('validation.descriptionTooLong')
     }
 
-    // Target amount validation
+    // Target amount validation (REQUIRED)
     if (!formData.targetAmount) {
       newErrors.targetAmount = t('validation.targetAmountRequired')
     } else if (parseFloat(formData.targetAmount) <= 0) {
@@ -192,29 +175,14 @@ export default function CaseDetailsPage() {
       newErrors.targetAmount = t('validation.targetAmountTooHigh')
     }
 
-    // Category validation
+    // Category validation (REQUIRED)
     if (!formData.category) {
       newErrors.category = t('validation.categoryRequired')
     }
 
-    // Priority validation
-    if (!formData.priority) {
-      newErrors.priority = t('validation.priorityRequired')
-    }
-
-    // Location validation
-    if (!formData.location.trim()) {
-      newErrors.location = t('validation.locationRequired')
-    }
-
-    // Beneficiary validation
-    if (!formData.beneficiaryName.trim()) {
-      newErrors.beneficiaryName = t('validation.beneficiaryNameRequired')
-    }
-
-    if (!formData.beneficiaryContact.trim()) {
-      newErrors.beneficiaryContact = t('validation.beneficiaryContactRequired')
-    }
+    // Priority validation (OPTIONAL - removed)
+    // Location validation (OPTIONAL - removed)
+    // Beneficiary validation (OPTIONAL - removed)
 
     // One-time case specific validation
     if (caseType === 'one-time') {
@@ -252,15 +220,53 @@ export default function CaseDetailsPage() {
   }
 
   const handleNext = () => {
-    if (validateForm()) {
-      // Store form data in session storage or state management
+    console.log('Continue button clicked')
+    console.log('Form data:', formData)
+    console.log('Case type:', caseType)
+    
+    const isValid = validateForm()
+    console.log('Form validation result:', isValid)
+    console.log('Validation errors:', errors)
+    
+    if (isValid) {
+      console.log('Validation passed, navigating to images page')
+      // Store form data in session storage
       sessionStorage.setItem('caseFormData', JSON.stringify(formData))
-      router.push(`/${locale}/cases/create/images?type=${caseType}`)
+      const nextUrl = `/${locale}/cases/create/images?type=${caseType}`
+      console.log('Navigating to:', nextUrl)
+      router.push(nextUrl)
+    } else {
+      console.log('Validation failed, showing error toast')
+      // Show validation error toast
+      toast({
+        type: 'error',
+        title: t('validationError'),
+        description: t('pleaseFixErrors'),
+        duration: 4000,
+      })
+      
+      // Scroll to first error
+      const firstErrorField = document.querySelector('.border-red-500')
+      if (firstErrorField) {
+        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
     }
   }
 
   const handleSaveDraft = async () => {
-    if (!user) return
+    if (!user) {
+      toast({
+        type: 'error',
+        title: t('error'),
+        description: tAuth('pleaseLoginFirst'),
+      })
+      return
+    }
+
+    // Prevent multiple submissions
+    if (saving || submitting) {
+      return
+    }
 
     setSaving(true)
     try {
@@ -271,7 +277,7 @@ export default function CaseDetailsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: formData.title,
+          title: formData.title || 'Untitled Draft',
           description: formData.description,
           targetAmount: formData.targetAmount,
           category: formData.category,
@@ -295,9 +301,31 @@ export default function CaseDetailsPage() {
 
       const result = await response.json()
       setLastSaved(new Date())
+      
+      // Show success message
+      toast({
+        type: 'success',
+        title: t('draftSaved'),
+        description: t('draftSavedSuccessfully'),
+        duration: 4000,
+      })
+
       console.log('Draft saved successfully:', result.case)
+      
+      // Redirect to cases list after a short delay
+      setTimeout(() => {
+        router.push(`/${locale}/admin/cases`)
+      }, 1500)
     } catch (error) {
       console.error('Error saving draft:', error)
+      
+      // Show error message
+      toast({
+        type: 'error',
+        title: t('saveFailed'),
+        description: error instanceof Error ? error.message : t('failedToSaveDraft'),
+        duration: 5000,
+      })
     } finally {
       setSaving(false)
     }
@@ -392,13 +420,13 @@ export default function CaseDetailsPage() {
                 </label>
                 <Select
                   value={formData.category || ''}
-                  onValueChange={(value) => handleInputChange('category', value)}
+                  onValueChange={(value) => handleInputChange('category', value === 'not_specified' ? '' : value)}
                 >
                   <SelectTrigger className={errors.category ? 'border-red-500' : ''}>
                     <SelectValue placeholder={t('selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Not specified</SelectItem>
+                    <SelectItem value="not_specified">Not specified</SelectItem>
                     <SelectItem value="medical">Medical</SelectItem>
                     <SelectItem value="education">Education</SelectItem>
                     <SelectItem value="housing">Housing</SelectItem>
@@ -414,26 +442,23 @@ export default function CaseDetailsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('priority')} *
+                  {t('priority')}
                 </label>
                 <Select
                   value={formData.priority || ''}
-                  onValueChange={(value) => handleInputChange('priority', value as Priority)}
+                  onValueChange={(value) => handleInputChange('priority', (value === 'not_specified' ? '' : value) as Priority)}
                 >
-                  <SelectTrigger className={errors.priority ? 'border-red-500' : ''}>
+                  <SelectTrigger>
                     <SelectValue placeholder={t('selectPriority')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Not specified</SelectItem>
+                    <SelectItem value="not_specified">Not specified</SelectItem>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="high">High</SelectItem>
                     <SelectItem value="critical">Critical</SelectItem>
                   </SelectContent>
                 </Select>
-                {errors.priority && (
-                  <p className="text-red-500 text-sm mt-1">{errors.priority}</p>
-                )}
               </div>
 
               <div>
@@ -495,13 +520,13 @@ export default function CaseDetailsPage() {
                     </label>
                     <Select
                       value={formData.frequency || ''}
-                      onValueChange={(value) => handleInputChange('frequency', value as Frequency)}
+                      onValueChange={(value) => handleInputChange('frequency', (value === 'not_specified' ? '' : value) as Frequency)}
                     >
                       <SelectTrigger className={errors.frequency ? 'border-red-500' : ''}>
                         <SelectValue placeholder={t('selectFrequency')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Not specified</SelectItem>
+                        <SelectItem value="not_specified">Not specified</SelectItem>
                         <SelectItem value="weekly">Weekly</SelectItem>
                         <SelectItem value="monthly">Monthly</SelectItem>
                         <SelectItem value="quarterly">Quarterly</SelectItem>
@@ -548,29 +573,26 @@ export default function CaseDetailsPage() {
           </CardContent>
         </Card>
 
-        {/* Image Upload Section */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>{t('images')}</CardTitle>
-            <CardDescription>
-              {t('uploadImagesDescription')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ImageUpload
-              onImagesChange={setImages}
-              maxImages={5}
-              maxFileSize={5}
-            />
-          </CardContent>
-        </Card>
-
         {/* Action Buttons */}
         <div className="flex justify-between mt-8">
-          <Button variant="outline" onClick={handleSaveDraft}>
-            {t('saveDraft')}
+          <Button 
+            variant="outline" 
+            onClick={handleSaveDraft}
+            disabled={saving || submitting}
+          >
+            {saving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                {t('saving')}...
+              </>
+            ) : (
+              t('saveDraft')
+            )}
           </Button>
-          <Button onClick={handleNext}>
+          <Button 
+            onClick={handleNext}
+            disabled={saving || submitting}
+          >
             {t('continue')}
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>

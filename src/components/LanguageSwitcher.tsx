@@ -11,11 +11,6 @@ export default function LanguageSwitcher() {
   
   // Alternative way to get current locale from pathname
   const currentLocaleFromPath = pathname.split('/')[1] || 'en'
-  
-  // Debug: log both locale sources
-  console.log('useLocale():', locale)
-  console.log('From pathname:', currentLocaleFromPath)
-  console.log('Pathname:', pathname)
 
   const switchLanguage = (newLocale: string) => {
     // Remove any locale from the pathname (both current and any other locale)
@@ -40,7 +35,6 @@ export default function LanguageSwitcher() {
           // Use pathname-based locale as the primary source since useLocale might not update immediately
           const currentLoc = currentLocaleFromPath || locale || 'en'
           const isActive = currentLoc === loc
-          console.log(`Locale ${loc}: active=${isActive}, useLocale=${locale}, fromPath=${currentLocaleFromPath}, final=${currentLoc}`)
           
           return (
             <button

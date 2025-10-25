@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useDatabaseRBAC } from './useDatabaseRBAC'
+import { Permission, UserWithRoles } from '../rbac/database-rbac'
 
 export interface ModulePermission {
   id: string
@@ -29,6 +30,9 @@ interface UseModularRBACReturn {
   hasModuleAccess: (moduleName: string) => boolean
   getModulePermissions: (moduleName: string) => ModulePermission[]
   refreshModules: () => Promise<void>
+  // Expose userRoles so consumers don't need to call useDatabaseRBAC separately
+  userRoles: UserWithRoles | null
+  userPermissions: Permission[] | null
 }
 
 export function useModularRBAC(): UseModularRBACReturn {
@@ -75,6 +79,7 @@ export function useModularRBAC(): UseModularRBACReturn {
       const processedModules: NavigationModule[] = (modulesData || []).map(module => {
         const modulePermissions = module.permissions || []
         const permissionNames = modulePermissions.map(p => p.name)
+        const hasAccess = hasAnyPermission(permissionNames)
         
         return {
           id: module.id,
@@ -84,12 +89,11 @@ export function useModularRBAC(): UseModularRBACReturn {
           color: module.color,
           sort_order: module.sort_order,
           permissions: modulePermissions,
-          hasAnyPermission: hasAnyPermission(permissionNames)
+          hasAnyPermission: hasAccess
         }
       })
 
       setModules(processedModules)
-      console.log('Loaded modular navigation:', processedModules.filter(m => m.hasAnyPermission))
       
     } catch (err) {
       console.error('Error fetching modular navigation:', err)
@@ -103,6 +107,19 @@ export function useModularRBAC(): UseModularRBACReturn {
   // Refresh modules when RBAC data changes
   useEffect(() => {
     fetchModulesWithPermissions()
+  }, [fetchModulesWithPermissions])
+
+  // Listen for RBAC updates from other components
+  useEffect(() => {
+    const handleRBACUpdate = () => {
+      fetchModulesWithPermissions()
+    }
+
+    window.addEventListener('rbac-updated', handleRBACUpdate)
+    
+    return () => {
+      window.removeEventListener('rbac-updated', handleRBACUpdate)
+    }
   }, [fetchModulesWithPermissions])
 
   // Helper functions
@@ -120,12 +137,24 @@ export function useModularRBAC(): UseModularRBACReturn {
     await fetchModulesWithPermissions()
   }, [fetchModulesWithPermissions])
 
+  // Compute user permissions for easy access (memoized to prevent re-renders)
+  const userPermissions = useMemo(() => {
+    return userRoles?.permissions?.map(p => p.name) || []
+  }, [userRoles])
+
+  // Memoize filtered modules to prevent unnecessary re-renders
+  const filteredModules = useMemo(() => {
+    return modules.filter(m => m.hasAnyPermission)
+  }, [modules])
+
   return {
-    modules: modules.filter(m => m.hasAnyPermission), // Only return modules user has access to
+    modules: filteredModules,
     loading,
     error,
     hasModuleAccess,
     getModulePermissions,
-    refreshModules
+    refreshModules,
+    userRoles,
+    userPermissions: userPermissions as unknown as Permission[] | null
   }
 }

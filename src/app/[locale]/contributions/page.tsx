@@ -56,6 +56,7 @@ interface Filters {
   search: string
   dateFrom: string
   dateTo: string
+  sortOrder: 'asc' | 'desc'
 }
 
 export default function ContributionsPage() {
@@ -77,7 +78,8 @@ export default function ContributionsPage() {
     status: 'all',
     search: '',
     dateFrom: '',
-    dateTo: ''
+    dateTo: '',
+    sortOrder: 'desc' // Default: newest first
   })
 
   const supabase = createClient()
@@ -91,7 +93,7 @@ export default function ContributionsPage() {
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         sortBy: 'created_at',
-        sortOrder: 'desc'
+        sortOrder: filters.sortOrder // Use filter's sort order
       })
 
       // Add filters
@@ -150,7 +152,8 @@ export default function ContributionsPage() {
       status: 'all',
       search: '',
       dateFrom: '',
-      dateTo: ''
+      dateTo: '',
+      sortOrder: 'desc' // Reset to default
     })
     setPagination(prev => ({ ...prev, page: 1 }))
   }

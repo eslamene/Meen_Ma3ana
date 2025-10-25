@@ -10,6 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
+import { Toaster } from '@/components/ui/toaster'
 import { 
   Target, 
   Plus, 
@@ -24,7 +27,8 @@ import {
   ArrowLeft,
   Calendar,
   DollarSign,
-  Users
+  Users,
+  AlertTriangle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -34,7 +38,7 @@ interface Case {
   description: string
   target_amount: number
   current_amount: number
-  status: 'active' | 'completed' | 'paused'
+  status: 'draft' | 'submitted' | 'published' | 'closed' | 'under_review'
   created_at: string
   created_by: string
   image_url?: string
@@ -53,10 +57,25 @@ export default function AdminCasesPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [stats, setStats] = useState({
     total: 0,
-    active: 0,
+    published: 0,
     completed: 0,
-    paused: 0
+    closed: 0,
+    under_review: 0
   })
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean
+    caseId: string | null
+    caseTitle: string
+    step: 'confirm' | 'final'
+  }>({
+    isOpen: false,
+    caseId: null,
+    caseTitle: '',
+    step: 'confirm'
+  })
+  const [deleting, setDeleting] = useState(false)
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('')
+  const { toast } = useEnhancedToast()
 
   const supabase = createClient()
 
@@ -91,11 +110,12 @@ export default function AdminCasesPage() {
       
       // Calculate stats
       const total = casesWithAmounts?.length || 0
-      const active = casesWithAmounts?.filter(c => c.status === 'active').length || 0
+      const published = casesWithAmounts?.filter(c => c.status === 'published').length || 0
       const completed = casesWithAmounts?.filter(c => c.status === 'completed').length || 0
-      const paused = casesWithAmounts?.filter(c => c.status === 'paused').length || 0
+      const closed = casesWithAmounts?.filter(c => c.status === 'closed').length || 0
+      const under_review = casesWithAmounts?.filter(c => c.status === 'under_review').length || 0
 
-      setStats({ total, active, completed, paused })
+      setStats({ total, published, completed, closed, under_review })
     } catch (error) {
       console.error('Error fetching cases:', error)
     } finally {
@@ -142,25 +162,25 @@ export default function AdminCasesPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active':
+      case 'published':
         return (
           <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Active
+            Published
           </Badge>
         )
-      case 'completed':
+      case 'closed':
         return (
-          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Completed
+          <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+            <XCircle className="h-3 w-3 mr-1" />
+            Closed
           </Badge>
         )
-      case 'paused':
+      case 'under_review':
         return (
           <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
             <Clock className="h-3 w-3 mr-1" />
-            Paused
+            Under Review
           </Badge>
         )
       case 'draft':
@@ -168,6 +188,20 @@ export default function AdminCasesPage() {
           <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
             <Edit className="h-3 w-3 mr-1" />
             Draft
+          </Badge>
+        )
+      case 'submitted':
+        return (
+          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Submitted
+          </Badge>
+        )
+      case 'completed':
+        return (
+          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Completed
           </Badge>
         )
       default:
@@ -205,6 +239,119 @@ export default function AdminCasesPage() {
     const matchesStatus = statusFilter === 'all' || case_.status === statusFilter
     return matchesSearch && matchesStatus
   })
+
+  const handleDeleteClick = (caseId: string, caseTitle: string) => {
+    setDeleteDialog({
+      isOpen: true,
+      caseId,
+      caseTitle,
+      step: 'confirm'
+    })
+  }
+
+  const handleDeleteConfirm = () => {
+    if (deleteDialog.step === 'confirm') {
+      setDeleteDialog(prev => ({ ...prev, step: 'final' }))
+      setDeleteConfirmationText('') // Reset confirmation text
+    } else {
+      // Check if user typed exactly "DELETE"
+      if (deleteConfirmationText !== 'DELETE') {
+        toast.error("Invalid Confirmation", "You must type exactly 'DELETE' to confirm deletion.")
+        return
+      }
+      performDelete()
+    }
+  }
+
+  const performDelete = async () => {
+    if (!deleteDialog.caseId) return
+
+    try {
+      setDeleting(true)
+      
+      const response = await fetch(`/api/cases/${deleteDialog.caseId}/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      // Note: 400 responses in console are expected for contribution protection
+      // This is normal browser network logging, not an actual error
+
+      const result = await response.json()
+
+      // Check if deletion was blocked by business logic (contribution protection)
+      if (result.success === false && result.blocked === true && result.reason === 'contribution_protection') {
+        // This is expected business logic, not an error
+        toast.error(
+          "Cannot Delete Case with Contributions",
+          result.message || "This case has received contributions and cannot be deleted for data integrity. Please contact an administrator if you need to remove this case."
+        )
+        
+        // Close dialog without treating as error
+        setDeleteDialog({
+          isOpen: false,
+          caseId: null,
+          caseTitle: '',
+          step: 'confirm'
+        })
+        return
+      }
+
+      // Check for actual errors
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to delete case')
+      }
+
+      // Remove case from local state
+      setCases(prev => prev.filter(c => c.id !== deleteDialog.caseId))
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        total: prev.total - 1
+      }))
+
+      // Close dialog
+      setDeleteDialog({
+        isOpen: false,
+        caseId: null,
+        caseTitle: '',
+        step: 'confirm'
+      })
+
+      // Show success message
+      toast.success(
+        "Case Deleted Successfully",
+        `Case "${deleteDialog.caseTitle}" and all related data have been permanently deleted.`
+      )
+
+    } catch (error) {
+      // Only log actual errors, not business logic responses
+      console.error('Unexpected error deleting case:', error)
+      
+      // Show error message for unexpected errors only
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete case'
+      
+      toast.error(
+        "Delete Failed",
+        errorMessage
+      )
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteDialog({
+      isOpen: false,
+      caseId: null,
+      caseTitle: '',
+      step: 'confirm'
+    })
+    setDeleteConfirmationText('') // Reset confirmation text
+  }
 
   return (
     <ProtectedRoute>
@@ -258,8 +405,8 @@ export default function AdminCasesPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Active Cases</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
+                      <p className="text-sm font-medium text-gray-600">Published</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.published}</p>
                     </div>
                     <div className="p-3 bg-green-100 rounded-full">
                       <CheckCircle className="h-6 w-6 text-green-600" />
@@ -275,8 +422,8 @@ export default function AdminCasesPage() {
                       <p className="text-sm font-medium text-gray-600">Completed</p>
                       <p className="text-2xl font-bold text-gray-900">{stats.completed}</p>
                     </div>
-                    <div className="p-3 bg-purple-100 rounded-full">
-                      <CheckCircle className="h-6 w-6 text-purple-600" />
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <CheckCircle className="h-6 w-6 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -286,8 +433,22 @@ export default function AdminCasesPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Paused</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.paused}</p>
+                      <p className="text-sm font-medium text-gray-600">Closed</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.closed}</p>
+                    </div>
+                    <div className="p-3 bg-purple-100 rounded-full">
+                      <XCircle className="h-6 w-6 text-purple-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Under Review</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.under_review}</p>
                     </div>
                     <div className="p-3 bg-yellow-100 rounded-full">
                       <Clock className="h-6 w-6 text-yellow-600" />
@@ -318,9 +479,12 @@ export default function AdminCasesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="published">Published</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="paused">Paused</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                      <SelectItem value="under_review">Under Review</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="submitted">Submitted</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -441,6 +605,15 @@ export default function AdminCasesPage() {
                             <Edit className="h-3 w-3 mr-1" />
                             Edit
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClick(case_.id, case_.title)}
+                            className="border-2 border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -450,6 +623,94 @@ export default function AdminCasesPage() {
             )}
           </div>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialog.isOpen} onOpenChange={handleDeleteCancel}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                {deleteDialog.step === 'confirm' ? 'Confirm Case Deletion' : 'Final Confirmation'}
+              </DialogTitle>
+              <DialogDescription asChild>
+                <div>
+                  {deleteDialog.step === 'confirm' ? (
+                    <>
+                      <p>Are you sure you want to delete the case <strong>{deleteDialog.caseTitle}</strong>?</p>
+                      <p className="mt-2">This action will permanently delete:</p>
+                      <ul className="list-disc list-inside mt-2 space-y-1 ml-4">
+                        <li>The case and all its data</li>
+                        <li>All uploaded files and images</li>
+                        <li>All case updates and comments</li>
+                        <li>All related records</li>
+                      </ul>
+                      <p className="mt-4">
+                        <strong className="text-red-600">This action cannot be undone!</strong>
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        <strong className="text-red-600">FINAL WARNING!</strong>
+                      </p>
+                      <p className="mt-2">
+                        You are about to permanently delete case <strong>{deleteDialog.caseTitle}</strong> and ALL its related data.
+                      </p>
+                      <p className="mt-2">
+                        <strong className="text-red-600">This action cannot be undone!</strong>
+                      </p>
+                      <p className="mt-2">
+                        Type <strong>DELETE</strong> in the box below to confirm:
+                      </p>
+                    </>
+                  )}
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            
+            {deleteDialog.step === 'final' && (
+              <div className="py-4">
+                <Input
+                  placeholder="Type DELETE to confirm"
+                  className="w-full"
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                />
+                {deleteConfirmationText && deleteConfirmationText !== 'DELETE' && (
+                  <p className="text-sm text-red-600 mt-2">
+                    You must type exactly &quot;DELETE&quot; to confirm
+                  </p>
+                )}
+                {deleteConfirmationText === 'DELETE' && (
+                  <p className="text-sm text-green-600 mt-2">
+                    ✓ Confirmation text is correct
+                  </p>
+                )}
+              </div>
+            )}
+
+            <DialogFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleDeleteCancel}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={deleting || (deleteDialog.step === 'final' && deleteConfirmationText !== 'DELETE')}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deleting ? 'Deleting...' : deleteDialog.step === 'confirm' ? 'Continue' : 'Delete Forever'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Toast Notifications */}
+        <Toaster />
       </PermissionGuard>
     </ProtectedRoute>
   )

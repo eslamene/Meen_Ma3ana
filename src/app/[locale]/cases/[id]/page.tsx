@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -43,6 +43,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import ProgressBar from '@/components/cases/ProgressBar'
 import UpdatesTimeline from '@/components/cases/UpdatesTimeline'
+import CaseFileManager, { CaseFile } from '@/components/cases/CaseFileManager'
 import { realtimeCaseUpdates, CaseProgressUpdate, CaseUpdateNotification } from '@/lib/realtime-case-updates'
 import { CaseUpdate } from '@/lib/case-updates'
 
@@ -69,6 +70,7 @@ interface Case {
   start_date?: string
   end_date?: string
   created_by: string
+  supporting_documents?: string // JSON string of CaseFile[]
 }
 
 interface Contribution {
@@ -114,6 +116,7 @@ export default function CaseDetailPage() {
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [updates, setUpdates] = useState<CaseUpdate[]>([])
+  const [caseFiles, setCaseFiles] = useState<CaseFile[]>([])
   const [loading, setLoading] = useState(true)
   
   // Use centralized hook for approved contributions
@@ -121,13 +124,18 @@ export default function CaseDetailPage() {
   const { hasPermission } = usePermissions()
   const [error, setError] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'contributions' | 'updates'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'contributions' | 'updates' | 'files'>('overview')
   const [realTimeProgress, setRealTimeProgress] = useState<CaseProgressUpdate | null>(null)
   const [canCreateUpdates, setCanCreateUpdates] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [totalContributions, setTotalContributions] = useState(0)
 
   const supabase = createClient()
+
+  // Memoized callback to prevent infinite loops
+  const handleFilesChange = useCallback((updatedFiles: CaseFile[]) => {
+    setCaseFiles(updatedFiles)
+  }, [])
 
   useEffect(() => {
     fetchCaseDetails()
@@ -252,7 +260,10 @@ export default function CaseDetailPage() {
 
       const { data, error } = await supabase
         .from('cases')
-        .select('*')
+        .select(`
+          *,
+          case_categories(name)
+        `)
         .eq('id', caseId)
         .single()
 
@@ -262,7 +273,44 @@ export default function CaseDetailPage() {
         return
       }
 
-      setCaseData(data)
+      // Map database fields to include category name
+      const mappedData = {
+        ...data,
+        category: (data.case_categories as { name: string } | null)?.name || null
+      }
+      
+      setCaseData(mappedData)
+      
+      // Fetch all files from unified case_files table
+      const { data: filesData, error: filesError } = await supabase
+        .from('case_files')
+        .select('*')
+        .eq('case_id', caseId)
+        .order('display_order', { ascending: true })
+
+      if (filesData && !filesError) {
+        const files: CaseFile[] = filesData.map((file) => ({
+          id: file.id,
+          name: file.filename || file.original_filename || 'unnamed',
+          originalName: file.filename || file.original_filename || 'unnamed',
+          url: file.file_url,
+          path: file.file_path,
+          size: file.file_size || 0,
+          type: file.file_type || 'application/octet-stream',
+          category: file.category as FileCategory || 'other',
+          description: file.description || '',
+          isPublic: file.is_public || false,
+          uploadedAt: file.created_at,
+          uploadedBy: file.uploaded_by || data.created_by,
+          metadata: {
+            isPrimary: file.is_primary || false,
+            displayOrder: file.display_order || 0
+          }
+        }))
+        setCaseFiles(files)
+      } else {
+        setCaseFiles([])
+      }
     } catch (error) {
       console.error('Error fetching case details:', error)
       setError('Failed to load case details')
@@ -400,7 +448,43 @@ export default function CaseDetailPage() {
       case 'published': return 'bg-green-100 text-green-800'
       case 'under_review': return 'bg-yellow-100 text-yellow-800'
       case 'closed': return 'bg-gray-100 text-gray-800'
+      case 'completed': return 'bg-green-100 text-green-800'
+      case 'draft': return 'bg-orange-100 text-orange-800'
+      case 'submitted': return 'bg-blue-100 text-blue-800'
       default: return 'bg-blue-100 text-blue-800'
+    }
+  }
+
+  const getFundingProgressStatus = (status: string, currentAmount: number, targetAmount: number) => {
+    // If case is closed or completed, show completed status
+    if (status === 'closed' || status === 'completed') {
+      return {
+        text: t('completed'),
+        bgColor: 'bg-green-100',
+        textColor: 'text-green-700',
+        dotColor: 'bg-green-500',
+        animate: false
+      }
+    }
+    
+    // If target is reached, show completed
+    if (currentAmount >= targetAmount) {
+      return {
+        text: t('completed'),
+        bgColor: 'bg-green-100',
+        textColor: 'text-green-700',
+        dotColor: 'bg-green-500',
+        animate: false
+      }
+    }
+    
+    // Otherwise show in progress
+    return {
+      text: t('inProgress'),
+      bgColor: 'bg-blue-100',
+      textColor: 'text-blue-700',
+      dotColor: 'bg-blue-500',
+      animate: true
     }
   }
 
@@ -439,13 +523,135 @@ export default function CaseDetailPage() {
       if (isNaN(date.getTime())) return t('unknown')
       
       return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
     } catch (error) {
       return t('unknown')
     }
+  }
+
+  // Generate sorted activity timeline
+  const generateSortedActivities = () => {
+    const activities = []
+    
+    // Case Published/Created
+    if (caseData.status !== 'draft') {
+      activities.push({
+        id: 'case-published',
+        title: t('casePublished'),
+        description: 'Case was published and made available for contributions',
+        date: caseData.created_at,
+        icon: Globe,
+        bgColor: 'bg-gradient-to-r from-green-50 to-emerald-50',
+        borderColor: 'border-green-100',
+        dotColor: 'bg-green-500',
+        iconColor: 'text-green-600'
+      })
+    } else {
+      activities.push({
+        id: 'case-draft',
+        title: 'Case Created (Draft)',
+        description: 'Case is in draft mode and not yet available for contributions',
+        date: caseData.created_at,
+        icon: Edit,
+        bgColor: 'bg-gradient-to-r from-yellow-50 to-amber-50',
+        borderColor: 'border-yellow-100',
+        dotColor: 'bg-yellow-500',
+        iconColor: 'text-yellow-600'
+      })
+    }
+
+    // First Contribution
+    const approvedContributions = getApprovedContributions()
+    if (approvedContributions.length > 0) {
+      const firstContribution = approvedContributions[approvedContributions.length - 1]
+      activities.push({
+        id: 'first-contribution',
+        title: t('firstContribution'),
+        description: `First donation of EGP ${firstContribution.amount} by ${firstContribution.donorName}`,
+        date: firstContribution.createdAt,
+        icon: Heart,
+        bgColor: 'bg-gradient-to-r from-blue-50 to-cyan-50',
+        borderColor: 'border-blue-100',
+        dotColor: 'bg-blue-500',
+        iconColor: 'text-blue-600'
+      })
+
+      // Latest Contribution (if different from first)
+      if (approvedContributions.length > 1) {
+        const latestContribution = approvedContributions[0]
+        activities.push({
+          id: 'latest-contribution',
+          title: 'Latest Contribution',
+          description: `Latest donation of EGP ${latestContribution.amount} by ${latestContribution.donorName}`,
+          date: latestContribution.createdAt,
+          icon: Gift,
+          bgColor: 'bg-gradient-to-r from-teal-50 to-green-50',
+          borderColor: 'border-teal-100',
+          dotColor: 'bg-teal-500',
+          iconColor: 'text-teal-600'
+        })
+      }
+
+      // Total Contributions Summary
+      activities.push({
+        id: 'total-contributions',
+        title: 'Total Contributions',
+        description: `${approvedContributions.length} people have contributed to this case`,
+        date: approvedContributions[0].createdAt, // Use latest contribution date
+        icon: Users,
+        bgColor: 'bg-gradient-to-r from-amber-50 to-orange-50',
+        borderColor: 'border-amber-100',
+        dotColor: 'bg-amber-500',
+        iconColor: 'text-amber-600',
+        extraInfo: `${approvedContributions.length} donors`
+      })
+
+      // Progress Milestone
+      if (getApprovedContributionsTotal() > 0) {
+        const progressPercentage = Math.round((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100)
+        activities.push({
+          id: 'progress-milestone',
+          title: 'Progress Milestone',
+          description: `${formatAmount(getApprovedContributionsTotal())} raised of ${formatAmount(caseData.target_amount)} goal`,
+          date: approvedContributions[0].createdAt, // Use latest contribution date
+          icon: TrendingUp,
+          bgColor: 'bg-gradient-to-r from-indigo-50 to-blue-50',
+          borderColor: 'border-indigo-100',
+          dotColor: 'bg-indigo-500',
+          iconColor: 'text-indigo-600',
+          extraInfo: `${progressPercentage}%`
+        })
+      }
+    }
+
+    // Case Completion/Final Status
+    if (caseData.status === 'completed' || caseData.status === 'closed') {
+      // Use updated_at as the completion date since it would be more recent than created_at
+      const completionDate = caseData.updated_at || caseData.created_at
+      const isCompleted = caseData.status === 'completed'
+      
+      activities.push({
+        id: 'case-completion',
+        title: isCompleted ? 'Case Completed' : 'Case Closed',
+        description: isCompleted 
+          ? 'Case has been successfully completed and reached its goal'
+          : 'Case has been closed and is no longer accepting contributions',
+        date: completionDate,
+        icon: isCompleted ? CheckCircle : XCircle,
+        bgColor: isCompleted 
+          ? 'bg-gradient-to-r from-green-50 to-emerald-50'
+          : 'bg-gradient-to-r from-gray-50 to-slate-50',
+        borderColor: isCompleted ? 'border-green-100' : 'border-gray-100',
+        dotColor: isCompleted ? 'bg-green-500' : 'bg-gray-500',
+        iconColor: isCompleted ? 'text-green-600' : 'text-gray-600'
+      })
+    }
+
+    // Sort activities by date (most recent first)
+    return activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }
 
   const formatRelativeDate = (dateString: string | null | undefined) => {
@@ -566,10 +772,19 @@ export default function CaseDetailPage() {
                     </div>
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    <div className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium flex items-center gap-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                      In Progress
-                    </div>
+                    {(() => {
+                      const progressStatus = getFundingProgressStatus(
+                        caseData.status, 
+                        approvedTotal, 
+                        caseData.target_amount
+                      )
+                      return (
+                        <div className={`px-3 py-1 ${progressStatus.bgColor} ${progressStatus.textColor} rounded-full text-sm font-medium flex items-center gap-1`}>
+                          <div className={`w-2 h-2 ${progressStatus.dotColor} rounded-full ${progressStatus.animate ? 'animate-pulse' : ''}`}></div>
+                          {progressStatus.text}
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               </CardHeader>
@@ -689,9 +904,9 @@ export default function CaseDetailPage() {
             {/* Tabs */}
             <Card className="border-2 border-blue-50 bg-gradient-to-br from-white to-blue-50 shadow-lg overflow-hidden">
               <div className="w-full h-1 bg-gradient-to-r from-green-400 via-blue-500 to-purple-600"></div>
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'contributions' | 'updates')}>
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'contributions' | 'updates' | 'files')}>
                 <CardHeader className="pb-4">
-                  <TabsList className="grid w-full grid-cols-3 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+                  <TabsList className="grid w-full grid-cols-4 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
                     <TabsTrigger 
                       value="overview" 
                       className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-200"
@@ -720,6 +935,18 @@ export default function CaseDetailPage() {
                         {updates.length > 0 && (
                         <Badge variant="secondary" className="ml-1 text-xs bg-white/20 text-white border-white/30">
                             {updates.length}
+                          </Badge>
+                        )}
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="files" 
+                      className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-200"
+                    >
+                        <FileText className="h-4 w-4" />
+                        Files
+                        {caseFiles.length > 0 && (
+                        <Badge variant="secondary" className="ml-1 text-xs bg-white/20 text-white border-white/30">
+                            {caseFiles.length}
                           </Badge>
                         )}
                     </TabsTrigger>
@@ -870,6 +1097,17 @@ export default function CaseDetailPage() {
                       canCreate={canCreateUpdates}
                     />
                   </TabsContent>
+
+                  <TabsContent value="files">
+                    <CaseFileManager
+                      caseId={caseId}
+                      files={caseFiles}
+                      canEdit={hasPermission('cases:edit') || hasPermission('admin:manage')}
+                      onFilesChange={handleFilesChange}
+                      viewMode="grid"
+                      showUpload={true}
+                    />
+                  </TabsContent>
                 </CardContent>
               </Tabs>
             </Card>
@@ -978,7 +1216,7 @@ export default function CaseDetailPage() {
                       <Tag className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-600">{t('category')}</span>
                 </div>
-                    <span className="text-sm font-medium text-gray-800">{caseData.category ? t(caseData.category) : t('notSpecified')}</span>
+                    <span className="text-sm font-medium text-gray-800">{caseData.category || t('notSpecified')}</span>
                   </div>
                   
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -1023,122 +1261,28 @@ export default function CaseDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Case Published - Only show for published cases */}
-                  {caseData.status !== 'draft' && (
-                    <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
-                      <div className="flex-shrink-0 w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Globe className="h-4 w-4 text-green-600" />
-                            <span className="font-medium text-gray-800">{t('casePublished')}</span>
-                    </div>
-                          <span className="text-sm text-gray-500">{formatRelativeDate(caseData.created_at)}</span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Case was published and made available for contributions
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Case Draft Status - Show for draft cases */}
-                  {caseData.status === 'draft' && (
-                    <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border border-yellow-100">
-                      <div className="flex-shrink-0 w-3 h-3 bg-yellow-500 rounded-full mt-1.5"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Edit className="h-4 w-4 text-yellow-600" />
-                            <span className="font-medium text-gray-800">Case Created (Draft)</span>
-                    </div>
-                          <span className="text-sm text-gray-500">{formatRelativeDate(caseData.created_at)}</span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Case is in draft mode and not yet available for contributions
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* First Contribution */}
-                  {getApprovedContributions().length > 0 && (
-                    <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-100">
-                      <div className="flex-shrink-0 w-3 h-3 bg-blue-500 rounded-full mt-1.5"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Heart className="h-4 w-4 text-blue-600" />
-                            <span className="font-medium text-gray-800">{t('firstContribution')}</span>
+                  {generateSortedActivities().map((activity) => {
+                    const IconComponent = activity.icon
+                    return (
+                      <div key={activity.id} className={`flex items-start gap-4 p-3 ${activity.bgColor} rounded-lg border ${activity.borderColor}`}>
+                        <div className={`flex-shrink-0 w-3 h-3 ${activity.dotColor} rounded-full mt-1.5`}></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <IconComponent className={`h-4 w-4 ${activity.iconColor}`} />
+                              <span className="font-medium text-gray-800">{activity.title}</span>
+                            </div>
+                            <span className="text-sm text-gray-500">
+                              {activity.extraInfo || formatRelativeDate(activity.date)}
+                            </span>
                           </div>
-                          <span className="text-sm text-gray-500">{formatRelativeDate(getApprovedContributions()[getApprovedContributions().length - 1].createdAt)}</span>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {activity.description}
+                          </p>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          First donation of EGP {getApprovedContributions()[getApprovedContributions().length - 1].amount} by {getApprovedContributions()[getApprovedContributions().length - 1].donorName}
-                        </p>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Latest Contribution */}
-                  {getApprovedContributions().length > 1 && (
-                    <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-teal-50 to-green-50 rounded-lg border border-teal-100">
-                      <div className="flex-shrink-0 w-3 h-3 bg-teal-500 rounded-full mt-1.5"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Gift className="h-4 w-4 text-teal-600" />
-                            <span className="font-medium text-gray-800">Latest Contribution</span>
-                          </div>
-                          <span className="text-sm text-gray-500">{formatRelativeDate(getApprovedContributions()[0].createdAt)}</span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Latest donation of EGP {getApprovedContributions()[0].amount} by {getApprovedContributions()[0].donorName}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-
-                  {/* Total Contributions */}
-                  {getApprovedContributions().length > 0 && (
-                    <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-100">
-                      <div className="flex-shrink-0 w-3 h-3 bg-amber-500 rounded-full mt-1.5"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-amber-600" />
-                            <span className="font-medium text-gray-800">Total Contributions</span>
-                          </div>
-                          <span className="text-sm text-gray-500">{getApprovedContributions().length} donors</span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {getApprovedContributions().length} people have contributed to this case
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Progress Milestone */}
-                  {getApprovedContributionsTotal() > 0 && (
-                    <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-100">
-                      <div className="flex-shrink-0 w-3 h-3 bg-indigo-500 rounded-full mt-1.5"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-indigo-600" />
-                            <span className="font-medium text-gray-800">Progress Milestone</span>
-                          </div>
-                          <span className="text-sm text-gray-500">
-                            {Math.round((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100)}%
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {formatAmount(getApprovedContributionsTotal())} raised of {formatAmount(caseData.target_amount)} goal
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
