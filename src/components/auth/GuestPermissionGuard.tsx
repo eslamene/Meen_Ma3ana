@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
-import { useGuestRBAC } from '@/lib/hooks/useGuestRBAC'
+import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 import { useAuth } from '@/components/auth/AuthProvider'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -40,7 +40,7 @@ export function GuestPermissionGuard({
   showAuthPrompt = true
 }: GuestPermissionGuardProps) {
   const { user } = useAuth()
-  const { hasVisitorPermission, hasAnyVisitorPermission, loading } = useGuestRBAC()
+  const { hasPermission, loading } = useSimpleRBAC()
 
   // Show loading state
   if (loading && showLoading) {
@@ -60,8 +60,8 @@ export function GuestPermissionGuard({
   // Check visitor permissions for unauthenticated users
   if (visitorPermissions.length > 0) {
     const hasRequiredPermissions = requireAll 
-      ? visitorPermissions.every(p => hasVisitorPermission(p))
-      : hasAnyVisitorPermission(visitorPermissions)
+      ? visitorPermissions.every(p => hasPermission(p))
+      : visitorPermissions.some(p => hasPermission(p))
     
     if (hasRequiredPermissions) {
       return <>{children}</>

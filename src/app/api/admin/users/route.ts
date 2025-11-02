@@ -1,29 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAdminPermission } from '@/lib/security/rls'
+import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
-    console.log('Starting users fetch...')
+    logger.info('Starting users fetch...')
     
-    // Create admin client
-    const adminClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    // Require admin permission
+    const authResult = await requireAdminPermission(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
+    }
+
+    const { user: adminUser, supabase } = authResult
+
+    // Log the admin access
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAdminAction(
+      adminUser.id,
+      'admin_users_access',
+      'user',
+      undefined,
+      { endpoint: '/api/admin/users' },
+      ipAddress,
+      userAgent
     )
 
-    console.log('Admin client created')
+    logger.info('Admin user authenticated', { userId: adminUser.id })
 
-    // Fetch users
-    const { data: authUsers, error: usersError } = await adminClient.auth.admin.listUsers()
+    // Fetch users using admin client (now properly authenticated)
+    const { data: authUsers, error: usersError } = await supabase.auth.admin.listUsers()
     if (usersError) {
-      console.error('Error fetching users:', usersError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users:', usersError)
       throw usersError
     }
 
-    console.log('Users fetched:', authUsers.users.length)
+    logger.info('Users fetched:', authUsers.users.length)
 
     // Fetch user roles
-    const { data: userRoles, error: rolesError } = await adminClient
+    const { data: userRoles, error: rolesError } = await supabase
       .from('user_roles')
       .select(`
         user_id,
@@ -32,20 +53,32 @@ export async function GET(request: NextRequest) {
       `)
 
     if (rolesError) {
-      console.error('Error fetching user roles:', rolesError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user roles:', rolesError)
       // Don't throw, just return empty array
     }
 
-    console.log('User roles fetched:', userRoles?.length || 0)
+    logger.info('User roles fetched:', userRoles?.length || 0)
+
+    // Sanitize user data - remove sensitive fields
+    const sanitizedUsers = authUsers.users.map(user => ({
+      id: user.id,
+      email: user.email,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+      email_confirmed_at: user.email_confirmed_at,
+      last_sign_in_at: user.last_sign_in_at,
+      role: user.user_metadata?.role || 'donor',
+      // Remove sensitive fields like phone, app_metadata, etc.
+    }))
 
     return NextResponse.json({
       success: true,
-      users: authUsers.users,
+      users: sanitizedUsers,
       userRoles: userRoles || []
     })
 
   } catch (error) {
-    console.error('Users API error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Users API error:', error)
     return NextResponse.json({
       error: 'Failed to fetch users',
       details: error instanceof Error ? error.message : 'Unknown error'

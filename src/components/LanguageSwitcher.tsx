@@ -2,7 +2,7 @@
 
 import { useLocale } from 'next-intl'
 import { useRouter, usePathname } from 'next/navigation'
-import { locales } from '@/i18n'
+import { locales } from '@/i18n/request'
 
 export default function LanguageSwitcher() {
   const locale = useLocale()
@@ -22,9 +22,12 @@ export default function LanguageSwitcher() {
     // Clean up any double slashes and ensure we don't have trailing slash unless it's root
     pathWithoutLocale = pathWithoutLocale.replace(/\/+/g, '/').replace(/\/$/, '') || '/'
     
-    // Navigate to the new locale
-    const newPath = pathWithoutLocale === '/' ? `/${newLocale}` : `/${newLocale}${pathWithoutLocale}`
-    router.push(newPath)
+    // Build the new path with the new locale
+    const newPath = pathWithoutLocale === '/' ? `/${newLocale}/landing` : `/${newLocale}${pathWithoutLocale}`
+    
+    // Force a full page reload to ensure Next.js re-renders server components
+    // with the new locale. This is necessary for route groups with nested layouts
+    window.location.href = newPath
   }
 
   return (
@@ -42,7 +45,7 @@ export default function LanguageSwitcher() {
               onClick={() => switchLanguage(loc)}
               className={`relative px-3 py-2 text-sm font-medium transition-all duration-200 flex items-center gap-2 first:rounded-l-lg last:rounded-r-lg ${
                 isActive
-                  ? 'bg-blue-600 text-white shadow-sm transform scale-105 z-10'
+                  ? 'bg-[#E74C3C] text-white shadow-sm transform scale-105 z-10'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
               title={`Switch to ${loc === 'en' ? 'English' : 'Arabic'}`}

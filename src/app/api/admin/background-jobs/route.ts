@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { BackgroundJobService } from '@/lib/background-jobs'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -46,12 +52,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Error running background job:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error running background job:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -101,7 +110,7 @@ export async function GET(request: NextRequest) {
       ]
     })
   } catch (error) {
-    console.error('Error getting background job info:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error getting background job info:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 } 

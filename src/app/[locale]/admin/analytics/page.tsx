@@ -293,7 +293,7 @@ export default function AdminAnalyticsPage() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <PermissionGuard allowedPermissions={["admin:analytics", "admin:dashboard"]} requireAll={false}>
+        <PermissionGuard permission="view:analytics">
           <AnalyticsSkeleton />
         </PermissionGuard>
       </ProtectedRoute>
@@ -302,7 +302,7 @@ export default function AdminAnalyticsPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard allowedPermissions={["admin:analytics", "admin:dashboard"]} requireAll={false}>
+      <PermissionGuard permission="view:analytics">
         <div className="min-h-screen bg-gray-50">
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div className="px-4 py-6 sm:px-0">

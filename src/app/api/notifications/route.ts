@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     
@@ -27,7 +33,7 @@ export async function GET(request: NextRequest) {
       unreadCount
     })
   } catch (error) {
-    console.error('Error fetching notifications:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching notifications:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -36,6 +42,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     
@@ -50,9 +59,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { action } = body
+    const { action, notificationId } = body
 
-    if (action === 'mark-all-read') {
+    if (action === 'markAllAsRead' || action === 'mark-all-read') {
       const success = await contributionNotificationService.markAllNotificationsAsRead(user.id)
       
       if (success) {
@@ -65,12 +74,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (action === 'markAsRead' && notificationId) {
+      const success = await contributionNotificationService.markNotificationAsRead(notificationId, user.id)
+      
+      if (success) {
+        return NextResponse.json({ success: true })
+      } else {
+        return NextResponse.json(
+          { error: 'Failed to mark notification as read' },
+          { status: 500 }
+        )
+      }
+    }
+
     return NextResponse.json(
       { error: 'Invalid action' },
       { status: 400 }
     )
   } catch (error) {
-    console.error('Error handling notification action:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error handling notification action:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

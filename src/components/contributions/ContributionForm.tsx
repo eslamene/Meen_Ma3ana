@@ -28,7 +28,7 @@ import {
   Eye
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/components/ui/toast'
 
 interface ContributionFormProps {
   caseId: string
@@ -74,7 +74,7 @@ export default function ContributionForm({
   onCancel
 }: ContributionFormProps) {
   const t = useTranslations('cases')
-  const { addToast } = useToast()
+  const { toast } = useToast()
   const [formData, setFormData] = useState<ContributionData>({
     amount: 0,
     message: '',
@@ -136,10 +136,10 @@ export default function ContributionForm({
       // Validate file type
       const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
       if (!allowedTypes.includes(file.type)) {
-        addToast({
+        toast({
           type: 'error',
           title: 'Invalid File Type',
-          message: t('invalidFileType'),
+          description: t('invalidFileType'),
           duration: 5000
         })
         return
@@ -147,10 +147,10 @@ export default function ContributionForm({
       
       // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
-        addToast({
+        toast({
           type: 'error',
           title: 'File Too Large',
-          message: t('fileTooLarge'),
+          description: t('fileTooLarge'),
           duration: 5000
         })
         return
@@ -196,30 +196,30 @@ export default function ContributionForm({
     e.preventDefault()
     
     if (formData.amount <= 0) {
-      addToast({
+      toast({
         type: 'error',
         title: 'Amount Required',
-        message: t('amountRequired'),
+        description: t('amountRequired'),
         duration: 5000
       })
       return
     }
 
     if (!formData.paymentMethod) {
-      addToast({
+      toast({
         type: 'error',
         title: 'Payment Method Required',
-        message: t('paymentMethodRequired'),
+        description: t('paymentMethodRequired'),
         duration: 5000
       })
       return
     }
 
     if (!formData.paymentProof) {
-      addToast({
+      toast({
         type: 'error',
         title: 'Payment Proof Required',
-        message: t('paymentProofRequired'),
+        description: t('paymentProofRequired'),
         duration: 5000
       })
       return
@@ -259,10 +259,10 @@ export default function ContributionForm({
       onContributionSubmitted?.(contribution)
 
       // Show success toast
-      addToast({
+      toast({
         type: 'success',
         title: 'Donation Submitted Successfully!',
-        message: t('donationSuccess'),
+        description: t('donationSuccess'),
         duration: 5000
       })
 
@@ -281,10 +281,10 @@ export default function ContributionForm({
 
     } catch (error) {
       console.error('Error submitting contribution:', error)
-      addToast({
+      toast({
         type: 'error',
         title: 'Submission Failed',
-        message: error instanceof Error ? error.message : 'Failed to submit contribution',
+        description: error instanceof Error ? error.message : 'Failed to submit contribution',
         duration: 5000
       })
     } finally {

@@ -3,29 +3,51 @@ import { SecurityService } from '@/lib/security/rls'
 import { db } from '@/lib/db'
 import { cases, users, contributions } from '@/drizzle/schema'
 import { eq } from 'drizzle-orm'
+import { requirePermission } from '@/lib/security/guards'
+import { isTestEnabled } from '@/lib/security/rls'
+import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
-    const user = await SecurityService.getCurrentUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Check if test endpoints are enabled
+    if (!isTestEnabled()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Test endpoints are disabled'
+      }, { status: 404 })
     }
+
+    // Use permission guard
+    const guardResult = await requirePermission('admin:system')(request)
+    if (guardResult instanceof NextResponse) {
+      return guardResult
+    }
+    
+    const { user, supabase } = guardResult
+
+    // Log the test access
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAdminAction(
+      user.id,
+      'test_rls_access',
+      'api',
+      'test-rls',
+      { endpoint: '/api/test-rls' },
+      ipAddress,
+      userAgent
+    )
 
     const userRole = await SecurityService.getCurrentUserRole(user.id)
     
     // Set security context
     await SecurityService.setSecurityContext(user.id, userRole)
     
-    // Audit the test action
-    await SecurityService.auditAction(
-      user.id,
-      'test_rls_access',
-      'api',
-      'test-rls',
-      { userRole, timestamp: new Date().toISOString() }
-    )
-
     const results = {
       user: {
         id: user.id,
@@ -48,7 +70,7 @@ export async function GET(request: NextRequest) {
       
       results.accessibleCases = casesResult
     } catch (error) {
-      console.error('Error accessing cases:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error accessing cases:', error)
       results.accessibleCases = { error: 'Access denied' }
     }
 
@@ -63,7 +85,7 @@ export async function GET(request: NextRequest) {
       
       results.accessibleContributions = contributionsResult
     } catch (error) {
-      console.error('Error accessing contributions:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error accessing contributions:', error)
       results.accessibleContributions = { error: 'Access denied' }
     }
 
@@ -77,7 +99,7 @@ export async function GET(request: NextRequest) {
       
       results.accessibleUsers = usersResult
     } catch (error) {
-      console.error('Error accessing users:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error accessing users:', error)
       results.accessibleUsers = { error: 'Access denied' }
     }
 
@@ -86,12 +108,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      warning: 'This is a test endpoint - not for production use',
       message: 'RLS test completed',
       results
     })
 
   } catch (error) {
-    console.error('RLS test error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'RLS test error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -100,12 +123,25 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
-    const user = await SecurityService.getCurrentUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Check if test endpoints are enabled
+    if (!isTestEnabled()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Test endpoints are disabled'
+      }, { status: 404 })
     }
+
+    // Use permission guard
+    const guardResult = await requirePermission('admin:system')(request)
+    if (guardResult instanceof NextResponse) {
+      return guardResult
+    }
+    
+    const { user } = guardResult
 
     const userRole = await SecurityService.getCurrentUserRole(user.id)
     const body = await request.json()
@@ -121,8 +157,9 @@ export async function POST(request: NextRequest) {
       resourceId
     )
 
-    // Audit the access check
-    await SecurityService.auditAction(
+    // Log the test access
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAdminAction(
       user.id,
       'test_resource_access',
       resourceType,
@@ -131,8 +168,10 @@ export async function POST(request: NextRequest) {
         canAccess,
         userRole,
         action,
-        timestamp: new Date().toISOString()
-      }
+        endpoint: '/api/test-rls'
+      },
+      ipAddress,
+      userAgent
     )
 
     // Clear security context
@@ -147,7 +186,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Resource access test error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Resource access test error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

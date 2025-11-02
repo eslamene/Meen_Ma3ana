@@ -4,47 +4,26 @@ import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
 import { cases, contributions, sponsorships, users, projects, projectCycles } from '@/drizzle/schema'
 import { eq, and, gte, lte, desc, sql, count, sum, avg } from 'drizzle-orm'
+import { requirePermission } from '@/lib/security/guards'
 
-// Simple in-memory cache for analytics data
-const analyticsCache = new Map<string, { data: any; timestamp: number }>()
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
+// Disable in-memory cache in production to avoid cross-user data leakage
+const ENABLE_CACHE = process.env.NODE_ENV === 'development'
 
 export async function GET(request: NextRequest) {
-  try {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              )
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
-          },
-        },
-      }
-    )
-    
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
 
-    // Check if user is admin
-    if (user.user_metadata?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  try {
+    // Use permission guard
+    const guardResult = await requirePermission('view:analytics')(request)
+    if (guardResult instanceof NextResponse) {
+      return guardResult
     }
+    
+    const { user, supabase } = guardResult
 
     // Get query parameters
     const { searchParams } = new URL(request.url)
@@ -52,14 +31,9 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     
-    // Create cache key based on parameters
-    const cacheKey = `analytics_${dateRange}_${startDate}_${endDate}_${user.id}`
-    
-    // Check cache first
-    const cachedData = analyticsCache.get(cacheKey)
-    if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
-      console.log('📊 Returning cached analytics data')
-      return NextResponse.json(cachedData.data)
+    // Skip cache in production to avoid cross-user data leakage
+    if (!ENABLE_CACHE) {
+      // Cache disabled in production - proceed with fresh data
     }
 
     // Calculate date range
@@ -249,23 +223,11 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Cache the response
-    analyticsCache.set(cacheKey, {
-      data: responseData,
-      timestamp: Date.now()
-    })
-    
-    // Clean up old cache entries (simple cleanup)
-    if (analyticsCache.size > 100) {
-      const oldestKey = analyticsCache.keys().next().value
-      analyticsCache.delete(oldestKey)
-    }
-    
-    console.log('📊 Analytics data computed and cached')
+    logger.info('📊 Analytics data computed')
     return NextResponse.json(responseData)
 
   } catch (error) {
-    console.error('Analytics API error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Analytics API error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

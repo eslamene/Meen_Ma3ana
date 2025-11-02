@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger } from '@/lib/logger'
+
 interface Contribution {
   id: string
   amount: number
@@ -61,7 +63,7 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
         if (Array.isArray(approvalStatus)) {
           return approvalStatus.length > 0 && approvalStatus[0]?.status === 'approved'
         }
-        return approvalStatus && approvalStatus.status === 'approved'
+        return approvalStatus && (approvalStatus as { status: string }).status === 'approved'
       })
 
       // Format contributions
@@ -70,9 +72,9 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
         const user = contribution.users
         const donorName = contribution.anonymous 
           ? 'Anonymous Donor' 
-          : user && user.first_name && user.last_name
-            ? `${user.first_name} ${user.last_name}`
-            : user?.first_name || user?.last_name || user?.email || 'Unknown Donor'
+          : user && user[0].first_name && user[0].last_name
+            ? `${user[0].first_name} ${user[0].last_name}`
+            : user[0]?.first_name || user[0]?.last_name || user[0]?.email || 'Unknown Donor'
 
         return {
           id: contribution.id,
@@ -93,8 +95,17 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
       setTotalAmount(total)
 
     } catch (err) {
-      console.error('Error fetching approved contributions:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch contributions')
+      // Log both to console and structured logger for better visibility in devtools
+      // Some non-Error objects (e.g., PostgrestError) don't render well in Next DevTools
+      // so we also emit a plain console.error.
+      console.error('Error fetching approved contributions', err)
+      defaultLogger.error('Error fetching approved contributions', err)
+      const message = err instanceof Error
+        ? err.message
+        : (typeof err === 'object' && err !== null && 'message' in (err as any))
+          ? String((err as any).message)
+          : 'Failed to fetch contributions'
+      setError(message)
     } finally {
       setIsLoading(false)
     }

@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
   try {
@@ -31,7 +37,7 @@ export async function POST(
       )
     }
   } catch (error) {
-    console.error('Error marking notification as read:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error marking notification as read:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

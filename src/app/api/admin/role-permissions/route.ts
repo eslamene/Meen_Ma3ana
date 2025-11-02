@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const { searchParams } = new URL(request.url)
     const roleId = searchParams.get('roleId')
@@ -10,7 +16,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Role ID required' }, { status: 400 })
     }
 
-    console.log('Fetching permissions for role:', roleId)
+    logger.info('Fetching permissions for role:', roleId)
 
     // Create admin client
     const adminClient = createClient(
@@ -31,12 +37,12 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (roleError) {
-      console.error('Error fetching role:', roleError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching role:', roleError)
       throw roleError
     }
 
-    console.log('Role fetched successfully:', role.name)
-    console.log('Permissions count:', role.role_permissions?.length || 0)
+    logger.info('Role fetched successfully:', role.name)
+    logger.info('Permissions count:', role.role_permissions?.length || 0)
 
     return NextResponse.json({
       success: true,
@@ -44,7 +50,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Role permissions API error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Role permissions API error:', error)
     return NextResponse.json({
       error: 'Failed to fetch role permissions',
       details: error instanceof Error ? error.message : 'Unknown error'

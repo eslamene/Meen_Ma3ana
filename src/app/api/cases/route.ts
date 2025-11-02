@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { caseUpdateService } from '@/lib/case-updates'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const { searchParams } = new URL(request.url)
     
@@ -25,7 +31,14 @@ export async function GET(request: NextRequest) {
     if (category && category !== 'all') {
       // Capitalize the first letter to match database format
       const capitalizedCategory = category.charAt(0).toUpperCase() + category.slice(1)
-      console.log('Filtering by category:', category, '-> capitalized:', capitalizedCategory)
+      
+      // Only log category filtering in development
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('Filtering by category', { 
+          originalCategory: category, 
+          capitalizedCategory 
+        })
+      }
       
       const { data: categoryData, error: categoryError } = await supabase
         .from('case_categories')
@@ -34,23 +47,33 @@ export async function GET(request: NextRequest) {
         .single()
       
       if (categoryError) {
-        console.error('Error fetching category:', categoryError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching category:', categoryError)
       }
       
       if (categoryData) {
         categoryId = categoryData.id
-        console.log('Found category ID:', categoryId)
+        // Only log category ID resolution in development
+        if (process.env.NODE_ENV === 'development') {
+          logger.debug('Category ID resolved', { categoryId })
+        }
       } else {
-        console.log('No category found for:', capitalizedCategory)
+        // Only log missing category in development
+        if (process.env.NODE_ENV === 'development') {
+          logger.debug('No category found', { capitalizedCategory })
+        }
       }
     }
 
-    // Start with base query - use left join to include cases without categories
+    // Start with base query - use left join to include cases without categories and aggregate approved amounts
     let query = supabase
       .from('cases')
       .select(`
         *,
-        case_categories(name)
+        case_categories(name),
+        approved_contributions:contributions!case_id(
+          amount,
+          approval_status:contribution_approval_status!contribution_id(status)
+        )
       `, { count: 'exact' })
 
     // Apply status filter - default to published cases if no status specified
@@ -97,17 +120,24 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query
 
     if (error) {
-      console.error('Error fetching cases:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching cases:', error)
       return NextResponse.json(
         { error: 'Failed to fetch cases' },
         { status: 500 }
       )
     }
 
-    console.log('API Response - Total cases found:', count, 'Category filter:', category, 'Category ID:', categoryId)
+    // Only log API response details in development to avoid exposing user data and counts in production
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('API Response generated', { 
+        totalCount: count,
+        hasCategoryFilter: !!category,
+        hasCategoryId: !!categoryId
+      })
+    }
 
     // Transform snake_case field names to camelCase for frontend compatibility
-    const transformedCases = await Promise.all((data || []).map(async (caseItem: {
+    const transformedCases = (data || []).map((caseItem: {
       id: string
       title: string
       description: string
@@ -126,18 +156,16 @@ export async function GET(request: NextRequest) {
       sponsored_by?: string
       supporting_documents?: string
       case_categories?: { name: string } | null
+      approved_contributions?: Array<{
+        amount: string
+        approval_status: Array<{ status: string }> | { status: string } | null
+      }>
     }) => {
-      // Calculate approved contributions total for this case
-      const { data: approvedContributions } = await supabase
-        .from('contributions')
-        .select(`
-          amount,
-          approval_status:contribution_approval_status!contribution_id(status)
-        `)
-        .eq('case_id', caseItem.id)
-
-      const approvedTotal = approvedContributions?.reduce((total, contribution) => {
-        const approvalStatus = contribution.approval_status?.status || 'pending'
+      // Calculate approved contributions total from the joined data
+      const approvedTotal = caseItem.approved_contributions?.reduce((total, contribution) => {
+        const approvalStatus = Array.isArray(contribution.approval_status) 
+          ? contribution.approval_status[0]?.status 
+          : contribution.approval_status?.status || 'pending'
         return approvalStatus === 'approved' ? total + parseFloat(contribution.amount) : total
       }, 0) || 0
 
@@ -146,7 +174,7 @@ export async function GET(request: NextRequest) {
         title: caseItem.title,
         description: caseItem.description,
         targetAmount: parseFloat(caseItem.target_amount),
-        currentAmount: approvedTotal, // Use approved contributions total
+        currentAmount: approvedTotal, // Use approved contributions total from single query
         status: caseItem.status,
         category: caseItem.case_categories?.name || 'other', // Use category name from join
         type: caseItem.type,
@@ -161,7 +189,7 @@ export async function GET(request: NextRequest) {
         sponsoredBy: caseItem.sponsored_by,
         supportingDocuments: caseItem.supporting_documents,
       }
-    }))
+    })
 
     return NextResponse.json({
       cases: transformedCases,
@@ -173,7 +201,7 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error in cases API:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in cases API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -182,6 +210,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
 
@@ -260,7 +291,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) {
-      console.error('Error creating case:', insertError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating case:', insertError)
       return NextResponse.json(
         { error: 'Failed to create case' },
         { status: 500 }
@@ -278,7 +309,7 @@ export async function POST(request: NextRequest) {
         createdBy: user.id,
       })
     } catch (updateError) {
-      console.error('Error creating initial case update:', updateError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating initial case update:', updateError)
       // Don't fail the request if case update creation fails
     }
 
@@ -302,7 +333,7 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 201 })
   } catch (error) {
-    console.error('Error in cases API POST:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in cases API POST:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

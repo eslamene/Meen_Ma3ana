@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function PATCH(
   request: NextRequest,
-  context: { params: Promise<{ id: string; fileId: string }> }
+  context: {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params: Promise<{ id: string; fileId: string }> }
 ) {
   try {
     const params = await context.params
@@ -18,11 +24,11 @@ export async function PATCH(
     const body = await request.json()
     const { originalName, description, category, isPublic } = body
 
-    console.log('Update file request:', { caseId, fileId, originalName, description, category, isPublic })
+    logger.info('Update file request:', { caseId, fileId, originalName, description, category, isPublic })
 
     // Clean up fileId (remove any prefixes from old system)
     const cleanFileId = fileId.replace('case-image-', '')
-    console.log('Updating case_files with ID:', cleanFileId)
+    logger.info('Updating case_files with ID:', cleanFileId)
     
     // First, check if the file exists
     const { data: existingFile, error: fetchError } = await supabase
@@ -32,10 +38,10 @@ export async function PATCH(
       .eq('case_id', caseId)
       .single()
 
-    console.log('Existing file check:', { existingFile, fetchError })
+    logger.info('Existing file check:', { existingFile, fetchError })
 
     if (fetchError || !existingFile) {
-      console.error('File not found:', { cleanFileId, caseId, fetchError })
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'File not found:', { cleanFileId, caseId, fetchError })
       return NextResponse.json({ 
         error: 'File not found', 
         details: fetchError?.message || 'File does not exist or does not belong to this case'
@@ -56,7 +62,7 @@ export async function PATCH(
     if (category !== undefined) updateData.category = category
     if (isPublic !== undefined) updateData.is_public = isPublic
 
-    console.log('Update data:', updateData)
+    logger.info('Update data:', updateData)
     
     // Make sure we have something to update
     if (Object.keys(updateData).length === 0) {
@@ -75,7 +81,7 @@ export async function PATCH(
       .single()
 
     if (updateError) {
-      console.error('Error updating file:', updateError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating file:', updateError)
       return NextResponse.json({ 
         error: 'Failed to update file', 
         details: updateError.message,
@@ -83,13 +89,13 @@ export async function PATCH(
       }, { status: 500 })
     }
 
-    console.log('File updated successfully:', updatedFile)
+    logger.info('File updated successfully:', updatedFile)
     return NextResponse.json({ success: true, file: updatedFile })
 
   } catch (error) {
-    console.error('Caught error in PATCH handler:', error)
-    console.error('Error stack:', (error as Error)?.stack)
-    console.error('Error message:', (error as Error)?.message)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Caught error in PATCH handler:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error stack:', (error as Error)?.stack)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error message:', (error as Error)?.message)
     return NextResponse.json({ 
       error: 'Internal server error',
       message: (error as Error)?.message || 'Unknown error',

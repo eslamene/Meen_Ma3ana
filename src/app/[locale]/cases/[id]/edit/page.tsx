@@ -12,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
-import { Toaster } from '@/components/ui/toaster'
 import CaseFileManager, { CaseFile, FileCategory } from '@/components/cases/CaseFileManager'
 import { ArrowLeft, Save, AlertCircle, CheckCircle, FileText, Trash2, AlertTriangle } from 'lucide-react'
 
@@ -486,7 +485,7 @@ export default function CaseEditPage() {
   }
 
   return (
-    <PermissionGuard allowedPermissions={["cases:update"]} fallback={
+    <PermissionGuard permissions={["update:cases"]} fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
@@ -879,9 +878,6 @@ export default function CaseEditPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Toast Notifications */}
-      <Toaster />
     </PermissionGuard>
   )
 }

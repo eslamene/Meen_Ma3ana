@@ -272,6 +272,27 @@ export const notifications = pgTable('notifications', {
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 })
 
+export const landingStats = pgTable('landing_stats', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  statKey: text('stat_key').notNull().unique(),
+  statValue: decimal('stat_value', { precision: 20, scale: 0 }).notNull().default('0'),
+  displayFormat: text('display_format'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+export const systemConfig = pgTable('system_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  configKey: text('config_key').notNull().unique(),
+  configValue: text('config_value').notNull(),
+  description: text('description'),
+  descriptionAr: text('description_ar'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
 export const contributionApprovalStatus = pgTable('contribution_approval_status', {
   id: uuid('id').primaryKey().defaultRandom(),
   contribution_id: uuid('contribution_id').notNull().references(() => contributions.id, { onDelete: 'cascade' }),
@@ -457,4 +478,6 @@ export const schema = {
   sponsorships,
   communications,
   localization,
+  landingStats,
+  systemConfig,
 }

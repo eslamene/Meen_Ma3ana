@@ -85,9 +85,9 @@ export default function ContributionRevisionModal({
   originalContribution, 
   isOpen, 
   onClose,
-  onRevisionSubmit 
+  onRevisionSubmit,
 }: ContributionRevisionModalProps) {
-  const { addToast } = useToast()
+    const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
   
@@ -194,22 +194,20 @@ export default function ContributionRevisionModal({
 
   const handleSubmit = async () => {
     if (!amount || !paymentMethod || !explanation.trim()) {
-      addToast({
-        type: 'error',
+      toast({
         title: 'Missing Information',
-        message: 'Please fill in all required fields including amount, payment method, and explanation.',
-        duration: 5000
+        description: 'Please fill in all required fields including amount, payment method, and explanation.',
+        type: 'error'
       })
       return
     }
 
     const amountNum = parseFloat(amount)
     if (isNaN(amountNum) || amountNum <= 0) {
-      addToast({
-        type: 'error',
+      toast({
         title: 'Invalid Amount',
-        message: 'Please enter a valid amount greater than 0.',
-        duration: 5000
+        description: 'Please enter a valid amount greater than 0.',
+        type: 'error'
       })
       return
     }
@@ -228,20 +226,18 @@ export default function ContributionRevisionModal({
         proofFile: proofFile || undefined
       })
       
-      addToast({
-        type: 'success',
+      toast({
         title: 'Revision Submitted',
-        message: 'Your contribution revision has been submitted for review.',
-        duration: 5000
+        description: 'Your contribution revision has been submitted for review.',
+        type: 'success'
       })
       
       onClose()
     } catch (error) {
-      addToast({
-        type: 'error',
+      toast({
         title: 'Submission Failed',
-        message: 'Failed to submit revision. Please try again.',
-        duration: 5000
+        description: 'Failed to submit revision. Please try again.',
+        type: 'error'
       })
     } finally {
       setIsSubmitting(false)
@@ -274,18 +270,16 @@ export default function ContributionRevisionModal({
       }
 
       const data = await response.json()
-      addToast({
-        type: 'success',
+      toast({
         title: 'Proof Uploaded',
-        message: 'Payment proof uploaded successfully.',
-        duration: 3000
+        description: 'Payment proof uploaded successfully.',
+        type: 'success'
       })
     } catch (error) {
-      addToast({
-        type: 'error',
+      toast({
         title: 'Upload Failed',
-        message: 'Failed to upload payment proof. Please try again.',
-        duration: 5000
+        description: 'Failed to upload payment proof. Please try again.',
+        type: 'error'
       })
     } finally {
       setUploading(false)
@@ -495,7 +489,7 @@ export default function ContributionRevisionModal({
                   className="mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Explain what you've corrected or changed from the original contribution.
+                  Explain what you&apos;ve corrected or changed from the original contribution.
                 </p>
               </div>
             </CardContent>

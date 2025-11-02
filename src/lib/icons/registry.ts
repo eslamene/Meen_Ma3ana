@@ -33,6 +33,12 @@ import {
   Folder,
   Upload,
   Lock,
+  Globe,
+  Info,
+  Mail,
+  UserPlus,
+  Package,
+  Circle,
   type LucideIcon
 } from 'lucide-react'
 
@@ -78,6 +84,14 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
   Folder,
   Upload,
   Lock,
+  
+  // Additional icons for menu system
+  Globe,
+  Info,
+  Mail,
+  UserPlus,
+  Package,
+  Circle,
   
   // Aliases for backward compatibility
   'User': User,

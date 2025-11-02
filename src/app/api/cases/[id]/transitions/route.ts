@@ -5,9 +5,15 @@ import { db } from '@/lib/db'
 import { cases, users } from '@/drizzle/schema'
 import { eq } from 'drizzle-orm'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -46,7 +52,7 @@ export async function GET(
 
     return NextResponse.json({ transitions: availableTransitions })
   } catch (error) {
-    console.error('Error getting available transitions:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error getting available transitions:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 } 

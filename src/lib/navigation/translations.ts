@@ -17,9 +17,11 @@ export const NAVIGATION_TRANSLATION_KEYS: Record<string, string> = {
   'Analytics': 'adminAnalytics',
   
   // RBAC module
-  'Roles': 'rbacRoles',
-  'Permissions': 'rbacPermissions',
+  'RBAC Management': 'rbacManagement',
   'User Management': 'rbacUserManagement',
+  'Permissions': 'rbacPermissions',
+  'Role Management': 'rbacRoleManagement',
+  'Roles': 'rbacRoles',
   
   // Cases module
   'All Cases': 'allCases',

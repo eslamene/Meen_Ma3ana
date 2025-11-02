@@ -4,6 +4,8 @@ import { cases, users } from '@/drizzle/schema'
 import { eq } from 'drizzle-orm'
 import type { CaseStatus } from '@/drizzle/schema'
 
+import { defaultLogger } from '@/lib/logger'
+
 export interface NotificationTemplate {
   subject: string
   body: string
@@ -33,7 +35,7 @@ export class NotificationService {
         .where(eq(cases.id, data.caseId))
 
       if (!caseData) {
-        console.error('Case not found for notification:', data.caseId)
+        defaultLogger.error('Case not found for notification:', data.caseId)
         return
       }
 
@@ -63,9 +65,9 @@ export class NotificationService {
         this.sendWebhookNotification(data, template)
       ])
 
-      console.log(`Notifications sent for case ${data.caseId} status change`)
+      defaultLogger.info(`Notifications sent for case ${data.caseId} status change`)
     } catch (error) {
-      console.error('Error sending status change notifications:', error)
+      defaultLogger.error('Error sending status change notifications:', error)
     }
   }
 
@@ -163,14 +165,14 @@ export class NotificationService {
 
     try {
       // TODO: Integrate with email service (SendGrid, AWS SES, etc.)
-      console.log('Email notification would be sent to:', email)
-      console.log('Subject:', template.subject)
-      console.log('Body:', template.body)
+      defaultLogger.info('Email notification would be sent to:', email)
+      defaultLogger.info('Subject:', template.subject)
+      defaultLogger.info('Body:', template.body)
       
       // For now, just log the email notification
       // In production, you would integrate with an email service
     } catch (error) {
-      console.error('Error sending email notification:', error)
+      defaultLogger.error('Error sending email notification:', error)
     }
   }
 
@@ -189,15 +191,15 @@ export class NotificationService {
           title: template.subject,
           message: template.inAppMessage,
           type: 'case_status_change',
-          read: false,
-          created_at: new Date().toISOString()
+          read: false
+          // created_at will be set automatically by the database DEFAULT NOW()
         })
 
       if (error) {
-        console.error('Error creating in-app notification:', error)
+        defaultLogger.error('Error creating in-app notification:', error)
       }
     } catch (error) {
-      console.error('Error sending in-app notification:', error)
+      defaultLogger.error('Error sending in-app notification:', error)
     }
   }
 
@@ -207,13 +209,13 @@ export class NotificationService {
   static async sendWebhookNotification(data: NotificationData, template: NotificationTemplate) {
     try {
       // TODO: Send webhook to configured endpoints
-      console.log('Webhook notification would be sent:', {
+      defaultLogger.info('Webhook notification would be sent:', {
         event: 'case_status_change',
         data,
         template
       })
     } catch (error) {
-      console.error('Error sending webhook notification:', error)
+      defaultLogger.error('Error sending webhook notification:', error)
     }
   }
 
@@ -251,7 +253,7 @@ export class NotificationService {
         ])
       }
     } catch (error) {
-      console.error('Error sending automatic closure notification:', error)
+      defaultLogger.error('Error sending automatic closure notification:', error)
     }
   }
 
@@ -288,7 +290,7 @@ export class NotificationService {
         ])
       }
     } catch (error) {
-      console.error('Error sending deadline reminder notification:', error)
+      defaultLogger.error('Error sending deadline reminder notification:', error)
     }
   }
 } 

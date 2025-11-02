@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     
@@ -32,7 +38,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching recurring contributions:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching recurring contributions:', error)
       return NextResponse.json({ error: 'Failed to fetch recurring contributions' }, { status: 500 })
     }
 
@@ -41,12 +47,15 @@ export async function GET(request: NextRequest) {
       total: data?.length || 0
     })
   } catch (error) {
-    console.error('Error in recurring contributions API:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in recurring contributions API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     
@@ -120,13 +129,13 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating recurring contribution:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating recurring contribution:', error)
       return NextResponse.json({ error: 'Failed to create recurring contribution' }, { status: 500 })
     }
 
     return NextResponse.json({ recurringContribution: data })
   } catch (error) {
-    console.error('Error in recurring contributions API:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in recurring contributions API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 } 

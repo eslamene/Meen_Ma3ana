@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger } from '@/lib/logger'
+
 export interface ContributionNotification {
   id: string
   type: 'contribution_approved' | 'contribution_rejected' | 'contribution_pending'
@@ -26,8 +28,8 @@ export class ContributionNotificationService {
           amount,
           case_title: caseTitle
         },
-        read: false,
-        created_at: new Date().toISOString()
+        read: false
+        // Remove created_at to let database set the timestamp
       }
 
       const { error } = await this.supabase
@@ -35,13 +37,13 @@ export class ContributionNotificationService {
         .insert(notification)
 
       if (error) {
-        console.error('Error sending approval notification:', error)
+        defaultLogger.error('Error sending approval notification:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error sending approval notification:', error)
+      defaultLogger.error('Error sending approval notification:', error)
       return false
     }
   }
@@ -59,8 +61,8 @@ export class ContributionNotificationService {
           case_title: caseTitle,
           rejection_reason: reason
         },
-        read: false,
-        created_at: new Date().toISOString()
+        read: false
+        // Remove created_at to let database set the timestamp
       }
 
       const { error } = await this.supabase
@@ -68,13 +70,13 @@ export class ContributionNotificationService {
         .insert(notification)
 
       if (error) {
-        console.error('Error sending rejection notification:', error)
+        defaultLogger.error('Error sending rejection notification:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error sending rejection notification:', error)
+      defaultLogger.error('Error sending rejection notification:', error)
       return false
     }
   }
@@ -91,8 +93,8 @@ export class ContributionNotificationService {
           amount,
           case_title: caseTitle
         },
-        read: false,
-        created_at: new Date().toISOString()
+        read: false
+        // Remove created_at to let database set the timestamp
       }
 
       const { error } = await this.supabase
@@ -100,38 +102,65 @@ export class ContributionNotificationService {
         .insert(notification)
 
       if (error) {
-        console.error('Error sending pending notification:', error)
+        defaultLogger.error('Error sending pending notification:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error sending pending notification:', error)
+      defaultLogger.error('Error sending pending notification:', error)
       return false
     }
   }
 
   async getUserNotifications(userId: string): Promise<ContributionNotification[]> {
     try {
+      // Get all notifications and sort them properly on the client side
       const { data, error } = await this.supabase
         .from('notifications')
         .select('*')
         .eq('recipient_id', userId)
-        .order('created_at', { ascending: false })
 
       if (error) {
         // If table doesn't exist, return empty array instead of throwing
         if (error.code === '42P01') { // Table doesn't exist
-          console.warn('Notifications table does not exist yet')
+          defaultLogger.warn('Notifications table does not exist yet')
           return []
         }
-        console.error('Error fetching user notifications:', error)
+        defaultLogger.error('Error fetching user notifications:', error)
         return []
       }
 
-      return data || []
+      // Force proper client-side sorting
+      const sortedData = (data || []).sort((a, b) => {
+        // Try to parse dates, fallback to 0 if invalid
+        let dateA = 0
+        let dateB = 0
+        
+        if (a.created_at) {
+          const parsedA = new Date(a.created_at)
+          dateA = isNaN(parsedA.getTime()) ? 0 : parsedA.getTime()
+        }
+        
+        if (b.created_at) {
+          const parsedB = new Date(b.created_at)
+          dateB = isNaN(parsedB.getTime()) ? 0 : parsedB.getTime()
+        }
+        
+        // Debug logging removed - sorting is now working correctly
+        
+        // If both dates are valid, sort by date
+        if (dateA > 0 && dateB > 0) {
+          return dateB - dateA // Newest first
+        }
+        
+        // If dates are equal or invalid, sort by ID (newer IDs first)
+        return b.id.localeCompare(a.id)
+      })
+
+      return sortedData
     } catch (error) {
-      console.error('Error fetching user notifications:', error)
+      defaultLogger.error('Error fetching user notifications:', error)
       return []
     }
   }
@@ -144,13 +173,13 @@ export class ContributionNotificationService {
         .eq('id', notificationId)
 
       if (error) {
-        console.error('Error marking notification as read:', error)
+        defaultLogger.error('Error marking notification as read:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error marking notification as read:', error)
+      defaultLogger.error('Error marking notification as read:', error)
       return false
     }
   }
@@ -164,13 +193,33 @@ export class ContributionNotificationService {
         .eq('read', false)
 
       if (error) {
-        console.error('Error marking all notifications as read:', error)
+        defaultLogger.error('Error marking all notifications as read:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error marking all notifications as read:', error)
+      defaultLogger.error('Error marking all notifications as read:', error)
+      return false
+    }
+  }
+
+  async markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {
+    try {
+      const { error } = await this.supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId)
+        .eq('recipient_id', userId)
+
+      if (error) {
+        defaultLogger.error('Error marking notification as read:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      defaultLogger.error('Error marking notification as read:', error)
       return false
     }
   }
@@ -186,16 +235,16 @@ export class ContributionNotificationService {
       if (error) {
         // If table doesn't exist, return 0 instead of throwing
         if (error.code === '42P01') { // Table doesn't exist
-          console.warn('Notifications table does not exist yet')
+          defaultLogger.warn('Notifications table does not exist yet')
           return 0
         }
-        console.error('Error getting unread notification count:', error)
+        defaultLogger.error('Error getting unread notification count:', error)
         return 0
       }
 
       return count || 0
     } catch (error) {
-      console.error('Error getting unread notification count:', error)
+      defaultLogger.error('Error getting unread notification count:', error)
       return 0
     }
   }

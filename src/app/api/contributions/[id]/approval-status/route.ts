@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { ContributionNotificationService } from '@/lib/notifications/contribution-notifications'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -31,7 +38,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -127,6 +137,46 @@ export async function POST(
       .from('contributions')
       .update({ status })
       .eq('id', params.id)
+
+    // Send notification to donor
+    if (status === 'approved' || status === 'rejected') {
+      try {
+        // Get contribution details for notification
+        const { data: contribution } = await supabase
+          .from('contributions')
+          .select(`
+            donor_id,
+            amount,
+            cases!inner(title)
+          `)
+          .eq('id', params.id)
+          .single()
+
+        if (contribution) {
+          const notificationService = new ContributionNotificationService()
+          
+          if (status === 'approved') {
+            await notificationService.sendApprovalNotification(
+              params.id,
+              contribution.donor_id,
+              contribution.amount,
+              contribution.cases.title
+            )
+          } else if (status === 'rejected' && rejection_reason) {
+            await notificationService.sendRejectionNotification(
+              params.id,
+              contribution.donor_id,
+              contribution.amount,
+              contribution.cases.title,
+              rejection_reason
+            )
+          }
+        }
+      } catch (notificationError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error sending notification:', notificationError)
+        // Don't fail the main operation if notification fails
+      }
+    }
 
     return NextResponse.json(result)
   } catch (error) {

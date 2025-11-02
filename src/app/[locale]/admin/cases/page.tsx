@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
-import { Toaster } from '@/components/ui/toaster'
 import { 
   Target, 
   Plus, 
@@ -355,7 +354,7 @@ export default function AdminCasesPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard allowedPermissions={["admin:dashboard", "cases:update", "cases:delete"]} requireAll={false}>
+      <PermissionGuard permission="view:admin_cases">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}
@@ -708,9 +707,6 @@ export default function AdminCasesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Toast Notifications */}
-        <Toaster />
       </PermissionGuard>
     </ProtectedRoute>
   )

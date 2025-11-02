@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = createClient()
 
@@ -25,7 +31,7 @@ export async function GET(request: NextRequest) {
       .select('resource, action')
 
     if (error) {
-      console.error('Database error:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Database error:', error)
       throw error
     }
 
@@ -71,7 +77,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error fetching permission options:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching permission options:', error)
     
     return NextResponse.json({
       success: false,

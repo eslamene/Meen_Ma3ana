@@ -1,213 +1,326 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { serverDbRBAC } from '@/lib/rbac/server-rbac'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      console.error('Auth error:', authError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('User authenticated:', user.id)
-
-    // Temporarily skip permission check for debugging
-    console.log('Skipping permission check for debugging')
-
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
+    const roleId = searchParams.get('roleId')
+    const userId = searchParams.get('userId')
+
+    // Use service client for admin operations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     switch (type) {
       case 'roles':
-        const roles = await serverDbRBAC.getRoles()
-        return NextResponse.json({ roles })
+        logger.info('Fetching roles...')
+        try {
+          const { data: roles, error: rolesError } = await serviceClient
+            .from('rbac_roles')
+            .select('*')
+            .eq('is_active', true)
+            .order('name')
+          
+          if (rolesError) throw rolesError
+          
+          logger.info('Roles fetched successfully:', roles.length)
+          return NextResponse.json({ success: true, roles })
+        } catch (rolesError) {
+          logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching roles:', rolesError)
+          return NextResponse.json({ error: 'Failed to fetch roles' }, { status: 500 })
+        }
 
       case 'permissions':
-        const permissions = await serverDbRBAC.getPermissions()
-        return NextResponse.json({ permissions })
+        const { data: permissions, error: permissionsError } = await serviceClient
+          .from('rbac_permissions')
+          .select('*')
+          .eq('is_active', true)
+          .order('name')
+        
+        if (permissionsError) throw permissionsError
+        return NextResponse.json({ success: true, permissions })
 
       case 'role-permissions':
-        const roleId = searchParams.get('roleId')
         if (!roleId) {
           return NextResponse.json({ error: 'Role ID required' }, { status: 400 })
         }
-        const roleWithPermissions = await serverDbRBAC.getRoleWithPermissions(roleId)
+        
+        const { data: roleWithPermissions, error: rolePermsError } = await serviceClient
+          .from('rbac_role_permissions')
+          .select(`
+            id,
+            rbac_permissions (*)
+          `)
+          .eq('role_id', roleId)
+          .eq('is_active', true)
+        
+        if (rolePermsError) throw rolePermsError
         return NextResponse.json({ role: roleWithPermissions })
 
       case 'user-roles':
-        const userId = searchParams.get('userId')
         if (!userId) {
           return NextResponse.json({ error: 'User ID required' }, { status: 400 })
         }
-        const userRoles = await serverDbRBAC.getUserRolesAndPermissions(userId)
+        
+        const { data: userRoles, error: userRolesError } = await serviceClient
+          .from('rbac_user_roles')
+          .select(`
+            id,
+            rbac_roles (*),
+            rbac_roles (
+              rbac_role_permissions (
+                rbac_permissions (*)
+              )
+            )
+          `)
+          .eq('user_id', userId)
+          .eq('is_active', true)
+        
+        if (userRolesError) throw userRolesError
         return NextResponse.json({ userRoles })
 
       case 'users':
-        try {
-          // Create admin client with service role key
-          const adminClient = createServiceClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-          )
+        const { data: users, error: usersError } = await serviceClient.auth.admin.listUsers()
+        if (usersError) throw usersError
+        return NextResponse.json({ users: users.users })
 
-          // Fetch all users from Supabase Auth using admin client
-          const { data: authUsers, error: usersError } = await adminClient.auth.admin.listUsers()
-          if (usersError) {
-            console.error('Error fetching auth users:', usersError)
-            throw usersError
-          }
-
-          // Fetch user roles from database
-          const { data: allUserRoles, error: userRolesError } = await supabase
-            .from('user_roles')
-            .select(`
-              user_id,
-              role_id,
-              roles(id, name, display_name)
-            `)
-          
-          if (userRolesError) {
-            console.error('Error fetching user roles:', userRolesError)
-            throw userRolesError
-          }
-
-          console.log('Successfully fetched users:', authUsers.users.length, 'user roles:', allUserRoles?.length)
-
-          return NextResponse.json({ 
-            success: true, 
-            users: authUsers.users,
-            userRoles: allUserRoles || []
-          })
-        } catch (userError) {
-          console.error('Error in users case:', userError)
-          throw userError
-        }
+      case 'modules':
+        const { data: modules, error: modulesError } = await serviceClient
+          .from('rbac_modules')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order')
+        
+        if (modulesError) throw modulesError
+        return NextResponse.json({ success: true, modules })
 
       default:
         return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 })
     }
-  } catch (error) {
-    console.error('RBAC API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  } catch (error: any) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'RBAC API Error:', error)
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const body = await request.json()
+    const { action, data } = body
+
+    // Use service client for admin operations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
     // Check if user has RBAC management permission
-    const hasPermission = await serverDbRBAC.userHasPermission(user.id, 'admin:rbac')
+    const { data: userRoles } = await serviceClient
+      .from('rbac_user_roles')
+      .select(`
+        rbac_roles (
+          rbac_role_permissions (
+            rbac_permissions (name)
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+
+    const hasPermission = userRoles?.some((ur: any) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+        rp.rbac_permissions?.name === 'admin:rbac'
+      )
+    )
+
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { action, ...data } = body
-
     switch (action) {
       case 'create-role':
-        const newRole = await serverDbRBAC.createRole({
-          name: data.name,
-          display_name: data.display_name,
-          description: data.description,
-          is_system: false
-        })
+        const { data: newRole, error: createRoleError } = await serviceClient
+          .from('rbac_roles')
+          .insert({
+            name: data.name,
+            display_name: data.display_name,
+            description: data.description,
+            is_active: true
+          })
+          .select()
+          .single()
+        
+        if (createRoleError) throw createRoleError
         
         // Assign permissions to role if provided
         if (data.permissions && Array.isArray(data.permissions)) {
-          for (const permissionId of data.permissions) {
-            await serverDbRBAC.assignPermissionToRole(newRole.id, permissionId)
-          }
+          const rolePermissions = data.permissions.map((permissionId: string) => ({
+            role_id: newRole.id,
+            permission_id: permissionId,
+            is_active: true
+          }))
+          
+          await serviceClient
+            .from('rbac_role_permissions')
+            .insert(rolePermissions)
         }
         
         return NextResponse.json({ role: newRole })
 
       case 'update-role':
-        const updatedRole = await serverDbRBAC.updateRole(data.id, {
-          display_name: data.display_name,
-          description: data.description
-        })
+        const { data: updatedRole, error: updateRoleError } = await serviceClient
+          .from('rbac_roles')
+          .update({
+            display_name: data.display_name,
+            description: data.description
+          })
+          .eq('id', data.id)
+          .select()
+          .single()
+        
+        if (updateRoleError) throw updateRoleError
         return NextResponse.json({ role: updatedRole })
 
       case 'delete-role':
-        await serverDbRBAC.deleteRole(data.id)
+        await serviceClient
+          .from('rbac_roles')
+          .update({ is_active: false })
+          .eq('id', data.id)
+        
         return NextResponse.json({ success: true })
 
       case 'create-permission':
-        const newPermission = await serverDbRBAC.createPermission({
-          name: data.name,
-          display_name: data.display_name,
-          description: data.description,
-          resource: data.resource,
-          action: data.action,
-          is_system: false
-        })
+        const { data: newPermission, error: createPermError } = await serviceClient
+          .from('rbac_permissions')
+          .insert({
+            name: data.name,
+            display_name: data.display_name,
+            description: data.description,
+            resource: data.resource,
+            action: data.action,
+            is_active: true
+          })
+          .select()
+          .single()
+        
+        if (createPermError) throw createPermError
         return NextResponse.json({ permission: newPermission })
 
       case 'update-permission':
-        const updatedPermission = await serverDbRBAC.updatePermission(data.id, {
-          display_name: data.display_name,
-          description: data.description,
-          resource: data.resource,
-          action: data.action
-        })
+        const { data: updatedPermission, error: updatePermError } = await serviceClient
+          .from('rbac_permissions')
+          .update({
+            display_name: data.display_name,
+            description: data.description,
+            resource: data.resource,
+            action: data.action
+          })
+          .eq('id', data.id)
+          .select()
+          .single()
+        
+        if (updatePermError) throw updatePermError
         return NextResponse.json({ permission: updatedPermission })
 
       case 'delete-permission':
-        await serverDbRBAC.deletePermission(data.id)
+        await serviceClient
+          .from('rbac_permissions')
+          .update({ is_active: false })
+          .eq('id', data.id)
+        
         return NextResponse.json({ success: true })
 
       case 'assign-role':
-        await serverDbRBAC.assignRoleToUser(data.userId, data.roleId, user.id)
+        await serviceClient
+          .from('rbac_user_roles')
+          .insert({
+            user_id: data.userId,
+            role_id: data.roleId,
+            assigned_by: user.id,
+            is_active: true
+          })
+        
         return NextResponse.json({ success: true })
 
       case 'remove-role':
-        await serverDbRBAC.removeRoleFromUser(data.userId, data.roleId)
+        await serviceClient
+          .from('rbac_user_roles')
+          .update({ is_active: false })
+          .eq('user_id', data.userId)
+          .eq('role_id', data.roleId)
+        
         return NextResponse.json({ success: true })
 
       case 'assign-permission-to-role':
-        await serverDbRBAC.assignPermissionToRole(data.roleId, data.permissionId)
+        await serviceClient
+          .from('rbac_role_permissions')
+          .insert({
+            role_id: data.roleId,
+            permission_id: data.permissionId,
+            is_active: true
+          })
+        
         return NextResponse.json({ success: true })
 
       case 'remove-permission-from-role':
-        await serverDbRBAC.removePermissionFromRole(data.roleId, data.permissionId)
+        await serviceClient
+          .from('rbac_role_permissions')
+          .update({ is_active: false })
+          .eq('role_id', data.roleId)
+          .eq('permission_id', data.permissionId)
+        
         return NextResponse.json({ success: true })
 
       case 'assign_user_roles':
-        // Remove all existing roles for the user
-        const { error: deleteError } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', data.userId)
+        // Handle bulk role assignment
+        const { userId: targetUserId, roleIds } = data
         
-        if (deleteError) throw deleteError
+        // Remove existing roles
+        await serviceClient
+          .from('rbac_user_roles')
+          .update({ is_active: false })
+          .eq('user_id', targetUserId)
+          .eq('is_active', true)
 
-        // Assign new roles
-        if (data.roleIds && data.roleIds.length > 0) {
-          const userRoleInserts = data.roleIds.map((roleId: string) => ({
-            user_id: data.userId,
+        // Add new roles
+        if (roleIds && roleIds.length > 0) {
+          const newRoleAssignments = roleIds.map((roleId: string) => ({
+            user_id: targetUserId,
             role_id: roleId,
-            assigned_by: user.id
+            assigned_by: user.id,
+            is_active: true
           }))
 
-          const { error: insertError } = await supabase
-            .from('user_roles')
-            .insert(userRoleInserts)
-          
-          if (insertError) throw insertError
+          await serviceClient
+            .from('rbac_user_roles')
+            .insert(newRoleAssignments)
         }
 
         return NextResponse.json({ success: true })
@@ -215,11 +328,8 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
-  } catch (error) {
-    console.error('RBAC API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  } catch (error: any) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'RBAC API Error:', error)
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }

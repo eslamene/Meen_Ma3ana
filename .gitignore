@@ -39,4 +39,21 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+# Cleanup patterns
+
+
+
+
+
+*.analysis.md
+RBAC_*.md
+# Cleanup patterns
 messages/*.backup
+scripts/test-*.js
+scripts/test-*.mjs
+supabase/debug_*.sql
+supabase/check_*.sql
+*.analysis.md
+RBAC_*.md

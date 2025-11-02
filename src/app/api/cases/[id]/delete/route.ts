@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: caseId } = await params
@@ -17,7 +23,7 @@ export async function DELETE(
       .limit(1)
 
     if (contributionsError) {
-      console.error('Error checking contributions:', contributionsError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking contributions:', contributionsError)
       return NextResponse.json(
         { error: 'Failed to check case contributions' },
         { status: 500 }
@@ -43,7 +49,7 @@ export async function DELETE(
       .eq('case_id', caseId)
 
     if (filesError) {
-      console.error('Error fetching case files:', filesError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching case files:', filesError)
       return NextResponse.json(
         { error: 'Failed to fetch case files' },
         { status: 500 }
@@ -88,7 +94,7 @@ export async function DELETE(
         .eq('id', caseId)
 
       if (caseDeleteError) {
-        console.error('Error deleting case:', caseDeleteError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting case:', caseDeleteError)
         return NextResponse.json(
           { error: 'Failed to delete case' },
           { status: 500 }
@@ -108,7 +114,7 @@ export async function DELETE(
         }
       })
     } catch (deleteError) {
-      console.error('Error in cascaded deletion:', deleteError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in cascaded deletion:', deleteError)
       return NextResponse.json(
         { error: 'Failed to delete case and related data' },
         { status: 500 }
@@ -127,7 +133,7 @@ export async function DELETE(
           .remove(filePaths)
 
         if (storageError) {
-          console.error('Error deleting files from storage:', storageError)
+          logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting files from storage:', storageError)
           // Don't fail the entire operation if storage cleanup fails
         }
       }
@@ -139,7 +145,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('Unexpected error in case deletion:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Unexpected error in case deletion:', error)
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import NavigationBar from '@/components/navigation/NavigationBar'
-import SidebarNavigationNew from '@/components/navigation/SidebarNavigationNew'
+import SimpleSidebar from '@/components/navigation/SimpleSidebar'
 
 interface ConditionalLayoutProps {
   children: React.ReactNode
@@ -64,7 +64,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* New Sidebar - handles its own mobile menu */}
-      <SidebarNavigationNew />
+      <SimpleSidebar isOpen={true} onToggle={() => {}} />
       
       {/* Main Content */}
       <div className="flex-1">

@@ -1,18 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
-import { 
-  UserRole, 
-  Permission, 
-  hasPermission, 
-  hasAnyPermission, 
-  hasAllPermissions,
-  canPerformAction,
-  isRoleAllowed,
-  PERMISSION_CONFIG
-} from '@/lib/rbac/permissions'
+import { useDatabasePermissions } from './useDatabasePermissions'
+import { UserRole, Permission } from '@/lib/rbac/types'
 
 interface UsePermissionsReturn {
   user: User | null
@@ -36,66 +26,59 @@ interface UsePermissionsReturn {
  * Provides easy access to user permissions throughout the app
  */
 export function usePermissions(): UsePermissionsReturn {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  
-  const supabase = createClient()
-  
-  useEffect(() => {
-    // Get initial user
-    const getUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        setUser(user)
-      } catch (error) {
-        console.error('Error fetching user:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    getUser()
-    
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
-    
-    return () => subscription.unsubscribe()
-  }, [supabase.auth])
-  
-  // Get user role from user metadata
-  const userRole = user?.user_metadata?.role as UserRole | undefined
-  
-  // Permission checking functions
+  const {
+    user,
+    loading,
+    roles,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    canPerformAction,
+    hasRole,
+    canCreateCase,
+    canEditCase,
+    canDeleteCase,
+    canApproveCase,
+    canCreateContribution,
+    canApproveContribution,
+    canRejectContribution,
+    canAccessAdminDashboard,
+    canAccessAnalytics,
+    canManageUsers,
+    canCreateProject,
+    canEditProject,
+    canDeleteProject,
+    canCreateSponsorship,
+    canApproveSponsorship
+  } = useDatabasePermissions()
+
+  // Get user role from database roles (fallback to first role)
+  const userRole = roles.length > 0 ? roles[0].name as UserRole : undefined
+
+  // Permission checking functions (wrapper for backward compatibility)
   const checkPermission = (permission: Permission): boolean => {
-    return hasPermission(userRole, permission)
+    return hasPermission(permission)
   }
   
   const checkAnyPermission = (permissions: Permission[]): boolean => {
-    return hasAnyPermission(userRole, permissions)
+    return hasAnyPermission(permissions)
   }
   
   const checkAllPermissions = (permissions: Permission[]): boolean => {
-    return hasAllPermissions(userRole, permissions)
+    return hasAllPermissions(permissions)
   }
   
   const checkCanPerformAction = (resource: string, action: string): boolean => {
-    return canPerformAction(userRole, resource, action)
+    return canPerformAction(resource, action)
   }
   
   const checkIsRoleAllowed = (allowedRoles: UserRole[]): boolean => {
-    return isRoleAllowed(userRole, allowedRoles)
+    return hasRole(allowedRoles[0]) // Check if user has any of the allowed roles
   }
   
-  // Specific permission checks for common actions
-  const canCreateCase = checkIsRoleAllowed(PERMISSION_CONFIG.CASE_CREATION_ROLES)
-  const canApproveContributions = checkIsRoleAllowed(PERMISSION_CONFIG.CONTRIBUTION_APPROVAL_ROLES)
-  const canAccessAdminDashboard = checkIsRoleAllowed(PERMISSION_CONFIG.ADMIN_DASHBOARD_ROLES)
-  const canAccessAnalytics = checkIsRoleAllowed(PERMISSION_CONFIG.ANALYTICS_ACCESS_ROLES)
-  const canManageUsers = checkIsRoleAllowed(PERMISSION_CONFIG.USER_MANAGEMENT_ROLES)
-  const canManageProjects = checkIsRoleAllowed(PERMISSION_CONFIG.PROJECT_MANAGEMENT_ROLES)
+  // Specific permission checks for common actions (using database permissions)
+  const canApproveContributions = canApproveContribution
+  const canManageProjects = canCreateProject || canEditProject || canDeleteProject
   
   return {
     user,

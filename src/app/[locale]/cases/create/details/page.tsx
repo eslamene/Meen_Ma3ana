@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import BeneficiarySelector from '@/components/beneficiaries/BeneficiarySelector'
+import type { Beneficiary } from '@/types/beneficiary'
 
 type CaseType = 'one-time' | 'recurring'
 type Priority = '' | 'low' | 'medium' | 'high' | 'critical'
@@ -24,8 +26,7 @@ interface CaseFormData {
   category: string
   priority: Priority
   location: string
-  beneficiaryName: string
-  beneficiaryContact: string
+  selectedBeneficiary: Beneficiary | null
   duration: string
   frequency?: Frequency
   startDate: string
@@ -49,8 +50,7 @@ export default function CaseDetailsPage() {
     category: '',
     priority: '',
     location: '',
-    beneficiaryName: '',
-    beneficiaryContact: '',
+    selectedBeneficiary: null,
     duration: '',
     frequency: undefined,
     startDate: '',
@@ -145,6 +145,15 @@ export default function CaseDetailsPage() {
     setErrors(newErrors)
   }
 
+  const handleBeneficiarySelect = (beneficiary: Beneficiary | null) => {
+    setFormData(prev => ({ ...prev, selectedBeneficiary: beneficiary }))
+    
+    // Clear beneficiary-related errors
+    if (errors.beneficiary) {
+      setErrors(prev => ({ ...prev, beneficiary: '' }))
+    }
+  }
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -178,6 +187,11 @@ export default function CaseDetailsPage() {
     // Category validation (REQUIRED)
     if (!formData.category) {
       newErrors.category = t('validation.categoryRequired')
+    }
+
+    // Beneficiary validation (REQUIRED)
+    if (!formData.selectedBeneficiary) {
+      newErrors.beneficiary = t('validation.beneficiaryRequired')
     }
 
     // Priority validation (OPTIONAL - removed)
@@ -283,8 +297,8 @@ export default function CaseDetailsPage() {
           category: formData.category,
           priority: formData.priority,
           location: formData.location,
-          beneficiaryName: formData.beneficiaryName,
-          beneficiaryContact: formData.beneficiaryContact,
+          beneficiaryName: formData.selectedBeneficiary?.name || '',
+          beneficiaryContact: formData.selectedBeneficiary?.mobile_number || '',
           type: caseType,
           status: 'draft',
           duration: formData.duration,
@@ -472,26 +486,18 @@ export default function CaseDetailsPage() {
                 />
               </div>
 
-              <div>
+              <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('beneficiaryName')}
+                  {t('beneficiary')} <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  value={formData.beneficiaryName}
-                  onChange={(e) => handleInputChange('beneficiaryName', e.target.value)}
-                  placeholder={t('beneficiaryNamePlaceholder')}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('beneficiaryContact')}
-                </label>
-                <Input
-                  value={formData.beneficiaryContact}
-                  onChange={(e) => handleInputChange('beneficiaryContact', e.target.value)}
-                  placeholder={t('beneficiaryContactPlaceholder')}
-                />
+            <BeneficiarySelector
+              selectedBeneficiary={formData.selectedBeneficiary}
+              onSelect={handleBeneficiarySelect}
+              showOpenButton={true}
+            />
+                {errors.beneficiary && (
+                  <p className="text-red-500 text-sm mt-1">{errors.beneficiary}</p>
+                )}
               </div>
 
               {caseType === 'one-time' && (

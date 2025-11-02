@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/client'
 import { RealtimeChannel } from '@supabase/supabase-js'
 
+import { defaultLogger } from '@/lib/logger'
+
 export interface CaseProgressUpdate {
   caseId: string
   currentAmount: number
@@ -69,7 +71,7 @@ export class RealtimeCaseUpdates {
         }
       )
       .on('error', (error) => {
-        console.error('Realtime case progress error:', error)
+        defaultLogger.error('Realtime case progress error:', error)
         onError?.(error)
       })
 
@@ -155,7 +157,7 @@ export class RealtimeCaseUpdates {
         }
       )
       .on('error', (error) => {
-        console.error('Realtime case updates error:', error)
+        defaultLogger.error('Realtime case updates error:', error)
         onError?.(error)
       })
 
@@ -207,7 +209,7 @@ export class RealtimeCaseUpdates {
         }
       )
       .on('error', (error) => {
-        console.error('Realtime case contributions error:', error)
+        defaultLogger.error('Realtime case contributions error:', error)
         onError?.(error)
       })
 
@@ -287,7 +289,7 @@ export class RealtimeCaseUpdates {
           : 0
       }
     } catch (error) {
-      console.error('Error getting case progress:', error)
+      defaultLogger.error('Error getting case progress:', error)
       return null
     }
   }

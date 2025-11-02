@@ -44,4 +44,4 @@ export const db = drizzle(client, { schema })
 export { schema }
 
 // Export individual tables for easier imports
-export const { users, cases, projects, projectCycles, contributions, sponsorships, communications, localization } = schema 
+export const { users, cases, projects, projectCycles, contributions, sponsorships, communications, localization, landingStats, systemConfig } = schema 

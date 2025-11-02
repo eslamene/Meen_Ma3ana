@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { createBrowserClient } from '@supabase/ssr'
-import { UserRole, userRoles, getRoleDisplayName, getRoleDescription } from '@/lib/rbac'
+import { UserRole, userRoles, getRoleDisplayName, getRoleDescription } from '@/lib/rbac/types'
 import PermissionGuard from './PermissionGuard'
 
 interface RoleManagerProps {

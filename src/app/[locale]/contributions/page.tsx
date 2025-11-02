@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Layout } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import ContributionsList from '@/components/contributions/ContributionsList'
 
@@ -63,6 +63,7 @@ export default function ContributionsPage() {
   const t = useTranslations('cases')
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -81,8 +82,21 @@ export default function ContributionsPage() {
     dateTo: '',
     sortOrder: 'desc' // Default: newest first
   })
+  const [highlightedTxId, setHighlightedTxId] = useState<string | null>(null)
 
   const supabase = createClient()
+
+  // Handle tx parameter from URL (for notification redirects)
+  useEffect(() => {
+    const txId = searchParams.get('tx')
+    if (txId) {
+      setHighlightedTxId(txId)
+      // Clear the parameter from URL after setting it
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('tx')
+      router.replace(newUrl.pathname + newUrl.search, { scroll: false })
+    }
+  }, [searchParams, router])
 
   const fetchContributions = useCallback(async () => {
     try {
@@ -166,6 +180,30 @@ export default function ContributionsPage() {
     fetchContributions()
   }
 
+  const handleStatusUpdate = async (contributionId: string, status: 'approved' | 'rejected', adminComment?: string) => {
+    try {
+      const response = await fetch(`/api/contributions/${contributionId}/approval-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status,
+          admin_comment: adminComment
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update contribution status')
+      }
+
+      // Refresh the contributions list
+      await fetchContributions()
+    } catch (error) {
+      console.error('Error updating contribution status:', error)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -186,23 +224,31 @@ export default function ContributionsPage() {
               <h1 className="text-3xl font-bold text-gray-900">Contribution History</h1>
               <p className="text-gray-600 mt-2">View and manage all your contributions</p>
             </div>
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-lg px-4 py-2">
-              {pagination.total} contributions
-            </Badge>
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/${params.locale}/contributions/compare`)}
+                className="flex items-center gap-2"
+              >
+                <Layout className="h-4 w-4" />
+                Compare Designs
+              </Button>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-lg px-4 py-2">
+                {pagination.total} contributions
+              </Badge>
+            </div>
           </div>
         </div>
 
         {/* Unified Contributions List Component */}
         <ContributionsList
           contributions={contributions}
-          pagination={pagination}
-          filters={filters}
           loading={loading}
-          error={error}
+          onStatusUpdate={handleStatusUpdate}
           isAdmin={false}
-          onSearch={handleSearch}
-          onFilterChange={handleFilterChange}
-          onClearFilters={handleClearFilters}
+          highlightedTxId={highlightedTxId}
+          pagination={pagination}
+          error={error}
           onPageChange={handlePageChange}
           onRefresh={handleRefresh}
         />

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
   
@@ -128,7 +134,7 @@ export async function POST(
       .single()
 
     if (insertError) {
-      console.error('Error creating revision contribution:', insertError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating revision contribution:', insertError)
       return NextResponse.json(
         { error: 'Failed to create revision contribution' },
         { status: 500 }
@@ -146,7 +152,7 @@ export async function POST(
       })
 
     if (approvalInsertError) {
-      console.error('Error creating approval status for revision:', approvalInsertError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating approval status for revision:', approvalInsertError)
       // Don't fail the request, but log the error
     }
 
@@ -163,7 +169,7 @@ export async function POST(
       .eq('id', approvalStatus.id)
 
     if (updateError) {
-      console.error('Error updating original approval status:', updateError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating original approval status:', updateError)
       // Don't fail the request, but log the error
     }
 
@@ -193,7 +199,7 @@ export async function POST(
         await supabase.from('notifications').insert(notifications)
       }
     } catch (notificationError) {
-      console.error('Error creating notifications:', notificationError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating notifications:', notificationError)
       // Don't fail the request if notification creation fails
     }
 
@@ -203,7 +209,7 @@ export async function POST(
       revisionId: newContribution.id
     })
   } catch (error) {
-    console.error('Error in contribution revision:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in contribution revision:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

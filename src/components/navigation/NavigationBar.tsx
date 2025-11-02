@@ -10,10 +10,8 @@ import { createClient } from '@/lib/supabase/client'
 import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
-import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
-import { useModularRBAC } from '@/lib/hooks/useModularRBAC'
+import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 import GuestPermissionGuard from '@/components/auth/GuestPermissionGuard'
-import { ModularNavigationItem } from './ModularNavigationItem'
 
 export default function NavigationBar() {
   const t = useTranslations('navigation')
@@ -28,20 +26,10 @@ export default function NavigationBar() {
 
   const supabase = createClient()
   
-  // Optimize RBAC usage - useModularRBAC already includes useDatabaseRBAC
-  // So we only need useModularRBAC, and extract refreshUserRoles from it
-  const { modules, loading: modulesLoading, refreshModules } = useModularRBAC()
+  // Use the new simplified RBAC hook
+  const { modules, loading: modulesLoading } = useSimpleRBAC()
   
-  // Get refreshUserRoles only when needed, with memoization
-  const { refreshUserRoles } = useDatabaseRBAC()
-  
-  // Memoize the refresh function to prevent unnecessary re-renders
-  const handleRefreshRoles = useCallback(async () => {
-    await Promise.all([
-      refreshUserRoles(),
-      refreshModules()
-    ])
-  }, [refreshUserRoles, refreshModules])
+  // Note: useSimpleRBAC handles refresh internally
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
@@ -74,8 +62,7 @@ export default function NavigationBar() {
       if (session?.user) {
         setUser(session.user)
         fetchUnreadNotifications(session.user.id)
-        // Refresh permissions when user changes
-        handleRefreshRoles()
+        // Permissions are handled automatically by useSimpleRBAC
       } else {
         setUser(null)
         setUnreadNotifications(0)
@@ -83,48 +70,13 @@ export default function NavigationBar() {
     })
 
     return () => subscription.unsubscribe()
-  }, [handleRefreshRoles, supabase.auth, fetchUserAndNotifications, fetchUnreadNotifications])
+  }, [supabase.auth, fetchUserAndNotifications, fetchUnreadNotifications])
 
-  // Listen for window focus to refresh permissions (when coming back from RBAC page)
-  useEffect(() => {
-    const handleFocus = () => {
-      if (user) {
-        console.log('Window focused - refreshing user permissions')
-        handleRefreshRoles()
-      }
-    }
+  // Note: useSimpleRBAC handles permission refresh automatically
 
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [user, handleRefreshRoles])
+  // Note: useSimpleRBAC handles cross-tab synchronization automatically
 
-  // Listen for storage events (in case permissions are updated in another tab)
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'rbac_updated' && user) {
-        console.log('RBAC updated in another tab - refreshing permissions')
-        handleRefreshRoles()
-        // Clear the flag
-        localStorage.removeItem('rbac_updated')
-      }
-    }
-
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [user, handleRefreshRoles])
-
-  // Listen for custom RBAC update events
-  useEffect(() => {
-    const handleRBACUpdate = () => {
-      if (user) {
-        console.log('RBAC updated - refreshing navigation permissions')
-        handleRefreshRoles()
-      }
-    }
-
-    window.addEventListener('rbac-updated', handleRBACUpdate)
-    return () => window.removeEventListener('rbac-updated', handleRBACUpdate)
-  }, [user, handleRefreshRoles])
+  // Note: useSimpleRBAC handles RBAC update events automatically
 
 
   const handleSignOut = async () => {
@@ -192,11 +144,26 @@ export default function NavigationBar() {
 
             {/* Modular Navigation */}
             {!modulesLoading && modules.map((module) => (
-              <ModularNavigationItem
-                key={module.id}
-                module={module}
-                isMobile={false}
-              />
+              <div key={module.id} className="relative group">
+                <Button variant="ghost" className="text-gray-700 hover:text-gray-900">
+                  {module.display_name}
+                </Button>
+                {module.items && module.items.length > 0 && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="py-1">
+                      {module.items.map((item, index) => (
+                        <Link
+                          key={index}
+                          href={`/${locale}${item.href}`}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             ))}
 
             {user && (
@@ -347,12 +314,25 @@ export default function NavigationBar() {
 
                   {/* Modular Navigation - Mobile */}
                   {!modulesLoading && modules.map((module) => (
-                    <ModularNavigationItem
-                      key={module.id}
-                      module={module}
-                      isMobile={true}
-                      onItemClick={closeMobileMenu}
-                    />
+                    <div key={module.id} className="space-y-1">
+                      <div className="px-3 py-2 text-sm font-medium text-gray-900">
+                        {module.display_name}
+                      </div>
+                      {module.items && module.items.length > 0 && (
+                        <div className="pl-4 space-y-1">
+                          {module.items.map((item, index) => (
+                            <Link
+                              key={index}
+                              href={`/${locale}${item.href}`}
+                              onClick={closeMobileMenu}
+                              className="block px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
+                            >
+                              {item.label}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
 
                   <Link 

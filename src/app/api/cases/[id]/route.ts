@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -54,7 +60,7 @@ export async function PATCH(
         .insert(imageRecords)
 
       if (imagesError) {
-        console.error('Error inserting case images:', imagesError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting case images:', imagesError)
         return NextResponse.json(
           { error: 'Failed to save images', details: imagesError.message },
           { status: 500 }
@@ -82,7 +88,7 @@ export async function PATCH(
         .single()
 
       if (updateError) {
-        console.error('Error updating case:', updateError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating case:', updateError)
         return NextResponse.json(
           { error: 'Failed to update case', details: updateError.message },
           { status: 500 }
@@ -94,7 +100,7 @@ export async function PATCH(
       message: 'Case updated successfully'
     })
   } catch (error) {
-    console.error('Error in case PATCH API:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in case PATCH API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -104,7 +110,10 @@ export async function PATCH(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -120,7 +129,7 @@ export async function GET(
       .single()
 
     if (error) {
-      console.error('Error fetching case:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching case:', error)
       return NextResponse.json(
         { error: 'Case not found' },
         { status: 404 }
@@ -129,7 +138,7 @@ export async function GET(
 
     return NextResponse.json({ case: caseData })
   } catch (error) {
-    console.error('Error in case GET API:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in case GET API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

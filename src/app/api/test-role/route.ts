@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { UserRole } from '@/lib/rbac'
+import { UserRole } from '@/lib/rbac/types'
+import { requirePermission } from '@/lib/security/guards'
+import { isTestEnabled } from '@/lib/security/rls'
+import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 
 export async function POST(request: NextRequest) {
   try {
-    const { role } = await request.json()
+    // Check if test endpoints are enabled
+    if (!isTestEnabled()) {
+      return NextResponse.json({
+        success: false,
+        message: 'Test endpoints are disabled'
+      }, { status: 404 })
+    }
+
+    const { role, targetUserId } = await request.json()
     
     if (!role || !['donor', 'sponsor', 'admin'].includes(role)) {
       return NextResponse.json({
@@ -13,21 +24,42 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      return NextResponse.json({
-        success: false,
-        message: 'User not authenticated'
-      }, { status: 401 })
+    // Require admin permission for role changes
+    const authResult = await requireAdminPermission(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
 
-    // Update user metadata with new role
-    const { error: updateError } = await supabase.auth.updateUser({
-      data: { role: role as UserRole }
+    const { user: adminUser, supabase } = authResult
+
+    // Log the role change attempt
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logRBACAction(
+      adminUser.id,
+      'test_role_change',
+      targetUserId || adminUser.id,
+      undefined,
+      undefined,
+      { 
+        newRole: role,
+        endpoint: '/api/test-role',
+        isSelfChange: !targetUserId || targetUserId === adminUser.id
+      },
+      ipAddress,
+      userAgent
+    )
+
+    // Prevent users from changing their own role
+    if (!targetUserId || targetUserId === adminUser.id) {
+      return NextResponse.json({
+        success: false,
+        message: 'Admins cannot change their own role through this endpoint. Use RBAC management instead.'
+      }, { status: 403 })
+    }
+
+    // Update target user metadata with new role
+    const { error: updateError } = await supabase.auth.admin.updateUserById(targetUserId, {
+      user_metadata: { role: role as UserRole }
     })
 
     if (updateError) {
@@ -39,8 +71,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Role updated to ${role}`,
-      role: role
+      message: `Role updated to ${role} for user ${targetUserId}`,
+      role: role,
+      targetUserId: targetUserId
     })
 
   } catch (error) {
@@ -51,19 +84,23 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
+    // Check if test endpoints are enabled
+    if (!isTestEnabled()) {
       return NextResponse.json({
         success: false,
-        message: 'User not authenticated'
-      }, { status: 401 })
+        message: 'Test endpoints are disabled'
+      }, { status: 404 })
     }
+
+    // Require admin permission to view role information
+    const authResult = await requireAdminPermission(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
+    }
+
+    const { user } = authResult
 
     const currentRole = user.user_metadata?.role || 'donor'
 

@@ -3,7 +3,7 @@
  * This file allows easy modification of role permissions without touching the core RBAC system
  */
 
-import { UserRole } from '@/lib/rbac/permissions'
+import { UserRole } from '@/lib/rbac/types'
 
 /**
  * Feature Access Configuration

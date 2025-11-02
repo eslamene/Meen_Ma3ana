@@ -6,6 +6,8 @@ import { NotificationService } from './notifications'
 import { caseUpdateService } from './case-updates'
 import type { CaseStatus } from '@/drizzle/schema'
 
+import { defaultLogger } from '@/lib/logger'
+
 export interface StatusTransition {
   from: CaseStatus
   to: CaseStatus
@@ -208,7 +210,7 @@ export class CaseLifecycleService {
           })
         }
       } catch (updateError) {
-        console.error('Error creating case update for status change:', updateError)
+        defaultLogger.error('Error creating case update for status change:', updateError)
         // Don't fail the request if case update creation fails
       }
 
@@ -231,7 +233,7 @@ export class CaseLifecycleService {
 
       return { success: true, case: updatedCase }
     } catch (error) {
-      console.error('Error changing case status:', error)
+      defaultLogger.error('Error changing case status:', error)
       return { success: false, error: 'Failed to change case status' }
     }
   }
@@ -310,7 +312,7 @@ export class CaseLifecycleService {
     try {
       await NotificationService.sendStatusChangeNotifications(data)
     } catch (error) {
-      console.error('Error sending status change notifications:', error)
+      defaultLogger.error('Error sending status change notifications:', error)
       // Don't fail the status change if notifications fail
     }
   }
@@ -343,7 +345,7 @@ export class CaseLifecycleService {
 
       return { success: true, history }
     } catch (error) {
-      console.error('Error getting case status history:', error)
+      defaultLogger.error('Error getting case status history:', error)
       return { success: false, error: 'Failed to get case status history' }
     }
   }
@@ -360,7 +362,7 @@ export class CaseLifecycleService {
 
       return { success: true, cases: casesList }
     } catch (error) {
-      console.error('Error getting cases by status:', error)
+      defaultLogger.error('Error getting cases by status:', error)
       return { success: false, error: 'Failed to get cases by status' }
     }
   }

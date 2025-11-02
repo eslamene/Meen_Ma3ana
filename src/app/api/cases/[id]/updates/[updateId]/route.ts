@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { caseUpdateService } from '@/lib/case-updates'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; updateId: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string; updateId: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -72,7 +78,7 @@ export async function PUT(
       update: result.update
     })
   } catch (error) {
-    console.error('Error updating case update:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating case update:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -82,7 +88,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; updateId: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string; updateId: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -134,7 +143,7 @@ export async function DELETE(
       success: true
     })
   } catch (error) {
-    console.error('Error deleting case update:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting case update:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

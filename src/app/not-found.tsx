@@ -3,8 +3,14 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Home, ArrowLeft } from 'lucide-react'
+import { useParams } from 'next/navigation'
+import { defaultLocale } from '@/i18n/request'
 
 export default function NotFound() {
+  const params = useParams()
+  const locale = (params?.locale as string) || defaultLocale
+  const landingUrl = `/${locale}/landing`
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
@@ -22,7 +28,7 @@ export default function NotFound() {
         
         <div className="space-y-3">
           <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-            <Link href="/">
+            <Link href={landingUrl}>
               <Home className="h-4 w-4 mr-2" />
               Go to homepage
             </Link>

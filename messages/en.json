@@ -1,6 +1,10 @@
 {
   "admin": {
     "analytics": "Analytics",
+    "rbacManagement": "RBAC Management",
+    "userManagement": "User Management", 
+    "permissions": "Permissions",
+    "roleManagement": "Role Management",
     "charts": {
       "caseProgressChart": "Case Progress",
       "categoryDistribution": "Category Distribution",
@@ -193,19 +197,117 @@
     "medicalCondition": "Medical Condition / Situation",
     "medicalConditionPlaceholder": "Brief description of condition or situation",
     "mobileNumber": "Mobile Number",
+    "additionalMobileNumber": "Additional Mobile Number",
     "name": "Name",
     "namePlaceholder": "Enter full name",
     "nationalId": "National ID",
     "nationalIdPlaceholder": "Enter ID or passport number",
+    "idType": "ID Type",
+    "selectIdType": "Select ID type",
+    "selectCity": "Select city",
+    "noCitiesFound": "No cities found",
+    "openBeneficiary": "Open",
+    "title": "Beneficiaries",
+    "subtitle": "Manage beneficiary profiles and documents",
+    "addBeneficiary": "Add Beneficiary",
+    "filters": "Filters",
+    "searchPlaceholder": "Search by name, mobile, ID...",
+    "allCities": "All Cities",
+    "allLevels": "All Levels",
+    "clearFilters": "Clear Filters",
+    "verified": "Verified",
+    "created": "Created",
+    "view": "View",
+    "edit": "Edit",
+    "noBeneficiaries": "No beneficiaries found",
+    "noBeneficiariesFiltered": "Try adjusting your filters",
+    "noBeneficiariesDescription": "Get started by adding your first beneficiary",
+    "addFirstBeneficiary": "Add First Beneficiary",
+    "deleteBeneficiary": "Delete Beneficiary",
+    "deleteConfirmation": "Are you sure you want to delete this beneficiary? This action cannot be undone.",
+    "cancel": "Cancel",
+    "deleting": "Deleting...",
+    "delete": "Delete",
+    "beneficiaryDetails": "Beneficiary Details",
+    "back": "Back",
+    "basicInformation": "Basic Information",
+    "nameAr": "Name (Arabic)",
+    "age": "Age",
+    "gender": "Gender",
+    "male": "Male",
+    "female": "Female",
+    "other": "Other",
+    "riskLevel": "Risk Level",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical",
+    "status": "Status",
+    "contactInformation": "Contact Information",
+    "mobileNumber": "Mobile Number",
+    "additionalMobileNumber": "Additional Mobile Number",
+    "email": "Email",
+    "alternativeContact": "Alternative Contact",
+    "identification": "Identification",
+    "idType": "ID Type",
+    "nationalId": "National ID",
+    "country": "Country",
+    "city": "City",
+    "address": "Address",
+    "additionalInformation": "Additional Information",
+    "medicalCondition": "Medical Condition",
+    "notes": "Notes",
+    "documents": "Documents",
+    "noDocuments": "No documents uploaded",
+    "statistics": "Statistics",
+    "totalCases": "Total Cases",
+    "activeCases": "Active Cases",
+    "lastUpdated": "Last Updated",
+    "beneficiaryNotFound": "Beneficiary not found",
+    "beneficiaryNotFoundDescription": "The beneficiary you are looking for does not exist.",
+    "backToBeneficiaries": "Back to Beneficiaries",
+    "createBeneficiary": "Create Beneficiary",
+    "createBeneficiaryDescription": "Add a new beneficiary to the system",
+    "namePlaceholder": "Enter full name",
+    "nameArPlaceholder": "Enter name in Arabic",
+    "agePlaceholder": "Enter age",
+    "mobileNumberPlaceholder": "Enter mobile number",
+    "additionalMobileNumberPlaceholder": "Enter additional mobile number",
+    "emailPlaceholder": "Enter email address",
+    "alternativeContactPlaceholder": "Enter alternative contact",
+    "selectIdType": "Select ID type",
+    "selectCity": "Search and select city...",
+    "addressPlaceholder": "Enter full address",
+    "medicalConditionPlaceholder": "Enter medical condition if any",
+    "notesPlaceholder": "Additional information about the beneficiary",
+    "creating": "Creating...",
+    "editBeneficiary": "Edit Beneficiary",
+    "editBeneficiaryDescription": "Update beneficiary information",
+    "updating": "Updating...",
+    "updateBeneficiary": "Update Beneficiary",
+    "validation": {
+      "nameRequired": "Name is required",
+      "mobileRequired": "Mobile number is required",
+      "emailInvalid": "Invalid email format"
+    },
+    "public": "Public",
+    "private": "Private",
     "noResults": "No beneficiary found",
     "noResultsDescription": "Create a new beneficiary profile for recurring cases",
-    "notes": "Notes",
-    "notesPlaceholder": "Additional information about the beneficiary",
     "search": "Search",
     "searchPlaceholder": "Search by name, mobile, or national ID...",
     "searchResults": "Search Results",
     "totalCases": "Total Cases",
-    "verified": "Verified"
+    "verified": "Verified",
+    "documents": "Documents",
+    "uploadDocument": "Upload Document",
+    "documentType": "Document Type",
+    "isPublic": "Public Document",
+    "publicDescription": "Visible to all users",
+    "privateDescription": "Only visible to contributors",
+    "identityCopy": "Identity Copy",
+    "personalPhoto": "Personal Photo",
+    "otherDocument": "Other Document"
   },
   "auth": {
     "alreadyHaveAccount": "Already have an account?",
@@ -244,7 +346,15 @@
     "signUp": "Sign Up",
     "signUpForAccount": "Create a new account",
     "signUpSuccess": "Account created successfully. Please check your email to verify your account.",
-    "unknownError": "An unknown error occurred"
+    "unknownError": "An unknown error occurred",
+    "accessDenied": "Access Denied",
+    "accessDeniedMessage": "You don't have permission to access this page or perform this action.",
+    "requiredPermission": "Required Permission",
+    "requiredRole": "Required Role",
+    "requiredAccess": "Required Access",
+    "goBack": "Go Back",
+    "goHome": "Go Home",
+    "contactAdmin": "If you believe this is an error, please contact your administrator."
   },
   "cases": {
     "addUpdate": "Add Update",
@@ -565,6 +675,7 @@
     "validation": {
       "beneficiaryContactRequired": "Beneficiary contact is required",
       "beneficiaryNameRequired": "Beneficiary name is required",
+      "beneficiaryRequired": "Please select a beneficiary",
       "categoryRequired": "Category is required",
       "descriptionRequired": "Description is required",
       "descriptionTooLong": "Description must be less than 2000 characters",
@@ -759,6 +870,8 @@
     "new": "New",
     "noNotifications": "No notifications found",
     "notifications": "Notifications",
+    "subtitle": "Stay updated with your contribution status and important updates",
+    "title": "Notifications",
     "unread": "unread"
   },
   "profile": {
@@ -1079,5 +1192,300 @@
     "testConnection": "Test Connection",
     "title": "Component Tests",
     "userInfo": "User Information"
+  },
+  "rbac": {
+    "roles": {
+      "title": "Roles Management",
+      "description": "Create and manage user roles",
+      "createRole": "Create Role",
+      "editRole": "Edit Role",
+      "deleteRole": "Delete Role",
+      "assignPermissions": "Assign Permissions",
+      "roleName": "Role Name",
+      "displayName": "Display Name",
+      "description": "Description",
+      "systemRole": "System Role",
+      "customRole": "Custom Role",
+      "permissionsCount": "Permissions",
+      "usersCount": "Users",
+      "noRoles": "No roles found",
+      "createFirstRole": "Create your first role",
+      "type": "Type",
+      "actions": "Actions",
+      "stats": {
+        "totalRoles": "Total Roles",
+        "usersWithRoles": "Users with Roles"
+      }
+    },
+    "permissions": {
+      "title": "Permissions Management",
+      "description": "Manage system permissions",
+      "createPermission": "Create Permission",
+      "editPermission": "Edit Permission",
+      "deletePermission": "Delete Permission",
+      "permissionName": "Permission Name",
+      "displayName": "Display Name",
+      "description": "Description",
+      "resource": "Resource",
+      "action": "Action",
+      "module": "Module",
+      "systemPermission": "System Permission",
+      "customPermission": "Custom Permission",
+      "noPermissions": "No permissions found",
+      "stats": {
+        "totalPermissions": "Total Permissions",
+        "totalModules": "Total Modules",
+        "systemPermissions": "System Permissions",
+        "customPermissions": "Custom Permissions"
+      },
+      "table": {
+        "permissionName": "Permission Name",
+        "displayName": "Display Name",
+        "description": "Description",
+        "resource": "Resource",
+        "action": "Action",
+        "type": "Type",
+        "actions": "Actions"
+      },
+      "modals": {
+        "viewRoles": "Roles with \"{permissionName}\"",
+        "viewRolesDescription": "These roles have this permission assigned.",
+        "noRolesAssigned": "No roles have this permission assigned.",
+        "permissionsCount": "{count} permissions"
+      }
+    },
+    "users": {
+      "title": "User Role Management",
+      "description": "Assign roles to users",
+      "manageRoles": "Manage Roles",
+      "assignRoles": "Assign Roles",
+      "userEmail": "Email",
+      "displayName": "Display Name",
+      "assignedRoles": "Assigned Roles",
+      "noUsers": "No users found",
+      "stats": {
+        "totalUsers": "Total Users",
+        "usersWithRoles": "Users with Roles",
+        "usersWithoutRoles": "Users without Roles",
+        "roleBreakdown": "Role Breakdown"
+      },
+      "table": {
+        "user": "User",
+        "assignedRoles": "Assigned Roles",
+        "roleCount": "Role Count",
+        "lastUpdated": "Last Updated",
+        "actions": "Actions",
+        "never": "Never"
+      },
+      "modals": {
+        "bulkAssignTitle": "Bulk Assign Roles",
+        "bulkAssignDescription": "Assign roles to {count} selected users.",
+        "selectRolesToAssign": "Select Roles to Assign",
+        "assignToUsers": "Assign to {count} Users"
+      },
+      "confirmations": {
+        "confirmRoleChange": "Confirm Role Change",
+        "cannotRemoveOwnAdmin": "Error: You cannot remove your own admin role.",
+        "removingLastAdmin": "Warning: Removing the last admin role from this user."
+      }
+    },
+    "modules": {
+      "title": "Modules Management",
+      "description": "Organize permissions into modules",
+      "createModule": "Create Module",
+      "editModule": "Edit Module",
+      "deleteModule": "Delete Module",
+      "moduleName": "Module Name",
+      "displayName": "Display Name",
+      "description": "Description",
+      "icon": "Icon",
+      "color": "Color",
+      "sortOrder": "Sort Order",
+      "systemModule": "System Module",
+      "customModule": "Custom Module",
+      "noModules": "No modules found",
+      "stats": {
+        "totalModules": "Total Modules",
+        "systemModules": "System Modules",
+        "customModules": "Custom Modules",
+        "avgPermissionsPerModule": "Avg Permissions/Module"
+      },
+      "table": {
+        "permissions": "Permissions",
+        "sort": "Sort",
+        "usedByRoles": "Used by {count} role{plural}",
+        "viewPermissions": "View Permissions ({count})",
+        "managePermissions": "Manage Permissions"
+      },
+      "modals": {
+        "managePermissionsTitle": "Manage Permissions - {moduleName}",
+        "managePermissionsDescription": "Move permissions to other modules. Select permissions and choose target module.",
+        "selectPermissionsToMove": "Select Permissions to Move",
+        "selectAll": "Select All ({count})",
+        "targetModule": "Target Module",
+        "selectTargetModule": "Select target module",
+        "movePermissions": "Move {count} Permission{plural}",
+        "moving": "Moving..."
+      }
+    },
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "edit": "Edit",
+      "create": "Create",
+      "search": "Search",
+      "filter": "Filter",
+      "loading": "Loading...",
+      "success": "Success",
+      "error": "Error",
+      "confirm": "Confirm",
+      "systemItem": "System",
+      "customItem": "Custom",
+      "all": "All",
+      "close": "Close",
+      "type": "Type",
+      "actions": "Actions",
+      "searchRolesPlaceholder": "Search roles...",
+      "searchPermissionsPlaceholder": "Search permissions...",
+      "searchUsersPlaceholder": "Search users...",
+      "searchModulesPlaceholder": "Search modules...",
+      "allModules": "All Modules",
+      "allUsers": "All Users",
+      "noRoles": "No Roles",
+      "filterByModule": "Filter by module",
+      "filterByRole": "Filter by role"
+    }
+  },
+  "landing": {
+    "title": "Meen Ma3ana - Empowering Communities Through Compassionate Giving",
+    "subtitle": "Make a Real Difference in People's Lives",
+    "description": "A comprehensive platform for managing charitable donations, connecting donors with beneficiaries, and facilitating meaningful contributions to make a positive impact in communities.",
+    "hero": {
+      "title": "Who's With Us?",
+      "subtitle": "Helping those in need, one case at a time",
+      "description": "A simple idea from the heart—to help those in need. No big organization, just caring hearts coming together to make a difference.",
+      "ctaPrimary": "Get Started",
+      "ctaSecondary": "Learn More"
+    },
+    "features": {
+      "title": "Why Choose Meen Ma3ana",
+      "subtitle": "A platform built with compassion and transparency",
+      "communitySupport": {
+        "title": "Community Support",
+        "description": "Connect with your community and make a real difference in people's lives through our platform."
+      },
+      "secureDonations": {
+        "title": "Secure Donations",
+        "description": "Your donations are processed securely with full transparency and tracking."
+      },
+      "impactTracking": {
+        "title": "Impact Tracking",
+        "description": "See the real impact of your contributions with detailed progress tracking."
+      },
+      "transparency": {
+        "title": "Full Transparency",
+        "description": "Every contribution is tracked and visible, ensuring trust and accountability."
+      },
+      "easyProcess": {
+        "title": "Easy Process",
+        "description": "Simple, intuitive interface for both donors and beneficiaries."
+      },
+      "trustedPlatform": {
+        "title": "Trusted Platform",
+        "description": "Built on reliable infrastructure with security and privacy as top priorities."
+      }
+    },
+    "stats": {
+      "title": "Our Impact",
+      "totalRaised": "Total Raised",
+      "activeCases": "Active Cases",
+      "beneficiaries": "Beneficiaries Helped",
+      "contributors": "Contributors"
+    },
+    "values": {
+      "title": "Our Values",
+      "subtitle": "What drives us every day",
+      "transparency": {
+        "title": "Transparency",
+        "description": "Complete visibility into where your contributions go and how they're used."
+      },
+      "integrity": {
+        "title": "Integrity",
+        "description": "We operate with the highest ethical standards in everything we do."
+      },
+      "impact": {
+        "title": "Impact",
+        "description": "Every contribution makes a measurable difference in someone's life."
+      },
+      "community": {
+        "title": "Community",
+        "description": "Building stronger communities through collective support and compassion."
+      }
+    },
+    "contact": {
+      "title": "Get in Touch",
+      "subtitle": "We'd love to hear from you",
+      "name": "Name",
+      "namePlaceholder": "Enter your name",
+      "email": "Email",
+      "emailPlaceholder": "Enter your email",
+      "message": "Message",
+      "messagePlaceholder": "Enter your message",
+      "submit": "Send Message",
+      "submitting": "Sending...",
+      "success": "Message sent successfully! We'll get back to you soon.",
+      "error": "Failed to send message. Please try again."
+    },
+    "cta": {
+      "title": "Ready to Make a Difference?",
+      "subtitle": "Join us today and start making a positive impact",
+      "button": "Contact Us",
+      "email": "support@ma3ana.org"
+    },
+    "whatsapp": {
+      "number": "201234567890",
+      "defaultMessage": "Hello! I'd like to know more about Meen Ma3ana.",
+      "ariaLabel": "Chat with us on WhatsApp",
+      "tooltip": "Chat with us on WhatsApp"
+    },
+    "footer": {
+      "copyright": "Meen Ma3ana. All rights reserved.",
+      "brandName": "Meen Ma3ana"
+    },
+    "stories": {
+      "title": "Success Stories",
+      "subtitle": "Real impact from real contributions",
+      "readMore": "Read More",
+      "viewAll": "View All Stories",
+      "items": [
+        {
+          "title": "Emergency Medical Support",
+          "description": "Helped a family cover urgent medical expenses.",
+          "impact": "Amount raised:"
+        },
+        {
+          "title": "Educational Assistance",
+          "description": "Supported students with school supplies and tuition fees.",
+          "impact": "30 students helped"
+        },
+        {
+          "title": "Housing Support",
+          "description": "Provided housing assistance for families in need.",
+          "impact": "15 families supported"
+        }
+      ]
+    },
+    "inspiration": {
+      "title": "Words from Our Founder",
+      "subtitle": "Inspiring thoughts that guide our mission",
+      "quotes": [
+        {
+          "text": "\"Meen Ma3ana\" isn't an organization or charity.\n\nThis is an idea I've carried in my heart for years, born from a love for those in need. I have no team behind me, no funding. I'm just doing this, one case at a time—listening, checking, and trying my best.\n\nBut God sends kind hearts to support me. Every time I ask \"Who's with us?\" you show up, truly with us ❤️\n\nLet's help and care for those in need as much as we can, so God may help and love us in return ❤️\n\nThe poor will be a nation on the Day of Judgment ❤️",
+          "icon": "🤍",
+          "signature": "🤍 I am Marwa"
+        }
+      ]
+    }
   }
 }

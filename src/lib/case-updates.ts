@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { caseUpdates, users, contributions, contributionApprovalStatus } from '@/drizzle/schema'
 import { eq, desc, and, asc, or, like } from 'drizzle-orm'
 
+import { defaultLogger } from '@/lib/logger'
+
 export interface CaseUpdate {
   id: string
   caseId: string
@@ -292,9 +294,9 @@ export class CaseUpdateService {
           )
         )
       
-      console.log('Cleaned up old contribution updates')
+      defaultLogger.info('Cleaned up old contribution updates')
     } catch (error) {
-      console.error('Error cleaning up old contribution updates:', error)
+      defaultLogger.error('Error cleaning up old contribution updates:', error)
     }
   }
 
@@ -327,7 +329,7 @@ export class CaseUpdateService {
         .limit(10)
 
       if (error) {
-        console.error('Error fetching approved contributions:', error)
+        defaultLogger.error('Error fetching approved contributions:', error)
         return []
       }
 
@@ -369,7 +371,7 @@ export class CaseUpdateService {
         }
       })
     } catch (error) {
-      console.error('Error generating contribution updates:', error)
+      defaultLogger.error('Error generating contribution updates:', error)
       return []
     }
   }
@@ -395,7 +397,7 @@ export class CaseUpdateService {
 
       return { success: true, update: this.mapToCaseUpdate(updatedUpdate) }
     } catch (error) {
-      console.error('Error updating case update:', error)
+      defaultLogger.error('Error updating case update:', error)
       return { success: false, error: 'Failed to update case update' }
     }
   }
@@ -413,7 +415,7 @@ export class CaseUpdateService {
 
       return { success: true }
     } catch (error) {
-      console.error('Error deleting case update:', error)
+      defaultLogger.error('Error deleting case update:', error)
       return { success: false, error: 'Failed to delete case update' }
     }
   }

@@ -11,6 +11,7 @@ npm run setup:all
 
 # 3. Add your Supabase service role key to .env
 # Edit .env and replace 'your_service_role_key_here' with your actual key
+# Optional: Set PRELAUNCH=true to block app routes during pre-launch
 
 # 4. Test the upload functionality
 npm run test:upload

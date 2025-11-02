@@ -4,9 +4,15 @@ import { projects, projectCycles } from '@/lib/db'
 import { eq, and, asc } from 'drizzle-orm'
 import { createClient } from '@/lib/supabase/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -73,7 +79,7 @@ export async function GET(
 
     return NextResponse.json(transformedProject)
   } catch (error) {
-    console.error('Error fetching project:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching project:', error)
     return NextResponse.json(
       { error: 'Failed to fetch project' },
       { status: 500 }
@@ -83,7 +89,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -137,7 +146,7 @@ export async function PUT(
 
     return NextResponse.json(updatedProject)
   } catch (error) {
-    console.error('Error updating project:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating project:', error)
     return NextResponse.json(
       { error: 'Failed to update project' },
       { status: 500 }
@@ -147,7 +156,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -185,7 +197,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting project:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting project:', error)
     return NextResponse.json(
       { error: 'Failed to delete project' },
       { status: 500 }

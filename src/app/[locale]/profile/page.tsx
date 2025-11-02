@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, usePathname } from 'next/navigation'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -37,6 +38,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import ContributionHistory from '@/components/profile/ContributionHistory'
+import UserRoleInfo from '@/components/profile/UserRoleInfo'
 
 interface UserProfile {
   id: string
@@ -577,6 +579,23 @@ export default function ProfilePage() {
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Role Information */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-800">
+                          <Shield className="h-5 w-5 text-purple-600" />
+                          Role & Permissions
+                        </h3>
+                        <Link href="/profile/role">
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
+                        </Link>
+                      </div>
+                      <UserRoleInfo showDetails={false} />
                     </div>
 
                     {/* Recent Activity */}

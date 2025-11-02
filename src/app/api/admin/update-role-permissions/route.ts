@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const body = await request.json()
     const { roleId, permissionIds } = body
@@ -10,8 +16,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Role ID required' }, { status: 400 })
     }
 
-    console.log('Updating permissions for role:', roleId)
-    console.log('New permissions:', permissionIds)
+    logger.info('Updating permissions for role:', roleId)
+    logger.info('New permissions:', permissionIds)
 
     // Create admin client
     const adminClient = createClient(
@@ -26,11 +32,11 @@ export async function POST(request: NextRequest) {
       .eq('role_id', roleId)
 
     if (deleteError) {
-      console.error('Error removing existing permissions:', deleteError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error removing existing permissions:', deleteError)
       throw deleteError
     }
 
-    console.log('Removed existing permissions')
+    logger.info('Removed existing permissions')
 
     // Then, add the new permissions
     if (permissionIds && permissionIds.length > 0) {
@@ -44,11 +50,11 @@ export async function POST(request: NextRequest) {
         .insert(rolePermissions)
 
       if (insertError) {
-        console.error('Error inserting new permissions:', insertError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting new permissions:', insertError)
         throw insertError
       }
 
-      console.log('Added new permissions:', permissionIds.length)
+      logger.info('Added new permissions:', permissionIds.length)
     }
 
     return NextResponse.json({
@@ -57,7 +63,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Update role permissions API error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Update role permissions API error:', error)
     return NextResponse.json({
       error: 'Failed to update role permissions',
       details: error instanceof Error ? error.message : 'Unknown error'

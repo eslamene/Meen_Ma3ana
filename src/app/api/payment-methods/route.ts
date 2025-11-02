@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 // Mock payment methods data until database table is created
 const MOCK_PAYMENT_METHODS = [
   {
@@ -40,11 +43,14 @@ const MOCK_PAYMENT_METHODS = [
 ]
 
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     // Return mock data for now
     return NextResponse.json({ paymentMethods: MOCK_PAYMENT_METHODS })
   } catch (error) {
-    console.error('Error in payment methods API:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in payment methods API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

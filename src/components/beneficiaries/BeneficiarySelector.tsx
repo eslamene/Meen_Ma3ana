@@ -5,17 +5,22 @@
  * Allows searching for existing beneficiaries or creating new ones
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { Search, Plus, User, Phone, IdCard, MapPin, AlertCircle, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { BeneficiaryService } from '@/lib/services/beneficiaryService'
-import type { Beneficiary, CreateBeneficiaryData } from '@/types/beneficiary'
+import { LookupService } from '@/lib/services/lookupService'
+import { BeneficiaryDocumentService } from '@/lib/services/beneficiaryDocumentService'
+import BeneficiaryDocumentUpload from './BeneficiaryDocumentUpload'
+import type { Beneficiary, CreateBeneficiaryData, IdType, City, BeneficiaryDocument, DocumentType } from '@/types/beneficiary'
 
 interface BeneficiarySelectorProps {
   selectedBeneficiary?: Beneficiary | null
@@ -23,6 +28,7 @@ interface BeneficiarySelectorProps {
   defaultMobileNumber?: string
   defaultNationalId?: string
   defaultName?: string
+  showOpenButton?: boolean
 }
 
 export default function BeneficiarySelector({
@@ -30,7 +36,8 @@ export default function BeneficiarySelector({
   onSelect,
   defaultMobileNumber,
   defaultNationalId,
-  defaultName
+  defaultName,
+  showOpenButton = false,
 }: BeneficiarySelectorProps) {
   const t = useTranslations('beneficiaries')
   const [searchQuery, setSearchQuery] = useState('')
@@ -38,6 +45,40 @@ export default function BeneficiarySelector({
   const [isSearching, setIsSearching] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [idTypes, setIdTypes] = useState<IdType[]>([])
+  const [cities, setCities] = useState<City[]>([])
+  const [documents, setDocuments] = useState<BeneficiaryDocument[]>([])
+  const [loadingLookups, setLoadingLookups] = useState(true)
+
+  // Load documents function
+  const loadDocuments = async (beneficiaryId: string) => {
+    try {
+      const docs = await BeneficiaryDocumentService.getByBeneficiaryId(beneficiaryId)
+      setDocuments(docs)
+    } catch (error) {
+      console.error('Error loading documents:', error)
+    }
+  }
+
+  // Load lookup data on component mount
+  useEffect(() => {
+    const loadLookupData = async () => {
+      try {
+        const [idTypesData, citiesData] = await Promise.all([
+          LookupService.getIdTypes(),
+          LookupService.getCities()
+        ])
+        setIdTypes(idTypesData)
+        setCities(citiesData)
+      } catch (error) {
+        console.error('Error loading lookup data:', error)
+      } finally {
+        setLoadingLookups(false)
+      }
+    }
+
+    loadLookupData()
+  }, [])
 
   // Auto-search when component mounts with default identifiers
   useEffect(() => {
@@ -45,6 +86,13 @@ export default function BeneficiarySelector({
       handleSearchByIdentifier()
     }
   }, [defaultMobileNumber, defaultNationalId])
+
+  // Load documents when beneficiary is selected
+  useEffect(() => {
+    if (selectedBeneficiary) {
+      loadDocuments(selectedBeneficiary.id)
+    }
+  }, [selectedBeneficiary])
 
   const handleSearchByIdentifier = async () => {
     if (!defaultMobileNumber && !defaultNationalId) return
@@ -96,9 +144,10 @@ export default function BeneficiarySelector({
       onSelect(newBeneficiary)
       setShowCreateDialog(false)
       setSearchResults([newBeneficiary])
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       console.error('Error creating beneficiary:', error)
-      alert(error.message || 'Failed to create beneficiary')
+      alert(errorMessage || 'Failed to create beneficiary')
     } finally {
       setIsCreating(false)
     }
@@ -147,6 +196,16 @@ export default function BeneficiarySelector({
                   <span>{t('activeCases') || 'Active Cases'}: <strong>{selectedBeneficiary.active_cases}</strong></span>
                 </div>
               </div>
+              {showOpenButton && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`/beneficiaries/${selectedBeneficiary.id}`, '_blank')}
+                >
+                  <User className="h-4 w-4 mr-1" />
+                  {t('openBeneficiary') || 'Open'}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -156,7 +215,20 @@ export default function BeneficiarySelector({
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </Card>)}
+
+        {/* Document Upload Section */}
+        {selectedBeneficiary && (
+          <BeneficiaryDocumentUpload
+          beneficiaryId={selectedBeneficiary?.id || ''}
+          onDocumentUploaded={(document) => {
+            setDocuments(prev => [document, ...prev])
+          }}
+          onDocumentDeleted={(documentId) => {
+            setDocuments(prev => prev.filter(doc => doc.id !== documentId))
+          }}
+          documents={documents}
+        />
       )}
 
       {/* Search Section */}
@@ -192,6 +264,8 @@ export default function BeneficiarySelector({
                 <CreateBeneficiaryForm
                   onSubmit={handleCreateBeneficiary}
                   isSubmitting={isCreating}
+                  idTypes={idTypes}
+                  cities={cities}
                   defaultValues={{
                     name: defaultName || '',
                     mobile_number: defaultMobileNumber || '',
@@ -278,26 +352,119 @@ interface CreateBeneficiaryFormProps {
   onSubmit: (data: CreateBeneficiaryData) => void
   isSubmitting: boolean
   defaultValues?: Partial<CreateBeneficiaryData>
+  idTypes: IdType[]
+  cities: City[]
 }
 
-function CreateBeneficiaryForm({ onSubmit, isSubmitting, defaultValues }: CreateBeneficiaryFormProps) {
+function CreateBeneficiaryForm({ onSubmit, isSubmitting, defaultValues, idTypes, cities }: CreateBeneficiaryFormProps) {
   const t = useTranslations('beneficiaries')
   const [formData, setFormData] = useState<CreateBeneficiaryData>({
     name: defaultValues?.name || '',
     mobile_number: defaultValues?.mobile_number || '',
+    additional_mobile_number: defaultValues?.additional_mobile_number || '',
     national_id: defaultValues?.national_id || '',
     country: 'Egypt',
     id_type: 'national_id',
+    id_type_id: defaultValues?.id_type_id || '',
+    city: defaultValues?.city || '',
+    city_id: defaultValues?.city_id || '',
     risk_level: 'low'
   })
+  
+  // City search state
+  const [citySearchQuery, setCitySearchQuery] = useState('')
+  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false)
+  const [filteredCities, setFilteredCities] = useState<City[]>(cities)
+  const cityDropdownRef = useRef<HTMLDivElement>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSubmit(formData)
   }
 
-  const handleChange = (field: keyof CreateBeneficiaryData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+  const handleChange = (field: keyof CreateBeneficiaryData, value: string | number | boolean) => {
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value }
+      
+      // When ID type changes, also update the id_type field
+      if (field === 'id_type_id') {
+        const selectedIdType = idTypes.find(type => type.id === value)
+        if (selectedIdType) {
+          newData.id_type = selectedIdType.code as 'national_id' | 'passport' | 'other'
+        }
+      }
+      
+      return newData
+    })
+  }
+
+  // Get dynamic label and placeholder based on ID type
+  const getIDFieldInfo = () => {
+    const selectedIdType = idTypes.find(type => type.id === formData.id_type_id)
+    const idTypeName = selectedIdType?.name_en || 'ID'
+    
+    return {
+      label: idTypeName,
+      placeholder: `Enter ${idTypeName.toLowerCase()} number`
+    }
+  }
+
+  const { label: idFieldLabel, placeholder: idFieldPlaceholder } = getIDFieldInfo()
+
+  // Filter cities based on search query
+  useEffect(() => {
+    if (citySearchQuery.trim() === '') {
+      setFilteredCities(cities)
+    } else {
+      const filtered = cities.filter(city => 
+        city.name_en.toLowerCase().includes(citySearchQuery.toLowerCase()) ||
+        city.name_ar.includes(citySearchQuery)
+      )
+      setFilteredCities(filtered)
+    }
+  }, [citySearchQuery, cities])
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(event.target as Node)) {
+        setIsCityDropdownOpen(false)
+      }
+    }
+
+    if (isCityDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isCityDropdownOpen])
+
+  // Handle city selection
+  const handleCitySelect = (city: City) => {
+    setFormData(prev => ({
+      ...prev,
+      city_id: city.id,
+      city: city.name_en
+    }))
+    setCitySearchQuery(city.name_en)
+    setIsCityDropdownOpen(false)
+  }
+
+  // Handle city search input change
+  const handleCitySearchChange = (value: string) => {
+    setCitySearchQuery(value)
+    setIsCityDropdownOpen(true)
+    
+    // Clear city selection if search doesn't match selected city
+    if (formData.city && !value.toLowerCase().includes(formData.city.toLowerCase())) {
+      setFormData(prev => ({
+        ...prev,
+        city_id: '',
+        city: ''
+      }))
+    }
   }
 
   return (
@@ -317,7 +484,7 @@ function CreateBeneficiaryForm({ onSubmit, isSubmitting, defaultValues }: Create
           <Input
             type="number"
             value={formData.age || ''}
-            onChange={(e) => handleChange('age', parseInt(e.target.value) || undefined)}
+            onChange={(e) => handleChange('age', parseInt(e.target.value) || 0)}
             placeholder={t('agePlaceholder') || 'Enter age'}
           />
         </div>
@@ -334,22 +501,83 @@ function CreateBeneficiaryForm({ onSubmit, isSubmitting, defaultValues }: Create
           />
         </div>
         <div>
-          <Label>{t('nationalId') || 'National ID'}</Label>
+          <Label>{t('additionalMobileNumber') || 'Additional Mobile Number'}</Label>
           <Input
-            value={formData.national_id || ''}
-            onChange={(e) => handleChange('national_id', e.target.value)}
-            placeholder={t('nationalIdPlaceholder') || 'Enter ID number'}
+            type="tel"
+            value={formData.additional_mobile_number || ''}
+            onChange={(e) => handleChange('additional_mobile_number', e.target.value)}
+            placeholder="+20 XXX XXX XXXX"
           />
         </div>
       </div>
 
-      <div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>{t('idType') || 'ID Type'}</Label>
+          <Select value={formData.id_type_id} onValueChange={(value) => handleChange('id_type_id', value)}>
+            <SelectTrigger>
+              <SelectValue placeholder={t('selectIdType') || 'Select ID type'} />
+            </SelectTrigger>
+            <SelectContent>
+              {idTypes.filter(type => type.id && type.id.trim() !== '').map((type) => (
+                <SelectItem key={type.id} value={type.id}>
+                  {type.name_en}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>{idFieldLabel}</Label>
+          <Input
+            value={formData.national_id || ''}
+            onChange={(e) => handleChange('national_id', e.target.value)}
+            placeholder={idFieldPlaceholder}
+          />
+        </div>
+      </div>
+
+      <div className="relative" ref={cityDropdownRef}>
         <Label>{t('city') || 'City'}</Label>
-        <Input
-          value={formData.city || ''}
-          onChange={(e) => handleChange('city', e.target.value)}
-          placeholder={t('cityPlaceholder') || 'Enter city'}
-        />
+        <div className="relative">
+          <Input
+            value={citySearchQuery}
+            onChange={(e) => handleCitySearchChange(e.target.value)}
+            onFocus={() => setIsCityDropdownOpen(true)}
+            placeholder={t('selectCity') || 'Search and select city...'}
+            className="w-full"
+          />
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        </div>
+        
+        {/* City Dropdown */}
+        {isCityDropdownOpen && (
+          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+            {filteredCities.length > 0 ? (
+              filteredCities.map((city) => (
+                <div
+                  key={city.id}
+                  className="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center justify-between"
+                  onClick={() => handleCitySelect(city)}
+                >
+                  <div>
+                    <div className="font-medium">{city.name_en}</div>
+                    {city.name_ar && (
+                      <div className="text-sm text-gray-500">{city.name_ar}</div>
+                    )}
+                  </div>
+                  {formData.city_id === city.id && (
+                    <CheckCircle className="h-4 w-4 text-blue-600" />
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-gray-500 text-sm">
+                {t('noCitiesFound') || 'No cities found'}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div>

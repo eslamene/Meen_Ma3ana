@@ -4,6 +4,8 @@
  */
 
 import { createClient } from '@/lib/supabase/client'
+import { defaultLogger } from '@/lib/logger'
+
 import type {
   Beneficiary,
   CreateBeneficiaryData,
@@ -13,6 +15,24 @@ import type {
 } from '@/types/beneficiary'
 
 export class BeneficiaryService {
+  /**
+   * Calculate age from year of birth
+   */
+  private static calculateAge(yearOfBirth: number): number {
+    const currentYear = new Date().getFullYear()
+    return currentYear - yearOfBirth
+  }
+
+  /**
+   * Transform beneficiary data to include calculated age
+   */
+  private static transformBeneficiary(beneficiary: any): Beneficiary {
+    if (beneficiary.year_of_birth) {
+      beneficiary.age = this.calculateAge(beneficiary.year_of_birth)
+    }
+    return beneficiary as Beneficiary
+  }
+
   /**
    * Search for beneficiaries by name, mobile number, or national ID
    */
@@ -69,11 +89,11 @@ export class BeneficiaryService {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error searching beneficiaries:', error)
+      defaultLogger.error('Error searching beneficiaries:', error)
       throw new Error(error.message)
     }
 
-    return data || []
+    return (data || []).map(beneficiary => this.transformBeneficiary(beneficiary))
   }
 
   /**
@@ -105,11 +125,11 @@ export class BeneficiaryService {
     const { data, error } = await query.limit(1).single()
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error('Error finding beneficiary:', error)
+      defaultLogger.error('Error finding beneficiary:', error)
       throw new Error(error.message)
     }
 
-    return data || null
+    return data ? this.transformBeneficiary(data) : null
   }
 
   /**
@@ -124,11 +144,11 @@ export class BeneficiaryService {
       .single()
 
     if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching beneficiary:', error)
+      defaultLogger.error('Error fetching beneficiary:', error)
       throw new Error(error.message)
     }
 
-    return data || null
+    return data ? this.transformBeneficiary(data) : null
   }
 
   /**
@@ -147,18 +167,26 @@ export class BeneficiaryService {
       throw new Error('Beneficiary with this mobile number or national ID already exists')
     }
 
+    // Convert age to year of birth
+    const dataToInsert = { ...data }
+    if (data.age) {
+      const currentYear = new Date().getFullYear()
+      dataToInsert.year_of_birth = currentYear - data.age
+      delete dataToInsert.age // Remove age from the data to insert
+    }
+
     const { data: beneficiary, error } = await supabase
       .from('beneficiaries')
-      .insert([data])
+      .insert([dataToInsert])
       .select()
       .single()
 
     if (error) {
-      console.error('Error creating beneficiary:', error)
+      defaultLogger.error('Error creating beneficiary:', error)
       throw new Error(error.message)
     }
 
-    return beneficiary
+    return this.transformBeneficiary(beneficiary)
   }
 
   /**
@@ -166,19 +194,28 @@ export class BeneficiaryService {
    */
   static async update(id: string, data: UpdateBeneficiaryData): Promise<Beneficiary> {
     const supabase = createClient()
+    
+    // Convert age to year of birth if age is provided
+    const dataToUpdate = { ...data }
+    if (data.age) {
+      const currentYear = new Date().getFullYear()
+      dataToUpdate.year_of_birth = currentYear - data.age
+      delete dataToUpdate.age // Remove age from the data to update
+    }
+
     const { data: beneficiary, error } = await supabase
       .from('beneficiaries')
-      .update(data)
+      .update(dataToUpdate)
       .eq('id', id)
       .select()
       .single()
 
     if (error) {
-      console.error('Error updating beneficiary:', error)
+      defaultLogger.error('Error updating beneficiary:', error)
       throw new Error(error.message)
     }
 
-    return beneficiary
+    return this.transformBeneficiary(beneficiary)
   }
 
   /**
@@ -203,7 +240,7 @@ export class BeneficiaryService {
       .eq('id', id)
 
     if (error) {
-      console.error('Error deleting beneficiary:', error)
+      defaultLogger.error('Error deleting beneficiary:', error)
       throw new Error(error.message)
     }
   }
@@ -266,11 +303,76 @@ export class BeneficiaryService {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching beneficiary cases:', error)
+      defaultLogger.error('Error fetching beneficiary cases:', error)
       throw new Error(error.message)
     }
 
     return data || []
+  }
+
+  /**
+   * Get all beneficiaries with pagination and filtering
+   */
+  static async getAll(params: {
+    page?: number
+    limit?: number
+    search?: string
+    cityId?: string
+    riskLevel?: string
+  } = {}): Promise<Beneficiary[]> {
+    const supabase = createClient()
+    const { page = 1, limit = 10, search = '', cityId = '', riskLevel = '' } = params
+
+    let query = supabase
+      .from('beneficiaries')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    // Apply search filter
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,mobile_number.ilike.%${search}%,national_id.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+
+    // Apply city filter
+    if (cityId) {
+      query = query.eq('city_id', cityId)
+    }
+
+    // Apply risk level filter
+    if (riskLevel) {
+      query = query.eq('risk_level', riskLevel)
+    }
+
+    // Apply pagination
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    query = query.range(from, to)
+
+    const { data, error } = await query
+
+    if (error) {
+      defaultLogger.error('Error fetching beneficiaries:', error)
+      throw new Error(error.message)
+    }
+
+    return (data || []).map(beneficiary => this.transformBeneficiary(beneficiary))
+  }
+
+  /**
+   * Delete beneficiary
+   */
+  static async delete(id: string): Promise<void> {
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('beneficiaries')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      defaultLogger.error('Error deleting beneficiary:', error)
+      throw new Error(error.message)
+    }
   }
 }
 

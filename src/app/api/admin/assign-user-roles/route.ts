@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { auditService } from '@/lib/services/auditService'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const body = await request.json()
     const { userId, roleIds } = body
@@ -10,8 +17,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
 
-    console.log('Assigning roles to user:', userId)
-    console.log('New roles:', roleIds)
+    logger.info('Assigning roles to user:', userId)
+    logger.info('New roles:', roleIds)
 
     // Create admin client
     const adminClient = createClient(
@@ -19,18 +26,41 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // First, remove all existing roles for this user
-    const { error: deleteError } = await adminClient
-      .from('user_roles')
-      .delete()
+    // First, get existing roles for audit logging
+    const { data: existingRoles } = await adminClient
+      .from('rbac_user_roles')
+      .select(`
+        id,
+        rbac_roles (name)
+      `)
       .eq('user_id', userId)
+      .eq('is_active', true)
+
+    // Remove all existing roles for this user
+    const { error: deleteError } = await adminClient
+      .from('rbac_user_roles')
+      .update({ is_active: false })
+      .eq('user_id', userId)
+      .eq('is_active', true)
 
     if (deleteError) {
-      console.error('Error removing existing user roles:', deleteError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error removing existing user roles:', deleteError)
       throw deleteError
     }
 
-    console.log('Removed existing user roles')
+    // Log role revocations
+    if (existingRoles) {
+      for (const role of existingRoles) {
+        await auditService.logRoleAssignment({
+          target_user_id: userId,
+          role_name: role.rbac_roles?.name || 'unknown',
+          action: 'revoke',
+          request_id: request.headers.get('x-request-id') || undefined
+        })
+      }
+    }
+
+    logger.info('Removed existing user roles')
 
     // Then, add the new roles
     if (roleIds && roleIds.length > 0) {
@@ -46,11 +76,11 @@ export async function POST(request: NextRequest) {
         .insert(userRoles)
 
       if (insertError) {
-        console.error('Error inserting new user roles:', insertError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting new user roles:', insertError)
         throw insertError
       }
 
-      console.log('Added new user roles:', roleIds.length)
+      logger.info('Added new user roles:', roleIds.length)
     }
 
     return NextResponse.json({
@@ -59,7 +89,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Assign user roles API error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Assign user roles API error:', error)
     return NextResponse.json({
       error: 'Failed to assign user roles',
       details: error instanceof Error ? error.message : 'Unknown error'

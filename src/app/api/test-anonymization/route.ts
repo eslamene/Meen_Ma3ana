@@ -1,21 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AnonymizationService } from '@/lib/security/anonymization'
 import { SecurityService } from '@/lib/security/rls'
+import { requirePermission } from '@/lib/security/guards'
+import { isTestEnabled } from '@/lib/security/rls'
+import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
-    const user = await SecurityService.getCurrentUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Check if test endpoints are enabled
+    if (!isTestEnabled()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Test endpoints are disabled'
+      }, { status: 404 })
     }
 
-    const userRole = await SecurityService.getCurrentUserRole(user.id)
-    
-    // Only admins can test anonymization
-    if (userRole !== 'admin') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Require admin permission
+    const authResult = await requireAdminPermission(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
+
+    const { user } = authResult
+
+    const userRole = await SecurityService.getCurrentUserRole(user.id)
 
     const { searchParams } = new URL(request.url)
     const level = searchParams.get('level') || 'partial'
@@ -54,8 +68,9 @@ export async function GET(request: NextRequest) {
         }
     }
 
-    // Audit the anonymization test
-    await SecurityService.auditAction(
+    // Log the test access
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAdminAction(
       user.id,
       'test_anonymization',
       'api',
@@ -64,8 +79,10 @@ export async function GET(request: NextRequest) {
         level, 
         type, 
         userRole,
-        timestamp: new Date().toISOString() 
-      }
+        endpoint: '/api/test-anonymization'
+      },
+      ipAddress,
+      userAgent
     )
 
     return NextResponse.json({
@@ -77,7 +94,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Anonymization test error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Anonymization test error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -86,19 +103,27 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
-    const user = await SecurityService.getCurrentUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Check if test endpoints are enabled
+    if (!isTestEnabled()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Test endpoints are disabled'
+      }, { status: 404 })
     }
 
-    const userRole = await SecurityService.getCurrentUserRole(user.id)
-    
-    // Only admins can create anonymized views
-    if (userRole !== 'admin') {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Require admin permission
+    const authResult = await requireAdminPermission(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
+
+    const { user } = authResult
+
+    const userRole = await SecurityService.getCurrentUserRole(user.id)
 
     const body = await request.json()
     const { action } = body
@@ -118,8 +143,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
-    // Audit the action
-    await SecurityService.auditAction(
+    // Log the action
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAdminAction(
       user.id,
       `anonymization_${action}`,
       'api',
@@ -127,8 +153,10 @@ export async function POST(request: NextRequest) {
       { 
         action,
         userRole,
-        timestamp: new Date().toISOString() 
-      }
+        endpoint: '/api/test-anonymization'
+      },
+      ipAddress,
+      userAgent
     )
 
     return NextResponse.json({
@@ -138,7 +166,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Anonymization action error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Anonymization action error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

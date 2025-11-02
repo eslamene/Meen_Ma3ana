@@ -4,7 +4,13 @@ import { projects, projectCycles } from '@/lib/db'
 import { eq, desc } from 'drizzle-orm'
 import { createClient } from '@/lib/supabase/server'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     
@@ -77,7 +83,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError) {
-      console.error('Error creating project:', projectError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating project:', projectError)
       return NextResponse.json(
         { error: 'Failed to create project' },
         { status: 500 }
@@ -102,13 +108,13 @@ export async function POST(request: NextRequest) {
       })
 
     if (cycleError) {
-      console.error('Error creating project cycle:', cycleError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating project cycle:', cycleError)
       // Don't fail the request if cycle creation fails
     }
 
     return NextResponse.json(project)
   } catch (error) {
-    console.error('Error creating project:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating project:', error)
     return NextResponse.json(
       { error: 'Failed to create project' },
       { status: 500 }
@@ -117,10 +123,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     // Check if Supabase environment variables are set
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.error('Missing Supabase environment variables')
+      logger.error('Missing Supabase environment variables')
       return NextResponse.json(
         { error: 'Server configuration error' },
         { status: 500 }
@@ -161,7 +170,7 @@ export async function GET(request: NextRequest) {
     const { data: projectList, error } = await query
 
     if (error) {
-      console.error('Error fetching projects:', error)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching projects:', error)
       
       // Handle specific database connection errors
       if (error.code === 'SASL_SIGNATURE_MISMATCH') {
@@ -186,7 +195,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error fetching projects:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching projects:', error)
     return NextResponse.json(
       { error: 'Failed to fetch projects' },
       { status: 500 }

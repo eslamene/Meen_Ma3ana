@@ -6,6 +6,7 @@
 export type BeneficiaryGender = 'male' | 'female' | 'other'
 export type BeneficiaryIdType = 'national_id' | 'passport' | 'other'
 export type BeneficiaryRiskLevel = 'low' | 'medium' | 'high' | 'critical'
+export type DocumentType = 'identity_copy' | 'personal_photo' | 'other'
 
 export interface Beneficiary {
   id: string
@@ -13,21 +14,25 @@ export interface Beneficiary {
   // Basic Information
   name: string
   name_ar?: string
-  age?: number
+  age?: number // Calculated from year_of_birth
+  year_of_birth?: number // Stored in database
   gender?: BeneficiaryGender
   
   // Contact Information
   mobile_number?: string
+  additional_mobile_number?: string
   email?: string
   alternative_contact?: string
   
   // Identification
   national_id?: string
   id_type: BeneficiaryIdType
+  id_type_id?: string
   
   // Location
   address?: string
   city?: string
+  city_id?: string
   governorate?: string
   country: string
   
@@ -64,12 +69,15 @@ export interface CreateBeneficiaryData {
   age?: number
   gender?: BeneficiaryGender
   mobile_number?: string
+  additional_mobile_number?: string
   email?: string
   alternative_contact?: string
   national_id?: string
   id_type?: BeneficiaryIdType
+  id_type_id?: string
   address?: string
   city?: string
+  city_id?: string
   governorate?: string
   country?: string
   medical_condition?: string
@@ -111,5 +119,59 @@ export interface BeneficiaryStats {
     critical: number
   }
   by_city: Record<string, number>
+}
+
+// Document interfaces
+export interface BeneficiaryDocument {
+  id: string
+  beneficiary_id: string
+  document_type: DocumentType
+  file_name: string
+  file_url: string
+  file_size?: number
+  mime_type?: string
+  is_public: boolean
+  description?: string
+  uploaded_at: string
+  uploaded_by?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateBeneficiaryDocumentData {
+  beneficiary_id: string
+  document_type: DocumentType
+  file_name: string
+  file_url: string
+  file_size?: number
+  mime_type?: string
+  is_public?: boolean
+  description?: string
+}
+
+// Lookup table interfaces
+export interface IdType {
+  id: string
+  code: string
+  name_en: string
+  name_ar: string
+  description?: string
+  is_active: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface City {
+  id: string
+  code: string
+  name_en: string
+  name_ar: string
+  governorate?: string
+  country: string
+  is_active: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
 }
 

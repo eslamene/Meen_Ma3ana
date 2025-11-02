@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -414,16 +415,48 @@ export default function CaseDetailPage() {
     // TODO: Implement favorite functionality
   }
 
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: caseData?.title || '',
-        text: caseData?.description || '',
-        url: window.location.href
-      })
-    } else {
-      navigator.clipboard.writeText(window.location.href)
-      // TODO: Show toast notification
+  const handleShare = async () => {
+    try {
+      if (navigator.share && window.isSecureContext) {
+        await navigator.share({
+          title: caseData?.title || '',
+          text: caseData?.description || '',
+          url: window.location.href
+        })
+      } else if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(window.location.href)
+        // TODO: Show toast notification
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea')
+        textArea.value = window.location.href
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+        // TODO: Show toast notification
+      }
+    } catch (error) {
+      // Handle share cancellation or errors gracefully
+      if (error.name !== 'AbortError') {
+        console.error('Error sharing:', error)
+        // Fallback to clipboard
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(window.location.href)
+          } else {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea')
+            textArea.value = window.location.href
+            document.body.appendChild(textArea)
+            textArea.select()
+            document.execCommand('copy')
+            document.body.removeChild(textArea)
+          }
+        } catch (clipboardError) {
+          console.error('Error copying to clipboard:', clipboardError)
+        }
+      }
     }
   }
 
@@ -701,7 +734,21 @@ export default function CaseDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <PermissionGuard permissions={["view:cases"]} fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-4">You don't have permission to view this case.</p>
+            <Button onClick={() => router.push(`/${locale}/cases`)}>
+              Back to Cases
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -1292,5 +1339,6 @@ export default function CaseDetailPage() {
 
       </div>
     </div>
+    </PermissionGuard>
   )
 } 

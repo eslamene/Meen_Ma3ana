@@ -2,6 +2,8 @@ import { db } from '@/lib/db'
 import { users, cases, contributions, sponsorships, communications } from '@/drizzle/schema'
 import { eq, and, like } from 'drizzle-orm'
 
+import { defaultLogger } from '@/lib/logger'
+
 /**
  * Data anonymization service for protecting sensitive information
  * while preserving data utility for analysis
@@ -163,7 +165,7 @@ export class AnonymizationService {
         createdAt: user.createdAt
       }))
     } catch (error) {
-      console.error('Error getting anonymized users:', error)
+      defaultLogger.error('Error getting anonymized users:', error)
       return []
     }
   }
@@ -195,7 +197,7 @@ export class AnonymizationService {
         createdAt: caseItem.createdAt
       }))
     } catch (error) {
-      console.error('Error getting anonymized cases:', error)
+      defaultLogger.error('Error getting anonymized cases:', error)
       return []
     }
   }
@@ -219,7 +221,7 @@ export class AnonymizationService {
         createdAt: contribution.createdAt
       }))
     } catch (error) {
-      console.error('Error getting anonymized contributions:', error)
+      defaultLogger.error('Error getting anonymized contributions:', error)
       return []
     }
   }
@@ -285,7 +287,7 @@ export class AnonymizationService {
 
       return true
     } catch (error) {
-      console.error('Error creating anonymized views:', error)
+      defaultLogger.error('Error creating anonymized views:', error)
       return false
     }
   }
@@ -305,7 +307,7 @@ export class AnonymizationService {
 
       return data
     } catch (error) {
-      console.error('Error exporting anonymized data:', error)
+      defaultLogger.error('Error exporting anonymized data:', error)
       throw new Error('Failed to export anonymized data')
     }
   }
@@ -335,7 +337,7 @@ export class AnonymizationService {
 
       return stats
     } catch (error) {
-      console.error('Error getting anonymization stats:', error)
+      defaultLogger.error('Error getting anonymization stats:', error)
       return null
     }
   }

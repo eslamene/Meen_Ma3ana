@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { serverDbRBAC } from '@/lib/rbac/server-rbac'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -11,32 +17,93 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const hasPermission = await serverDbRBAC.userHasPermission(user.id, 'admin:rbac')
+    // Use service client for admin operations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Check if user has RBAC management permission
+    const { data: userRoles } = await serviceClient
+      .from('rbac_user_roles')
+      .select(`
+        rbac_roles (
+          rbac_role_permissions (
+            rbac_permissions (name)
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+
+    const hasPermission = userRoles?.some((ur: any) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+        rp.rbac_permissions?.name === 'admin:rbac'
+      )
+    )
+
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
-    const grouped = searchParams.get('grouped') === 'true'
+    const type = searchParams.get('type')
 
-    if (grouped) {
-      const groupedPermissions = await serverDbRBAC.getPermissionsByModule()
-      return NextResponse.json({ success: true, modules: groupedPermissions })
+    if (type === 'grouped') {
+      // Get permissions grouped by module
+      const { data: permissions, error: permissionsError } = await serviceClient
+        .from('rbac_permissions')
+        .select(`
+          *,
+          rbac_modules (
+            id,
+            name,
+            display_name,
+            icon,
+            color
+          )
+        `)
+        .eq('is_active', true)
+        .order('name')
+
+      if (permissionsError) throw permissionsError
+
+      // Group permissions by module
+      const groupedPermissions = permissions.reduce((acc: any, permission: any) => {
+        const moduleName = permission.rbac_modules?.name || 'uncategorized'
+        if (!acc[moduleName]) {
+          acc[moduleName] = {
+            module: permission.rbac_modules,
+            permissions: []
+          }
+        }
+        acc[moduleName].permissions.push(permission)
+        return acc
+      }, {})
+
+      return NextResponse.json({ groupedPermissions })
     } else {
-      const modules = await serverDbRBAC.getPermissionModules()
-      return NextResponse.json({ success: true, modules })
-    }
+      // Get all modules
+      const { data: modules, error: modulesError } = await serviceClient
+        .from('rbac_modules')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order')
 
-  } catch (error) {
-    console.error('API Error in /api/admin/permission-modules GET:', error)
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    )
+      if (modulesError) throw modulesError
+
+      return NextResponse.json({ modules })
+    }
+  } catch (error: any) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Permission Modules API Error:', error)
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -45,53 +112,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const hasPermission = await serverDbRBAC.userHasPermission(user.id, 'admin:rbac')
+    const body = await request.json()
+
+    // Use service client for admin operations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Check if user has RBAC management permission
+    const { data: userRoles } = await serviceClient
+      .from('rbac_user_roles')
+      .select(`
+        rbac_roles (
+          rbac_role_permissions (
+            rbac_permissions (name)
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+
+    const hasPermission = userRoles?.some((ur: any) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+        rp.rbac_permissions?.name === 'admin:rbac'
+      )
+    )
+
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { name, display_name, description, icon, color, sort_order } = body
-
-    if (!name || !display_name) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Missing required fields: name, display_name' 
-      }, { status: 400 })
-    }
-
-    const { data: module, error } = await supabase
-      .from('permission_modules')
+    const { data: module, error: createError } = await serviceClient
+      .from('rbac_modules')
       .insert({
-        name,
-        display_name,
-        description: description || '',
-        icon: icon || 'Package',
-        color: color || 'gray',
-        sort_order: sort_order || 0,
+        name: body.name,
+        display_name: body.display_name,
+        description: body.description,
+        icon: body.icon,
+        color: body.color,
+        sort_order: body.sort_order || 0,
         is_active: true
       })
       .select()
       .single()
 
-    if (error) throw error
+    if (createError) throw createError
 
-    return NextResponse.json({ 
-      success: true, 
-      module,
-      message: 'Permission module created successfully' 
-    })
-
-  } catch (error) {
-    console.error('API Error in /api/admin/permission-modules POST:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to create permission module'
-    }, { status: 500 })
+    return NextResponse.json({ module })
+  } catch (error: any) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Create Module API Error:', error)
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function PUT(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -100,49 +178,121 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const hasPermission = await serverDbRBAC.userHasPermission(user.id, 'admin:rbac')
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    const body = await request.json()
+
+    if (!id) {
+      return NextResponse.json({ error: 'Module ID required' }, { status: 400 })
+    }
+
+    // Use service client for admin operations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Check if user has RBAC management permission
+    const { data: userRoles } = await serviceClient
+      .from('rbac_user_roles')
+      .select(`
+        rbac_roles (
+          rbac_role_permissions (
+            rbac_permissions (name)
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+
+    const hasPermission = userRoles?.some((ur: any) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+        rp.rbac_permissions?.name === 'admin:rbac'
+      )
+    )
+
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { id, display_name, description, icon, color, sort_order, is_active } = body
-
-    if (!id) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Module ID is required' 
-      }, { status: 400 })
-    }
-
-    const { data: module, error } = await supabase
-      .from('permission_modules')
+    const { data: module, error: updateError } = await serviceClient
+      .from('rbac_modules')
       .update({
-        display_name,
-        description,
-        icon,
-        color,
-        sort_order,
-        is_active,
-        updated_at: new Date().toISOString()
+        display_name: body.display_name,
+        description: body.description,
+        icon: body.icon,
+        color: body.color,
+        sort_order: body.sort_order
       })
       .eq('id', id)
       .select()
       .single()
 
-    if (error) throw error
+    if (updateError) throw updateError
 
-    return NextResponse.json({ 
-      success: true, 
-      module,
-      message: 'Permission module updated successfully' 
-    })
+    return NextResponse.json({ module })
+  } catch (error: any) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Update Module API Error:', error)
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+  }
+}
 
-  } catch (error) {
-    console.error('API Error in /api/admin/permission-modules PUT:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to update permission module'
-    }, { status: 500 })
+export async function DELETE(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'Module ID required' }, { status: 400 })
+    }
+
+    // Use service client for admin operations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Check if user has RBAC management permission
+    const { data: userRoles } = await serviceClient
+      .from('rbac_user_roles')
+      .select(`
+        rbac_roles (
+          rbac_role_permissions (
+            rbac_permissions (name)
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+
+    const hasPermission = userRoles?.some((ur: any) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+        rp.rbac_permissions?.name === 'admin:rbac'
+      )
+    )
+
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    await serviceClient
+      .from('rbac_modules')
+      .update({ is_active: false })
+      .eq('id', id)
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Delete Module API Error:', error)
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }

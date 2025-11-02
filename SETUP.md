@@ -48,6 +48,8 @@ This guide will help you set up the Meen Ma3ana charity platform project.
 
 ### Optional Variables
 
+- `PRELAUNCH`: Set to `true` to block access to app routes during pre-launch phase. Only landing pages and static assets will be accessible. App routes will redirect to the landing page. (Default: `false` or unset)
+
 - `ANTHROPIC_API_KEY`: For AI-powered task management
 - `PERPLEXITY_API_KEY`: For research-backed task generation
 - `NODE_ENV`: Environment (development/production)

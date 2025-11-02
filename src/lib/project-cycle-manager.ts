@@ -2,6 +2,8 @@ import { db } from '@/lib/db'
 import { projects, projectCycles } from '@/lib/db'
 import { eq, and, lte, gte } from 'drizzle-orm'
 
+import { defaultLogger } from '@/lib/logger'
+
 export class ProjectCycleManager {
   /**
    * Check and advance cycles for all active projects
@@ -26,9 +28,9 @@ export class ProjectCycleManager {
         await this.advanceProjectCycle(project.id)
       }
 
-      console.log(`Processed ${activeProjects.length} projects for cycle advancement`)
+      defaultLogger.info(`Processed ${activeProjects.length} projects for cycle advancement`)
     } catch (error) {
-      console.error('Error checking and advancing cycles:', error)
+      defaultLogger.error('Error checking and advancing cycles:', error)
       throw error
     }
   }
@@ -59,7 +61,7 @@ export class ProjectCycleManager {
           })
           .where(eq(projects.id, projectId))
 
-        console.log(`Project ${projectId} completed all cycles`)
+        defaultLogger.info(`Project ${projectId} completed all cycles`)
         return
       }
 
@@ -118,9 +120,9 @@ export class ProjectCycleManager {
         })
         .where(eq(projects.id, projectId))
 
-      console.log(`Advanced project ${projectId} to cycle ${nextCycleNumber}`)
+      defaultLogger.info(`Advanced project ${projectId} to cycle ${nextCycleNumber}`)
     } catch (error) {
-      console.error(`Error advancing cycle for project ${projectId}:`, error)
+      defaultLogger.error(`Error advancing cycle for project ${projectId}:`, error)
       throw error
     }
   }
@@ -157,7 +159,7 @@ export class ProjectCycleManager {
       // Update project total amount
       await this.updateProjectTotalAmount(cycle.project_id)
     } catch (error) {
-      console.error(`Error updating cycle progress for cycle ${cycleId}:`, error)
+      defaultLogger.error(`Error updating cycle progress for cycle ${cycleId}:`, error)
       throw error
     }
   }
@@ -187,7 +189,7 @@ export class ProjectCycleManager {
         })
         .where(eq(projects.id, projectId))
     } catch (error) {
-      console.error(`Error updating project total amount for project ${projectId}:`, error)
+      defaultLogger.error(`Error updating project total amount for project ${projectId}:`, error)
       throw error
     }
   }
@@ -206,9 +208,9 @@ export class ProjectCycleManager {
         })
         .where(eq(projects.id, projectId))
 
-      console.log(`Project ${projectId} paused`)
+      defaultLogger.info(`Project ${projectId} paused`)
     } catch (error) {
-      console.error(`Error pausing project ${projectId}:`, error)
+      defaultLogger.error(`Error pausing project ${projectId}:`, error)
       throw error
     }
   }
@@ -227,9 +229,9 @@ export class ProjectCycleManager {
         })
         .where(eq(projects.id, projectId))
 
-      console.log(`Project ${projectId} resumed`)
+      defaultLogger.info(`Project ${projectId} resumed`)
     } catch (error) {
-      console.error(`Error resuming project ${projectId}:`, error)
+      defaultLogger.error(`Error resuming project ${projectId}:`, error)
       throw error
     }
   }
@@ -258,7 +260,7 @@ export class ProjectCycleManager {
         totalRaised,
       }
     } catch (error) {
-      console.error(`Error getting cycle stats for project ${projectId}:`, error)
+      defaultLogger.error(`Error getting cycle stats for project ${projectId}:`, error)
       throw error
     }
   }

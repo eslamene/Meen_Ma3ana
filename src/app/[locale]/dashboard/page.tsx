@@ -31,7 +31,7 @@ import {
   Info
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
+import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 
 // Dynamic Quick Actions Component
 interface QuickActionsSectionProps {
@@ -48,11 +48,11 @@ interface QuickActionsSectionProps {
 }
 
 function QuickActionsSection({ quickActions, t }: QuickActionsSectionProps) {
-  const { hasAnyPermission } = useDatabaseRBAC()
+  const { hasPermission } = useSimpleRBAC()
   
   // Filter actions based on permissions
   const visibleActions = quickActions.filter(action => 
-    hasAnyPermission([action.permission])
+    hasPermission(action.permission)
   )
   
   // Don't render the section if no actions are visible

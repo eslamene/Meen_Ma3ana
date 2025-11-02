@@ -31,7 +31,7 @@ import {
   Info
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useDatabaseRBAC } from '@/lib/hooks/useDatabaseRBAC'
+import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {
@@ -41,7 +41,7 @@ interface AdminQuickActionsSectionProps {
 }
 
 function AdminQuickActionsSection({ router, params, t }: AdminQuickActionsSectionProps) {
-  const { hasAnyPermission } = useDatabaseRBAC()
+  const { hasPermission } = useSimpleRBAC()
   
   // Define all possible admin actions with their permissions
   const allActions = [
@@ -89,7 +89,7 @@ function AdminQuickActionsSection({ router, params, t }: AdminQuickActionsSectio
   
   // Filter actions based on permissions
   const visibleActions = allActions.filter(action => 
-    hasAnyPermission([action.permission])
+    hasPermission(action.permission)
   )
   
   // Don't render if no actions are visible
@@ -335,7 +335,7 @@ export default function AdminPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard allowedPermissions={["admin:dashboard"]}>
+      <PermissionGuard permission="view:admin_dashboard">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}

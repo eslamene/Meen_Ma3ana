@@ -3,17 +3,21 @@ import { createClient } from '@/lib/supabase/server'
 import { caseUpdateService } from '@/lib/case-updates'
 import { caseNotificationService } from '@/lib/notifications/case-notifications'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
   try {
     const { searchParams } = new URL(request.url)
     const includePrivate = searchParams.get('includePrivate') === 'true'
-    const resolvedParams = await params
     
     const updates = await caseUpdateService.getDynamicUpdates({
-      caseId: resolvedParams.id,
+      caseId: params.id,
       isPublic: includePrivate ? undefined : true,
       limit: 50
     })
@@ -22,7 +26,7 @@ export async function GET(
       updates: updates || []
     })
   } catch (error) {
-    console.error('Error in case updates API:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in case updates API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -32,8 +36,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
   try {
     const supabase = await createClient()
     
@@ -49,7 +55,6 @@ export async function POST(
 
     const body = await request.json()
     const { title, content, updateType, isPublic, attachments } = body
-    const resolvedParams = await params
 
     if (!title || !content) {
       return NextResponse.json(
@@ -59,7 +64,7 @@ export async function POST(
     }
 
     const newUpdate = await caseUpdateService.createUpdate({
-      caseId: resolvedParams.id,
+      caseId: params.id,
       title,
       content,
       updateType,
@@ -71,14 +76,14 @@ export async function POST(
     // Send notification for the new update
     try {
       await caseNotificationService.createCaseUpdateNotification(
-        resolvedParams.id,
+        params.id,
         newUpdate.id,
         newUpdate.title,
         newUpdate.updateType,
         user.id
       )
     } catch (notificationError) {
-      console.error('Error sending notification:', notificationError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error sending notification:', notificationError)
       // Don't fail the request if notification fails
     }
 
@@ -86,7 +91,7 @@ export async function POST(
       update: newUpdate
     }, { status: 201 })
   } catch (error) {
-    console.error('Error creating case update:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating case update:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

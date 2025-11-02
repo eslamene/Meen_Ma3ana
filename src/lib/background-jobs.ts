@@ -3,6 +3,8 @@ import { cases, contributions } from '@/drizzle/schema'
 import { eq, sum, and, gte } from 'drizzle-orm'
 import { CaseLifecycleService } from './case-lifecycle'
 
+import { defaultLogger } from '@/lib/logger'
+
 export class BackgroundJobService {
   /**
    * Check and close fully funded one-time cases
@@ -10,7 +12,7 @@ export class BackgroundJobService {
    */
   static async processAutomaticCaseClosure() {
     try {
-      console.log('Starting automatic case closure check...')
+      defaultLogger.info('Starting automatic case closure check...')
 
       // Get all published one-time cases
       const publishedCases = await db
@@ -53,28 +55,28 @@ export class BackgroundJobService {
 
               if (result.success) {
                 closedCount++
-                console.log(`✅ Automatically closed case: ${caseData.title} (${caseData.id})`)
+                defaultLogger.info(`✅ Automatically closed case: ${caseData.title} (${caseData.id})`)
                 
                 // TODO: Send notifications to case creator and donors
                 // await sendCaseClosedNotifications(caseData.id)
               } else {
                 errorCount++
-                console.error(`❌ Failed to close case ${caseData.id}:`, result.error)
+                defaultLogger.error(`❌ Failed to close case ${caseData.id}:`, result.error)
               }
             } else {
-              console.log(`⏳ Case ${caseData.id} is fully funded but still in grace period`)
+              defaultLogger.info(`⏳ Case ${caseData.id} is fully funded but still in grace period`)
             }
           }
         } catch (error) {
           errorCount++
-          console.error(`❌ Error processing case ${caseData.id}:`, error)
+          defaultLogger.error(`❌ Error processing case ${caseData.id}:`, error)
         }
       }
 
-      console.log(`Automatic closure check completed: ${closedCount} cases closed, ${errorCount} errors`)
+      defaultLogger.info(`Automatic closure check completed: ${closedCount} cases closed, ${errorCount} errors`)
       return { success: true, closedCount, errorCount }
     } catch (error) {
-      console.error('Error in automatic case closure job:', error)
+      defaultLogger.error('Error in automatic case closure job:', error)
       return { success: false, error: 'Background job failed' }
     }
   }
@@ -85,7 +87,7 @@ export class BackgroundJobService {
    */
   static async updateCaseAmounts() {
     try {
-      console.log('Starting case amount updates...')
+      defaultLogger.info('Starting case amount updates...')
 
       // Get all cases with their total contributions
       const casesWithAmounts = await db
@@ -120,17 +122,17 @@ export class BackgroundJobService {
               .where(eq(cases.id, caseData.caseId))
 
             updatedCount++
-            console.log(`✅ Updated case ${caseData.caseId} amount: ${currentAmount} -> ${totalAmount}`)
+            defaultLogger.info(`✅ Updated case ${caseData.caseId} amount: ${currentAmount} -> ${totalAmount}`)
           }
         } catch (error) {
-          console.error(`❌ Error updating case ${caseData.caseId} amount:`, error)
+          defaultLogger.error(`❌ Error updating case ${caseData.caseId} amount:`, error)
         }
       }
 
-      console.log(`Case amount updates completed: ${updatedCount} cases updated`)
+      defaultLogger.info(`Case amount updates completed: ${updatedCount} cases updated`)
       return { success: true, updatedCount }
     } catch (error) {
-      console.error('Error in case amount update job:', error)
+      defaultLogger.error('Error in case amount update job:', error)
       return { success: false, error: 'Background job failed' }
     }
   }
@@ -141,7 +143,7 @@ export class BackgroundJobService {
    */
   static async cleanupExpiredDrafts() {
     try {
-      console.log('Starting expired draft cleanup...')
+      defaultLogger.info('Starting expired draft cleanup...')
 
       // Delete drafts older than 30 days
       const thirtyDaysAgo = new Date()
@@ -154,10 +156,10 @@ export class BackgroundJobService {
           gte(cases.createdAt, thirtyDaysAgo)
         ))
 
-      console.log(`Expired draft cleanup completed: ${result.rowCount} drafts deleted`)
+      defaultLogger.info(`Expired draft cleanup completed: ${result.rowCount} drafts deleted`)
       return { success: true, deletedCount: result.rowCount }
     } catch (error) {
-      console.error('Error in expired draft cleanup job:', error)
+      defaultLogger.error('Error in expired draft cleanup job:', error)
       return { success: false, error: 'Background job failed' }
     }
   }
@@ -168,7 +170,7 @@ export class BackgroundJobService {
    */
   static async sendDeadlineReminders() {
     try {
-      console.log('Starting deadline reminder checks...')
+      defaultLogger.info('Starting deadline reminder checks...')
 
       // Get cases that are published and have a deadline within 7 days
       const sevenDaysFromNow = new Date()
@@ -202,17 +204,17 @@ export class BackgroundJobService {
             // TODO: Send reminder notification to case creator
             // await sendDeadlineReminder(caseData.id, caseData.createdBy)
             reminderCount++
-            console.log(`📧 Sent deadline reminder for case: ${caseData.title}`)
+            defaultLogger.info(`📧 Sent deadline reminder for case: ${caseData.title}`)
           }
         } catch (error) {
-          console.error(`❌ Error sending reminder for case ${caseData.id}:`, error)
+          defaultLogger.error(`❌ Error sending reminder for case ${caseData.id}:`, error)
         }
       }
 
-      console.log(`Deadline reminder check completed: ${reminderCount} reminders sent`)
+      defaultLogger.info(`Deadline reminder check completed: ${reminderCount} reminders sent`)
       return { success: true, reminderCount }
     } catch (error) {
-      console.error('Error in deadline reminder job:', error)
+      defaultLogger.error('Error in deadline reminder job:', error)
       return { success: false, error: 'Background job failed' }
     }
   }

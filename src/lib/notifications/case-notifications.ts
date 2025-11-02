@@ -3,6 +3,8 @@ import { db } from '@/lib/db'
 import { notifications, users, cases } from '@/drizzle/schema'
 import { eq, and, desc } from 'drizzle-orm'
 
+import { defaultLogger } from '@/lib/logger'
+
 export interface CaseNotification {
   id: string
   userId: string
@@ -70,7 +72,7 @@ export class CaseNotificationService {
 
       await Promise.all(notificationPromises)
     } catch (error) {
-      console.error('Error creating case update notification:', error)
+      defaultLogger.error('Error creating case update notification:', error)
     }
   }
 
@@ -114,7 +116,7 @@ export class CaseNotificationService {
 
       await Promise.all(notificationPromises)
     } catch (error) {
-      console.error('Error creating progress milestone notification:', error)
+      defaultLogger.error('Error creating progress milestone notification:', error)
     }
   }
 
@@ -154,7 +156,7 @@ export class CaseNotificationService {
         caseId,
       })
     } catch (error) {
-      console.error('Error creating contribution notification:', error)
+      defaultLogger.error('Error creating contribution notification:', error)
     }
   }
 
@@ -180,7 +182,7 @@ export class CaseNotificationService {
 
       return usersToNotify
     } catch (error) {
-      console.error('Error getting users to notify:', error)
+      defaultLogger.error('Error getting users to notify:', error)
       return []
     }
   }
@@ -199,7 +201,7 @@ export class CaseNotificationService {
         read: false,
       })
     } catch (error) {
-      console.error('Error creating notification:', error)
+      defaultLogger.error('Error creating notification:', error)
     }
   }
 
@@ -234,7 +236,7 @@ export class CaseNotificationService {
         }
       })
     } catch (error) {
-      console.error('Error getting user notifications:', error)
+      defaultLogger.error('Error getting user notifications:', error)
       return []
     }
   }
@@ -252,7 +254,7 @@ export class CaseNotificationService {
 
       return !!updated
     } catch (error) {
-      console.error('Error marking notification as read:', error)
+      defaultLogger.error('Error marking notification as read:', error)
       return false
     }
   }
@@ -269,7 +271,7 @@ export class CaseNotificationService {
 
       return true
     } catch (error) {
-      console.error('Error marking all notifications as read:', error)
+      defaultLogger.error('Error marking all notifications as read:', error)
       return false
     }
   }
@@ -289,7 +291,7 @@ export class CaseNotificationService {
 
       return results.length
     } catch (error) {
-      console.error('Error getting unread count:', error)
+      defaultLogger.error('Error getting unread count:', error)
       return 0
     }
   }

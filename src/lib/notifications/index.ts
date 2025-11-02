@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger } from '@/lib/logger'
+
 export interface UnifiedNotification {
   id: string
   type: string
@@ -24,13 +26,13 @@ export class UnifiedNotificationService {
         .limit(limit)
 
       if (error) {
-        console.error('Error fetching user notifications:', error)
+        defaultLogger.error('Error fetching user notifications:', error)
         return []
       }
 
       return data || []
     } catch (error) {
-      console.error('Error fetching user notifications:', error)
+      defaultLogger.error('Error fetching user notifications:', error)
       return []
     }
   }
@@ -44,13 +46,13 @@ export class UnifiedNotificationService {
         .eq('read', false)
 
       if (error) {
-        console.error('Error getting unread count:', error)
+        defaultLogger.error('Error getting unread count:', error)
         return 0
       }
 
       return count || 0
     } catch (error) {
-      console.error('Error getting unread count:', error)
+      defaultLogger.error('Error getting unread count:', error)
       return 0
     }
   }
@@ -63,13 +65,13 @@ export class UnifiedNotificationService {
         .eq('id', notificationId)
 
       if (error) {
-        console.error('Error marking notification as read:', error)
+        defaultLogger.error('Error marking notification as read:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error marking notification as read:', error)
+      defaultLogger.error('Error marking notification as read:', error)
       return false
     }
   }
@@ -83,13 +85,13 @@ export class UnifiedNotificationService {
         .eq('read', false)
 
       if (error) {
-        console.error('Error marking all notifications as read:', error)
+        defaultLogger.error('Error marking all notifications as read:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error marking all notifications as read:', error)
+      defaultLogger.error('Error marking all notifications as read:', error)
       return false
     }
   }

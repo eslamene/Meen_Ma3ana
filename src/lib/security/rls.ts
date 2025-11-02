@@ -1,8 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
 import { users, cases, contributions, sponsorships, communications } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
+import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+import { defaultLogger } from '@/lib/logger'
 
 /**
  * Security service for handling Row Level Security (RLS) context
@@ -15,12 +20,12 @@ export class SecurityService {
    */
   static async setSecurityContext(userId: string, userRole: string) {
     try {
-      // Set JWT claims for RLS policies
-      await db.execute(`
-        SET LOCAL "request.jwt.claims" = '{"sub": "${userId}", "role": "${userRole}"}';
+      // Set JWT claims for RLS policies using parameterized query
+      await db.execute(sql`
+        SET LOCAL "request.jwt.claims" = ${JSON.stringify({ sub: userId, role: userRole })};
       `)
     } catch (error) {
-      console.error('Error setting security context:', error)
+      defaultLogger.error('Error setting security context:', error)
       throw new Error('Failed to set security context')
     }
   }
@@ -30,11 +35,9 @@ export class SecurityService {
    */
   static async clearSecurityContext() {
     try {
-      await db.execute(`
-        RESET "request.jwt.claims";
-      `)
+      await db.execute(sql`RESET "request.jwt.claims";`)
     } catch (error) {
-      console.error('Error clearing security context:', error)
+      defaultLogger.error('Error clearing security context:', error)
     }
   }
 
@@ -70,7 +73,7 @@ export class SecurityService {
 
       return 'donor' // Default role
     } catch (error) {
-      console.error('Error getting user role:', error)
+      defaultLogger.error('Error getting user role:', error)
       return 'donor'
     }
   }
@@ -149,7 +152,7 @@ export class SecurityService {
           return false
       }
     } catch (error) {
-      console.error('Error checking resource access:', error)
+      defaultLogger.error('Error checking resource access:', error)
       return false
     } finally {
       await this.clearSecurityContext()
@@ -169,7 +172,7 @@ export class SecurityService {
           const casesResult = await db
             .select({ id: cases.id, title: cases.title, status: cases.status })
             .from(cases)
-            .orderBy(cases.createdAt)
+            .orderBy(cases.created_at)
           return casesResult
 
         case 'contributions':
@@ -183,14 +186,14 @@ export class SecurityService {
           const sponsorshipsResult = await db
             .select({ id: sponsorships.id, amount: sponsorships.amount, status: sponsorships.status })
             .from(sponsorships)
-            .orderBy(sponsorships.createdAt)
+            .orderBy(sponsorships.created_at)
           return sponsorshipsResult
 
         default:
           return []
       }
     } catch (error) {
-      console.error('Error getting accessible resources:', error)
+      defaultLogger.error('Error getting accessible resources:', error)
       return []
     } finally {
       await this.clearSecurityContext()
@@ -210,7 +213,7 @@ export class SecurityService {
     try {
       // Note: This would require a security_audit_log table in the schema
       // For now, we'll log to console as a placeholder
-      console.log('Security Audit:', {
+      defaultLogger.info('Security Audit:', {
         userId,
         action,
         resourceType,
@@ -219,7 +222,7 @@ export class SecurityService {
         timestamp: new Date().toISOString()
       })
     } catch (error) {
-      console.error('Error auditing action:', error)
+      defaultLogger.error('Error auditing action:', error)
       // Don't throw error for audit failures to avoid breaking main functionality
     }
   }
@@ -281,4 +284,164 @@ export function requireRole(requiredRole: string) {
 
     return descriptor
   }
+}
+
+/**
+ * Check if user has specific permission via RBAC system
+ */
+export async function hasPermission(userId: string, permission: string): Promise<boolean> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 1 FROM rbac_user_roles ur
+      JOIN rbac_role_permissions rp ON ur.role_id = rp.role_id
+      JOIN rbac_permissions p ON rp.permission_id = p.id
+      WHERE ur.user_id = ${userId}
+        AND ur.is_active = true
+        AND rp.is_active = true
+        AND p.is_active = true
+        AND p.name = ${permission}
+      LIMIT 1
+    `)
+    
+    return result.length > 0
+  } catch (error) {
+    defaultLogger.error('Error checking permission:', error)
+    return false
+  }
+}
+
+/**
+ * Check if user has admin role via RBAC system
+ */
+export async function isAdminUser(userId: string): Promise<boolean> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 1 FROM rbac_user_roles ur
+      JOIN rbac_roles r ON ur.role_id = r.id
+      WHERE ur.user_id = ${userId}
+        AND ur.is_active = true
+        AND r.is_active = true
+        AND r.name = 'admin'
+      LIMIT 1
+    `)
+    
+    return result.length > 0
+  } catch (error) {
+    defaultLogger.error('Error checking admin role:', error)
+    return false
+  }
+}
+
+/**
+ * Require admin permission guard for API routes
+ */
+export async function requireAdminPermission(_request: NextRequest): Promise<{ user: { id: string; email?: string; user_metadata?: Record<string, unknown> }; supabase: SupabaseClient } | NextResponse> {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              )
+            } catch {
+              // The `setAll` method was called from a Server Component.
+              // This can be ignored if you have middleware refreshing
+              // user sessions.
+            }
+          },
+        },
+      }
+    )
+    
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check admin permission via RBAC
+    const isAdmin = await isAdminUser(user.id)
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
+    }
+
+    return { user, supabase }
+  } catch (error) {
+    defaultLogger.error('Error in requireAdminPermission:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+/**
+ * Require specific permission guard for API routes
+ */
+export function requirePermission(permission: string) {
+  return async (request: NextRequest): Promise<{ user: { id: string; email?: string; user_metadata?: Record<string, unknown> }; supabase: SupabaseClient } | NextResponse> => {
+    try {
+      const cookieStore = await cookies()
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll()
+            },
+            setAll(cookiesToSet) {
+              try {
+                cookiesToSet.forEach(({ name, value, options }) =>
+                  cookieStore.set(name, value, options)
+                )
+              } catch {
+                // The `setAll` method was called from a Server Component.
+                // This can be ignored if you have middleware refreshing
+                // user sessions.
+              }
+            },
+          },
+        }
+      )
+      
+      // Check authentication
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      // Check specific permission via RBAC
+      const hasRequiredPermission = await hasPermission(user.id, permission)
+      if (!hasRequiredPermission) {
+        return NextResponse.json({ error: `Forbidden - ${permission} permission required` }, { status: 403 })
+      }
+
+      return { user, supabase }
+    } catch (error) {
+      defaultLogger.error(`Error in requirePermission(${permission}):`, error)
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
+  }
+}
+
+/**
+ * Check if debug/test endpoints should be enabled
+ */
+export function isDebugEnabled(): boolean {
+  return process.env.NODE_ENV !== 'production' && 
+         process.env.ENABLE_DEBUG_ENDPOINTS === 'true'
+}
+
+/**
+ * Check if test endpoints should be enabled
+ */
+export function isTestEnabled(): boolean {
+  return process.env.NODE_ENV !== 'production' && 
+         process.env.ENABLE_TEST_ENDPOINTS === 'true'
 } 

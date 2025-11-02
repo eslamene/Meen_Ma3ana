@@ -1,8 +1,12 @@
 import { getRequestConfig } from 'next-intl/server';
-import { locales, defaultLocale } from '../i18n';
-import type { Locale } from '../i18n';
 
-export default getRequestConfig(async ({ locale }) => {
+// Can be imported from a shared config
+export const locales = ['en', 'ar'] as const
+export const defaultLocale = 'en' as const
+
+export type Locale = (typeof locales)[number]
+
+export default getRequestConfig(async ({ locale }: { locale?: string }) => {
   const validLocale: string = locale && locales.includes(locale as Locale) ? locale : defaultLocale;
   return {
     messages: (await import(`../../messages/${validLocale}.json`)).default,

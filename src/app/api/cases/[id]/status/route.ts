@@ -5,9 +5,15 @@ import { db } from '@/lib/db'
 import { cases, contributions } from '@/drizzle/schema'
 import { eq, sum } from 'drizzle-orm'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -28,14 +34,17 @@ export async function GET(
 
     return NextResponse.json({ history: historyResult.history })
   } catch (error) {
-    console.error('Error getting case status history:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error getting case status history:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -64,14 +73,17 @@ export async function PATCH(
 
     return NextResponse.json({ case: result.case })
   } catch (error) {
-    console.error('Error changing case status:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error changing case status:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+ params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -93,7 +105,7 @@ export async function POST(
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error) {
-    console.error('Error processing case action:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error processing case action:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -153,7 +165,7 @@ async function checkAndCloseCaseIfFullyFunded(caseId: string) {
       }
     }
   } catch (error) {
-    console.error('Error checking automatic closure:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking automatic closure:', error)
     return { success: false, error: 'Failed to check automatic closure' }
   }
 } 

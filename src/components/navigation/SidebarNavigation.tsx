@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
-import { useModularRBAC } from '@/lib/hooks/useModularRBAC'
+import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 import { 
   Menu, 
   X, 
@@ -24,16 +24,8 @@ import {
   BarChart3
 } from 'lucide-react'
 import { getIconWithFallback } from '@/lib/icons/registry'
-import { 
-  getModuleNavigationItems,
-  filterNavigationItemsByPermissions
-} from '@/lib/navigation/config'
 
-// Helper function to get user permissions as array
-const getUserPermissions = (userRoles: { permissions?: { name: string }[] } | null): string[] => {
-  if (!userRoles?.permissions) return []
-  return userRoles.permissions.map((p) => p.name)
-}
+// Note: useSimpleRBAC handles permissions internally
 
 interface SidebarNavigationProps {
   isOpen: boolean
@@ -57,20 +49,15 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
 
   const supabase = createClient()
   
-  // Use ONLY useModularRBAC - it already includes useDatabaseRBAC internally
-  // Using both hooks creates duplicate instances with separate loading states!
+  // Use the new simplified RBAC hook
   const { 
     modules, 
-    loading: modulesLoading, 
-    refreshModules,
-    userRoles,
-    userPermissions 
-  } = useModularRBAC()
+    loading: modulesLoading,
+    hasPermission,
+    hasRole
+  } = useSimpleRBAC()
   
-  // Memoize the refresh function to prevent unnecessary re-renders
-  const handleRefreshRoles = useCallback(async () => {
-    await refreshModules()
-  }, [refreshModules])
+  // Note: useSimpleRBAC handles refresh internally
 
   useEffect(() => {
     fetchUserAndNotifications()
@@ -80,7 +67,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
       if (session?.user) {
         setUser(session.user)
         fetchUnreadNotifications(session.user.id)
-        handleRefreshRoles()
+        // Permissions are handled automatically by useSimpleRBAC
       } else {
         setUser(null)
         setUnreadNotifications(0)
@@ -89,18 +76,16 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     })
 
     return () => subscription.unsubscribe()
-  }, [handleRefreshRoles])
+  }, [])
 
   // Auto-expand module based on current path
   useEffect(() => {
     try {
       if (!modulesLoading && modules.length > 0 && pathname && locale) {
         const currentModule = modules.find(module => {
-          if (!module?.name) return false
-          const navigationItems = getModuleNavigationItems(module.name)
-          if (!navigationItems || navigationItems.length === 0) return false
+          if (!module?.items || module.items.length === 0) return false
           
-          return navigationItems.some(item => {
+          return module.items.some(item => {
             if (!item?.href) return false
             return pathname === `/${locale}${item.href}` || 
                    (item.href !== '/' && pathname.startsWith(`/${locale}${item.href}`))
@@ -116,17 +101,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     }
   }, [pathname, locale, modules, modulesLoading, expandedModules])
 
-  // Listen for RBAC updates
-  useEffect(() => {
-    const handleRBACUpdate = () => {
-      if (user) {
-        handleRefreshRoles()
-      }
-    }
-
-    window.addEventListener('rbac-updated', handleRBACUpdate)
-    return () => window.removeEventListener('rbac-updated', handleRBACUpdate)
-  }, [user, handleRefreshRoles])
+  // Note: useSimpleRBAC handles RBAC update events automatically
 
   const fetchUserAndNotifications = async () => {
     try {
@@ -295,9 +270,8 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
               const IconComponent = getIconWithFallback(module.icon)
               if (!module.name) return null // Ensure module name is present for navigation item retrieval
 
-              const navigationItems = getModuleNavigationItems(module.name) || [] // Ensure navigation items is an array
-              // userPermissions is now memoized above
-              const filteredItems = filterNavigationItemsByPermissions(navigationItems, userPermissions?.map(p => p.name) || [])
+              // With useSimpleRBAC, module.items are already filtered based on permissions
+              const filteredItems = module.items || []
               const isExpanded = expandedModules.has(module.id)
 
               if (filteredItems.length === 0) return null
