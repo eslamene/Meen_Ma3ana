@@ -15,7 +15,7 @@ export function createClient() {
         set(name: string, value: string, options: any) {
           document.cookie = `${name}=${value}; path=/; ${options?.secure ? 'secure; ' : ''}${options?.sameSite ? `samesite=${options.sameSite}; ` : ''}`
         },
-        remove(name: string, options: any) {
+        remove(name: string, options?: { secure?: boolean; sameSite?: string }) {
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; ${options?.secure ? 'secure; ' : ''}${options?.sameSite ? `samesite=${options.sameSite}; ` : ''}`
         }
       }
