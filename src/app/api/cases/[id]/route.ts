@@ -25,7 +25,7 @@ export async function PATCH(
     const body = await request.json()
 
     // Build update object dynamically based on what's provided
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
 
@@ -78,12 +78,10 @@ export async function PATCH(
 
     // Update the case only if there are fields to update
     if (Object.keys(updateData).length > 1) { // More than just updated_at
-      const { data: updatedCase, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('cases')
         .update(updateData)
         .eq('id', id)
-        .select()
-        .single()
 
       if (updateError) {
         logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating case:', updateError)
