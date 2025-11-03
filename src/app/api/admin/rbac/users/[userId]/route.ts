@@ -4,18 +4,23 @@ import { createClient } from '@/lib/supabase/server'
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
+type UserRoleWithRole = {
+  rbac_roles: { name: string } | { name: string }[] | null
+}
+
 /**
  * DELETE /api/admin/rbac/users/[userId]
  * Remove all roles from a user
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const supabase = createClient()
+    const { userId } = await params
+    const supabase = await createClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -38,15 +43,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to check user permissions' }, { status: 500 })
     }
 
-    const hasAdminRole = userRoles?.some((ur: any) => 
-      ur.rbac_roles?.name === 'admin' || ur.rbac_roles?.name === 'super_admin'
-    )
+    const hasAdminRole = userRoles?.some((ur: UserRoleWithRole) => {
+      const role = Array.isArray(ur.rbac_roles) ? ur.rbac_roles[0] : ur.rbac_roles
+      return role?.name === 'admin' || role?.name === 'super_admin'
+    })
 
     if (!hasAdminRole) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
-
-    const { userId } = params
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
