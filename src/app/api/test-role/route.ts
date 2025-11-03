@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { UserRole } from '@/lib/rbac/types'
-import { requirePermission } from '@/lib/security/guards'
-import { isTestEnabled } from '@/lib/security/rls'
+import { isTestEnabled, requireAdminPermission } from '@/lib/security/rls'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 
 export async function POST(request: NextRequest) {
