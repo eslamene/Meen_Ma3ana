@@ -119,7 +119,7 @@ export function DeleteConfirmationDialog({
           {dangerLevel === 'high' && (
             <div className="space-y-2">
               <label htmlFor="confirm-text" className="text-sm font-medium">
-                Type "{itemName}" to confirm deletion:
+                Type &quot;{itemName}&quot; to confirm deletion:
               </label>
               <Input
                 id="confirm-text"

@@ -60,7 +60,7 @@ export function RolesDataTable({ roles, onEdit, onDelete, onAssignPermissions, l
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false)
 
   const filteredAndSortedRoles = useMemo(() => {
-    let filtered = roles.filter(role => {
+    const filtered = roles.filter(role => {
       const matchesSearch = role.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            role.description.toLowerCase().includes(searchTerm.toLowerCase())

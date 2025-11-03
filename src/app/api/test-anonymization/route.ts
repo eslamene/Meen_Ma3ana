@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { action } = body
 
-    let result: any = {}
+    const result: any = {}
 
     switch (action) {
       case 'create_views':

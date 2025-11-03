@@ -45,7 +45,7 @@ export default function CreateCasePage() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-                <p className="text-gray-600 mb-4">You don't have permission to create cases. Only administrators and moderators can create new cases.</p>
+                <p className="text-gray-600 mb-4">You don&apos;t have permission to create cases. Only administrators and moderators can create new cases.</p>
                 <Button onClick={() => router.push(`/${locale}/cases`)} className="bg-blue-600 hover:bg-blue-700">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Cases

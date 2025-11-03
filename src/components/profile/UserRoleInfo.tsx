@@ -258,7 +258,7 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
             <span className="text-sm font-medium text-blue-900">Need More Access?</span>
           </div>
           <p className="text-sm text-blue-700 mb-3">
-            If you need additional permissions, contact your administrator or check if you're missing any required roles.
+            If you need additional permissions, contact your administrator or check if you&apos;re missing any required roles.
           </p>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" className="text-blue-600 border-blue-200">

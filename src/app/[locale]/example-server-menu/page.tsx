@@ -38,7 +38,7 @@ export default async function ExampleServerMenuPage({
             <li>2. Menu modules are filtered based on user permissions</li>
             <li>3. Data is passed to ClientLayout for rendering</li>
             <li>4. ClientSidebarNavigation handles interactive UI state</li>
-            <li>5. Menu items are rendered based on user's actual permissions</li>
+            <li>5. Menu items are rendered based on user&apos;s actual permissions</li>
           </ol>
         </div>
 

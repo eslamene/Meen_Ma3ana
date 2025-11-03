@@ -806,7 +806,7 @@ export default function CaseEditPage() {
               <div>
                 {deleteDialog.step === 'confirm' ? (
                   <>
-                    <p>Are you sure you want to delete the case <strong>"{case_?.title}"</strong>?</p>
+                    <p>Are you sure you want to delete the case <strong>&quot;{case_?.title}&quot;</strong>?</p>
                     <p className="mt-2">This action will permanently delete:</p>
                     <ul className="list-disc list-inside mt-2 space-y-1 ml-4">
                       <li>The case and all its data</li>
@@ -824,7 +824,7 @@ export default function CaseEditPage() {
                       <strong className="text-red-600">FINAL WARNING!</strong>
                     </p>
                     <p className="mt-2">
-                      You are about to permanently delete case <strong>"{case_?.title}"</strong> and ALL its related data.
+                      You are about to permanently delete case <strong>&quot;{case_?.title}&quot;</strong> and ALL its related data.
                     </p>
                     <p className="mt-2">
                       <strong className="text-red-600">This action cannot be undone!</strong>
@@ -848,7 +848,7 @@ export default function CaseEditPage() {
               />
               {deleteConfirmationText && deleteConfirmationText !== 'DELETE' && (
                 <p className="text-sm text-red-600 mt-2">
-                  You must type exactly "DELETE" to confirm
+                  You must type exactly &quot;DELETE&quot; to confirm
                 </p>
               )}
               {deleteConfirmationText === 'DELETE' && (

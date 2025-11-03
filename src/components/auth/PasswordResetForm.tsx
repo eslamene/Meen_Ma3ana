@@ -117,7 +117,7 @@ export default function PasswordResetForm() {
 
       <div className="text-center">
         <p className="text-xs text-gray-500">
-          We'll send you an email with a link to reset your password.
+          We&apos;ll send you an email with a link to reset your password.
         </p>
       </div>
     </div>

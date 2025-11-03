@@ -88,7 +88,7 @@ export default function ContributionRejectionModal({
             Reject Contribution
           </DialogTitle>
           <DialogDescription>
-            Please provide a reason for rejecting the contribution for <strong>"{contributionTitle}"</strong>.
+            Please provide a reason for rejecting the contribution for <strong>&quot;{contributionTitle}&quot;</strong>.
             This will help the donor understand why their contribution was not accepted.
           </DialogDescription>
         </DialogHeader>

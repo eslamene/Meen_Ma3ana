@@ -59,7 +59,7 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-700 text-center leading-relaxed">
-                Connect with your community and make a real difference in people's lives through our platform.
+                Connect with your community and make a real difference in people&apos;s lives through our platform.
               </p>
             </CardContent>
           </Card>

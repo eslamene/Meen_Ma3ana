@@ -740,7 +740,7 @@ export default function CaseDetailPage() {
           <CardContent className="p-6 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600 mb-4">You don't have permission to view this case.</p>
+            <p className="text-gray-600 mb-4">You don&apos;t have permission to view this case.</p>
             <Button onClick={() => router.push(`/${locale}/cases`)}>
               Back to Cases
             </Button>

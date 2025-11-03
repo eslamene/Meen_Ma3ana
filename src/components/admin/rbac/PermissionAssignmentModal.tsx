@@ -98,25 +98,25 @@ export function PermissionAssignmentModal({
   }
 
   const handleSelectAll = (moduleName: string, select: boolean) => {
-    const module = filteredPermissionsByModule[moduleName]
-    if (!module) return
-    const permIds = module.permissions.map((p: any) => p.id)
+    const permissionModule = filteredPermissionsByModule[moduleName]
+    if (!permissionModule) return
+    const permIds = permissionModule.permissions.map((p: any) => p.id)
     setSelectedPermissions(prev =>
       select ? [...new Set([...prev, ...permIds])] : prev.filter(id => !permIds.includes(id))
     )
   }
 
   const isModuleFullySelected = (moduleName: string) => {
-    const module = filteredPermissionsByModule[moduleName]
-    if (!module) return false
-    return module.permissions.every((p: any) => selectedPermissions.includes(p.id))
+    const permissionModule = filteredPermissionsByModule[moduleName]
+    if (!permissionModule) return false
+    return permissionModule.permissions.every((p: any) => selectedPermissions.includes(p.id))
   }
 
   const isModulePartiallySelected = (moduleName: string) => {
-    const module = filteredPermissionsByModule[moduleName]
-    if (!module) return false
-    const selectedInModule = module.permissions.filter((p: any) => selectedPermissions.includes(p.id))
-    return selectedInModule.length > 0 && selectedInModule.length < module.permissions.length
+    const permissionModule = filteredPermissionsByModule[moduleName]
+    if (!permissionModule) return false
+    const selectedInModule = permissionModule.permissions.filter((p: any) => selectedPermissions.includes(p.id))
+    return selectedInModule.length > 0 && selectedInModule.length < permissionModule.permissions.length
   }
 
   const totalPermissions = Object.values(filteredPermissionsByModule).reduce((sum, mod: any) => sum + mod.permissions.length, 0)

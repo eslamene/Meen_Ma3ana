@@ -225,7 +225,7 @@ function SponsorshipList({ sponsorships }: { sponsorships: Sponsorship[] }) {
             <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No sponsorships found</h3>
             <p className="text-gray-600 mb-4">
-              You haven't submitted any sponsorship requests yet.
+              You haven&apos;t submitted any sponsorship requests yet.
             </p>
             <Button onClick={() => router.push('/sponsor/request')}>
               <Plus className="h-4 w-4 mr-2" />

@@ -3,7 +3,7 @@ import postgres from 'postgres'
 import * as schema from '../../drizzle/schema'
 
 // Create the connection with proper URL encoding and error handling
-let connectionString = process.env.DATABASE_URL!
+const connectionString = process.env.DATABASE_URL!
 
 if (!connectionString) {
   throw new Error('DATABASE_URL environment variable is not set')

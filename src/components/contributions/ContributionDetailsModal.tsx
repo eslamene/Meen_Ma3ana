@@ -248,7 +248,7 @@ export default function ContributionDetailsModal({
               {contribution.message && (
                 <div>
                   <Label className="text-sm font-medium">Message:</Label>
-                  <p className="text-sm text-gray-600 italic">"{contribution.message}"</p>
+                  <p className="text-sm text-gray-600 italic">&quot;{contribution.message}&quot;</p>
                 </div>
               )}
 
