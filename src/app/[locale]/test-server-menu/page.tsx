@@ -5,8 +5,9 @@ import ClientLayout from '@/components/layout/ClientLayout'
 export default async function TestServerMenuPage({
   params
 }: {
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
@@ -14,7 +15,7 @@ export default async function TestServerMenuPage({
   const modules = await getMenuModules(user)
 
   return (
-    <ClientLayout locale={params.locale} modules={modules} user={user}>
+    <ClientLayout locale={locale} modules={modules} user={user}>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
