@@ -4,10 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = await createClient()
     
     // Get current user
@@ -23,7 +24,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const { data: existingContribution, error: fetchError } = await supabase
       .from('recurring_contributions')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('donor_id', user.id)
       .single()
 
@@ -32,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Prepare update data
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (status) updateData.status = status
     if (nextContributionDate) updateData.next_contribution_date = nextContributionDate
     if (notes !== undefined) updateData.notes = notes
@@ -41,7 +42,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const { data, error } = await supabase
       .from('recurring_contributions')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
 
@@ -57,10 +58,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = await createClient()
     
     // Get current user
@@ -73,7 +75,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const { data: existingContribution, error: fetchError } = await supabase
       .from('recurring_contributions')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('donor_id', user.id)
       .single()
 
@@ -88,7 +90,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         status: 'cancelled',
         updated_at: new Date().toISOString()
       })
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error cancelling recurring contribution:', error)
