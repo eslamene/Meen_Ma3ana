@@ -424,7 +424,7 @@ export default function UserRoleAssignmentPage() {
                       <td className="p-4">
                         {user.roles.length > 0 ? 
                           new Date(Math.max(...user.roles.map(r => new Date(r.assigned_at).getTime()))).toLocaleDateString() 
-                          : {t('table.never')}
+                          : t('table.never')
                         }
                       </td>
                       <td className="p-4">
