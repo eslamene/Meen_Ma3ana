@@ -6,11 +6,10 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function PATCH(
   request: NextRequest,
-  context: {
+  context: { params: Promise<{ id: string; fileId: string }> }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params: Promise<{ id: string; fileId: string }> }
-) {
   try {
     const params = await context.params
     const supabase = await createClient()

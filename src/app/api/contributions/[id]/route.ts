@@ -6,11 +6,10 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  context: {
+  context: { params: Promise<{ id: string }> }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params: Promise<{ id: string }> }
-) {
   try {
     const params = await context.params
     const supabase = await createClient()
