@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { CookieOptions } from '@supabase/ssr'
 
 export function createClient() {
   return createBrowserClient(
@@ -12,10 +13,10 @@ export function createClient() {
             .find(row => row.startsWith(`${name}=`))
             ?.split('=')[1]
         },
-        set(name: string, value: string, options?: { secure?: boolean; sameSite?: string }) {
+        set(name: string, value: string, options?: CookieOptions) {
           document.cookie = `${name}=${value}; path=/; ${options?.secure ? 'secure; ' : ''}${options?.sameSite ? `samesite=${options.sameSite}; ` : ''}`
         },
-        remove(name: string, options?: { secure?: boolean; sameSite?: string }) {
+        remove(name: string, options?: CookieOptions) {
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; ${options?.secure ? 'secure; ' : ''}${options?.sameSite ? `samesite=${options.sameSite}; ` : ''}`
         }
       }
