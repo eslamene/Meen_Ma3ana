@@ -169,6 +169,8 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 PERPLEXITY_API_KEY=your_perplexity_api_key
 ```
 
+> **Note:** For production deployment, refer to `.env.production.example` for the complete list of required environment variables. The above configuration is for local development only. Never commit actual `.env.production` files to version control, as they contain sensitive credentials.
+
 ### Installation
 
 1. Clone the repository
@@ -190,6 +192,113 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
    ```bash
    npm run dev
    ```
+
+## Deployment to Vercel
+
+### Prerequisites
+- Vercel account (free or paid)
+- GitHub/GitLab/Bitbucket repository connected to Vercel
+- Supabase project set up and configured
+- All environment variables ready (reference `.env.production.example`)
+
+### Quick Deployment Steps
+1. Connect repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Set build settings (usually auto-detected)
+4. Deploy
+
+### Step-by-Step Deployment
+
+1. **Connect Repository to Vercel:**
+   - Log in to your Vercel dashboard at [vercel.com](https://vercel.com)
+   - Click "Add New Project"
+   - Import your repository from GitHub, GitLab, or Bitbucket
+   - Vercel will automatically detect Next.js
+
+2. **Configure Project Settings:**
+   - Review and confirm build settings (auto-detected)
+   - Ensure build command is `npm run build`
+   - Output directory should be `.next`
+
+### Environment Variables Configuration
+
+- Link to `.env.production.example` file for complete list
+- In Vercel dashboard, navigate to **Project Settings > Environment Variables**
+- Click **Add** for each variable from `.env.production.example`
+- Set appropriate environment scope (Production, Preview, Development):
+  - **Production**: Live deployments
+  - **Preview**: Pull request previews
+  - **Development**: Local development (if using Vercel CLI)
+- Critical variables that must be set:
+  - All Supabase variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY)
+  - DATABASE_URL
+  - Security flags (ENABLE_DEBUG_ENDPOINTS=false, ENABLE_TEST_ENDPOINTS=false)
+- PRELAUNCH mode configuration:
+  - Set `PRELAUNCH=true` to enable landing-page-only mode
+  - Set `PRELAUNCH=false` or omit to enable full application
+  - Reference `middleware.ts` for implementation details
+
+### Build Configuration
+
+- The `vercel.json` file contains build settings
+- Vercel auto-detects Next.js projects
+- Build command: `npm run build` (from `package.json`)
+- Output directory: `.next`
+
+### Domain Configuration
+
+- In Vercel dashboard, navigate to **Project Settings > Domains**
+- Click **Add** to add a custom domain
+- Follow DNS configuration steps provided by Vercel
+- SSL certificate is automatically provisioned by Vercel
+
+### Database Setup for Production
+
+- Ensure Supabase project is in production mode
+- Run database migrations if needed
+- Verify RLS (Row Level Security) policies are enabled
+- Reference existing database setup documentation in `DATABASE_SETUP.md`
+
+### Post-Deployment Checklist
+
+- Verify environment variables are set correctly in Vercel dashboard
+- Test authentication flow end-to-end
+- Verify file uploads work (Supabase Storage)
+- Test i18n functionality (both English and Arabic)
+- Verify RTL layout for Arabic language
+- Test RBAC permissions and role-based access
+- Check that debug/test endpoints are disabled (ENABLE_DEBUG_ENDPOINTS=false, ENABLE_TEST_ENDPOINTS=false)
+- Verify PRELAUNCH mode if applicable
+
+### Monitoring and Logs
+
+- Access Vercel deployment logs: **Project Dashboard > Deployments > [Deployment] > Logs**
+- View runtime logs: **Project Dashboard > Logs**
+- Vercel Analytics (available on Pro plan): **Project Dashboard > Analytics**
+- Supabase dashboard for database monitoring: **Supabase Dashboard > Logs**
+
+### Troubleshooting
+
+Common issues and solutions:
+
+- **Build failures**: Check environment variables are set correctly in Vercel dashboard
+- **Database connection issues**: Verify DATABASE_URL is correct and connection pooler is configured (port 6543)
+- **Authentication issues**: Verify Supabase keys (NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY)
+- **File upload issues**: Check Supabase Storage configuration and bucket policies
+- **i18n issues**: Verify locale configuration in `src/i18n/request.ts`
+
+### Rollback Procedure
+
+- **Rollback to previous deployment**: 
+  - Navigate to **Project Dashboard > Deployments**
+  - Click the three dots menu on the deployment you want to restore
+  - Select **Promote to Production**
+- **Redeploy specific commit**:
+  - In **Project Dashboard > Deployments**, find the deployment from the desired commit
+  - Click **Redeploy**
+- **Emergency procedures**:
+  - Use Vercel's instant rollback feature from the deployments page
+  - Can also temporarily disable the deployment in project settings
 
 ## API Documentation
 
