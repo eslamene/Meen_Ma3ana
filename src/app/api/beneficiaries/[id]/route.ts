@@ -6,11 +6,10 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  {
+  { params }: { params: { id: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string } }
-) {
   try {
     const beneficiary = await BeneficiaryService.getById(params.id)
 
@@ -36,11 +35,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  {
+  { params }: { params: { id: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string } }
-) {
   try {
     const body = await request.json()
     
@@ -61,11 +59,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  {
+  { params }: { params: { id: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string } }
-) {
   try {
     await BeneficiaryService.delete(params.id)
 
