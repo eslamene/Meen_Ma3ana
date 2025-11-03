@@ -6,11 +6,6 @@
   "headers": [],
   "redirects": [],
   "rewrites": [],
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "maxDuration": 10
-    }
-  },
   "git": {
     "deploymentEnabled": {
       "main": true
