@@ -235,7 +235,7 @@ export async function DELETE(
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasAdminRole = userRoles?.some((ur: any) => {
+    const hasAdminRole = userRoles?.some((ur: UserRoleWithRole) => {
       const role = Array.isArray(ur.rbac_roles) ? ur.rbac_roles[0] : ur.rbac_roles
       return role?.name === 'admin' || role?.name === 'super_admin'
     })
