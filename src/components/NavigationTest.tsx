@@ -84,7 +84,7 @@ export default function NavigationTest() {
       <CardHeader>
         <CardTitle>Navigation Test</CardTitle>
         <CardDescription>
-          Test all admin routes to ensure they're accessible
+          Test all admin routes to ensure they&apos;re accessible
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
