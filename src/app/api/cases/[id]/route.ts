@@ -6,11 +6,12 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = await createClient()
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -21,8 +22,6 @@ export async function PATCH(
         { status: 401 }
       )
     }
-
-    const { id } = params
     const body = await request.json()
 
     // Build update object dynamically based on what's provided
@@ -109,13 +108,13 @@ export async function PATCH(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = await createClient()
-    const { id } = params
 
     const { data: caseData, error } = await supabase
       .from('cases')
