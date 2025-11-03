@@ -6,12 +6,13 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const beneficiary = await BeneficiaryService.getById(params.id)
+    const { id } = await params
+    const beneficiary = await BeneficiaryService.getById(id)
 
     if (!beneficiary) {
       return NextResponse.json(
@@ -35,14 +36,15 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const body = await request.json()
     
-    const beneficiary = await BeneficiaryService.update(params.id, body)
+    const beneficiary = await BeneficiaryService.update(id, body)
 
     return NextResponse.json({
       success: true,
@@ -59,12 +61,13 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    await BeneficiaryService.delete(params.id)
+    const { id } = await params
+    await BeneficiaryService.delete(id)
 
     return NextResponse.json({
       success: true,
