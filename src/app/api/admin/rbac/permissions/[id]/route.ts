@@ -11,11 +11,12 @@ import { getCorrelationId } from '@/lib/correlation'
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = createClient()
     
     // Check authentication
@@ -46,8 +47,6 @@ export async function PUT(
     if (!hasAdminRole) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
-
-    const { id } = params
     const body = await request.json()
     const { name, display_name, description, resource, action, module_id } = body
 
@@ -124,11 +123,12 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = createClient()
     
     // Check authentication
@@ -159,8 +159,6 @@ export async function DELETE(
     if (!hasAdminRole) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
-
-    const { id } = params
 
     if (!id) {
       return NextResponse.json({ error: 'Permission ID is required' }, { status: 400 })
