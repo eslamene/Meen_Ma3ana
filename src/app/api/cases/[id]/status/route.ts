@@ -5,24 +5,23 @@ import { db } from '@/lib/db'
 import { cases, contributions } from '@/drizzle/schema'
 import { eq, sum } from 'drizzle-orm'
 
-import { Logger } from '@/lib/logger'
+import { Logger, defaultLogger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id: caseId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const caseId = params.id
 
     // Get case status history
     const historyResult = await CaseLifecycleService.getCaseStatusHistory(caseId)
@@ -40,19 +39,18 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id: caseId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const caseId = params.id
     const body = await request.json()
     const { newStatus, changeReason, systemTriggered = false } = body
 
@@ -78,19 +76,18 @@ export async function PATCH(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id: caseId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const caseId = params.id
     const body = await request.json()
     const { action } = body
 
@@ -131,7 +128,7 @@ async function checkAndCloseCaseIfFullyFunded(caseId: string) {
       .where(eq(contributions.caseId, caseId))
 
     const totalAmount = parseFloat(totalContributions?.total || '0')
-    const targetAmount = parseFloat(caseData.targetAmount || '0')
+    const targetAmount = parseFloat(caseData.target_amount?.toString() || '0')
 
     // Check if case is fully funded
     if (totalAmount >= targetAmount) {
@@ -162,7 +159,7 @@ async function checkAndCloseCaseIfFullyFunded(caseId: string) {
       }
     }
   } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking automatic closure:', error)
+    defaultLogger.error('Error checking automatic closure:', error)
     return { success: false, error: 'Failed to check automatic closure' }
   }
 } 
