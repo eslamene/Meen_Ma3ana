@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { auditService } from '@/lib/services/auditService'
+import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
+
+type UserRoleWithRole = {
+  rbac_roles: { name: string } | { name: string }[] | null
+}
 
 /**
  * GET /api/admin/rbac/roles/[id]
@@ -36,7 +40,7 @@ export async function GET(
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasAdminRole = userRoles?.some((ur: any) => {
+    const hasAdminRole = userRoles?.some((ur: UserRoleWithRole) => {
       const role = Array.isArray(ur.rbac_roles) ? ur.rbac_roles[0] : ur.rbac_roles
       return role?.name === 'admin' || role?.name === 'super_admin'
     })
@@ -69,7 +73,7 @@ export async function GET(
       description: role.description,
       is_system: role.is_system,
       sort_order: role.sort_order,
-      permissions: role.rbac_role_permissions?.map((rp: any) => rp.rbac_permissions) || []
+      permissions: role.rbac_role_permissions?.map((rp: { rbac_permissions: unknown }) => rp.rbac_permissions) || []
     }
 
     return NextResponse.json({ role: transformedRole })
@@ -182,13 +186,16 @@ export async function PUT(
     }
 
     // Log the action
-    await auditService.logAction({
-      userId: user.id,
-      action: 'role_updated',
-      resourceType: 'role',
-      resourceId: id,
-      details: { permissions_count: permissions.length }
-    })
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAction(
+      user.id,
+      'role_updated',
+      'role',
+      id,
+      { permissions_count: permissions.length },
+      ipAddress,
+      userAgent
+    )
 
     return NextResponse.json({ message: 'Role updated successfully' })
   } catch (error) {
@@ -281,13 +288,16 @@ export async function DELETE(
     }
 
     // Log the action
-    await auditService.logAction({
-      userId: user.id,
-      action: 'role_deleted',
-      resourceType: 'role',
-      resourceId: id,
-      details: {}
-    })
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAction(
+      user.id,
+      'role_deleted',
+      'role',
+      id,
+      {},
+      ipAddress,
+      userAgent
+    )
 
     return NextResponse.json({ message: 'Role deleted successfully' })
   } catch (error) {
