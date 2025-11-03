@@ -12,7 +12,7 @@ export function createClient() {
             .find(row => row.startsWith(`${name}=`))
             ?.split('=')[1]
         },
-        set(name: string, value: string, options: any) {
+        set(name: string, value: string, options?: { secure?: boolean; sameSite?: string }) {
           document.cookie = `${name}=${value}; path=/; ${options?.secure ? 'secure; ' : ''}${options?.sameSite ? `samesite=${options.sameSite}; ` : ''}`
         },
         remove(name: string, options?: { secure?: boolean; sameSite?: string }) {
