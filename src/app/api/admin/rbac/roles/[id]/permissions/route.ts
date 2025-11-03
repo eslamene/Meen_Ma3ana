@@ -10,12 +10,13 @@ import { auditService } from '@/lib/services/auditService'
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
 
   try {
+    const { id } = await params
     // Check permission
     const guardResult = await requirePermission('manage:rbac')(request)
     if (guardResult instanceof NextResponse) {
@@ -23,7 +24,6 @@ export async function PUT(
     }
     
     const { user, supabase } = guardResult
-    const { id } = params
 
     const body = await request.json()
     const { permission_ids = [] } = body
@@ -100,12 +100,13 @@ export async function PUT(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
 
   try {
+    const { id } = await params
     // Check permission
     const guardResult = await requirePermission('manage:rbac')(request)
     if (guardResult instanceof NextResponse) {
@@ -113,7 +114,6 @@ export async function GET(
     }
     
     const { supabase } = guardResult
-    const { id } = params
 
     // Get role permissions
     const { data: rolePermissions, error: permissionsError } = await supabase
