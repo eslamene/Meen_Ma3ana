@@ -24,6 +24,7 @@
     "setup:all": "npm run setup:env && npm run setup:storage && npm run setup:rls && npm run disable:rls"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -54,21 +55,23 @@
     "postgres": "^3.4.7",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-hook-form": "^7.66.0",
     "swr": "^2.2.4",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.1.12"
   },
-"devDependencies": {
-  "@eslint/eslintrc": "3.2.0",
-  "@tailwindcss/postcss": "4.0.0",
-  "@types/node": "22.8.4",
-  "@types/react": "19.0.1",
-  "@types/react-dom": "19.0.1",
-  "drizzle-kit": "0.31.6",
-  "eslint": "9.13.0",
-  "eslint-config-next": "15.4.5",
-  "tailwindcss": "4.0.0",
-  "typescript": "5.6.3"
-},
+  "devDependencies": {
+    "@eslint/eslintrc": "3.2.0",
+    "@tailwindcss/postcss": "4.0.0",
+    "@types/node": "22.8.4",
+    "@types/react": "19.0.1",
+    "@types/react-dom": "19.0.1",
+    "drizzle-kit": "0.31.6",
+    "eslint": "9.13.0",
+    "eslint-config-next": "15.4.5",
+    "tailwindcss": "4.0.0",
+    "typescript": "5.6.3"
+  },
   "overrides": {
     "esbuild": ">=0.25.0"
   }
