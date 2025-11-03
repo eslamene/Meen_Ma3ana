@@ -11,11 +11,12 @@ import { getCorrelationId } from '@/lib/correlation'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = await createClient()
     
     // Check if user is authenticated and has admin role
@@ -27,11 +28,18 @@ export async function GET(
     // Check if user has admin role
     const { data: userRoles } = await supabase
       .from('rbac_user_roles')
-      .select('rbac_roles(name)')
+      .select(`
+        rbac_roles (
+          name
+        )
+      `)
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasAdminRole = userRoles?.some(ur => ur.rbac_roles?.name === 'admin')
+    const hasAdminRole = userRoles?.some((ur: any) => {
+      const role = Array.isArray(ur.rbac_roles) ? ur.rbac_roles[0] : ur.rbac_roles
+      return role?.name === 'admin' || role?.name === 'super_admin'
+    })
     if (!hasAdminRole) {
       return NextResponse.json({ error: 'Forbidden - Admin role required' }, { status: 403 })
     }
@@ -44,7 +52,7 @@ export async function GET(
           rbac_permissions(*)
         )
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('is_active', true)
       .single()
 
@@ -61,7 +69,7 @@ export async function GET(
       description: role.description,
       is_system: role.is_system,
       sort_order: role.sort_order,
-      permissions: role.rbac_role_permissions?.map(rp => rp.rbac_permissions) || []
+      permissions: role.rbac_role_permissions?.map((rp: any) => rp.rbac_permissions) || []
     }
 
     return NextResponse.json({ role: transformedRole })
@@ -77,11 +85,12 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = await createClient()
     
     // Check if user is authenticated and has admin role
@@ -93,11 +102,18 @@ export async function PUT(
     // Check if user has admin role
     const { data: userRoles } = await supabase
       .from('rbac_user_roles')
-      .select('rbac_roles(name)')
+      .select(`
+        rbac_roles (
+          name
+        )
+      `)
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasAdminRole = userRoles?.some(ur => ur.rbac_roles?.name === 'admin')
+    const hasAdminRole = userRoles?.some((ur: any) => {
+      const role = Array.isArray(ur.rbac_roles) ? ur.rbac_roles[0] : ur.rbac_roles
+      return role?.name === 'admin' || role?.name === 'super_admin'
+    })
     if (!hasAdminRole) {
       return NextResponse.json({ error: 'Forbidden - Admin role required' }, { status: 403 })
     }
@@ -109,7 +125,7 @@ export async function PUT(
     const { data: existingRole } = await supabase
       .from('rbac_roles')
       .select('is_system')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('is_active', true)
       .single()
 
@@ -129,7 +145,7 @@ export async function PUT(
         description,
         updated_at: new Date().toISOString()
       })
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (roleError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating role:', roleError)
@@ -141,7 +157,7 @@ export async function PUT(
     const { error: deleteError } = await supabase
       .from('rbac_role_permissions')
       .delete()
-      .eq('role_id', params.id)
+      .eq('role_id', id)
 
     if (deleteError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error removing old permissions:', deleteError)
@@ -151,7 +167,7 @@ export async function PUT(
     // Then, add new permissions
     if (permissions.length > 0) {
       const rolePermissions = permissions.map((permissionId: string) => ({
-        role_id: params.id,
+        role_id: id,
         permission_id: permissionId
       }))
 
@@ -170,7 +186,7 @@ export async function PUT(
       userId: user.id,
       action: 'role_updated',
       resourceType: 'role',
-      resourceId: params.id,
+      resourceId: id,
       details: { permissions_count: permissions.length }
     })
 
@@ -187,11 +203,12 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await params
     const supabase = await createClient()
     
     // Check if user is authenticated and has admin role
@@ -203,11 +220,18 @@ export async function DELETE(
     // Check if user has admin role
     const { data: userRoles } = await supabase
       .from('rbac_user_roles')
-      .select('rbac_roles(name)')
+      .select(`
+        rbac_roles (
+          name
+        )
+      `)
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasAdminRole = userRoles?.some(ur => ur.rbac_roles?.name === 'admin')
+    const hasAdminRole = userRoles?.some((ur: any) => {
+      const role = Array.isArray(ur.rbac_roles) ? ur.rbac_roles[0] : ur.rbac_roles
+      return role?.name === 'admin' || role?.name === 'super_admin'
+    })
     if (!hasAdminRole) {
       return NextResponse.json({ error: 'Forbidden - Admin role required' }, { status: 403 })
     }
@@ -216,7 +240,7 @@ export async function DELETE(
     const { data: existingRole } = await supabase
       .from('rbac_roles')
       .select('is_system')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('is_active', true)
       .single()
 
@@ -232,7 +256,7 @@ export async function DELETE(
     const { data: userAssignments } = await supabase
       .from('rbac_user_roles')
       .select('id')
-      .eq('role_id', params.id)
+      .eq('role_id', id)
       .eq('is_active', true)
       .limit(1)
 
@@ -249,7 +273,7 @@ export async function DELETE(
         is_active: false,
         updated_at: new Date().toISOString()
       })
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (deleteError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting role:', deleteError)
@@ -261,7 +285,7 @@ export async function DELETE(
       userId: user.id,
       action: 'role_deleted',
       resourceType: 'role',
-      resourceId: params.id,
+      resourceId: id,
       details: {}
     })
 
