@@ -7,11 +7,10 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  {
+  { params }: { params: { id: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string } }
-) {
   try {
     const supabase = await createClient()
     
@@ -38,11 +37,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  {
+  { params }: { params: { id: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string } }
-) {
   try {
     const supabase = await createClient()
     

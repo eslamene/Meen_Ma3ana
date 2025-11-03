@@ -10,11 +10,10 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  {
+  { params }: { params: { id: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string } }
-) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

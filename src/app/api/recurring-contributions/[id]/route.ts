@@ -4,10 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
-export async function PUT(request: NextRequest, {
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
     
@@ -58,10 +57,9 @@ export async function PUT(request: NextRequest, {
   }
 }
 
-export async function DELETE(request: NextRequest, {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
     

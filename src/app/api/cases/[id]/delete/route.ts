@@ -6,11 +6,10 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function DELETE(
   request: NextRequest,
-  {
+  { params }: { params: Promise<{ id: string }> }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: Promise<{ id: string }> }
-) {
   try {
     const { id: caseId } = await params
     const supabase = await createClient()

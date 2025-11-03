@@ -10,11 +10,10 @@ import { getCorrelationId } from '@/lib/correlation'
  */
 export async function DELETE(
   request: NextRequest,
-  {
+  { params }: { params: { userId: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { userId: string } }
-) {
   try {
     const supabase = createClient()
     

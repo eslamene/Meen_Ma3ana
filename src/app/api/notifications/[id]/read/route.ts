@@ -7,11 +7,10 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function POST(
   request: NextRequest,
-  {
+  { params }: { params: Promise<{ id: string }> }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: Promise<{ id: string }> }
-) {
   const { id } = await params
   try {
     const supabase = await createClient()

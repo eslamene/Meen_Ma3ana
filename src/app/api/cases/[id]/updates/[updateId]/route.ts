@@ -7,11 +7,10 @@ import { getCorrelationId } from '@/lib/correlation'
 
 export async function PUT(
   request: NextRequest,
-  {
+  { params }: { params: { id: string; updateId: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string; updateId: string } }
-) {
   try {
     const supabase = await createClient()
     
@@ -88,11 +87,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  {
+  { params }: { params: { id: string; updateId: string } }
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
- params }: { params: { id: string; updateId: string } }
-) {
   try {
     const supabase = await createClient()
     
