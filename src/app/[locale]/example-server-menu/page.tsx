@@ -3,10 +3,11 @@ import ServerLayout from '@/components/layout/ServerLayout'
 export default async function ExampleServerMenuPage({
   params
 }: {
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   return (
-    <ServerLayout locale={params.locale}>
+    <ServerLayout locale={locale}>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
