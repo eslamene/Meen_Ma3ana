@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { requirePermission } from '@/lib/security/rls'
 
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest) {
       return guardResult
     }
     
-    const { user, supabase } = guardResult
+    const { supabase } = guardResult
 
     // Get all permissions with their modules
     const { data: permissions, error: permissionsError } = await supabase
