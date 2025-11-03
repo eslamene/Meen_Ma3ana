@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { auditService } from '@/lib/services/auditService'
+import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { requirePermission } from '@/lib/security/rls'
 
 import { Logger } from '@/lib/logger'
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('is_active', true)
-      .order('resource', 'action')
+      .order('resource', { ascending: true })
 
     if (permissionsError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching permissions:', permissionsError)
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         is_system: permission.is_system
       })
       return acc
-    }, {} as Record<string, any>) || {}
+    }, {} as Record<string, unknown>) || {}
 
     return NextResponse.json({ permissionsByModule })
   } catch (error) {
@@ -151,17 +151,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the action
-    await auditService.logAction({
-      userId: user.id,
-      action: 'permission_created',
-      resourceType: 'permission',
-      resourceId: newPermission.id,
-      details: { 
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAction(
+      user.id,
+      'permission_created',
+      'permission',
+      newPermission.id,
+      { 
         permission_name: name,
         resource,
         action
-      }
-    })
+      },
+      ipAddress,
+      userAgent
+    )
 
     return NextResponse.json({ 
       message: 'Permission created successfully',
