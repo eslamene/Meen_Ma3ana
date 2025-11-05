@@ -48,7 +48,12 @@ export async function GET(request: NextRequest) {
     // Set security context
     await SecurityService.setSecurityContext(user.id, userRole)
     
-    const results = {
+    const results: {
+      user: { id: string; role: any; email?: string }
+      accessibleCases: any[]
+      accessibleContributions: any[]
+      accessibleUsers: any[]
+    } = {
       user: {
         id: user.id,
         role: userRole,
@@ -65,13 +70,13 @@ export async function GET(request: NextRequest) {
         id: cases.id,
         title: cases.title,
         status: cases.status,
-        createdBy: cases.createdBy
+        createdBy: cases.created_by
       }).from(cases).limit(5)
       
       results.accessibleCases = casesResult
     } catch (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error accessing cases:', error)
-      results.accessibleCases = { error: 'Access denied' }
+      results.accessibleCases = [{ error: 'Access denied' }]
     }
 
     try {
@@ -80,13 +85,13 @@ export async function GET(request: NextRequest) {
         id: contributions.id,
         amount: contributions.amount,
         status: contributions.status,
-        donorId: contributions.donorId
+        donorId: contributions.donor_id
       }).from(contributions).limit(5)
       
       results.accessibleContributions = contributionsResult
     } catch (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error accessing contributions:', error)
-      results.accessibleContributions = { error: 'Access denied' }
+      results.accessibleContributions = [{ error: 'Access denied' }]
     }
 
     try {
@@ -100,7 +105,7 @@ export async function GET(request: NextRequest) {
       results.accessibleUsers = usersResult
     } catch (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error accessing users:', error)
-      results.accessibleUsers = { error: 'Access denied' }
+      results.accessibleUsers = [{ error: 'Access denied' }]
     }
 
     // Clear security context

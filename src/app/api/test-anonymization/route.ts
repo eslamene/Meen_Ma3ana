@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Require admin permission
-    const authResult = await requireAdminPermission(request)
+    const authResult = await requirePermission('admin:dashboard')(request)
     if (authResult instanceof NextResponse) {
       return authResult
     }
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Require admin permission
-    const authResult = await requireAdminPermission(request)
+    const authResult = await requirePermission('admin:dashboard')(request)
     if (authResult instanceof NextResponse) {
       return authResult
     }

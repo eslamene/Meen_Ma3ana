@@ -73,20 +73,29 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data
-    const roles = userRoles?.map(ur => ({
-      id: ur.rbac_roles.id,
-      name: ur.rbac_roles.name,
-      display_name: ur.rbac_roles.display_name,
-      description: ur.rbac_roles.description,
-      is_system: ur.rbac_roles.is_system,
-      sort_order: ur.rbac_roles.sort_order,
-      assigned_at: ur.assigned_at,
-      assigned_by: ur.assigned_by
-    })) || []
+    const roles = userRoles?.map(ur => {
+      const role = Array.isArray(ur.rbac_roles) ? ur.rbac_roles[0] : ur.rbac_roles
+      return {
+        id: role?.id,
+        name: role?.name,
+        display_name: role?.display_name,
+        description: role?.description,
+        is_system: role?.is_system,
+        sort_order: role?.sort_order,
+        assigned_at: ur.assigned_at,
+        assigned_by: ur.assigned_by
+      }
+    }).filter(role => role.id) || []
 
     const permissions = userPermissions
-      ?.flatMap(ur => ur.rbac_roles?.rbac_role_permissions || [])
-      .map(rp => rp.rbac_permissions)
+      ?.flatMap(ur => {
+        const role = Array.isArray(ur.rbac_roles) ? ur.rbac_roles[0] : ur.rbac_roles
+        return role?.rbac_role_permissions || []
+      })
+      .map(rp => {
+        const perm = Array.isArray(rp.rbac_permissions) ? rp.rbac_permissions[0] : rp.rbac_permissions
+        return perm
+      })
       .filter(Boolean) || []
 
     return NextResponse.json({

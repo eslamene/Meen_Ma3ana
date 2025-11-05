@@ -1,8 +1,8 @@
-import { db } from '@/lib/db'
-import { users, cases, contributions, sponsorships, communications } from '@/drizzle/schema'
+import { db } from '../db'
+import { users, cases, contributions, sponsorships, communications } from '../../../drizzle/schema'
 import { eq, and, like } from 'drizzle-orm'
 
-import { defaultLogger } from '@/lib/logger'
+import { defaultLogger } from '../logger'
 
 /**
  * Data anonymization service for protecting sensitive information
@@ -150,10 +150,10 @@ export class AnonymizationService {
       const usersData = await db.select({
         id: users.id,
         email: users.email,
-        firstName: users.firstName,
-        lastName: users.lastName,
+        firstName: users.first_name,
+        lastName: users.last_name,
         role: users.role,
-        createdAt: users.createdAt
+        createdAt: users.created_at
       }).from(users)
 
       return usersData.map(user => ({
@@ -179,11 +179,11 @@ export class AnonymizationService {
         id: cases.id,
         title: cases.title,
         description: cases.description,
-        targetAmount: cases.targetAmount,
-        currentAmount: cases.currentAmount,
+        targetAmount: cases.target_amount,
+        currentAmount: cases.current_amount,
         status: cases.status,
-        categoryId: cases.categoryId,
-        createdAt: cases.createdAt
+        categoryId: cases.category_id,
+        createdAt: cases.created_at
       }).from(cases).where(eq(cases.status, 'published'))
 
       return casesData.map(caseItem => ({
@@ -211,7 +211,7 @@ export class AnonymizationService {
         id: contributions.id,
         amount: contributions.amount,
         status: contributions.status,
-        createdAt: contributions.createdAt
+        createdAt: contributions.created_at
       }).from(contributions)
 
       return contributionsData.map(contribution => ({
@@ -331,9 +331,31 @@ export class AnonymizationService {
       const caseCount = await db.execute('SELECT COUNT(*) FROM anonymized_cases')
       const contributionCount = await db.execute('SELECT COUNT(*) FROM anonymized_contributions')
 
-      stats.anonymizedUsers = parseInt(userCount.rows?.[0]?.count || '0')
-      stats.anonymizedCases = parseInt(caseCount.rows?.[0]?.count || '0')
-      stats.anonymizedContributions = parseInt(contributionCount.rows?.[0]?.count || '0')
+      const extractCount = (result: unknown): number => {
+        // Handle different possible result structures from drizzle execute
+        type QueryResult = 
+          | { rows?: Array<{ count?: string | number }> }
+          | Array<{ count?: string | number }>
+          | { count?: string | number }
+          | unknown
+        
+        const r = result as QueryResult
+        const raw = 
+          (r && typeof r === 'object' && 'rows' in r && Array.isArray((r as { rows?: Array<{ count?: string | number }> }).rows))
+            ? (r as { rows: Array<{ count?: string | number }> }).rows[0]?.count
+            : Array.isArray(r) && r.length > 0
+              ? r[0]?.count
+              : (r && typeof r === 'object' && 'count' in r)
+                ? (r as { count?: string | number }).count
+                : '0'
+        
+        const num = parseInt(String(raw ?? '0'))
+        return isNaN(num) ? 0 : num
+      }
+
+      stats.anonymizedUsers = extractCount(userCount)
+      stats.anonymizedCases = extractCount(caseCount)
+      stats.anonymizedContributions = extractCount(contributionCount)
 
       return stats
     } catch (error) {

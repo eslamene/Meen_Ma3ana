@@ -227,12 +227,21 @@ export class CaseNotificationService {
         .limit(limit)
 
       return results.map(result => {
-        const parsedData = result.data ? JSON.parse(result.data) : undefined
+        const parsedData = result.data
+          ? (typeof result.data === 'string' ? JSON.parse(result.data) : result.data)
+          : undefined
+        const normalizedType = (result.type as CaseNotification['type'])
+        const normalizedCreatedAt = result.createdAt instanceof Date ? result.createdAt : new Date(result.createdAt as any)
         return {
-          ...result,
+          id: result.id,
+          userId: result.userId,
+          type: normalizedType,
+          title: result.title,
+          message: result.message,
           data: parsedData,
+          isRead: result.isRead,
+          createdAt: normalizedCreatedAt,
           caseId: parsedData?.caseId,
-          createdAt: new Date(result.createdAt),
         }
       })
     } catch (error) {

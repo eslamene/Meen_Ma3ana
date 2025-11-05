@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ContributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await context.params
     const supabase = await createClient()
     
     // Get the contribution approval status
@@ -22,7 +24,7 @@ export async function GET(
         contributions:contribution_id(*),
         admin:admin_id(id, first_name, last_name, email)
       `)
-      .eq('contribution_id', params.id)
+      .eq('contribution_id', id)
       .single()
 
     if (error) {
@@ -37,11 +39,12 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await context.params
     const supabase = await createClient()
     
     const body = await request.json()
@@ -57,7 +60,7 @@ export async function POST(
     const { data: existingStatus } = await supabase
       .from('contribution_approval_status')
       .select('*')
-      .eq('contribution_id', params.id)
+      .eq('contribution_id', id)
       .single()
 
     let result
@@ -94,7 +97,7 @@ export async function POST(
       const { data, error } = await supabase
         .from('contribution_approval_status')
         .update(updateData)
-        .eq('contribution_id', params.id)
+        .eq('contribution_id', id)
         .select()
         .single()
 
@@ -106,7 +109,7 @@ export async function POST(
     } else {
       // Create new status
       const newStatus = {
-        contribution_id: params.id,
+        contribution_id: id,
         status,
         admin_id: status === 'rejected' || status === 'approved' ? user.id : null,
         rejection_reason: status === 'rejected' ? rejection_reason : null,
@@ -134,7 +137,7 @@ export async function POST(
     await supabase
       .from('contributions')
       .update({ status })
-      .eq('id', params.id)
+      .eq('id', id)
 
     // Send notification to donor
     if (status === 'approved' || status === 'rejected') {
@@ -147,25 +150,29 @@ export async function POST(
             amount,
             cases!inner(title)
           `)
-          .eq('id', params.id)
+          .eq('id', id)
           .single()
 
         if (contribution) {
           const notificationService = new ContributionNotificationService()
           
           if (status === 'approved') {
+            const casesData = contribution.cases as any
+            const caseTitle = Array.isArray(casesData) ? casesData[0]?.title : casesData?.title
             await notificationService.sendApprovalNotification(
-              params.id,
+              id,
               contribution.donor_id,
               contribution.amount,
-              contribution.cases.title
+              caseTitle || 'Unknown Case'
             )
           } else if (status === 'rejected' && rejection_reason) {
+            const casesData = contribution.cases as any
+            const caseTitle = Array.isArray(casesData) ? casesData[0]?.title : casesData?.title
             await notificationService.sendRejectionNotification(
-              params.id,
+              id,
               contribution.donor_id,
               contribution.amount,
-              contribution.cases.title,
+              caseTitle || 'Unknown Case',
               rejection_reason
             )
           }

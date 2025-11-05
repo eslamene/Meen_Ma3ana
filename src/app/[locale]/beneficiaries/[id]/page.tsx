@@ -363,14 +363,14 @@ export default function BeneficiaryDetailPage() {
                 </div>
               ) : documents.length > 0 ? (
                 <div className="space-y-3">
-                  {documents.map((document) => (
-                    <div key={document.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{getFileIcon(document.file_type)}</span>
+                        <span className="text-2xl">{getFileIcon(doc.mime_type || '')}</span>
                         <div>
-                          <p className="font-medium text-sm">{document.original_filename}</p>
+                          <p className="font-medium text-sm">{doc.file_name}</p>
                           <p className="text-xs text-gray-500">
-                            {document.is_public ? t('public') || 'Public' : t('private') || 'Private'}
+                            {doc.is_public ? t('public') || 'Public' : t('private') || 'Private'}
                           </p>
                         </div>
                       </div>
@@ -378,7 +378,7 @@ export default function BeneficiaryDetailPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(document.file_url, '_blank')}
+                          onClick={() => window.open(doc.file_url, '_blank')}
                         >
                           <Eye className="h-3 w-3" />
                         </Button>
@@ -387,8 +387,8 @@ export default function BeneficiaryDetailPage() {
                           size="sm"
                           onClick={() => {
                             const link = document.createElement('a')
-                            link.href = document.file_url
-                            link.download = document.original_filename
+                            link.href = doc.file_url
+                            link.download = doc.file_name
                             link.click()
                           }}
                         >

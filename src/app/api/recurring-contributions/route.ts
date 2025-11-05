@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
-    query = query.limit(limit).offset(offset)
+    query = query.range(offset, offset + limit - 1)
 
     const { data, error } = await query
 

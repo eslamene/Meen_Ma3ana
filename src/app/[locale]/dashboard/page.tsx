@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
@@ -22,14 +22,13 @@ import {
   BarChart3, 
   Calendar,
   DollarSign,
-  Users,
   Activity,
   ArrowRight,
   Plus,
   Eye,
-  RefreshCw,
-  Info
+  RefreshCw
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 
@@ -38,7 +37,7 @@ interface QuickActionsSectionProps {
   quickActions: Array<{
     title: string
     description: string
-    icon: any
+    icon: LucideIcon
     color: string
     hoverColor: string
     permission: string
@@ -77,7 +76,10 @@ function QuickActionsSection({ quickActions, t }: QuickActionsSectionProps) {
               className={`group w-full flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r ${action.color} hover:${action.hoverColor} text-white transition-all duration-200 hover:shadow-md`}
             >
               <div className="flex-shrink-0">
-                <action.icon className="h-5 w-5" />
+                {(() => {
+                  const Icon = action.icon
+                  return <Icon className="h-5 w-5" />
+                })()}
               </div>
               <div className="flex-1 text-left">
                 <h3 className="font-medium text-base mb-1">{action.title}</h3>
@@ -153,11 +155,7 @@ export default function DashboardPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchDashboardStats()
-  }, [])
-
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = useCallback(async () => {
     try {
       setLoading(true)
       const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -177,10 +175,20 @@ export default function DashboardPage() {
         .eq('created_by', authUser.id)
 
       if (contributions) {
+        interface Contribution {
+          amount: number | string
+          status?: string
+        }
+        interface Case {
+          status?: string
+        }
         const totalContributions = contributions.length
-        const totalAmount = contributions.reduce((sum, c) => sum + (c.amount || 0), 0)
-        const activeCases = cases?.filter(c => c.status === 'active').length || 0
-        const completedCases = cases?.filter(c => c.status === 'completed').length || 0
+        const totalAmount = (contributions as Contribution[]).reduce((sum, c) => {
+          const amount = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0)
+          return sum + amount
+        }, 0)
+        const activeCases = (cases as Case[] | null)?.filter((c: Case) => c.status === 'active').length || 0
+        const completedCases = (cases as Case[] | null)?.filter((c: Case) => c.status === 'completed').length || 0
 
         setStats({
           totalContributions,
@@ -194,7 +202,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    fetchDashboardStats()
+  }, [fetchDashboardStats])
 
   const formatAmount = (amount: number) => {
     return `EGP ${amount.toLocaleString('en-US', {
@@ -298,9 +310,9 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <Badge variant="outline" className={getRoleColor(userRole)}>
+                <Badge variant="outline" className={getRoleColor(userRole || '')}>
                   <Shield className="h-3 w-3 mr-1" />
-                  {getRoleDisplayName(userRole)}
+                  {getRoleDisplayName(userRole || '')}
                 </Badge>
                 <Button
                   variant="outline"
@@ -420,8 +432,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <span className="text-sm font-medium text-gray-600">Role</span>
-                  <Badge variant="outline" className={getRoleColor(userRole)}>
-                    {getRoleDisplayName(userRole)}
+                  <Badge variant="outline" className={getRoleColor(userRole || '')}>
+                    {getRoleDisplayName(userRole || '')}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -448,28 +460,28 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-100">
                     <h3 className="font-semibold text-purple-900 mb-2">
-                      {getRoleDisplayName(userRole)}
+                      {getRoleDisplayName(userRole || '')}
                     </h3>
                     <p className="text-sm text-purple-700">
-                      {getRoleDescription(userRole)}
+                      {getRoleDescription(userRole || '')}
                     </p>
                   </div>
                   <div className="space-y-2">
                     <h4 className="font-medium text-gray-900">Permissions:</h4>
                     <div className="space-y-1">
-                      <PermissionGuard allowedPermissions={["contributions:create"]}>
+                      <PermissionGuard permissions={["contributions:create"]}>
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           Create contributions
                         </div>
                       </PermissionGuard>
-                      <PermissionGuard allowedPermissions={["cases:create"]}>
+                      <PermissionGuard permissions={["cases:create"]}>
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           Create cases
                         </div>
                       </PermissionGuard>
-                      <PermissionGuard allowedPermissions={["admin:dashboard"]}>
+                      <PermissionGuard permissions={["admin:dashboard"]}>
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           Admin access
@@ -525,7 +537,7 @@ export default function DashboardPage() {
 
           {/* Role-specific sections */}
           <div className="mt-8 space-y-6">
-            <PermissionGuard allowedPermissions={["contributions:read"]}>
+            <PermissionGuard permissions={["contributions:read"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
@@ -539,7 +551,7 @@ export default function DashboardPage() {
               </Card>
             </PermissionGuard>
 
-            <PermissionGuard allowedPermissions={["sponsorships:read"]}>
+            <PermissionGuard permissions={["sponsorships:read"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
@@ -553,7 +565,7 @@ export default function DashboardPage() {
               </Card>
             </PermissionGuard>
 
-            <PermissionGuard allowedPermissions={["admin:analytics"]}>
+            <PermissionGuard permissions={["admin:analytics"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">

@@ -43,7 +43,7 @@ export class NotificationService {
       const [creator] = await db
         .select()
         .from(users)
-        .where(eq(users.id, caseData.createdBy))
+        .where(eq(users.id, caseData.created_by))
 
       // Get user who made the change
       let changedByUser = null
@@ -61,7 +61,7 @@ export class NotificationService {
       // Send notifications
       await Promise.all([
         this.sendEmailNotification(creator?.email, template),
-        this.sendInAppNotification(caseData.createdBy, template),
+        this.sendInAppNotification(caseData.created_by, template),
         this.sendWebhookNotification(data, template)
       ])
 
@@ -245,11 +245,11 @@ export class NotificationService {
         const [creator] = await db
           .select()
           .from(users)
-          .where(eq(users.id, caseData.createdBy))
+          .where(eq(users.id, caseData.created_by))
 
         await Promise.all([
           this.sendEmailNotification(creator?.email, template),
-          this.sendInAppNotification(caseData.createdBy, template)
+          this.sendInAppNotification(caseData.created_by, template)
         ])
       }
     } catch (error) {
@@ -282,11 +282,11 @@ export class NotificationService {
         const [creator] = await db
           .select()
           .from(users)
-          .where(eq(users.id, caseData.createdBy))
+          .where(eq(users.id, caseData.created_by))
 
         await Promise.all([
           this.sendEmailNotification(creator?.email, template),
-          this.sendInAppNotification(caseData.createdBy, template)
+          this.sendInAppNotification(caseData.created_by, template)
         ])
       }
     } catch (error) {

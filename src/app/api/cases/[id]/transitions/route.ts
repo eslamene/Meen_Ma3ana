@@ -2,27 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { CaseLifecycleService } from '@/lib/case-lifecycle'
 import { db } from '@/lib/db'
-import { cases, users } from '@/drizzle/schema'
+import { cases, users, type CaseStatus } from '@/drizzle/schema'
 import { eq } from 'drizzle-orm'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id: caseId } = await context.params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const caseId = params.id
 
     // Get case details
     const [caseData] = await db
@@ -44,7 +44,7 @@ export async function GET(
 
     // Get available transitions
     const availableTransitions = CaseLifecycleService.getAvailableTransitions(
-      caseData.status as any,
+      caseData.status as CaseStatus,
       userRole,
       false
     )

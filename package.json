@@ -21,7 +21,10 @@
     "i18n:check": "npm run i18n:validate && npm run i18n:unused",
     "disable:rls": "node scripts/disable-storage-rls.js",
     "test:upload": "node scripts/test-upload.js",
-    "setup:all": "npm run setup:env && npm run setup:storage && npm run setup:rls && npm run disable:rls"
+    "setup:all": "npm run setup:env && npm run setup:storage && npm run setup:rls && npm run disable:rls",
+    "validate:lockfile": "npm ci --dry-run",
+    "precommit:check": "npm run validate:lockfile && npm run build",
+    "check:all": "tsc --noEmit && next lint && next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

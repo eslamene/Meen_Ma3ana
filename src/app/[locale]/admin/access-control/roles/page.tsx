@@ -1,16 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import PermissionGuard from '@/components/auth/PermissionGuard'
-import { DeleteConfirmationDialog } from '@/components/admin/rbac/DeleteConfirmationDialog'
-import { RoleFormModal } from '@/components/admin/rbac/RoleFormModal'
-import { RolesDataTable } from '@/components/admin/rbac/RolesDataTable'
-import { PermissionAssignmentModal } from '@/components/admin/rbac/PermissionAssignmentModal'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useToast } from '@/hooks/use-toast'
-import { Shield, Key, Users, Plus, Edit2, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import PermissionGuard from '../../../../../components/auth/PermissionGuard'
+import { DeleteConfirmationDialog } from '../../../../../components/admin/rbac/DeleteConfirmationDialog'
+import { RoleFormModal } from '../../../../../components/admin/rbac/RoleFormModal'
+import { RolesDataTable } from '../../../../../components/admin/rbac/RolesDataTable'
+import { PermissionAssignmentModal } from '../../../../../components/admin/rbac/PermissionAssignmentModal'
+import { Card, CardContent } from '../../../../../components/ui/card'
+import { useToast } from '../../../../../hooks/use-toast'
+import { Shield, Users, Plus } from 'lucide-react'
 
 // Types
 interface Role {
@@ -21,6 +20,7 @@ interface Role {
   is_system: boolean
   permissions_count: number
   users_count: number
+  permissions?: Permission[]
 }
 
 interface Permission {
@@ -33,26 +33,9 @@ interface Permission {
   is_system: boolean
 }
 
-interface Module {
-  id: string
-  name: string
-  display_name: string
-  icon: string
-  color: string
-}
-
-interface PermissionsByModule {
-  [moduleName: string]: {
-    module: Module
-    permissions: Permission[]
-  }
-}
-
 export default function RolesPage() {
   const t = useTranslations('rbac.roles')
-  const tCommon = useTranslations('rbac.common')
   const [roles, setRoles] = useState<Role[]>([])
-  const [permissionsByModule, setPermissionsByModule] = useState<PermissionsByModule>({})
   const [loading, setLoading] = useState(true)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -62,13 +45,7 @@ export default function RolesPage() {
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
   const { toast } = useToast()
 
-  // Fetch data
-  useEffect(() => {
-    fetchRoles()
-    fetchPermissions()
-  }, [])
-
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/rbac/roles', {
         credentials: 'include'
@@ -76,10 +53,19 @@ export default function RolesPage() {
       if (res.ok) {
         const data = await res.json()
         // Map permissions count for RolesDataTable compatibility
-        const rolesWithCounts = data.roles.map((role: any) => ({
+        interface RoleFromAPI {
+          id: string
+          name: string
+          display_name: string
+          description: string
+          is_system: boolean
+          permissions?: Permission[]
+          users_count?: number
+        }
+        const rolesWithCounts = (data.roles as RoleFromAPI[]).map((role) => ({
           ...role,
           permissions_count: role.permissions?.length || 0,
-          users_count: role.user_count || 0
+          users_count: role.users_count || 0
         }))
         setRoles(rolesWithCounts)
       } else {
@@ -93,24 +79,13 @@ export default function RolesPage() {
     } finally {
       setLoading(false)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const fetchPermissions = async () => {
-    try {
-      const res = await fetch('/api/admin/rbac/permissions', {
-        credentials: 'include'
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setPermissionsByModule(data.permissionsByModule)
-      } else {
-        const errorData = await res.json()
-        console.error('Permissions fetch error:', errorData)
-      }
-    } catch (error) {
-      console.error('Permissions fetch error:', error)
-    }
-  }
+  // Fetch data
+  useEffect(() => {
+    fetchRoles()
+  }, [fetchRoles])
 
   // Filtered and sorted roles
   const filteredRoles = roles
@@ -138,7 +113,7 @@ export default function RolesPage() {
         const error = await res.json()
         toast({ title: 'Error', description: error.error, type: 'error' })
       }
-    } catch (error) {
+    } catch {
       toast({ title: 'Error', description: 'Failed to create role', type: 'error' })
     }
   }
@@ -164,7 +139,7 @@ export default function RolesPage() {
         const error = await res.json()
         toast({ title: 'Error', description: error.error, type: 'error' })
       }
-    } catch (error) {
+    } catch {
       toast({ title: 'Error', description: 'Failed to update role', type: 'error' })
     }
   }
@@ -179,7 +154,7 @@ export default function RolesPage() {
       return
     }
     
-    if (selectedRole.user_count > 0) {
+    if (selectedRole.users_count && selectedRole.users_count > 0) {
       toast({ title: 'Error', description: 'Cannot delete role that is assigned to users. Remove all assignments first.', type: 'error' })
       setDeleteModalOpen(false)
       return
@@ -198,7 +173,7 @@ export default function RolesPage() {
         const error = await res.json()
         toast({ title: 'Error', description: error.error, type: 'error' })
       }
-    } catch (error) {
+    } catch {
       toast({ title: 'Error', description: 'Failed to delete role', type: 'error' })
     }
   }
@@ -222,7 +197,7 @@ export default function RolesPage() {
         const error = await res.json()
         toast({ title: 'Error', description: error.error, type: 'error' })
       }
-    } catch (error) {
+    } catch {
       toast({ title: 'Error', description: 'Failed to assign permissions', type: 'error' })
     }
   }
@@ -232,15 +207,41 @@ export default function RolesPage() {
     setCreateModalOpen(true)
   }
 
-  const openEditModal = (role: Role) => {
+  const openEditModal = async (role: Role) => {
     setSelectedRole(role)
-    setSelectedPermissions(role.permissions.map(p => p.id))
+    try {
+      // Fetch permissions for this role
+      const res = await fetch(`/api/admin/rbac/roles/${role.id}/permissions`, {
+        credentials: 'include'
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedPermissions(data.permissions?.map((p: Permission) => p.id) || [])
+      } else {
+        setSelectedPermissions([])
+      }
+    } catch {
+      setSelectedPermissions([])
+    }
     setEditModalOpen(true)
   }
 
-  const openAssignModal = (role: Role) => {
+  const openAssignModal = async (role: Role) => {
     setSelectedRole(role)
-    setSelectedPermissions(role.permissions.map(p => p.id))
+    try {
+      // Fetch permissions for this role
+      const res = await fetch(`/api/admin/rbac/roles/${role.id}/permissions`, {
+        credentials: 'include'
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedPermissions(data.permissions?.map((p: Permission) => p.id) || [])
+      } else {
+        setSelectedPermissions([])
+      }
+    } catch {
+      setSelectedPermissions([])
+    }
     setAssignModalOpen(true)
   }
 
@@ -311,7 +312,7 @@ export default function RolesPage() {
                 <Users className="h-5 w-5 text-purple-600" />
                 <div>
                   <p className="text-sm text-gray-600">{t('stats.usersWithRoles')}</p>
-                  <p className="text-2xl font-bold">{roles.reduce((sum, r) => sum + r.user_count, 0)}</p>
+                  <p className="text-2xl font-bold">{roles.reduce((sum, r) => sum + (r.users_count || 0), 0)}</p>
                 </div>
               </div>
             </CardContent>
@@ -348,7 +349,7 @@ export default function RolesPage() {
         <PermissionAssignmentModal
           roleId={selectedRole?.id || ''}
           roleName={selectedRole?.display_name || ''}
-          currentPermissions={[]}
+          currentPermissions={selectedPermissions}
           open={assignModalOpen}
           onClose={() => setAssignModalOpen(false)}
           onSave={handleAssignPermissions}
@@ -363,7 +364,7 @@ export default function RolesPage() {
           description="Are you sure you want to delete {itemName}? This action cannot be undone."
           itemName={selectedRole?.display_name || ''}
           itemType="role"
-          dangerLevel={selectedRole?.is_system || (selectedRole?.user_count ?? 0) > 0 ? 'high' : 'medium'}
+          dangerLevel={selectedRole?.is_system || (selectedRole?.users_count ?? 0) > 0 ? 'high' : 'medium'}
         />
       </div>
     </PermissionGuard>

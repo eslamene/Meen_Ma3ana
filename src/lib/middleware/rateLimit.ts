@@ -105,7 +105,8 @@ function getClientIP(request: NextRequest): string {
     return cfConnectingIP
   }
   
-  return request.ip || 'unknown'
+  // NextRequest doesn't have .ip property, return 'unknown' as fallback
+  return 'unknown'
 }
 
 /**

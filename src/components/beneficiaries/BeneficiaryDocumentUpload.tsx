@@ -130,7 +130,7 @@ export default function BeneficiaryDocumentUpload({
 
   const handleToggleVisibility = async (documentId: string, isPublic: boolean) => {
     try {
-      await BeneficiaryDocumentService.updateVisibility(documentId, isPublic)
+      await BeneficiaryDocumentService.update(documentId, { is_public: isPublic })
       // Refresh documents or update local state
     } catch (error) {
       console.error('Error updating document visibility:', error)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { auditService } from '@/lib/services/auditService'
+import { auditService, extractRequestInfo } from '@/lib/services/auditService'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
@@ -11,13 +12,13 @@ import { getCorrelationId } from '@/lib/correlation'
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const { id } = await params
-    const supabase = createClient()
+    const { id } = await context.params
+    const supabase = await createClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -89,19 +90,22 @@ export async function PUT(
     }
 
     // Log the action
-    await auditService.logAction({
-      userId: user.id,
-      action: 'permission_updated',
-      resourceType: 'permission',
-      resourceId: id,
-      details: { 
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await auditService.logAction(
+      user.id,
+      'permission_updated',
+      'permission',
+      id,
+      { 
         old_name: existingPermission.name,
         new_name: name,
         display_name,
         resource,
         action 
-      }
-    })
+      },
+      ipAddress,
+      userAgent
+    )
 
     return NextResponse.json({ 
       success: true, 
@@ -123,13 +127,13 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const { id } = await params
-    const supabase = createClient()
+    const { id } = await context.params
+    const supabase = await createClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()

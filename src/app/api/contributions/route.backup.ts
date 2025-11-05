@@ -153,8 +153,8 @@ export async function GET(request: NextRequest) {
       // Handle the case where approval_status might be an array or null
       const approvalStatusArray = contribution.approval_status
       const approvalStatus = Array.isArray(approvalStatusArray) && approvalStatusArray.length > 0 
-        ? approvalStatusArray[0]?.status 
-        : approvalStatusArray?.status || 'pending'
+        ? approvalStatusArray[0]?.status || 'pending'
+        : 'pending'
       
       if (approvalStatus === 'approved') {
         stats.approved++

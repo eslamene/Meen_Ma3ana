@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
     `)
 
     // Recent activity is already sorted and limited by the UNION query
-    const allActivity = recentActivity.rows || []
+    const allActivity = Array.isArray(recentActivity) ? recentActivity : []
 
     // Prepare metrics response using optimized data
     const metrics = {

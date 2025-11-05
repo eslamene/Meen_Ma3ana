@@ -48,7 +48,7 @@ interface PaginationState {
   total: number
   totalPages: number
   hasNextPage: boolean
-  hasPreviousPage: boolean
+  hasPrevPage: boolean
 }
 
 interface Filters {
@@ -73,7 +73,7 @@ export default function ContributionsPage() {
     total: 0,
     totalPages: 0,
     hasNextPage: false,
-    hasPreviousPage: false
+    hasPrevPage: false
   })
   const [filters, setFilters] = useState<Filters>({
     status: 'all',
@@ -137,7 +137,7 @@ export default function ContributionsPage() {
         total: data.pagination.total,
         totalPages: data.pagination.totalPages,
         hasNextPage: data.pagination.hasNextPage,
-        hasPreviousPage: data.pagination.hasPreviousPage
+        hasPrevPage: data.pagination.hasPreviousPage ?? data.pagination.hasPrevPage ?? false
       }))
     } catch (err) {
       console.error('Error fetching contributions:', err)
@@ -246,7 +246,7 @@ export default function ContributionsPage() {
           loading={loading}
           onStatusUpdate={handleStatusUpdate}
           isAdmin={false}
-          highlightedTxId={highlightedTxId}
+          highlightedTxId={highlightedTxId || undefined}
           pagination={pagination}
           error={error}
           onPageChange={handlePageChange}

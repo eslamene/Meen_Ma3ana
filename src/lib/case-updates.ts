@@ -1,9 +1,9 @@
 import { db } from './db'
-import { createClient } from '@/lib/supabase/server'
-import { caseUpdates, users, contributions, contributionApprovalStatus } from '@/drizzle/schema'
-import { eq, desc, and, asc, or, like } from 'drizzle-orm'
+import { createClient } from './supabase/client'
+import { caseUpdates, users, contributions, contributionApprovalStatus } from '../../drizzle/schema'
+import { eq, desc, and, asc, or, like, sql } from 'drizzle-orm'
 
-import { defaultLogger } from '@/lib/logger'
+import { defaultLogger } from './logger'
 
 export interface CaseUpdate {
   id: string
@@ -60,6 +60,20 @@ export interface DeleteResult {
   error?: string
 }
 
+// Type for database row structure (snake_case fields)
+interface CaseUpdateRow {
+  id: string
+  case_id: string
+  title: string
+  content: string
+  update_type: 'progress' | 'milestone' | 'general' | 'emergency'
+  is_public: boolean
+  attachments: string | null
+  created_by: string
+  created_at: Date
+  updated_at: Date
+}
+
 export class CaseUpdateService {
   async createUpdate(params: CreateCaseUpdateParams): Promise<CaseUpdate> {
     const [newUpdate] = await db
@@ -79,7 +93,30 @@ export class CaseUpdateService {
   }
 
   async getUpdates(filters: CaseUpdateFilters = {}): Promise<CaseUpdate[]> {
-    let query = db
+    const conditions: ReturnType<typeof eq>[] = []
+
+    if (filters.caseId) {
+      conditions.push(eq(caseUpdates.case_id, filters.caseId as string))
+    }
+
+    if (filters.updateType) {
+      conditions.push(eq(caseUpdates.update_type, filters.updateType as 'progress' | 'milestone' | 'general' | 'emergency'))
+    }
+
+    if (filters.isPublic !== undefined) {
+      conditions.push(eq(caseUpdates.is_public, filters.isPublic as boolean))
+    }
+
+    if (filters.createdBy) {
+      conditions.push(eq(caseUpdates.created_by, filters.createdBy as string))
+    }
+
+    // Build query with where clause - always required for leftJoin
+    const whereCondition = conditions.length > 0 
+      ? and(...conditions) 
+      : sql`1 = 1`
+    
+    const query = db
       .select({
         id: caseUpdates.id,
         caseId: caseUpdates.case_id,
@@ -96,40 +133,15 @@ export class CaseUpdateService {
       })
       .from(caseUpdates)
       .leftJoin(users, eq(caseUpdates.created_by, users.id))
+      .where(whereCondition)
+      .orderBy(desc(caseUpdates.created_at))
 
-    const conditions = []
+    // Apply limit and offset if provided
+    const finalQuery = filters.limit 
+      ? (filters.offset ? query.limit(filters.limit).offset(filters.offset) : query.limit(filters.limit))
+      : (filters.offset ? query.offset(filters.offset) : query)
 
-    if (filters.caseId) {
-      conditions.push(eq(caseUpdates.case_id, filters.caseId))
-    }
-
-    if (filters.updateType) {
-      conditions.push(eq(caseUpdates.update_type, filters.updateType))
-    }
-
-    if (filters.isPublic !== undefined) {
-      conditions.push(eq(caseUpdates.is_public, filters.isPublic))
-    }
-
-    if (filters.createdBy) {
-      conditions.push(eq(caseUpdates.created_by, filters.createdBy))
-    }
-
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions))
-    }
-
-    query = query.orderBy(desc(caseUpdates.created_at))
-
-    if (filters.limit) {
-      query = query.limit(filters.limit)
-    }
-
-    if (filters.offset) {
-      query = query.offset(filters.offset)
-    }
-
-    const results = await query
+    const results = await finalQuery
 
     // For contribution-related updates, we need to dynamically check approval status
     const filteredResults = await Promise.all(
@@ -147,7 +159,7 @@ export class CaseUpdateService {
             const donorEmail = emailMatch[0]
             
             // Find the contribution by donor email and check approval status
-            const { data: contribution } = await db
+            const contributionResults = await db
               .select({
                 id: contributions.id,
                 amount: contributions.amount,
@@ -156,10 +168,14 @@ export class CaseUpdateService {
               .from(contributions)
               .leftJoin(contributionApprovalStatus, eq(contributions.id, contributionApprovalStatus.contribution_id))
               .leftJoin(users, eq(contributions.donor_id, users.id))
-              .where(eq(users.email, donorEmail))
-              .where(eq(contributions.case_id, row.caseId))
+              .where(and(
+                eq(users.email, donorEmail),
+                eq(contributions.case_id, row.caseId)
+              ))
               .orderBy(desc(contributions.created_at))
               .limit(1)
+            
+            const contribution = contributionResults[0] || null
             
             // Only include if the contribution is approved
             if (!contribution || contribution.approval_status !== 'approved') {
@@ -168,7 +184,7 @@ export class CaseUpdateService {
           } else {
             // If no email found, check if it's an anonymous donation
             // For anonymous donations, we need to check the most recent anonymous contribution
-            const { data: anonymousContribution } = await db
+            const anonymousContributionResults = await db
               .select({
                 id: contributions.id,
                 amount: contributions.amount,
@@ -176,10 +192,14 @@ export class CaseUpdateService {
               })
               .from(contributions)
               .leftJoin(contributionApprovalStatus, eq(contributions.id, contributionApprovalStatus.contribution_id))
-              .where(eq(contributions.case_id, row.caseId))
-              .where(eq(contributions.anonymous, true))
+              .where(and(
+                eq(contributions.case_id, row.caseId),
+                eq(contributions.anonymous, true)
+              ))
               .orderBy(desc(contributions.created_at))
               .limit(1)
+            
+            const anonymousContribution = anonymousContributionResults[0] || null
             
             // Only include if the anonymous contribution is approved
             if (!anonymousContribution || anonymousContribution.approval_status !== 'approved') {
@@ -209,8 +229,8 @@ export class CaseUpdateService {
           first_name: 'Anonymous',
           last_name: 'Donor',
         } : {
-          first_name: row!.first_name,
-          last_name: row!.last_name,
+          first_name: row!.first_name ?? undefined,
+          last_name: row!.last_name ?? undefined
         },
       }))
   }
@@ -252,8 +272,8 @@ export class CaseUpdateService {
         first_name: 'Anonymous',
         last_name: 'Donor',
       } : {
-        first_name: result.first_name,
-        last_name: result.last_name,
+        first_name: result.first_name ?? undefined,
+        last_name: result.last_name ?? undefined,
       },
     }
   }
@@ -345,13 +365,14 @@ export class CaseUpdateService {
 
       // Generate dynamic updates for each approved contribution
       return filteredContributions.map((contribution) => {
+        const user = Array.isArray(contribution.users) ? contribution.users[0] : contribution.users
         const donorName = contribution.anonymous 
           ? 'Anonymous Donor' 
-          : contribution.users?.first_name && contribution.users?.last_name
-            ? `${contribution.users.first_name} ${contribution.users.last_name}`
-            : contribution.users?.email || 'Anonymous Donor'
+          : user?.first_name && user?.last_name
+            ? `${user.first_name} ${user.last_name}`
+            : user?.email || 'Anonymous Donor'
 
-        const donorEmail = contribution.anonymous ? 'anonymous@donor.com' : contribution.users?.email
+        const donorEmail = contribution.anonymous ? 'anonymous@donor.com' : user?.email
 
         return {
           id: `dynamic-${contribution.id}`,
@@ -365,8 +386,8 @@ export class CaseUpdateService {
           created_at: contribution.created_at,
           updated_at: contribution.created_at,
           createdByUser: {
-            first_name: contribution.anonymous ? 'Anonymous' : contribution.users?.first_name,
-            last_name: contribution.anonymous ? 'Donor' : contribution.users?.last_name,
+            first_name: contribution.anonymous ? 'Anonymous' : user?.first_name ?? undefined,
+            last_name: contribution.anonymous ? 'Donor' : user?.last_name ?? undefined,
           },
         }
       })
@@ -457,13 +478,13 @@ export class CaseUpdateService {
         first_name: 'Anonymous',
         last_name: 'Donor',
       } : {
-        first_name: row.first_name,
-        last_name: row.last_name,
+        first_name: row.first_name ?? undefined,
+        last_name: row.last_name ?? undefined,
       },
     }))
   }
 
-  private mapToCaseUpdate(dbUpdate: any): CaseUpdate {
+  private mapToCaseUpdate(dbUpdate: CaseUpdateRow): CaseUpdate {
     return {
       id: dbUpdate.id,
       caseId: dbUpdate.case_id,

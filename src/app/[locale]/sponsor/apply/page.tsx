@@ -40,7 +40,7 @@ export default function SponsorApplicationPage() {
     sponsorshipTier: '',
     termsAccepted: false,
   })
-  const [errors, setErrors] = useState<Partial<SponsorFormData>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const supabase = createClient()
 
@@ -78,12 +78,16 @@ export default function SponsorApplicationPage() {
     setFormData(prev => ({ ...prev, [field]: value }))
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }))
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
     }
   }
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<SponsorFormData> = {}
+    const newErrors: Record<string, string> = {}
 
     if (!formData.companyName.trim()) {
       newErrors.companyName = t('validation.companyNameRequired')
@@ -120,7 +124,7 @@ export default function SponsorApplicationPage() {
     }
 
     if (!formData.termsAccepted) {
-      newErrors.termsAccepted = t('validation.termsRequired')
+      newErrors.termsAccepted = t('validation.termsRequired') || 'You must accept the terms and conditions'
     }
 
     setErrors(newErrors)

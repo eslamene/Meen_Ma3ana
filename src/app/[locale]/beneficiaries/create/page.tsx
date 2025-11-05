@@ -172,7 +172,7 @@ export default function CreateBeneficiaryPage() {
       newErrors.name = t('validation.nameRequired') || 'Name is required'
     }
 
-    if (!formData.mobile_number.trim()) {
+    if (!formData.mobile_number?.trim()) {
       newErrors.mobile_number = t('validation.mobileRequired') || 'Mobile number is required'
     }
 

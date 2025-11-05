@@ -112,12 +112,14 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
           }
 
           // Send notification
-          await contributionNotificationService.sendApprovalNotification(
-            contributionId,
-            contribution.donor_id,
-            contribution.amount,
-            contribution.case?.title || 'Unknown Case'
-          )
+          if (contribution) {
+            await contributionNotificationService.sendApprovalNotification(
+              contributionId,
+              contribution.donor_id,
+              contribution.amount,
+              contribution.case?.title || 'Unknown Case'
+            )
+          }
         }
       } else if (bulkAction === 'reject') {
         // Reject all selected contributions

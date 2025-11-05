@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/security/rls'
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
-import { auditService } from '@/lib/services/auditService'
+import { auditService, extractRequestInfo } from '@/lib/services/auditService'
+import { RouteContext } from '@/types/next-api'
 
 /**
  * PUT /api/admin/rbac/roles/[id]/permissions
@@ -10,13 +11,13 @@ import { auditService } from '@/lib/services/auditService'
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
 
   try {
-    const { id } = await params
+    const { id } = await context.params
     // Check permission
     const guardResult = await requirePermission('manage:rbac')(request)
     if (guardResult instanceof NextResponse) {
@@ -70,17 +71,20 @@ export async function PUT(
     }
 
     // Log the action
-    await auditService.logAction({
-      userId: user.id,
-      action: 'role_permissions_updated',
-      resourceType: 'role',
-      resourceId: id,
-      details: { 
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await auditService.logAction(
+      user.id,
+      'role_permissions_updated',
+      'role',
+      id,
+      { 
         role_name: role.name, 
         permissions_count: permission_ids.length,
         permission_ids 
-      }
-    })
+      },
+      ipAddress,
+      userAgent
+    )
 
     return NextResponse.json({ 
       message: 'Permissions updated successfully',
@@ -100,13 +104,13 @@ export async function PUT(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
 
   try {
-    const { id } = await params
+    const { id } = await context.params
     // Check permission
     const guardResult = await requirePermission('manage:rbac')(request)
     if (guardResult instanceof NextResponse) {

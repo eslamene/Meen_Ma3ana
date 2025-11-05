@@ -4,9 +4,9 @@
  * instead of hardcoded permissions
  */
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '../supabase/client'
 
-import { defaultLogger } from '@/lib/logger'
+import { defaultLogger } from '../logger'
 
 export type DatabaseUserRole = {
   id: string
@@ -36,6 +36,35 @@ export type DatabasePermissionModule = {
   color: string
   sort_order: number
   is_active: boolean
+}
+
+// Types for Supabase nested query results
+interface RbacPermissionQueryResult {
+  id: string
+  name: string
+  display_name: string
+  description: string
+  resource: string
+  action: string
+  is_system: boolean
+  module_id?: string
+}
+
+interface RbacRolePermissionQueryResult {
+  rbac_permissions: RbacPermissionQueryResult | RbacPermissionQueryResult[] | null
+}
+
+interface RbacRoleQueryResult {
+  rbac_role_permissions: RbacRolePermissionQueryResult | RbacRolePermissionQueryResult[] | null
+}
+
+interface UserRoleQueryResult {
+  rbac_roles: RbacRoleQueryResult | RbacRoleQueryResult[] | null
+}
+
+// Type for user roles query result (simpler structure)
+interface UserRoleWithRole {
+  rbac_roles: DatabaseUserRole | DatabaseUserRole[] | null
 }
 
 /**
@@ -126,7 +155,17 @@ export class DatabaseRBACService {
 
       if (error) throw error
 
-      return data?.map((ur: any) => ur.rbac_roles).filter(Boolean) || []
+      // Cast to typed structure (Supabase returns nested relationships as arrays)
+      const typedData = (data || []) as unknown as UserRoleWithRole[]
+      
+      return typedData
+        .flatMap((ur: UserRoleWithRole) => {
+          const roles = Array.isArray(ur.rbac_roles)
+            ? ur.rbac_roles
+            : ur.rbac_roles ? [ur.rbac_roles] : []
+          return roles
+        })
+        .filter((role): role is DatabaseUserRole => Boolean(role))
     } catch (error) {
       defaultLogger.error('Error fetching user roles:', error)
       return []
@@ -161,10 +200,32 @@ export class DatabaseRBACService {
 
       if (error) throw error
 
-      const permissions = data
-        ?.flatMap((ur: any) => ur.rbac_roles?.rbac_role_permissions || [])
-        .map((rp: any) => rp.rbac_permissions)
-        .filter(Boolean) || []
+      // Cast to typed structure (Supabase returns nested relationships as arrays)
+      const typedData = (data || []) as unknown as UserRoleQueryResult[]
+      
+      const permissions: DatabasePermission[] = typedData
+        .flatMap((ur: UserRoleQueryResult) => {
+          const roles = Array.isArray(ur.rbac_roles) 
+            ? ur.rbac_roles 
+            : ur.rbac_roles ? [ur.rbac_roles] : []
+          
+          return roles.flatMap((role: RbacRoleQueryResult) => {
+            const rolePermissions = Array.isArray(role.rbac_role_permissions)
+              ? role.rbac_role_permissions
+              : role.rbac_role_permissions ? [role.rbac_role_permissions] : []
+            
+            return rolePermissions
+              .map((rp: RbacRolePermissionQueryResult) => {
+                const permissions = Array.isArray(rp.rbac_permissions)
+                  ? rp.rbac_permissions
+                  : rp.rbac_permissions ? [rp.rbac_permissions] : []
+                
+                return permissions
+              })
+              .flat()
+          })
+        })
+        .filter((p): p is DatabasePermission => Boolean(p))
 
       return permissions
     } catch (error) {

@@ -2,7 +2,30 @@
 // Provides easy access to audit logging functionality
 
 import { useCallback } from 'react'
-import { auditService, AuditLogEntry, RoleAssignmentAudit, PermissionChangeAudit } from '@/lib/services/auditService'
+import { auditService, AuditLogEntry } from '@/lib/services/auditService'
+
+// Re-export types for convenience
+export type { AuditLogEntry }
+
+// Define types for role assignment and permission change audits
+export interface RoleAssignmentAudit {
+  id: string
+  user_id: string
+  target_user_id: string
+  role_name: string
+  action: 'assign' | 'revoke'
+  performed_by?: string
+  created_at: Date
+}
+
+export interface PermissionChangeAudit {
+  id: string
+  role_name: string
+  permission_name: string
+  action: 'grant' | 'revoke'
+  performed_by?: string
+  created_at: Date
+}
 
 export interface UseAuditLogReturn {
   // Logging functions

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { Plus, Search, Filter, Edit2, Trash2, Eye, Shield, Key, Package, Users } from 'lucide-react'
 import PermissionGuard from '@/components/auth/PermissionGuard'
@@ -121,7 +121,7 @@ export default function PermissionsPage() {
   const [viewingRoles, setViewingRoles] = useState<Permission | undefined>()
   const { toast } = useToast()
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [permissionsRes, modulesRes, rolesRes] = await Promise.all([
         fetch('/api/admin/rbac/permissions', { credentials: 'include' }),
@@ -162,11 +162,11 @@ export default function PermissionsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [fetchData])
 
   const handleCreatePermission = async (data: Partial<Permission>) => {
     const response = await fetch('/api/admin/rbac/permissions', {
@@ -215,7 +215,7 @@ export default function PermissionsPage() {
       })
 
       await fetchData()
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to delete permission',
@@ -225,10 +225,11 @@ export default function PermissionsPage() {
   }
 
   const filteredModules = useMemo(() => {
-    let filtered = Object.entries(permissionsByModule)
+    type ModuleEntry = [string, { module: Module; permissions: Permission[] }]
+    let filtered: ModuleEntry[] = Object.entries(permissionsByModule) as ModuleEntry[]
 
     if (selectedModule !== 'all') {
-      filtered = filtered.filter(([moduleName, data]) => data.module.id === selectedModule)
+      filtered = filtered.filter(([, data]) => data.module.id === selectedModule)
     }
 
     if (searchTerm) {
@@ -242,7 +243,7 @@ export default function PermissionsPage() {
             permission.resource.toLowerCase().includes(searchTerm.toLowerCase())
           )
         }
-      ]).filter(([, data]) => data.permissions.length > 0)
+      ] as ModuleEntry).filter(([, data]) => data.permissions.length > 0)
     }
 
     return filtered

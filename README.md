@@ -287,6 +287,61 @@ Common issues and solutions:
 - **File upload issues**: Check Supabase Storage configuration and bucket policies
 - **i18n issues**: Verify locale configuration in `src/i18n/request.ts`
 
+#### Troubleshooting: npm ci Failures
+
+**Symptom Description:**
+- Build fails on Vercel with `npm ci` error
+- Error message shows lock file out of sync with package.json
+- Specific version mismatches listed in error (e.g., TypeScript 5.9.2 ≠ 5.8.3, @neondatabase/serverless mismatch, missing @types/node@22.18.13)
+
+**Root Cause:**
+- `package.json` was updated without regenerating `package-lock.json`
+- Lock file contains outdated or conflicting dependency versions
+- `npm ci` requires exact synchronization (by design)
+
+**Solution Steps:**
+1. Delete `package-lock.json` locally
+2. Run `npm install` to regenerate the lock file
+3. Verify with `npm ci` locally (this simulates Vercel's build)
+4. Test build with `npm run build`
+5. Commit and push the updated lock file:
+   ```bash
+   git add package-lock.json
+   git commit -m "fix: sync package-lock.json"
+   git push
+   ```
+
+**Prevention:**
+- Always run `npm install` after updating `package.json`
+- Never manually edit `package-lock.json`
+- Use `npm run validate:lockfile` before committing (validates lock file sync without installing)
+- Consider setting up pre-commit hooks to run validation automatically
+
+**Why We Use `npm ci` in Production:**
+- Ensures deterministic builds (exact same dependency versions every time)
+- Faster than `npm install` (optimized for CI/CD environments)
+- Prevents unexpected dependency updates that could introduce bugs or vulnerabilities
+- Industry best practice for CI/CD pipelines
+- Guarantees local and production environments match exactly
+
+**Quick Reference Commands:**
+```bash
+# Fix lock file drift
+rm package-lock.json
+npm install
+npm ci  # Verify it works
+npm run build  # Test build
+git add package-lock.json
+git commit -m "fix: sync package-lock.json"
+git push
+```
+
+**When to Seek Help:**
+- If regenerating lock file causes dependency conflicts
+- If `npm install` fails with errors
+- If build succeeds locally but fails on Vercel
+- If you see peer dependency warnings that can't be resolved
+
 ### Rollback Procedure
 
 - **Rollback to previous deployment**: 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { auditService } from '@/lib/services/auditService'
+import { auditService, extractRequestInfo } from '@/lib/services/auditService'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
       .from('rbac_user_roles')
       .select(`
         id,
-        rbac_roles (name)
+        role_id,
+        rbac_roles!inner (name)
       `)
       .eq('user_id', userId)
       .eq('is_active', true)
@@ -48,15 +49,28 @@ export async function POST(request: NextRequest) {
       throw deleteError
     }
 
+    // Get current user for audit logging
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    // Use 'system' as default since we don't have easy access to the current user in this context
+    const currentUserId = 'system'
+
     // Log role revocations
     if (existingRoles) {
       for (const role of existingRoles) {
-        await auditService.logRoleAssignment({
-          target_user_id: userId,
-          role_name: role.rbac_roles?.name || 'unknown',
-          action: 'revoke',
-          request_id: request.headers.get('x-request-id') || undefined
-        })
+        const roleData = Array.isArray(role.rbac_roles) ? role.rbac_roles[0] : role.rbac_roles
+        await auditService.logRBACAction(
+          currentUserId,
+          'revoke_role',
+          userId,
+          role.role_id,
+          undefined,
+          {
+            role_name: roleData?.name || 'unknown',
+            request_id: request.headers.get('x-request-id')
+          },
+          ipAddress,
+          userAgent
+        )
       }
     }
 
@@ -78,6 +92,31 @@ export async function POST(request: NextRequest) {
       if (insertError) {
         logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting new user roles:', insertError)
         throw insertError
+      }
+
+      // Log role assignments
+      // Get role names for logging
+      const { data: rolesData } = await adminClient
+        .from('rbac_roles')
+        .select('id, name')
+        .in('id', roleIds)
+
+      if (rolesData) {
+        for (const role of rolesData) {
+          await auditService.logRBACAction(
+            currentUserId,
+            'assign_role',
+            userId,
+            role.id,
+            undefined,
+            {
+              role_name: role.name,
+              request_id: request.headers.get('x-request-id')
+            },
+            ipAddress,
+            userAgent
+          )
+        }
       }
 
       logger.info('Added new user roles:', roleIds.length)

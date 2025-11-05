@@ -8,7 +8,7 @@ export function useEnhancedToast() {
       baseToast({
         title: `✅ ${title}`,
         description,
-        variant: "success",
+        type: 'success',
       })
     },
     
@@ -16,7 +16,7 @@ export function useEnhancedToast() {
       baseToast({
         title: `❌ ${title}`,
         description,
-        variant: "destructive",
+        type: 'error',
       })
     },
     
@@ -24,7 +24,7 @@ export function useEnhancedToast() {
       baseToast({
         title: `⚠️ ${title}`,
         description,
-        variant: "warning",
+        type: 'warning',
       })
     },
     
@@ -32,7 +32,7 @@ export function useEnhancedToast() {
       baseToast({
         title: `ℹ️ ${title}`,
         description,
-        variant: "default",
+        type: 'default',
       })
     }
   }

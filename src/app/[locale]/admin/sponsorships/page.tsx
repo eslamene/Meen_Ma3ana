@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertCircle, CheckCircle, XCircle, Clock, Building2, User as UserIcon, Calendar, DollarSign, MessageSquare } from 'lucide-react'
 
 interface SponsorshipRequest {
@@ -38,8 +38,43 @@ interface SponsorshipRequest {
   }
 }
 
+interface SponsorshipFromSupabase {
+  id: string
+  sponsor_id: string
+  case_id: string
+  amount: string
+  status: string
+  terms: string | null
+  start_date: string
+  end_date: string
+  created_at: string
+  sponsor?: {
+    first_name: string | null
+    last_name: string | null
+    email: string | null
+    company_name?: string | null
+  } | Array<{
+    first_name: string | null
+    last_name: string | null
+    email: string | null
+    company_name?: string | null
+  }> | null
+  case?: {
+    title: string | null
+    description: string | null
+    target_amount: string | null
+    current_amount: string | null
+    status: string | null
+  } | Array<{
+    title: string | null
+    description: string | null
+    target_amount: string | null
+    current_amount: string | null
+    status: string | null
+  }> | null
+}
+
 export default function AdminSponsorshipsPage() {
-  const t = useTranslations('admin')
   const [user, setUser] = useState<User | null>(null)
   const [sponsorships, setSponsorships] = useState<SponsorshipRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,11 +85,7 @@ export default function AdminSponsorshipsPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    checkAuthentication()
-  }, [])
-
-  const checkAuthentication = async () => {
+  const checkAuthentication = useCallback(async () => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser()
       
@@ -76,14 +107,13 @@ export default function AdminSponsorshipsPage() {
       }
 
       setUser(user)
-      fetchSponsorships()
     } catch (err) {
       console.error('Error checking authentication:', err)
       window.location.href = '/auth/login'
     }
-  }
+  }, [supabase])
 
-  const fetchSponsorships = async () => {
+  const fetchSponsorships = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -117,38 +147,47 @@ export default function AdminSponsorshipsPage() {
       if (error) throw error
       
       // Transform the data to match the interface
-      const transformedData = (data || []).map((item: any) => ({
-        id: item.id,
-        sponsor_id: item.sponsor_id,
-        case_id: item.case_id,
-        amount: parseFloat(item.amount),
-        status: item.status,
-        terms: item.terms,
-        start_date: item.start_date,
-        end_date: item.end_date,
-        created_at: item.created_at,
-        sponsor: {
-          first_name: item.sponsor?.first_name || '',
-          last_name: item.sponsor?.last_name || '',
-          email: item.sponsor?.email || '',
-          company_name: item.sponsor?.company_name || ''
-        },
-        case: {
-          title: item.case?.title || '',
-          description: item.case?.description || '',
-          target_amount: parseFloat(item.case?.target_amount || '0'),
-          current_amount: parseFloat(item.case?.current_amount || '0'),
-          status: item.case?.status || ''
+      const transformedData = ((data || []) as SponsorshipFromSupabase[]).map((item) => {
+        const sponsor = Array.isArray(item.sponsor) ? item.sponsor[0] : item.sponsor
+        const caseData = Array.isArray(item.case) ? item.case[0] : item.case
+        return {
+          id: item.id,
+          sponsor_id: item.sponsor_id,
+          case_id: item.case_id,
+          amount: parseFloat(item.amount),
+          status: item.status,
+          terms: item.terms || '',
+          start_date: item.start_date,
+          end_date: item.end_date,
+          created_at: item.created_at,
+          sponsor: {
+            first_name: sponsor?.first_name || '',
+            last_name: sponsor?.last_name || '',
+            email: sponsor?.email || '',
+            company_name: sponsor?.company_name || ''
+          },
+          case: {
+            title: caseData?.title || '',
+            description: caseData?.description || '',
+            target_amount: parseFloat(caseData?.target_amount || '0'),
+            current_amount: parseFloat(caseData?.current_amount || '0'),
+            status: caseData?.status || ''
+          }
         }
-      }))
+      })
       
       setSponsorships(transformedData)
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch sponsorship requests')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch sponsorship requests')
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    checkAuthentication()
+    fetchSponsorships()
+  }, [checkAuthentication, fetchSponsorships])
 
   const handleApprove = async (sponsorshipId: string) => {
     try {
@@ -182,8 +221,8 @@ export default function AdminSponsorshipsPage() {
       await fetchSponsorships()
       setSelectedSponsorship(null)
       setReviewComment('')
-    } catch (err: any) {
-      setError(err.message || 'Failed to approve sponsorship request')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to approve sponsorship request')
     } finally {
       setProcessing(false)
     }
@@ -224,8 +263,8 @@ export default function AdminSponsorshipsPage() {
       await fetchSponsorships()
       setSelectedSponsorship(null)
       setReviewComment('')
-    } catch (err: any) {
-      setError(err.message || 'Failed to reject sponsorship request')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reject sponsorship request')
     } finally {
       setProcessing(false)
     }

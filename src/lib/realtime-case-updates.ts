@@ -70,13 +70,15 @@ export class RealtimeCaseUpdates {
           onProgressUpdate(update)
         }
       )
-      .on('error', (error) => {
-        defaultLogger.error('Realtime case progress error:', error)
-        onError?.(error)
-      })
 
     this.channels.set(channelKey, channel)
-    channel.subscribe()
+    channel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR') {
+        const err = new Error('Realtime channel error')
+        defaultLogger.error('Realtime case progress error:', err)
+        onError?.(err)
+      }
+    })
 
     return () => this.unsubscribeFromCaseProgress(caseId)
   }
@@ -156,13 +158,15 @@ export class RealtimeCaseUpdates {
           onUpdateDeleted?.(updateData.id)
         }
       )
-      .on('error', (error) => {
-        defaultLogger.error('Realtime case updates error:', error)
-        onError?.(error)
-      })
 
     this.channels.set(channelKey, channel)
-    channel.subscribe()
+    channel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR') {
+        const err = new Error('Realtime channel error')
+        defaultLogger.error('Realtime case updates error:', err)
+        onError?.(err)
+      }
+    })
 
     return () => this.unsubscribeFromCaseUpdates(caseId)
   }
@@ -208,13 +212,15 @@ export class RealtimeCaseUpdates {
           onContributionUpdated?.(payload.new)
         }
       )
-      .on('error', (error) => {
-        defaultLogger.error('Realtime case contributions error:', error)
-        onError?.(error)
-      })
 
     this.channels.set(channelKey, channel)
-    channel.subscribe()
+    channel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR') {
+        const err = new Error('Realtime case update changes error')
+        defaultLogger.error('Realtime case update changes error:', err)
+        onError?.(err)
+      }
+    })
 
     return () => this.unsubscribeFromCaseContributions(caseId)
   }

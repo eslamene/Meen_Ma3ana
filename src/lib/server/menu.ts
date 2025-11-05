@@ -1,7 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '../supabase/server'
 import { User } from '@supabase/supabase-js'
 
-import { defaultLogger } from '@/lib/logger'
+import { defaultLogger } from '../logger'
 
 export interface MenuModule {
   id: string
@@ -22,6 +22,35 @@ export interface MenuItem {
   sortOrder: number
   permission?: string
   children?: MenuItem[]
+}
+
+// Types for Supabase query result structure
+interface RbacModule {
+  id: string
+  name: string
+  display_name: string
+  description: string
+  icon: string
+  color: string
+  sort_order: number
+}
+
+interface RbacPermission {
+  name: string
+  rbac_modules: RbacModule | null
+}
+
+interface RbacRolePermission {
+  rbac_permissions: RbacPermission | null
+}
+
+interface RbacRole {
+  name: string
+  rbac_role_permissions: RbacRolePermission[] | null
+}
+
+interface UserRole {
+  rbac_roles: RbacRole | null
 }
 
 /**
@@ -71,23 +100,32 @@ export async function getMenuModules(user: User | null): Promise<MenuModule[]> {
     const modulePermissions = new Map<string, string[]>()
     const moduleDataMap = new Map<string, { id: string; name: string; display_name: string; description: string; icon: string; color: string; sort_order: number }>()
 
-    userRoles?.forEach((userRole: { rbac_roles: { rbac_role_permissions: Array<{ rbac_permissions: { name: string; rbac_modules: { name: string; id: string; display_name: string; description: string; icon: string; color: string; sort_order: number } } }> } }) => {
-      const role = userRole.rbac_roles
-      if (role?.rbac_role_permissions) {
-        role.rbac_role_permissions.forEach((rp: { rbac_permissions: { name: string; rbac_modules: { name: string; id: string; display_name: string; description: string; icon: string; color: string; sort_order: number } } }) => {
-          const permission = rp.rbac_permissions
-          const moduleInfo = permission?.rbac_modules
+    // Cast to our typed structure (Supabase returns nested relationships as arrays)
+    const typedUserRoles = (userRoles || []) as unknown as UserRole[]
+
+    typedUserRoles.forEach((userRole: UserRole) => {
+      const roles: RbacRole[] = (userRole.rbac_roles || []) as RbacRole[]
+      
+      roles.forEach((role: RbacRole) => {
+        const rolePermissions: RbacRolePermission[] = (role.rbac_role_permissions || []) as RbacRolePermission[]
+        
+        rolePermissions.forEach((rp: RbacRolePermission) => {
+          const permissions: RbacPermission[] = (rp.rbac_permissions || []) as RbacPermission[]
           
-          if (moduleInfo) {
-            const moduleName = moduleInfo.name
-            if (!modulePermissions.has(moduleName)) {
-              modulePermissions.set(moduleName, [])
-              moduleDataMap.set(moduleName, moduleInfo)
-            }
-            modulePermissions.get(moduleName)?.push(permission.name)
-          }
+          permissions.forEach((permission: RbacPermission) => {
+            const modules: RbacModule[] = (permission.rbac_modules || []) as RbacModule[]
+            
+            modules.forEach((moduleInfo: RbacModule) => {
+              const moduleName = moduleInfo.name
+              if (!modulePermissions.has(moduleName)) {
+                modulePermissions.set(moduleName, [])
+                moduleDataMap.set(moduleName, moduleInfo)
+              }
+              modulePermissions.get(moduleName)?.push(permission.name)
+            })
+          })
         })
-      }
+      })
     })
 
     // Build menu modules with their items
@@ -96,6 +134,10 @@ export async function getMenuModules(user: User | null): Promise<MenuModule[]> {
     for (const [moduleName, permissions] of modulePermissions) {
       const moduleInfo = moduleDataMap.get(moduleName)
       const items = getModuleItems(moduleName, permissions)
+      
+      if (!moduleInfo) {
+        continue
+      }
       
       if (items.length > 0) {
         menuModules.push({

@@ -176,18 +176,18 @@ export class CaseLifecycleService {
         .update(cases)
         .set({
           status: newStatus,
-          updatedAt: new Date()
+          updated_at: new Date()
         })
         .where(eq(cases.id, caseId))
 
       // Record status change in history
       await db.insert(caseStatusHistory).values({
-        caseId,
-        previousStatus: currentCase.status as CaseStatus,
-        newStatus,
-        changedBy,
-        systemTriggered,
-        changeReason
+        case_id: caseId,
+        previous_status: currentCase.status as CaseStatus,
+        new_status: newStatus,
+        changed_by: changedBy,
+        system_triggered: systemTriggered,
+        change_reason: changeReason
       })
 
       // Create case update for status change
@@ -325,23 +325,23 @@ export class CaseLifecycleService {
       const history = await db
         .select({
           id: caseStatusHistory.id,
-          previousStatus: caseStatusHistory.previousStatus,
-          newStatus: caseStatusHistory.newStatus,
-          changedBy: caseStatusHistory.changedBy,
-          systemTriggered: caseStatusHistory.systemTriggered,
-          changeReason: caseStatusHistory.changeReason,
-          changedAt: caseStatusHistory.changedAt,
+          previousStatus: caseStatusHistory.previous_status,
+          newStatus: caseStatusHistory.new_status,
+          changedBy: caseStatusHistory.changed_by,
+          systemTriggered: caseStatusHistory.system_triggered,
+          changeReason: caseStatusHistory.change_reason,
+          changedAt: caseStatusHistory.changed_at,
           changedByUser: {
             id: users.id,
-            firstName: users.firstName,
-            lastName: users.lastName,
+            firstName: users.first_name,
+            lastName: users.last_name,
             email: users.email
           }
         })
         .from(caseStatusHistory)
-        .leftJoin(users, eq(caseStatusHistory.changedBy, users.id))
-        .where(eq(caseStatusHistory.caseId, caseId))
-        .orderBy(desc(caseStatusHistory.changedAt))
+        .leftJoin(users, eq(caseStatusHistory.changed_by, users.id))
+        .where(eq(caseStatusHistory.case_id, caseId))
+        .orderBy(desc(caseStatusHistory.changed_at))
 
       return { success: true, history }
     } catch (error) {

@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { caseUpdateService } from '@/lib/case-updates'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; updateId: string } }
+  context: RouteContext<{ id: string; updateId: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { updateId } = await context.params
     const supabase = await createClient()
     
     // Get current user
@@ -35,7 +37,7 @@ export async function PUT(
     }
 
     // Check if user can edit this update
-    const existingUpdate = await caseUpdateService.getUpdateById(params.updateId)
+    const existingUpdate = await caseUpdateService.getUpdateById(updateId)
 
     if (!existingUpdate) {
       return NextResponse.json(
@@ -58,7 +60,7 @@ export async function PUT(
       )
     }
 
-    const result = await caseUpdateService.updateUpdate(params.updateId, {
+    const result = await caseUpdateService.updateUpdate(updateId, {
       title,
       content,
       updateType,
@@ -87,11 +89,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; updateId: string } }
+  context: RouteContext<{ id: string; updateId: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { updateId } = await context.params
     const supabase = await createClient()
     
     // Get current user
@@ -105,7 +108,7 @@ export async function DELETE(
     }
 
     // Check if user can delete this update
-    const existingUpdate = await caseUpdateService.getUpdateById(params.updateId)
+    const existingUpdate = await caseUpdateService.getUpdateById(updateId)
 
     if (!existingUpdate) {
       return NextResponse.json(
@@ -128,7 +131,7 @@ export async function DELETE(
       )
     }
 
-    const result = await caseUpdateService.deleteUpdate(params.updateId)
+    const result = await caseUpdateService.deleteUpdate(updateId)
 
     if (!result.success) {
       return NextResponse.json(

@@ -165,7 +165,7 @@ export class ContributionNotificationService {
     }
   }
 
-  async markNotificationAsRead(notificationId: string): Promise<boolean> {
+  async markNotificationAsReadSimple(notificationId: string): Promise<boolean> {
     try {
       const { error } = await this.supabase
         .from('notifications')

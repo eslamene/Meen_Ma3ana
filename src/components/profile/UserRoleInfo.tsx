@@ -125,7 +125,7 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
     }
   }
 
-  const groupedPermissions = userPermissions.reduce((acc: Record<string, any[]>, permission) => {
+  const groupedPermissions = userPermissions.reduce((acc: Record<string, any[]>, permission: any) => {
     const category = getPermissionCategory(permission)
     if (!acc[category]) {
       acc[category] = []
@@ -216,7 +216,7 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
                     {category}
                   </h5>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {categoryPermissions.map((permission) => (
+                    {(categoryPermissions as any[]).map((permission: any) => (
                       <div 
                         key={permission.id} 
                         className="flex items-center gap-2 text-sm text-gray-700"

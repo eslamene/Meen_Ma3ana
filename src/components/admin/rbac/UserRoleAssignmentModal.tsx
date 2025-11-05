@@ -128,7 +128,7 @@ export function UserRoleAssignmentModal({
       toast({
         title: "Error",
         description: "You cannot remove your own admin role.",
-        variant: "destructive"
+        type: 'error'
       })
       return
     }
@@ -145,7 +145,7 @@ export function UserRoleAssignmentModal({
       toast({
         title: "Error",
         description: "Failed to update user roles.",
-        variant: "destructive"
+        type: 'error'
       })
     } finally {
       setIsSaving(false)
@@ -351,7 +351,7 @@ export function UserRoleAssignmentModal({
           <div className="flex items-center space-x-2">
             <Checkbox
               checked={sendNotification}
-              onCheckedChange={setSendNotification}
+              onCheckedChange={(checked) => setSendNotification(checked === true)}
               id="send-notification"
             />
             <label htmlFor="send-notification" className="text-sm flex items-center gap-1">

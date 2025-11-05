@@ -44,7 +44,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import ProgressBar from '@/components/cases/ProgressBar'
 import UpdatesTimeline from '@/components/cases/UpdatesTimeline'
-import CaseFileManager, { CaseFile } from '@/components/cases/CaseFileManager'
+import CaseFileManager, { CaseFile, FileCategory } from '@/components/cases/CaseFileManager'
 import { realtimeCaseUpdates, CaseProgressUpdate, CaseUpdateNotification } from '@/lib/realtime-case-updates'
 import { CaseUpdate } from '@/lib/case-updates'
 
@@ -438,7 +438,7 @@ export default function CaseDetailPage() {
       }
     } catch (error) {
       // Handle share cancellation or errors gracefully
-      if (error.name !== 'AbortError') {
+      if (error instanceof Error && error.name !== 'AbortError') {
         console.error('Error sharing:', error)
         // Fallback to clipboard
         try {
@@ -567,6 +567,7 @@ export default function CaseDetailPage() {
 
   // Generate sorted activity timeline
   const generateSortedActivities = () => {
+    if (!caseData) return []
     const activities = []
     
     // Case Published/Created
@@ -1149,7 +1150,7 @@ export default function CaseDetailPage() {
                     <CaseFileManager
                       caseId={caseId}
                       files={caseFiles}
-                      canEdit={hasPermission('cases:edit') || hasPermission('admin:manage')}
+                      canEdit={hasPermission('cases:update') || hasPermission('admin:cases')}
                       onFilesChange={handleFilesChange}
                       viewMode="grid"
                       showUpload={true}

@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
-  const { id } = await params
+  const { id } = await context.params
   try {
     const supabase = await createClient()
     

@@ -3,17 +3,19 @@ import { db } from '@/lib/db'
 import { projects, projectCycles } from '@/lib/db'
 import { eq, and, asc } from 'drizzle-orm'
 import { createClient } from '@/lib/supabase/server'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await context.params
     const supabase = await createClient()
     
     // Get current user
@@ -22,7 +24,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const projectId = params.id
+    const projectId = id
 
     // Fetch project with cycles
     const projectData = await db
@@ -41,8 +43,8 @@ export async function GET(
     const cyclesData = await db
       .select()
       .from(projectCycles)
-      .where(eq(projectCycles.projectId, projectId))
-      .orderBy(asc(projectCycles.cycleNumber))
+      .where(eq(projectCycles.project_id, projectId))
+      .orderBy(asc(projectCycles.cycle_number))
 
     // Transform the data to match the frontend interface
     const transformedProject = {
@@ -50,29 +52,29 @@ export async function GET(
       name: project.name,
       description: project.description,
       category: project.category,
-      targetAmount: project.targetAmount,
-      currentAmount: project.currentAmount,
+      targetAmount: project.target_amount,
+      currentAmount: project.current_amount,
       status: project.status,
-      cycleDuration: project.cycleDuration,
-      cycleDurationDays: project.cycleDurationDays,
-      currentCycleNumber: project.currentCycleNumber,
-      totalCycles: project.totalCycles,
-      nextCycleDate: project.nextCycleDate?.toISOString(),
-      lastCycleDate: project.lastCycleDate?.toISOString(),
-      autoProgress: project.autoProgress,
-      createdBy: project.createdBy,
-      createdAt: project.createdAt.toISOString(),
+      cycleDuration: project.cycle_duration,
+      cycleDurationDays: project.cycle_duration_days,
+      currentCycleNumber: project.current_cycle_number,
+      totalCycles: project.total_cycles,
+      nextCycleDate: project.next_cycle_date?.toISOString(),
+      lastCycleDate: project.last_cycle_date?.toISOString(),
+      autoProgress: project.auto_progress,
+      createdBy: project.created_by,
+      createdAt: project.created_at.toISOString(),
       cycles: cyclesData.map(cycle => ({
         id: cycle.id,
-        cycleNumber: cycle.cycleNumber,
-        startDate: cycle.startDate.toISOString(),
-        endDate: cycle.endDate.toISOString(),
-        targetAmount: cycle.targetAmount,
-        currentAmount: cycle.currentAmount,
+        cycleNumber: cycle.cycle_number,
+        startDate: cycle.start_date.toISOString(),
+        endDate: cycle.end_date.toISOString(),
+        targetAmount: cycle.target_amount,
+        currentAmount: cycle.current_amount,
         status: cycle.status,
-        progressPercentage: cycle.progressPercentage,
+        progressPercentage: cycle.progress_percentage,
         notes: cycle.notes,
-        completedAt: cycle.completedAt?.toISOString(),
+        completedAt: cycle.completed_at?.toISOString(),
       })),
     }
 
@@ -88,11 +90,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await context.params
     const supabase = await createClient()
     
     // Get current user
@@ -101,7 +104,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const projectId = params.id
+    const projectId = id
     const body = await request.json()
 
     // Check if project exists and user has permission to edit
@@ -116,7 +119,7 @@ export async function PUT(
     }
 
     // Only project creator or admin can edit
-    if (existingProject[0].createdBy !== user.id) {
+    if (existingProject[0].created_by !== user.id) {
       // Check if user is admin
       const { data: userData } = await supabase.auth.getUser()
       if (userData.user?.user_metadata?.role !== 'admin') {
@@ -131,13 +134,13 @@ export async function PUT(
         name: body.name,
         description: body.description,
         category: body.category,
-        targetAmount: body.targetAmount?.toString(),
+        target_amount: body.targetAmount?.toString(),
         status: body.status,
-        cycleDuration: body.cycleDuration,
-        cycleDurationDays: body.cycleDurationDays,
-        totalCycles: body.totalCycles,
-        autoProgress: body.autoProgress,
-        updatedAt: new Date(),
+        cycle_duration: body.cycleDuration,
+        cycle_duration_days: body.cycleDurationDays,
+        total_cycles: body.totalCycles,
+        auto_progress: body.autoProgress,
+        updated_at: new Date(),
       })
       .where(eq(projects.id, projectId))
       .returning()
@@ -154,11 +157,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await context.params
     const supabase = await createClient()
     
     // Get current user
@@ -167,7 +171,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const projectId = params.id
+    const projectId = id
 
     // Check if project exists and user has permission to delete
     const existingProject = await db
@@ -181,7 +185,7 @@ export async function DELETE(
     }
 
     // Only project creator or admin can delete
-    if (existingProject[0].createdBy !== user.id) {
+    if (existingProject[0].created_by !== user.id) {
       // Check if user is admin
       const { data: userData } = await supabase.auth.getUser()
       if (userData.user?.user_metadata?.role !== 'admin') {

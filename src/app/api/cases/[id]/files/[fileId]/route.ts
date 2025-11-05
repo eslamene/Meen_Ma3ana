@@ -1,12 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function PATCH(
   request: NextRequest,
-  context: { params: Promise<{ id: string; fileId: string }> }
+  context: RouteContext<{ id: string; fileId: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)

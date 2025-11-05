@@ -1,13 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '../supabase/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { db } from '@/lib/db'
-import { users, cases, contributions, sponsorships, communications } from '@/lib/db'
+import { db } from '../db'
+import { users, cases, contributions, sponsorships, communications } from '../db'
 import { eq, sql } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { defaultLogger } from '@/lib/logger'
+import { defaultLogger } from '../logger'
 
 /**
  * Security service for handling Row Level Security (RLS) context
@@ -179,7 +179,7 @@ export class SecurityService {
           const contributionsResult = await db
             .select({ id: contributions.id, amount: contributions.amount, status: contributions.status })
             .from(contributions)
-            .orderBy(contributions.createdAt)
+            .orderBy(contributions.created_at)
           return contributionsResult
 
         case 'sponsorships':
@@ -384,7 +384,8 @@ export async function requireAdminPermission(_request: NextRequest): Promise<{ u
  * Require specific permission guard for API routes
  */
 export function requirePermission(permission: string) {
-  return async (request: NextRequest): Promise<{ user: { id: string; email?: string; user_metadata?: Record<string, unknown> }; supabase: SupabaseClient } | NextResponse> => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  return async (_request: NextRequest): Promise<{ user: { id: string; email?: string; user_metadata?: Record<string, unknown> }; supabase: SupabaseClient } | NextResponse> => {
     try {
       const cookieStore = await cookies()
       const supabase = createServerClient(

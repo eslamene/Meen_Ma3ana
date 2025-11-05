@@ -256,7 +256,6 @@ export default function CaseDetailsPage() {
         type: 'error',
         title: t('validationError'),
         description: t('pleaseFixErrors'),
-        duration: 4000,
       })
       
       // Scroll to first error
@@ -321,7 +320,6 @@ export default function CaseDetailsPage() {
         type: 'success',
         title: t('draftSaved'),
         description: t('draftSavedSuccessfully'),
-        duration: 4000,
       })
 
       console.log('Draft saved successfully:', result.case)
@@ -338,7 +336,6 @@ export default function CaseDetailsPage() {
         type: 'error',
         title: t('saveFailed'),
         description: error instanceof Error ? error.message : t('failedToSaveDraft'),
-        duration: 5000,
       })
     } finally {
       setSaving(false)

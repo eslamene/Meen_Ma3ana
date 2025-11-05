@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
@@ -15,12 +16,12 @@ type UserRoleWithRole = {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const { id } = await params
+    const { id } = await context.params
     const supabase = await createClient()
     
     // Check if user is authenticated and has admin role
@@ -89,12 +90,12 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const { id } = await params
+    const { id } = await context.params
     const supabase = await createClient()
     
     // Check if user is authenticated and has admin role
@@ -210,12 +211,12 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const { id } = await params
+    const { id } = await context.params
     const supabase = await createClient()
     
     // Check if user is authenticated and has admin role

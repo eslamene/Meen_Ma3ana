@@ -2,22 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { caseUpdateService } from '@/lib/case-updates'
 import { caseNotificationService } from '@/lib/notifications/case-notifications'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await context.params
     const { searchParams } = new URL(request.url)
     const includePrivate = searchParams.get('includePrivate') === 'true'
     
     const updates = await caseUpdateService.getDynamicUpdates({
-      caseId: params.id,
+      caseId: id,
       isPublic: includePrivate ? undefined : true,
       limit: 50
     })
@@ -36,11 +38,12 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
+    const { id } = await context.params
     const supabase = await createClient()
     
     // Get current user
@@ -64,7 +67,7 @@ export async function POST(
     }
 
     const newUpdate = await caseUpdateService.createUpdate({
-      caseId: params.id,
+      caseId: id,
       title,
       content,
       updateType,
@@ -76,7 +79,7 @@ export async function POST(
     // Send notification for the new update
     try {
       await caseNotificationService.createCaseUpdateNotification(
-        params.id,
+        id,
         newUpdate.id,
         newUpdate.title,
         newUpdate.updateType,

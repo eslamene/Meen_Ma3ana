@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
@@ -84,7 +85,8 @@ export async function GET(
       .eq('user_id', user.id)
       .single()
 
-    const isAdmin = userRole?.roles?.name === 'admin' || userRole?.roles?.name === 'super_admin'
+    const roles = Array.isArray(userRole?.roles) ? userRole.roles : userRole?.roles ? [userRole.roles] : []
+    const isAdmin = roles.some((role: any) => role?.name === 'admin' || role?.name === 'super_admin')
 
     if (!isOwner && !isAdmin) {
       return NextResponse.json(
@@ -145,15 +147,15 @@ export async function GET(
       status: contribution.status,
       anonymous: contribution.anonymous,
       createdAt: contribution.created_at,
-      caseTitle: contribution.cases?.title || 'Unknown Case',
+      caseTitle: (Array.isArray(contribution.cases) ? contribution.cases[0] : contribution.cases)?.title || 'Unknown Case',
       donorName: contribution.anonymous 
         ? 'Anonymous' 
-        : `${contribution.users?.first_name || ''} ${contribution.users?.last_name || ''}`.trim() || 'Unknown Donor',
+        : `${(Array.isArray(contribution.users) ? contribution.users[0] : contribution.users)?.first_name || ''} ${(Array.isArray(contribution.users) ? contribution.users[0] : contribution.users)?.last_name || ''}`.trim() || 'Unknown Donor',
       donorId: contribution.donor_id,
-      donorEmail: contribution.anonymous ? undefined : contribution.users?.email,
-      donorFirstName: contribution.anonymous ? undefined : contribution.users?.first_name,
-      donorLastName: contribution.anonymous ? undefined : contribution.users?.last_name,
-      donorPhone: contribution.anonymous ? undefined : contribution.users?.phone,
+      donorEmail: contribution.anonymous ? undefined : (Array.isArray(contribution.users) ? contribution.users[0] : contribution.users)?.email,
+      donorFirstName: contribution.anonymous ? undefined : (Array.isArray(contribution.users) ? contribution.users[0] : contribution.users)?.first_name,
+      donorLastName: contribution.anonymous ? undefined : (Array.isArray(contribution.users) ? contribution.users[0] : contribution.users)?.last_name,
+      donorPhone: contribution.anonymous ? undefined : (Array.isArray(contribution.users) ? contribution.users[0] : contribution.users)?.phone,
       notes: contribution.notes,
       approval_status: contribution.contribution_approval_status || [],
       original_contribution: originalContribution,

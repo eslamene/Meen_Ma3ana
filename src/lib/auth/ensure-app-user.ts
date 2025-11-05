@@ -1,6 +1,6 @@
-import { db } from '@/lib/db'
-import { users } from '@/drizzle/schema'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { db , users} from '../db'
+import { defaultLogger } from '../logger';
+import { createClient } from '../supabase/client'
 
 type AuthUser = { id: string; email: string | null }
 
@@ -13,10 +13,8 @@ export async function ensureAppUser(authUser: AuthUser): Promise<string> {
   const email = authUser.email ?? `${authUserId}@placeholder.local`
 
   // Preferred path: upsert via service role (no selects, bypasses RLS)
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (url && serviceKey) {
-    const supa = createSupabaseClient(url, serviceKey)
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const supa = createClient()
     await supa.from('users').upsert({ id: authUserId, email }, { onConflict: 'id' })
     return authUserId
   }
@@ -25,6 +23,7 @@ export async function ensureAppUser(authUser: AuthUser): Promise<string> {
   try {
     await db.insert(users).values({ id: authUserId, email }).onConflictDoNothing()
   } catch (error) {
+    defaultLogger.error('Error ensuring app user:', error)
     // ignore; may fail under restricted environments
   }
   

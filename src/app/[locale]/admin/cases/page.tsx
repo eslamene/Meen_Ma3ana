@@ -1,22 +1,20 @@
 'use client'
-
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
-import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import PermissionGuard from '@/components/auth/PermissionGuard'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
+import ProtectedRoute from '../../../../components/auth/ProtectedRoute'
+import PermissionGuard from '../../../../components/auth/PermissionGuard'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card'
+import { Button } from '../../../../components/ui/button'
+import { Badge } from '../../../../components/ui/badge'
+import { Input } from '../../../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../../components/ui/dialog'
+import { useEnhancedToast } from '../../../../hooks/use-enhanced-toast'
 import { 
   Target, 
   Plus, 
   Search, 
-  Filter, 
   Eye, 
   Edit, 
   Trash2,
@@ -26,10 +24,9 @@ import {
   ArrowLeft,
   Calendar,
   DollarSign,
-  Users,
   AlertTriangle
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '../../../../lib/supabase/client'
 
 interface Case {
   id: string

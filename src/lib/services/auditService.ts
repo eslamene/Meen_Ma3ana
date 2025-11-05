@@ -1,6 +1,6 @@
-import { db } from '@/lib/db'
+import { db } from '../db'
 import { sql } from 'drizzle-orm'
-import { defaultLogger } from '@/lib/logger'
+import { defaultLogger } from '../logger'
 
 export interface AuditLogEntry {
   id?: string
@@ -168,7 +168,15 @@ export class AuditService {
         OFFSET ${offset}
       `)
 
-      return result.rows as AuditLogEntry[]
+      // Extract rows from drizzle result (handles both array and object with rows property)
+      const extractedRows = Array.isArray(result)
+        ? result
+        : (result && typeof result === 'object' && 'rows' in result && Array.isArray((result as { rows?: unknown[] }).rows))
+          ? (result as { rows: unknown[] }).rows
+          : []
+      
+      // Cast to AuditLogEntry[] - the SQL query returns columns matching AuditLogEntry structure
+      return extractedRows as AuditLogEntry[]
     } catch (error) {
       defaultLogger.error('Error getting user audit logs:', error)
       return []
@@ -204,7 +212,15 @@ export class AuditService {
         OFFSET ${offset}
       `)
 
-      return result.rows as AuditLogEntry[]
+      // Extract rows from drizzle result (handles both array and object with rows property)
+      const extractedRows = Array.isArray(result)
+        ? result
+        : (result && typeof result === 'object' && 'rows' in result && Array.isArray((result as { rows?: unknown[] }).rows))
+          ? (result as { rows: unknown[] }).rows
+          : []
+      
+      // Cast to AuditLogEntry[] - the SQL query returns columns matching AuditLogEntry structure
+      return extractedRows as AuditLogEntry[]
     } catch (error) {
       defaultLogger.error('Error getting resource audit logs:', error)
       return []
@@ -236,11 +252,138 @@ export class AuditService {
         OFFSET ${offset}
       `)
 
-      return result.rows as AuditLogEntry[]
+      // Extract rows from drizzle result (handles both array and object with rows property)
+      const extractedRows = Array.isArray(result)
+        ? result
+        : (result && typeof result === 'object' && 'rows' in result && Array.isArray((result as { rows?: unknown[] }).rows))
+          ? (result as { rows: unknown[] }).rows
+          : []
+      
+      // Cast to AuditLogEntry[] - the SQL query returns columns matching AuditLogEntry structure
+      return extractedRows as AuditLogEntry[]
     } catch (error) {
       defaultLogger.error('Error getting recent audit logs:', error)
       return []
     }
+  }
+
+  // Stub methods for useAuditLog hook compatibility
+  // TODO: Implement these methods properly
+  static async logChange(params: {
+    user_id?: string
+    action?: string
+    table_name?: string
+    record_id?: string
+    details?: Record<string, unknown>
+    new_values?: Record<string, unknown>
+    old_values?: Record<string, unknown>
+    session_id?: string
+    request_id?: string
+    severity?: 'info' | 'warning' | 'error' | 'critical'
+    category?: string
+    metadata?: Record<string, unknown>
+  }): Promise<string | null> {
+    defaultLogger.warn('logChange not implemented, using logAction')
+    await this.logAction(
+      params.user_id || 'system',
+      params.action || 'change',
+      params.table_name || 'unknown',
+      params.record_id,
+      params.details || params.new_values
+    )
+    return null
+  }
+
+  static async logRoleAssignment(params: {
+    user_id?: string
+    target_user_id?: string
+    role_name?: string
+    action?: 'assign' | 'revoke'
+    session_id?: string
+    request_id?: string
+  }): Promise<string | null> {
+    defaultLogger.warn('logRoleAssignment not implemented, using logRBACAction')
+    await this.logRBACAction(
+      params.user_id || 'system',
+      params.action || 'assign',
+      params.target_user_id,
+      undefined,
+      undefined,
+      { role_name: params.role_name }
+    )
+    return null
+  }
+
+  static async logPermissionChange(params: {
+    user_id?: string
+    role_name?: string
+    permission_name?: string
+    action?: 'grant' | 'revoke'
+    session_id?: string
+    request_id?: string
+  }): Promise<string | null> {
+    defaultLogger.warn('logPermissionChange not implemented, using logRBACAction')
+    await this.logRBACAction(
+      params.user_id || 'system',
+      params.action || 'grant',
+      undefined,
+      undefined,
+      undefined,
+      { role_name: params.role_name, permission_name: params.permission_name }
+    )
+    return null
+  }
+
+  static async getRoleAssignmentAudit(params?: {
+    limit?: number
+    offset?: number
+    user_id?: string
+    role_name?: string
+    action?: string
+  }): Promise<Array<{
+    id: string
+    user_id: string
+    target_user_id: string
+    role_name: string
+    action: 'assign' | 'revoke'
+    performed_by?: string
+    created_at: Date
+  }>> {
+    defaultLogger.warn('getRoleAssignmentAudit not implemented')
+    return []
+  }
+
+  static async getPermissionChangeAudit(params?: {
+    limit?: number
+    offset?: number
+    role_name?: string
+    permission_name?: string
+    action?: string
+  }): Promise<Array<{
+    id: string
+    role_name: string
+    permission_name: string
+    action: 'grant' | 'revoke'
+    performed_by?: string
+    created_at: Date
+  }>> {
+    defaultLogger.warn('getPermissionChangeAudit not implemented')
+    return []
+  }
+
+  static async getAllAuditLogs(params?: {
+    limit?: number
+    offset?: number
+    category?: string
+    severity?: string
+    action?: string
+  }): Promise<AuditLogEntry[]> {
+    return await this.getRecentAuditLogs(params?.limit, params?.offset)
+  }
+
+  static async cleanupAuditLogs(retentionDays?: number): Promise<number> {
+    defaultLogger.warn('cleanupAuditLogs not implemented')
+    return 0
   }
 }
 

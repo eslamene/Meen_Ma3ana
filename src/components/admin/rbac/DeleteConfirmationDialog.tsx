@@ -1,8 +1,7 @@
 "use client"
 
-import * as React from "react"
+import React from "react"
 import { AlertTriangle, Info, AlertOctagon, Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -10,10 +9,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
+} from "../../../components/ui/dialog"
+import { Button } from "../../../components/ui/button"
+import { Checkbox } from "../../../components/ui/checkbox"
+import { Input } from "../../../components/ui/input"
 
 interface DeleteConfirmationDialogProps {
   open: boolean

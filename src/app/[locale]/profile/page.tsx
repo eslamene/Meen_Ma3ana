@@ -1,15 +1,16 @@
 'use client'
 
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, usePathname } from 'next/navigation'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
+import { Button } from '../../../components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs'
+import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar'
+import { Badge } from '../../../components/ui/badge'
 import { 
   Calendar, 
   Mail, 
@@ -27,18 +28,16 @@ import {
   Bell,
   Download,
   Eye,
-  Share2,
   Target,
-  Users,
-  Activity,
-  Award,
   Clock,
+  AlertCircle,
   CheckCircle,
-  AlertCircle
+  Activity,
+  Award
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import ContributionHistory from '@/components/profile/ContributionHistory'
-import UserRoleInfo from '@/components/profile/UserRoleInfo'
+import { createClient } from '../../../lib/supabase/client'
+import ContributionHistory from '../../../components/profile/ContributionHistory'
+import UserRoleInfo from '../../../components/profile/UserRoleInfo'
 
 interface UserProfile {
   id: string
@@ -55,6 +54,18 @@ interface UserProfile {
   email_verified: boolean
 }
 
+interface LatestContribution {
+  id: string
+  amount: string
+  created_at: string
+  case_id: string | null
+  status: string
+  cases?: {
+    title: string
+    status: string
+  } | null
+}
+
 interface ProfileStats {
   totalContributions: number
   totalAmount: number
@@ -62,7 +73,7 @@ interface ProfileStats {
   completedCases: number
   averageContribution: number
   lastContribution: string | null
-  latestContribution: any | null
+  latestContribution: LatestContribution | null
 }
 
 export default function ProfilePage() {
@@ -149,7 +160,7 @@ export default function ProfilePage() {
       if (!authUser) return
 
       // Fetch contribution statistics - include all contributions regardless of status
-      const { data: contributions, error } = await supabase
+      const { data: contributions } = await supabase
         .from('contributions')
         .select('id, amount, created_at, case_id, status, cases!inner(title, status)')
         .eq('donor_id', authUser.id)
@@ -160,7 +171,9 @@ export default function ProfilePage() {
         
         // Calculate stats for all contributions
         const totalAmount = contributions.reduce((sum, c) => sum + parseFloat(c.amount), 0)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const approvedContributions = contributions.filter(c => c.status === 'approved')
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const pendingContributions = contributions.filter(c => c.status === 'pending')
         
         // Get unique cases and their statuses
@@ -175,6 +188,19 @@ export default function ProfilePage() {
         const completedCases = Array.from(uniqueCases.values()).filter(c => c.status === 'closed').length
         const lastContribution = contributions[0]?.created_at || null
 
+        // Normalize the latest contribution - handle cases as array or object
+        const latestContributionData = contributions[0]
+        const normalizedLatestContribution: LatestContribution | null = latestContributionData ? {
+          id: latestContributionData.id,
+          amount: latestContributionData.amount,
+          created_at: latestContributionData.created_at,
+          case_id: latestContributionData.case_id,
+          status: latestContributionData.status,
+          cases: Array.isArray(latestContributionData.cases) 
+            ? latestContributionData.cases[0] || null
+            : latestContributionData.cases || null
+        } : null
+
         const stats = {
           totalContributions: contributions.length,
           totalAmount,
@@ -182,7 +208,7 @@ export default function ProfilePage() {
           completedCases,
           averageContribution: totalAmount / contributions.length,
           lastContribution,
-          latestContribution: contributions[0] // Store the full latest contribution object
+          latestContribution: normalizedLatestContribution
         }
 
         setStats(stats)
@@ -623,7 +649,7 @@ export default function ProfilePage() {
                                 )}
                                 {stats.latestContribution.cases && (
                                   <button
-                                    onClick={() => router.push(`/${params.locale}/cases/${stats.latestContribution.case_id}`)}
+                                    onClick={() => router.push(`/${params.locale}/cases/${stats.latestContribution?.case_id}`)}
                                     className="text-blue-600 hover:text-blue-800 hover:underline font-medium transition-colors"
                                   >
                                     {stats.latestContribution.cases.title}

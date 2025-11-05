@@ -4,18 +4,19 @@ import { CaseLifecycleService } from '@/lib/case-lifecycle'
 import { db } from '@/lib/db'
 import { cases, contributions } from '@/drizzle/schema'
 import { eq, sum } from 'drizzle-orm'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger, defaultLogger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const { id: caseId } = await params
+    const { id: caseId } = await context.params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -39,12 +40,12 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const { id: caseId } = await params
+    const { id: caseId } = await context.params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -76,12 +77,12 @@ export async function PATCH(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
   try {
-    const { id: caseId } = await params
+    const { id: caseId } = await context.params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -125,7 +126,7 @@ async function checkAndCloseCaseIfFullyFunded(caseId: string) {
     const [totalContributions] = await db
       .select({ total: sum(contributions.amount) })
       .from(contributions)
-      .where(eq(contributions.caseId, caseId))
+      .where(eq(contributions.case_id, caseId))
 
     const totalAmount = parseFloat(totalContributions?.total || '0')
     const targetAmount = parseFloat(caseData.target_amount?.toString() || '0')

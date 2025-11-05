@@ -94,7 +94,6 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
   Circle,
   
   // Aliases for backward compatibility
-  'User': User,
   'BarChart': BarChart3,
   'Files': FileText,
   'Money': DollarSign,

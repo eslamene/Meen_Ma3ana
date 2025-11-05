@@ -32,16 +32,16 @@ export class BackgroundJobService {
           const [totalContributions] = await db
             .select({ total: sum(contributions.amount) })
             .from(contributions)
-            .where(eq(contributions.caseId, caseData.id))
+            .where(eq(contributions.case_id, caseData.id))
 
           const totalAmount = parseFloat(totalContributions?.total || '0')
-          const targetAmount = parseFloat(caseData.targetAmount || '0')
+          const targetAmount = parseFloat(caseData.target_amount || '0')
 
           // Check if case is fully funded
           if (totalAmount >= targetAmount) {
             // Add a grace period (e.g., 24 hours) before automatic closure
             const gracePeriodHours = 24
-            const caseCreatedAt = new Date(caseData.createdAt)
+            const caseCreatedAt = new Date(caseData.created_at)
             const gracePeriodEnd = new Date(caseCreatedAt.getTime() + (gracePeriodHours * 60 * 60 * 1000))
             
             if (new Date() >= gracePeriodEnd) {
@@ -93,8 +93,8 @@ export class BackgroundJobService {
       const casesWithAmounts = await db
         .select({
           caseId: cases.id,
-          targetAmount: cases.targetAmount,
-          currentAmount: cases.currentAmount
+          targetAmount: cases.target_amount,
+          currentAmount: cases.current_amount
         })
         .from(cases)
 
@@ -106,18 +106,18 @@ export class BackgroundJobService {
           const [totalContributions] = await db
             .select({ total: sum(contributions.amount) })
             .from(contributions)
-            .where(eq(contributions.caseId, caseData.caseId))
+            .where(eq(contributions.case_id, caseData.caseId))
 
           const totalAmount = parseFloat(totalContributions?.total || '0')
-          const currentAmount = parseFloat(caseData.currentAmount || '0')
+          const currentAmount = parseFloat(caseData.currentAmount || '0') // Note: currentAmount is from the select alias
 
           // Update if amounts don't match
           if (Math.abs(totalAmount - currentAmount) > 0.01) {
             await db
               .update(cases)
               .set({
-                currentAmount: totalAmount.toString(),
-                updatedAt: new Date()
+                current_amount: totalAmount.toString(),
+                updated_at: new Date()
               })
               .where(eq(cases.id, caseData.caseId))
 
@@ -153,11 +153,12 @@ export class BackgroundJobService {
         .delete(cases)
         .where(and(
           eq(cases.status, 'draft'),
-          gte(cases.createdAt, thirtyDaysAgo)
+          gte(cases.created_at, thirtyDaysAgo)
         ))
 
-      defaultLogger.info(`Expired draft cleanup completed: ${result.rowCount} drafts deleted`)
-      return { success: true, deletedCount: result.rowCount }
+      const deletedCount = Array.isArray(result) ? result.length : 0
+      defaultLogger.info(`Expired draft cleanup completed: ${deletedCount} drafts deleted`)
+      return { success: true, deletedCount }
     } catch (error) {
       defaultLogger.error('Error in expired draft cleanup job:', error)
       return { success: false, error: 'Background job failed' }
@@ -182,7 +183,7 @@ export class BackgroundJobService {
         .where(and(
           eq(cases.status, 'published'),
           eq(cases.type, 'one-time'),
-          gte(cases.endDate, sevenDaysFromNow)
+          gte(cases.end_date, sevenDaysFromNow)
         ))
 
       let reminderCount = 0
@@ -193,10 +194,10 @@ export class BackgroundJobService {
           const [totalContributions] = await db
             .select({ total: sum(contributions.amount) })
             .from(contributions)
-            .where(eq(contributions.caseId, caseData.id))
+            .where(eq(contributions.case_id, caseData.id))
 
           const totalAmount = parseFloat(totalContributions?.total || '0')
-          const targetAmount = parseFloat(caseData.targetAmount || '0')
+          const targetAmount = parseFloat(caseData.target_amount || '0')
           const progress = (totalAmount / targetAmount) * 100
 
           // Send reminder if progress is less than 80%

@@ -4,6 +4,8 @@
  * All actual permission data is now stored in the database
  */
 
+import { defaultLogger } from '../logger'
+
 export type UserRole = 'admin' | 'sponsor' | 'donor' | 'moderator' | 'volunteer'
 
 export type Permission = 
@@ -90,7 +92,8 @@ export type Permission =
  * These are kept for backward compatibility but now use database
  * @deprecated Use useDatabasePermissions hook instead
  */
-export function hasPermission(userRole: UserRole | undefined, permission: Permission): boolean {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function hasPermission(_userRole: UserRole | undefined, permission: Permission): boolean {
   defaultLogger.warn('hasPermission is deprecated. Use useDatabasePermissions hook instead.')
   return false
 }

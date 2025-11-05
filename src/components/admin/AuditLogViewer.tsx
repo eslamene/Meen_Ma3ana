@@ -143,23 +143,23 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  {getSeverityIcon(log.severity || 'info')}
-                  <Badge className={getSeverityColor(log.severity || 'info')}>
-                    {log.severity || 'info'}
+                  {getSeverityIcon((log as any).severity || 'info')}
+                  <Badge className={getSeverityColor((log as any).severity || 'info')}>
+                    {(log as any).severity || 'info'}
                   </Badge>
                   <Badge className={getActionColor(log.action)}>
                     {log.action}
                   </Badge>
                   <Badge variant="outline">
-                    {log.table_name}
+                    {(log as any).table_name || log.resource_type}
                   </Badge>
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  <span className="font-medium">Category:</span> {log.category || 'rbac'}
-                  {log.record_id && (
+                  <span className="font-medium">Category:</span> {(log as any).category || 'rbac'}
+                  {(log as any).record_id || log.resource_id && (
                     <>
                       <span className="mx-2">•</span>
-                      <span className="font-medium">Record ID:</span> {log.record_id}
+                      <span className="font-medium">Record ID:</span> {(log as any).record_id || log.resource_id}
                     </>
                   )}
                 </div>
@@ -200,8 +200,8 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
                   <Badge className={getActionColor(log.action)}>
                     {log.action}
                   </Badge>
-                  <Badge className={getSeverityColor(log.severity)}>
-                    {log.severity}
+                  <Badge className={getSeverityColor((log as any).severity)}>
+                    {(log as any).severity}
                   </Badge>
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
@@ -239,8 +239,8 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
                   <Badge className={getActionColor(log.action)}>
                     {log.action}
                   </Badge>
-                  <Badge className={getSeverityColor(log.severity)}>
-                    {log.severity}
+                  <Badge className={getSeverityColor((log as any).severity)}>
+                    {(log as any).severity}
                   </Badge>
                 </div>
                 <div className="text-sm text-gray-600 mb-2">

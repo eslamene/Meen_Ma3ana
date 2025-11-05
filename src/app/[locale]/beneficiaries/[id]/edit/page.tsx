@@ -63,6 +63,9 @@ export default function EditBeneficiaryPage() {
       try {
         setLoading(true)
         const beneficiaryData = await BeneficiaryService.getById(beneficiaryId)
+        if (!beneficiaryData) {
+          throw new Error('Beneficiary not found')
+        }
         setBeneficiary(beneficiaryData)
         
         // Populate form data
@@ -213,11 +216,11 @@ export default function EditBeneficiaryPage() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.name.trim()) {
+    if (!formData.name?.trim()) {
       newErrors.name = t('validation.nameRequired') || 'Name is required'
     }
 
-    if (!formData.mobile_number.trim()) {
+    if (!formData.mobile_number?.trim()) {
       newErrors.mobile_number = t('validation.mobileRequired') || 'Mobile number is required'
     }
 

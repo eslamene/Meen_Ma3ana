@@ -102,7 +102,18 @@ export default function SponsorshipRequestForm({
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setCases(data || [])
+      // Map the data to match the Case interface
+      const mappedCases = (data || []).map((caseItem: any) => ({
+        id: caseItem.id,
+        title: caseItem.title,
+        description: caseItem.description,
+        target_amount: caseItem.target_amount,
+        current_amount: caseItem.current_amount,
+        status: caseItem.status,
+        category: caseItem.category_id || '', // Map category_id to category
+        category_id: caseItem.category_id
+      }))
+      setCases(mappedCases)
     } catch (err: any) {
       console.error('Error fetching cases:', err)
     }

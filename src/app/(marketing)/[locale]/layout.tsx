@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getLocale } from 'next-intl/server'
-import { locales, defaultLocale } from '@/i18n/request'
+import { locales } from '@/i18n/request'
 import { Inter, Cairo } from 'next/font/google'
 import DirSetter from '@/components/marketing/DirSetter'
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { auditService } from '@/lib/services/auditService'
+import { auditService, extractRequestInfo } from '@/lib/services/auditService'
 import { requirePermission } from '@/lib/security/guards'
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
@@ -167,16 +167,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the action
-    await auditService.logAction({
-      userId: user.id,
-      action: 'roles_assigned',
-      resourceType: 'user',
-      resourceId: userId,
-      details: { 
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await auditService.logAction(
+      user.id,
+      'roles_assigned',
+      'user',
+      userId,
+      { 
         assigned_roles: roleIds,
         roles_count: roleIds.length
-      }
-    })
+      },
+      ipAddress,
+      userAgent
+    )
 
     logger.info('Roles assigned successfully', { userId, roleIds })
 

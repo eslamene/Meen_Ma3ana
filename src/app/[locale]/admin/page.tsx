@@ -1,46 +1,42 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
-import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import PermissionGuard from '@/components/auth/PermissionGuard'
-import { usePermissions } from '@/lib/hooks/usePermissions'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import ProtectedRoute from '../../../components/auth/ProtectedRoute'
+import PermissionGuard from '../../../components/auth/PermissionGuard'
+import { usePermissions } from '../../../lib/hooks/usePermissions'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
+import { Button } from '../../../components/ui/button'
+import { Badge } from '../../../components/ui/badge'
 import { 
   Users, 
   Heart, 
   DollarSign, 
   Target, 
   Activity, 
-  TrendingUp, 
   BarChart3, 
   Settings,
   Eye,
   CheckCircle,
   Clock,
   XCircle,
-  Plus,
   UserCheck,
   Shield,
-  Calendar,
-  FileText,
-  ArrowRight,
-  Info
+  ArrowRight
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
+import { createClient } from '../../../lib/supabase/client'
+import { useSimpleRBAC } from '../../../lib/hooks/useSimpleRBAC'
 
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {
-  router: any
-  params: any
+  router: ReturnType<typeof useRouter>
+  params: { locale?: string }
   t: (key: string) => string
 }
 
-function AdminQuickActionsSection({ router, params, t }: AdminQuickActionsSectionProps) {
+function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionProps) {
   const { hasPermission } = useSimpleRBAC()
   
   // Define all possible admin actions with their permissions
@@ -192,11 +188,7 @@ export default function AdminPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchSystemStats()
-  }, [])
-
-  const fetchSystemStats = async () => {
+  const fetchSystemStats = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -223,9 +215,24 @@ export default function AdminPage() {
       const totalUsers = users?.length || 0
       const totalContributions = contributions?.length || 0
       
+      // Contribution type for admin dashboard
+      interface ContributionWithApproval {
+        id: string
+        amount: number
+        status: string
+        created_at: string
+        approval_status?: {
+          status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
+        } | Array<{
+          status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
+        }>
+      }
+
       // Calculate total amount from approved contributions only
-      const totalAmount = contributions?.reduce((sum, c: any) => {
-        const approvalStatus = c.approval_status?.status || 'pending'
+      const totalAmount = contributions?.reduce((sum, c: ContributionWithApproval) => {
+        const approvalStatus = Array.isArray(c.approval_status) 
+          ? c.approval_status[0]?.status 
+          : c.approval_status?.status || 'pending'
         return approvalStatus === 'approved' ? sum + (c.amount || 0) : sum
       }, 0) || 0
       
@@ -233,18 +240,24 @@ export default function AdminPage() {
       const completedCases = cases?.filter(c => c.status === 'completed').length || 0
       
       // Calculate contribution counts based on approval status
-      const pendingContributions = contributions?.filter((c: any) => {
-        const approvalStatus = c.approval_status?.status || 'pending'
+      const pendingContributions = contributions?.filter((c: ContributionWithApproval) => {
+        const approvalStatus = Array.isArray(c.approval_status) 
+          ? c.approval_status[0]?.status 
+          : c.approval_status?.status || 'pending'
         return approvalStatus === 'pending'
       }).length || 0
       
-      const approvedContributions = contributions?.filter((c: any) => {
-        const approvalStatus = c.approval_status?.status || 'pending'
+      const approvedContributions = contributions?.filter((c: ContributionWithApproval) => {
+        const approvalStatus = Array.isArray(c.approval_status) 
+          ? c.approval_status[0]?.status 
+          : c.approval_status?.status || 'pending'
         return approvalStatus === 'approved'
       }).length || 0
       
-      const rejectedContributions = contributions?.filter((c: any) => {
-        const approvalStatus = c.approval_status?.status || 'pending'
+      const rejectedContributions = contributions?.filter((c: ContributionWithApproval) => {
+        const approvalStatus = Array.isArray(c.approval_status) 
+          ? c.approval_status[0]?.status 
+          : c.approval_status?.status || 'pending'
         return approvalStatus === 'rejected'
       }).length || 0
       
@@ -252,12 +265,14 @@ export default function AdminPage() {
 
       // Get recent activity (last 10 approved contributions)
       const recentActivity = contributions
-        ?.filter((c: any) => {
-          const approvalStatus = c.approval_status?.status || 'pending'
+        ?.filter((c: ContributionWithApproval) => {
+          const approvalStatus = Array.isArray(c.approval_status) 
+            ? c.approval_status[0]?.status 
+            : c.approval_status?.status || 'pending'
           return approvalStatus === 'approved'
         })
         .slice(0, 10)
-        .map((c: any) => ({
+        .map((c: ContributionWithApproval) => ({
           id: c.id,
           type: 'contribution',
           status: c.status,
@@ -282,7 +297,11 @@ export default function AdminPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    fetchSystemStats()
+  }, [fetchSystemStats])
 
   const formatAmount = (amount: number) => {
     return `EGP ${amount.toLocaleString('en-US', {
@@ -352,7 +371,7 @@ export default function AdminPage() {
                 <div className="flex items-center gap-3">
                   <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
                     <Shield className="h-3 w-3 mr-1" />
-                    {getRoleDisplayName(userRole)}
+                    {getRoleDisplayName(userRole || '')}
                   </Badge>
                 </div>
               </div>

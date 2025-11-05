@@ -3,8 +3,8 @@
  * Handles all beneficiary-related API operations
  */
 
-import { createClient } from '@/lib/supabase/client'
-import { defaultLogger } from '@/lib/logger'
+import { createClient } from '../supabase/client'
+import { defaultLogger } from '../logger'
 
 import type {
   Beneficiary,
@@ -12,7 +12,7 @@ import type {
   UpdateBeneficiaryData,
   BeneficiarySearchParams,
   BeneficiaryStats
-} from '@/types/beneficiary'
+} from '../../types/beneficiary'
 
 export class BeneficiaryService {
   /**
@@ -26,7 +26,7 @@ export class BeneficiaryService {
   /**
    * Transform beneficiary data to include calculated age
    */
-  private static transformBeneficiary(beneficiary: any): Beneficiary {
+  private static transformBeneficiary(beneficiary: Beneficiary): Beneficiary {
     if (beneficiary.year_of_birth) {
       beneficiary.age = this.calculateAge(beneficiary.year_of_birth)
     }
@@ -168,7 +168,7 @@ export class BeneficiaryService {
     }
 
     // Convert age to year of birth
-    const dataToInsert = { ...data }
+    const dataToInsert: CreateBeneficiaryData & { year_of_birth?: number } = { ...data }
     if (data.age) {
       const currentYear = new Date().getFullYear()
       dataToInsert.year_of_birth = currentYear - data.age
@@ -196,7 +196,7 @@ export class BeneficiaryService {
     const supabase = createClient()
     
     // Convert age to year of birth if age is provided
-    const dataToUpdate = { ...data }
+    const dataToUpdate: Partial<UpdateBeneficiaryData> & { year_of_birth?: number } = { ...data }
     if (data.age) {
       const currentYear = new Date().getFullYear()
       dataToUpdate.year_of_birth = currentYear - data.age
@@ -234,6 +234,7 @@ export class BeneficiaryService {
    */
   static async delete(id: string): Promise<void> {
     const supabase = createClient()
+
     const { error } = await supabase
       .from('beneficiaries')
       .delete()
@@ -356,23 +357,6 @@ export class BeneficiaryService {
     }
 
     return (data || []).map(beneficiary => this.transformBeneficiary(beneficiary))
-  }
-
-  /**
-   * Delete beneficiary
-   */
-  static async delete(id: string): Promise<void> {
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('beneficiaries')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      defaultLogger.error('Error deleting beneficiary:', error)
-      throw new Error(error.message)
-    }
   }
 }
 

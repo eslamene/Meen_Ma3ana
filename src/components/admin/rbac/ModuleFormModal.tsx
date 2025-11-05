@@ -203,7 +203,7 @@ export function ModuleFormModal({ module, onSave, onClose, open }: ModuleFormMod
       toast({
         title: 'Error',
         description: `Failed to ${isEdit ? 'update' : 'create'} module`,
-        variant: 'destructive',
+        type: 'error',
       })
     } finally {
       setLoading(false)

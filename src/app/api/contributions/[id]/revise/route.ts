@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext<{ id: string }>
 ) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
-  const { id } = await params
+  const { id } = await context.params
   
   try {
     const supabase = await createClient()
@@ -55,7 +56,7 @@ export async function POST(
     // Verify the original contribution belongs to the current user
     const { data: originalContribution, error: contributionError } = await supabase
       .from('contributions')
-      .select('id, donor_id, case_id, case:cases(title)')
+      .select('id, donor_id, case_id, amount, case:cases(title)')
       .eq('id', id)
       .single()
 

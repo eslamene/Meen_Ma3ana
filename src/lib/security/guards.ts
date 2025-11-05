@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { hasPermission, isAdminUser } from '@/lib/security/rls';
-import { Logger } from '@/lib/logger';
+import { createClient } from '../supabase/server';
+import { hasPermission, isAdminUser } from './rls';
+import { Logger, defaultLogger } from '../logger';
+import { SupabaseClient, User } from '@supabase/supabase-js';
 
 /**
  * Server-side guard utilities for API routes
@@ -9,8 +10,8 @@ import { Logger } from '@/lib/logger';
  */
 
 export interface GuardResult {
-  user: any;
-  supabase: any;
+  user: User;
+  supabase: SupabaseClient;
 }
 
 /**
@@ -21,11 +22,11 @@ export interface GuardResult {
 export function requirePermission(permission: string) {
   return async (request: NextRequest): Promise<GuardResult | NextResponse> => {
     try {
-      const supabase = createClient();
+      const supabase = await createClient();
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        Logger.warn('Unauthenticated request to protected endpoint', { 
+        defaultLogger.warn('Unauthenticated request to protected endpoint', { 
           path: request.nextUrl.pathname,
           error: authError?.message 
         });
@@ -38,7 +39,7 @@ export function requirePermission(permission: string) {
       const hasRequiredPermission = await hasPermission(user.id, permission);
       
       if (!hasRequiredPermission) {
-        Logger.warn('Unauthorized request - missing permission', {
+        defaultLogger.warn('Unauthorized request - missing permission', {
           userId: user.id,
           permission,
           path: request.nextUrl.pathname
@@ -49,7 +50,7 @@ export function requirePermission(permission: string) {
         );
       }
 
-      Logger.debug('Permission check passed', {
+      defaultLogger.debug('Permission check passed', {
         userId: user.id,
         permission,
         path: request.nextUrl.pathname
@@ -57,7 +58,7 @@ export function requirePermission(permission: string) {
 
       return { user, supabase };
     } catch (error) {
-      Logger.error('Error in permission guard', {
+      defaultLogger.error('Error in permission guard', {
         error: error instanceof Error ? error.message : 'Unknown error',
         permission,
         path: request.nextUrl.pathname
@@ -78,11 +79,11 @@ export function requirePermission(permission: string) {
 export function requireAnyPermission(permissions: string[]) {
   return async (request: NextRequest): Promise<GuardResult | NextResponse> => {
     try {
-      const supabase = createClient();
+      const supabase = await createClient();
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        Logger.warn('Unauthenticated request to protected endpoint', { 
+        defaultLogger.warn('Unauthenticated request to protected endpoint', { 
           path: request.nextUrl.pathname,
           error: authError?.message 
         });
@@ -100,7 +101,7 @@ export function requireAnyPermission(permissions: string[]) {
       const hasAnyPermission = permissionChecks.some(hasPermission => hasPermission);
       
       if (!hasAnyPermission) {
-        Logger.warn('Unauthorized request - missing any required permission', {
+        defaultLogger.warn('Unauthorized request - missing any required permission', {
           userId: user.id,
           permissions,
           path: request.nextUrl.pathname
@@ -111,7 +112,7 @@ export function requireAnyPermission(permissions: string[]) {
         );
       }
 
-      Logger.debug('Any permission check passed', {
+      defaultLogger.debug('Any permission check passed', {
         userId: user.id,
         permissions,
         path: request.nextUrl.pathname
@@ -119,7 +120,7 @@ export function requireAnyPermission(permissions: string[]) {
 
       return { user, supabase };
     } catch (error) {
-      Logger.error('Error in any permission guard', {
+      defaultLogger.error('Error in any permission guard', {
         error: error instanceof Error ? error.message : 'Unknown error',
         permissions,
         path: request.nextUrl.pathname
@@ -140,11 +141,11 @@ export function requireAnyPermission(permissions: string[]) {
 export function requireAllPermissions(permissions: string[]) {
   return async (request: NextRequest): Promise<GuardResult | NextResponse> => {
     try {
-      const supabase = createClient();
+      const supabase = await createClient();
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        Logger.warn('Unauthenticated request to protected endpoint', { 
+        defaultLogger.warn('Unauthenticated request to protected endpoint', { 
           path: request.nextUrl.pathname,
           error: authError?.message 
         });
@@ -162,7 +163,7 @@ export function requireAllPermissions(permissions: string[]) {
       const hasAllPermissions = permissionChecks.every(hasPermission => hasPermission);
       
       if (!hasAllPermissions) {
-        Logger.warn('Unauthorized request - missing required permissions', {
+        defaultLogger.warn('Unauthorized request - missing required permissions', {
           userId: user.id,
           permissions,
           path: request.nextUrl.pathname
@@ -173,7 +174,7 @@ export function requireAllPermissions(permissions: string[]) {
         );
       }
 
-      Logger.debug('All permissions check passed', {
+      defaultLogger.debug('All permissions check passed', {
         userId: user.id,
         permissions,
         path: request.nextUrl.pathname
@@ -181,7 +182,7 @@ export function requireAllPermissions(permissions: string[]) {
 
       return { user, supabase };
     } catch (error) {
-      Logger.error('Error in all permissions guard', {
+      defaultLogger.error('Error in all permissions guard', {
         error: error instanceof Error ? error.message : 'Unknown error',
         permissions,
         path: request.nextUrl.pathname
@@ -202,11 +203,11 @@ export function requireAllPermissions(permissions: string[]) {
 export function requireRole(role: string) {
   return async (request: NextRequest): Promise<GuardResult | NextResponse> => {
     try {
-      const supabase = createClient();
+      const supabase = await createClient();
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        Logger.warn('Unauthenticated request to protected endpoint', { 
+        defaultLogger.warn('Unauthenticated request to protected endpoint', { 
           path: request.nextUrl.pathname,
           error: authError?.message 
         });
@@ -228,7 +229,7 @@ export function requireRole(role: string) {
       const hasRequiredRole = userRoles && userRoles.length > 0;
       
       if (!hasRequiredRole) {
-        Logger.warn('Unauthorized request - missing required role', {
+        defaultLogger.warn('Unauthorized request - missing required role', {
           userId: user.id,
           role,
           path: request.nextUrl.pathname
@@ -239,7 +240,7 @@ export function requireRole(role: string) {
         );
       }
 
-      Logger.debug('Role check passed', {
+      defaultLogger.debug('Role check passed', {
         userId: user.id,
         role,
         path: request.nextUrl.pathname
@@ -247,7 +248,7 @@ export function requireRole(role: string) {
 
       return { user, supabase };
     } catch (error) {
-      Logger.error('Error in role guard', {
+      defaultLogger.error('Error in role guard', {
         error: error instanceof Error ? error.message : 'Unknown error',
         role,
         path: request.nextUrl.pathname

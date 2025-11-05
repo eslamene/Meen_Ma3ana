@@ -1,32 +1,27 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import PermissionGuard from '@/components/auth/PermissionGuard'
-import { useDatabasePermissions } from '@/lib/hooks/useDatabasePermissions'
-import { UserRoleAssignmentModal } from '@/components/admin/rbac/UserRoleAssignmentModal'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
-import { Button } from '@/components/ui/button' // Assuming this exists
+import PermissionGuard from '../../../../../components/auth/PermissionGuard'
+import { useDatabasePermissions } from '../../../../../lib/hooks/useDatabasePermissions'
+import { UserRoleAssignmentModal } from '../../../../../components/admin/rbac/UserRoleAssignmentModal'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../../components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../../../components/ui/dialog'
+import { Avatar, AvatarImage, AvatarFallback } from '../../../../../components/ui/avatar'
+import { Badge } from '../../../../../components/ui/badge'
+import { Checkbox } from '../../../../../components/ui/checkbox'
+import { Input } from '../../../../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../../components/ui/select'
+import { useToast } from '../../../../../hooks/use-toast'
+import { Button } from '../../../../../components/ui/button' // Assuming this exists
 import { 
   Users, 
   UserCheck, 
   UserX, 
   Shield, 
   Search, 
-  Filter, 
   Settings, 
-  AlertTriangle, 
-  CheckCircle, 
-  XCircle,
-  Clock,
-  User as UserIcon
+  AlertTriangle
 } from 'lucide-react'
 
 interface User {
@@ -55,6 +50,8 @@ interface Role {
   description: string
   is_system: boolean
   hierarchy_level?: number
+  permissions_count: number
+  users_count: number
 }
 
 interface Statistics {
@@ -73,6 +70,7 @@ export default function UserRoleAssignmentPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [manageRolesModal, setManageRolesModal] = useState<{
     open: boolean
     user?: User
@@ -87,12 +85,7 @@ export default function UserRoleAssignmentPage() {
   const { toast } = useToast()
   const { user: currentUser } = useDatabasePermissions()
 
-  // Fetch data
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [usersRes, rolesRes] = await Promise.all([
         fetch('/api/admin/rbac/users'),
@@ -103,7 +96,24 @@ export default function UserRoleAssignmentPage() {
         const usersData = await usersRes.json()
         const rolesData = await rolesRes.json()
         setUsers(usersData.users || [])
-        setRoles(rolesData.roles || [])
+        // Map roles to ensure permissions_count and users_count are present
+        interface RoleFromAPI {
+          id: string
+          name: string
+          display_name: string
+          description: string
+          is_system: boolean
+          permissions?: Array<{ id: string }>
+          permissions_count?: number
+          users_count?: number
+          user_count?: number
+        }
+        const mappedRoles = ((rolesData.roles || []) as RoleFromAPI[]).map((role) => ({
+          ...role,
+          permissions_count: role.permissions_count ?? role.permissions?.length ?? 0,
+          users_count: role.users_count ?? role.user_count ?? 0
+        }))
+        setRoles(mappedRoles)
       } else {
         toast({
           title: 'Error',
@@ -111,7 +121,7 @@ export default function UserRoleAssignmentPage() {
           type: 'error'
         })
       }
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to fetch data',
@@ -120,7 +130,11 @@ export default function UserRoleAssignmentPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   // Calculate statistics
   const statistics: Statistics = useMemo(() => {
@@ -213,7 +227,7 @@ export default function UserRoleAssignmentPage() {
           type: 'error'
         })
       }
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to assign roles',
@@ -449,7 +463,7 @@ export default function UserRoleAssignmentPage() {
           userEmail={manageRolesModal.user?.email || ''}
           currentRoles={manageRolesModal.user?.roles.map(r => r.role_id) || []}
           allRoles={roles}
-          onSave={async (roleIds: string[], notes: string, sendNotification: boolean) => {
+          onSave={async (roleIds: string[]) => {
             await handleRoleAssignment(manageRolesModal.user!.id, roleIds)
             setManageRolesModal({ open: false })
           }}

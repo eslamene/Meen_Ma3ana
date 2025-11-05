@@ -147,7 +147,7 @@ export function RoleFormModal({
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save role",
-        variant: "destructive",
+        type: 'error',
       })
     } finally {
       setLoading(false)
@@ -179,7 +179,9 @@ export function RoleFormModal({
           <div className="space-y-2">
             <Label htmlFor="name">
               Role Name
-              <Info className="h-4 w-4 ml-1 inline text-gray-400" title="Unique identifier for the role. Auto-generated from display name." />
+              <div title="Unique identifier for the role. Auto-generated from display name.">
+                <Info className="h-4 w-4 ml-1 inline text-gray-400" />
+              </div>
             </Label>
             <Input
               id="name"
@@ -195,7 +197,9 @@ export function RoleFormModal({
           <div className="space-y-2">
             <Label htmlFor="display_name">
               Display Name *
-              <Info className="h-4 w-4 ml-1 inline text-gray-400" title="Human-readable name shown in the interface." />
+              <div title="Human-readable name shown in the interface.">
+                <Info className="h-4 w-4 ml-1 inline text-gray-400" />
+              </div>
             </Label>
             <Input
               id="display_name"
@@ -209,7 +213,9 @@ export function RoleFormModal({
           <div className="space-y-2">
             <Label htmlFor="description">
               Description
-              <Info className="h-4 w-4 ml-1 inline text-gray-400" title="Optional description of what this role does." />
+              <div title="Optional description of what this role does.">
+                <Info className="h-4 w-4 ml-1 inline text-gray-400" />
+              </div>
             </Label>
             <Textarea
               id="description"
@@ -230,7 +236,9 @@ export function RoleFormModal({
             />
             <Label htmlFor="is_system" className="text-sm">
               System Role
-              <Info className="h-4 w-4 ml-1 inline text-gray-400" title="System roles are built-in and cannot be deleted. Only super-admins can modify." />
+              <div title="System roles are built-in and cannot be deleted. Only super-admins can modify.">
+                <Info className="h-4 w-4 ml-1 inline text-gray-400" />
+              </div>
             </Label>
           </div>
 

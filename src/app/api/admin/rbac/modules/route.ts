@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { auditService } from '@/lib/services/auditService'
+import { auditService, extractRequestInfo } from '@/lib/services/auditService'
 import { requirePermission } from '@/lib/security/guards'
 
 import { Logger } from '@/lib/logger'
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data
-    const transformedModules = modules?.map(module => ({
+    const transformedModules = modules?.map((module: any) => ({
       id: module.id,
       name: module.name,
       display_name: module.display_name,
@@ -139,16 +139,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the action
-    await auditService.logAction({
-      userId: user.id,
-      action: 'module_created',
-      resourceType: 'module',
-      resourceId: newModule.id,
-      details: { 
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await auditService.logAction(
+      user.id,
+      'module_created',
+      'module',
+      newModule.id,
+      { 
         module_name: name,
         display_name
-      }
-    })
+      },
+      ipAddress,
+      userAgent
+    )
 
     return NextResponse.json({ 
       message: 'Module created successfully',
