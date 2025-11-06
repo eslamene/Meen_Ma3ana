@@ -8,14 +8,6 @@
       "SKIP_ENV_VALIDATION": "true"
     }
   },
-  "functions": {
-    "app/**/*.{js,ts,tsx}": {
-      "runtime": "nodejs22.x"
-    },
-    "src/**/*.{js,ts,tsx}": {
-      "runtime": "nodejs22.x"
-    }
-  },
   "headers": [],
   "redirects": [],
   "rewrites": [],
