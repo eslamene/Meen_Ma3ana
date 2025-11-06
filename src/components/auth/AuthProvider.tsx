@@ -20,7 +20,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => {
     // Guard against SSR - createBrowserClient should only be called in browser
     if (typeof window === 'undefined') {
-      throw new Error('AuthProvider can only be used in client components')
+      // Return null during SSR - will be initialized on client
+      return null as any
     }
     return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,6 +30,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
 
   useEffect(() => {
+    // Skip initialization during SSR
+    if (!supabase || typeof window === 'undefined') {
+      setLoading(false)
+      return
+    }
+
     // Get initial session
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -49,10 +56,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  }, [supabase])
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    if (supabase) {
+      await supabase.auth.signOut()
+    }
   }
 
   const value = {
