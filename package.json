@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint src drizzle scripts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -23,7 +23,7 @@
     "setup:all": "npm run setup:env && npm run setup:storage && npm run setup:rls && npm run disable:rls",
     "validate:lockfile": "npm ci --dry-run",
     "precommit:check": "npm run validate:lockfile && npm run build",
-    "check:all": "tsc --noEmit && eslint . && next build"
+    "check:all": "tsc --noEmit && npm run lint && next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

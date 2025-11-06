@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase'
 
 import { defaultLogger } from '@/lib/logger'
 
@@ -14,7 +14,7 @@ export interface ContributionNotification {
 }
 
 export class ContributionNotificationService {
-  private supabase = createClient()
+  private supabase = supabase
 
   async sendApprovalNotification(contributionId: string, donorId: string, amount: number, caseTitle: string) {
     try {
@@ -32,7 +32,7 @@ export class ContributionNotificationService {
         // Remove created_at to let database set the timestamp
       }
 
-      const { error } = await (await this.supabase).from('notifications')
+      const { error } = await this.supabase.from('notifications')
         .insert(notification)
 
       if (error) {
@@ -64,7 +64,7 @@ export class ContributionNotificationService {
         // Remove created_at to let database set the timestamp
       }
 
-      const { error } = await (await this.supabase)
+      const { error } = await this.supabase
         .from('notifications')
         .insert(notification)
 
@@ -96,7 +96,7 @@ export class ContributionNotificationService {
         // Remove created_at to let database set the timestamp
       }
 
-      const { error } = await (await this.supabase)
+      const { error } = await this.supabase
         .from('notifications')
         .insert(notification)
 
@@ -115,7 +115,7 @@ export class ContributionNotificationService {
   async getUserNotifications(userId: string): Promise<ContributionNotification[]> {
     try {
       // Get all notifications and sort them properly on the client side
-      const { data, error } = await (await this.supabase)
+      const { data, error } = await this.supabase
         .from('notifications')
         .select('*')
         .eq('recipient_id', userId)
@@ -166,7 +166,7 @@ export class ContributionNotificationService {
 
   async markNotificationAsReadSimple(notificationId: string): Promise<boolean> {
     try {
-      const { error } = await (await this.supabase)
+      const { error } = await this.supabase
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId)
@@ -185,7 +185,7 @@ export class ContributionNotificationService {
 
   async markAllNotificationsAsRead(userId: string): Promise<boolean> {
     try {
-      const { error } = await (await this.supabase)
+      const { error } = await this.supabase
         .from('notifications')
         .update({ read: true })
         .eq('recipient_id', userId)
@@ -205,7 +205,7 @@ export class ContributionNotificationService {
 
   async markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {
     try {
-      const { error } = await (await this.supabase)
+      const { error } = await this.supabase
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId)
@@ -225,7 +225,7 @@ export class ContributionNotificationService {
 
   async getUnreadNotificationCount(userId: string): Promise<number> {
     try {
-      const { count, error } = await (await this.supabase)
+      const { count, error } = await this.supabase
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('recipient_id', userId)

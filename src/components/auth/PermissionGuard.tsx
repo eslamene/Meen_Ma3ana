@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useDatabasePermissions } from '@/src/lib/hooks/useDatabasePermissions'
+import { useDatabasePermissions } from '@/lib/hooks/useDatabasePermissions'
 import AccessDenied from './AccessDenied'
 
 interface PermissionGuardProps {

@@ -9,7 +9,7 @@ export type Locale = (typeof locales)[number]
 export default getRequestConfig(async ({ locale }: { locale?: string }) => {
   const validLocale: string = locale && locales.includes(locale as Locale) ? locale : defaultLocale;
   return {
-      messages: (await import(`@/messages/${validLocale}.json`)).default,
+      messages: (await import(`../../messages/${validLocale}.json`)).default,
       locale: validLocale
   };
 }); 

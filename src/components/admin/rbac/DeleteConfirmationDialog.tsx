@@ -9,10 +9,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/omponents/ui/dialog"
-import { Button } from "@/omponents/ui/button"
-import { Checkbox } from "@/omponents/ui/checkbox"
-import { Input } from "@/omponents/ui/input"
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 
 interface DeleteConfirmationDialogProps {
   open: boolean
@@ -105,7 +105,7 @@ export function DeleteConfirmationDialog({
             <Checkbox
               id="understand"
               checked={understandChecked}
-              onCheckedChange={(checked) => setUnderstandChecked(checked as boolean)}
+              onCheckedChange={(checked: boolean | "indeterminate") => setUnderstandChecked(!!checked && checked !== "indeterminate")}
             />
             <label
               htmlFor="understand"
@@ -123,7 +123,7 @@ export function DeleteConfirmationDialog({
               <Input
                 id="confirm-text"
                 value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmText(e.target.value)}
                 placeholder={`Type ${itemName} here`}
               />
             </div>
