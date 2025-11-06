@@ -47,10 +47,24 @@ export default async function middleware(request: NextRequest) {
     }
   }
   
+  // Get correlation ID for forwarding and observability
+  const correlationId = requestWithCorrelationId.headers.get('x-correlation-id');
+  
+  // Construct headers from request with correlation ID properly set
+  const headers = new Headers(requestWithCorrelationId.headers);
+  if (correlationId) {
+    headers.set('x-correlation-id', correlationId);
+  }
+  
   // Create response to handle auth session refresh
   const response = NextResponse.next({
-    request: requestWithCorrelationId,
+    request: { headers },
   });
+  
+  // Set correlation ID on response headers for observability
+  if (correlationId) {
+    response.headers.set('x-correlation-id', correlationId);
+  }
   
   // Refresh Supabase authentication session
   try {
