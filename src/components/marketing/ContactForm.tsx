@@ -4,6 +4,13 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 
+interface ErrorResponse {
+  error?: string
+  message?: string
+  retryAfter?: number
+  errorCode?: string
+}
+
 export default function ContactForm() {
   const t = useTranslations('landing.contact')
   const [formData, setFormData] = useState({
@@ -14,6 +21,73 @@ export default function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string>('')
+
+  /**
+   * Get translated error message based on error type and response data
+   */
+  const getErrorMessage = (response: Response, data: ErrorResponse): string => {
+    // Rate limit error (429)
+    if (response.status === 429) {
+      const retryAfter = data.retryAfter || 0
+      const minutes = Math.ceil(retryAfter / 60)
+      const seconds = retryAfter % 60
+      
+      if (minutes > 0) {
+        return t('errors.rateLimit', { minutes })
+      } else if (seconds > 0) {
+        return t('errors.rateLimitSeconds', { seconds })
+      }
+      return t('errors.rateLimit', { minutes: 1 })
+    }
+
+    // Validation errors (400) - check errorCode first for better mapping
+    if (response.status === 400) {
+      const errorCode = data.errorCode
+      const errorMsg = data.error || data.message || ''
+      
+      // Map error codes to translations
+      switch (errorCode) {
+        case 'MISSING_FIELDS':
+          return t('errors.missingFields')
+        case 'INVALID_EMAIL':
+          return t('errors.invalidEmail')
+        case 'MESSAGE_TOO_SHORT':
+          return t('errors.messageTooShort')
+        case 'MESSAGE_TOO_LONG':
+          return t('errors.messageTooLong')
+        case 'INVALID_REQUEST':
+          return t('errors.invalidRequest')
+      }
+      
+      // Fallback to message-based detection if no errorCode
+      if (errorMsg.toLowerCase().includes('missing') || errorMsg.toLowerCase().includes('required')) {
+        return t('errors.missingFields')
+      }
+      if (errorMsg.toLowerCase().includes('email') || errorMsg.toLowerCase().includes('invalid email')) {
+        return t('errors.invalidEmail')
+      }
+      if (errorMsg.toLowerCase().includes('message') && errorMsg.toLowerCase().includes('3')) {
+        return t('errors.messageTooShort')
+      }
+      if (errorMsg.toLowerCase().includes('message') && errorMsg.toLowerCase().includes('5000')) {
+        return t('errors.messageTooLong')
+      }
+      if (errorMsg.toLowerCase().includes('format') || errorMsg.toLowerCase().includes('invalid request')) {
+        return t('errors.invalidRequest')
+      }
+      
+      // Return the API error message if it's a known validation error
+      return errorMsg || t('errors.generic')
+    }
+
+    // Server error (500)
+    if (response.status >= 500) {
+      return t('errors.serverError')
+    }
+
+    // Default to generic error
+    return data.error || data.message || t('errors.generic')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,13 +104,25 @@ export default function ContactForm() {
         body: JSON.stringify(formData),
       })
 
-      let data
+      let data: ErrorResponse = {}
       try {
         data = await response.json()
-      } catch (parseError) {
-        // If response is not JSON, use default error message
-        setSubmitStatus('error')
-        setErrorMessage(t('error'))
+      } catch {
+        // If response is not JSON, determine error from status code
+        if (response.status === 429) {
+          const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10)
+          const minutes = Math.ceil(retryAfter / 60)
+          setSubmitStatus('error')
+          setErrorMessage(minutes > 0 
+            ? t('errors.rateLimit', { minutes })
+            : t('errors.rateLimitSeconds', { seconds: retryAfter }))
+        } else if (response.status >= 500) {
+          setSubmitStatus('error')
+          setErrorMessage(t('errors.serverError'))
+        } else {
+          setSubmitStatus('error')
+          setErrorMessage(t('errors.generic'))
+        }
         setTimeout(() => {
           setSubmitStatus('idle')
           setErrorMessage('')
@@ -50,16 +136,17 @@ export default function ContactForm() {
         setTimeout(() => setSubmitStatus('idle'), 5000)
       } else {
         setSubmitStatus('error')
-        // Display the actual error message from the API
-        setErrorMessage(data.error || t('error'))
+        // Get translated error message based on error type
+        setErrorMessage(getErrorMessage(response, data))
         setTimeout(() => {
           setSubmitStatus('idle')
           setErrorMessage('')
         }, 5000)
       }
-    } catch (error) {
+    } catch {
+      // Network error or other fetch errors
       setSubmitStatus('error')
-      setErrorMessage(t('error'))
+      setErrorMessage(t('errors.networkError'))
       setTimeout(() => {
         setSubmitStatus('idle')
         setErrorMessage('')

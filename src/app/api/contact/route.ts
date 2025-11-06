@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { rateLimit } from '@/lib/middleware/rateLimit'
+import { contactRateLimit } from '@/lib/middleware/rateLimit'
 import { createClient } from '@/lib/supabase/server'
 
-const contactRateLimitConfig = {
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 5, // 5 requests per window for contact form
-}
-
 export async function POST(request: NextRequest) {
-  // Apply rate limiting
-  const rateLimitResponse = rateLimit(contactRateLimitConfig)(request)
+  // Apply rate limiting using the centralized contact config
+  const rateLimitResponse = contactRateLimit(request)
   if (rateLimitResponse) {
     return rateLimitResponse
   }
@@ -21,7 +16,10 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!name || !email || !message) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { 
+          error: 'Missing required fields',
+          errorCode: 'MISSING_FIELDS'
+        },
         { status: 400 }
       )
     }
@@ -30,7 +28,10 @@ export async function POST(request: NextRequest) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json(
-        { error: 'Invalid email format' },
+        { 
+          error: 'Invalid email format',
+          errorCode: 'INVALID_EMAIL'
+        },
         { status: 400 }
       )
     }
@@ -38,7 +39,12 @@ export async function POST(request: NextRequest) {
     // Validate message length (reduced minimum to 3 characters for better UX)
     if (message.trim().length < 3 || message.length > 5000) {
       return NextResponse.json(
-        { error: 'Message must be between 3 and 5000 characters' },
+        { 
+          error: message.trim().length < 3 
+            ? 'Message must be at least 3 characters long'
+            : 'Message must not exceed 5000 characters',
+          errorCode: message.trim().length < 3 ? 'MESSAGE_TOO_SHORT' : 'MESSAGE_TOO_LONG'
+        },
         { status: 400 }
       )
     }
@@ -75,14 +81,20 @@ export async function POST(request: NextRequest) {
     // Handle JSON parsing errors and other errors
     if (error instanceof SyntaxError) {
       return NextResponse.json(
-        { error: 'Invalid request format' },
+        { 
+          error: 'Invalid request format',
+          errorCode: 'INVALID_REQUEST'
+        },
         { status: 400 }
       )
     }
     
     console.error('Contact form error:', error)
     return NextResponse.json(
-      { error: 'Failed to process request. Please try again later.' },
+      { 
+        error: 'Failed to process request. Please try again later.',
+        errorCode: 'SERVER_ERROR'
+      },
       { status: 500 }
     )
   }

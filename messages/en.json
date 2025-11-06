@@ -1435,7 +1435,19 @@
       "submit": "Send Message",
       "submitting": "Sending...",
       "success": "Message sent successfully! We'll get back to you soon.",
-      "error": "Failed to send message. Please try again."
+      "error": "Failed to send message. Please try again.",
+      "errors": {
+        "generic": "Failed to send message. Please try again.",
+        "rateLimit": "Too many requests. Please wait {minutes} minutes before trying again.",
+        "rateLimitSeconds": "Too many requests. Please wait {seconds} seconds before trying again.",
+        "missingFields": "Please fill in all required fields.",
+        "invalidEmail": "Please enter a valid email address.",
+        "messageTooShort": "Message must be at least 3 characters long.",
+        "messageTooLong": "Message must not exceed 5000 characters.",
+        "invalidRequest": "Invalid request format. Please try again.",
+        "serverError": "Server error. Please try again later.",
+        "networkError": "Network error. Please check your connection and try again."
+      }
     },
     "cta": {
       "title": "Ready to Make a Difference?",

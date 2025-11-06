@@ -10,6 +10,9 @@ interface RateLimitConfig {
   skipFailedRequests?: boolean
 }
 
+// Export the interface for use in other files
+export type { RateLimitConfig }
+
 const defaultConfig: RateLimitConfig = {
   windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 100, // 100 requests per window
@@ -24,6 +27,14 @@ const debugConfig: RateLimitConfig = {
   windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 50, // 50 requests per window for debug endpoints
 }
+
+const contactConfig: RateLimitConfig = {
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 10, // 10 requests per window for contact form
+}
+
+// Export all configs for direct use if needed
+export { defaultConfig, adminConfig, debugConfig, contactConfig }
 
 /**
  * Rate limiting middleware
@@ -124,6 +135,11 @@ export const debugRateLimit = rateLimit(debugConfig)
 export const apiRateLimit = rateLimit(defaultConfig)
 
 /**
+ * Rate limiting for contact form endpoint
+ */
+export const contactRateLimit = rateLimit(contactConfig)
+
+/**
  * Check if request should be rate limited based on path
  */
 export function shouldRateLimit(pathname: string): boolean {
@@ -141,14 +157,22 @@ export function shouldRateLimit(pathname: string): boolean {
  * Get appropriate rate limit config based on endpoint
  */
 export function getRateLimitConfig(pathname: string): RateLimitConfig {
+  // Contact form endpoint - stricter limits
+  if (pathname === '/api/contact') {
+    return contactConfig
+  }
+  
+  // Admin endpoints - higher limits
   if (pathname.startsWith('/api/admin/')) {
     return adminConfig
   }
   
+  // Debug/test endpoints - lower limits
   if (pathname.startsWith('/api/debug/') || 
       pathname.startsWith('/api/test-')) {
     return debugConfig
   }
   
+  // Default for all other API endpoints
   return defaultConfig
 }
