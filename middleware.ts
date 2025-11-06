@@ -8,6 +8,50 @@ import { createServerClient } from '@supabase/ssr';
 // Pin middleware to Node.js runtime for Supabase SSR compatibility
 export const runtime = 'nodejs';
 
+/**
+ * Detects the user's preferred locale from the Accept-Language header
+ * Maps browser language preferences to supported locales, handling variants
+ * (e.g., ar-SA -> ar, en-US -> en)
+ */
+function detectUserLocale(request: NextRequest): string {
+  const acceptLanguage = request.headers.get('accept-language');
+  
+  if (!acceptLanguage) {
+    return defaultLocale;
+  }
+
+  // Parse Accept-Language header (e.g., "en-US,en;q=0.9,ar-SA;q=0.8")
+  const languages = acceptLanguage
+    .split(',')
+    .map(lang => {
+      const [locale, qValue] = lang.trim().split(';');
+      const quality = qValue ? parseFloat(qValue.split('=')[1]) : 1.0;
+      return { locale: locale.toLowerCase(), quality };
+    })
+    .sort((a, b) => b.quality - a.quality); // Sort by quality (preference)
+
+  // Check each language preference
+  for (const { locale } of languages) {
+    // Check for exact match
+    if (locales.includes(locale as typeof locales[number])) {
+      return locale;
+    }
+    
+    // Check for Arabic variants (ar-SA, ar-EG, ar-AE, etc.)
+    if (locale.startsWith('ar')) {
+      return 'ar';
+    }
+    
+    // Check for English variants (en-US, en-GB, etc.)
+    if (locale.startsWith('en')) {
+      return 'en';
+    }
+  }
+
+  // Fallback to default locale
+  return defaultLocale;
+}
+
 const intlMiddleware = createMiddleware({
   // A list of all locales that are supported
   locales: locales,
@@ -16,12 +60,45 @@ const intlMiddleware = createMiddleware({
   defaultLocale: defaultLocale,
   
   // Always show the locale in the URL
-  localePrefix: 'always'
+  localePrefix: 'always',
+  
+  // Enable automatic locale detection from Accept-Language header
+  // The middleware will use our custom detection logic via manual handling
+  localeDetection: true
 });
 
 export default async function middleware(request: NextRequest) {
   // Add correlation ID to all requests
   const requestWithCorrelationId = addCorrelationId(request);
+  
+  // Normalize Accept-Language header to handle language variants
+  // This ensures Arabic variants (ar-SA, ar-EG, etc.) and English variants (en-US, en-GB, etc.)
+  // are properly detected by the intl middleware
+  const acceptLanguage = requestWithCorrelationId.headers.get('accept-language');
+  if (acceptLanguage) {
+    // Normalize language codes: replace variants with base language codes
+    // e.g., "ar-SA,ar;q=0.9" -> "ar,ar;q=0.9" and "en-US,en;q=0.8" -> "en,en;q=0.8"
+    const normalizedAcceptLanguage = acceptLanguage
+      .split(',')
+      .map(lang => {
+        const [locale, qValue] = lang.trim().split(';');
+        const baseLocale = locale.toLowerCase();
+        
+        // Map language variants to base codes
+        if (baseLocale.startsWith('ar')) {
+          return `ar${qValue ? `;${qValue}` : ''}`;
+        }
+        if (baseLocale.startsWith('en')) {
+          return `en${qValue ? `;${qValue}` : ''}`;
+        }
+        // Keep other languages as-is
+        return lang.trim();
+      })
+      .join(', ');
+    
+    // Update the header with normalized language codes
+    requestWithCorrelationId.headers.set('accept-language', normalizedAcceptLanguage);
+  }
   
   // Prelaunch guard - block app routes if PRELAUNCH=true
   const isPrelaunch = process.env.PRELAUNCH === 'true'
@@ -31,7 +108,10 @@ export default async function middleware(request: NextRequest) {
     // Extract locale from pathname (first segment after /)
     const pathSegments = pathname.split('/').filter(Boolean);
     const firstSegment = pathSegments[0] || '';
-    const locale = locales.includes(firstSegment as typeof locales[number]) ? firstSegment : defaultLocale;
+    // Use detected locale for prelaunch mode
+    const locale = locales.includes(firstSegment as typeof locales[number]) 
+      ? firstSegment 
+      : detectUserLocale(requestWithCorrelationId);
     
     // Explicit allowlist for prelaunch mode
     const isLandingRoute = pathname === `/${locale}/landing` || pathname === '/landing';
