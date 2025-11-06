@@ -1,12 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Layout } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import ContributionsList from '@/components/contributions/ContributionsList'
 
 interface Contribution {

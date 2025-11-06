@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
@@ -89,11 +89,7 @@ export default function SponsorshipRequestForm({
     getUser()
   }, [supabase.auth])
 
-  useEffect(() => {
-    fetchCases()
-  }, [])
-
-  const fetchCases = async () => {
+  const fetchCases = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('cases')
@@ -117,7 +113,11 @@ export default function SponsorshipRequestForm({
     } catch (err: any) {
       console.error('Error fetching cases:', err)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    fetchCases()
+  }, [fetchCases])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -67,7 +67,7 @@ export default function ContributionRejectionModal({
   const handleReject = () => {
     if (!selectedReason) return
     
-    const reason = selectedReason === 'other' ? customReason : selectedReason
+    const _reason = selectedReason === 'other' ? customReason : selectedReason
     onReject(selectedReason, selectedReason === 'other' ? customReason : undefined)
   }
 

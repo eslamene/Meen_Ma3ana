@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
@@ -16,8 +16,7 @@ import {
   Play, 
   X, 
   AlertCircle,
-  CheckCircle,
-  Clock
+  CheckCircle
 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
@@ -74,13 +73,7 @@ export default function RecurringContributionDashboard() {
     getUser()
   }, [supabase.auth])
 
-  useEffect(() => {
-    if (user) {
-      fetchRecurringContributions()
-    }
-  }, [user])
-
-  const fetchRecurringContributions = async () => {
+  const fetchRecurringContributions = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -130,7 +123,13 @@ export default function RecurringContributionDashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, user?.id])
+
+  useEffect(() => {
+    if (user) {
+      fetchRecurringContributions()
+    }
+  }, [user, fetchRecurringContributions])
 
   const handleStatusChange = async (contributionId: string, newStatus: string) => {
     try {

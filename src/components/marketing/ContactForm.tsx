@@ -36,7 +36,7 @@ export default function ContactForm() {
         setSubmitStatus('error')
         setTimeout(() => setSubmitStatus('idle'), 5000)
       }
-    } catch (error) {
+    } catch (_error) { // eslint-disable-line @typescript-eslint/no-unused-vars
       setSubmitStatus('error')
       setTimeout(() => setSubmitStatus('idle'), 5000)
     } finally {

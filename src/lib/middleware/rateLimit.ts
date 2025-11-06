@@ -32,7 +32,6 @@ export function rateLimit(config: RateLimitConfig = defaultConfig) {
   return (request: NextRequest): NextResponse | null => {
     const ip = getClientIP(request)
     const now = Date.now()
-    const windowStart = now - config.windowMs
 
     // Clean up old entries
     for (const [key, value] of rateLimitMap.entries()) {

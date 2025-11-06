@@ -104,7 +104,7 @@ export default function CaseDetailPage() {
   const [loading, setLoading] = useState(true)
   
   // Use centralized hook for approved contributions
-  const { contributions: approvedContributions, totalAmount: approvedTotal, isLoading: contributionsLoading, refetch: refetchContributions } = useApprovedContributions(caseId)
+  const { contributions: approvedContributions, totalAmount: approvedTotal } = useApprovedContributions(caseId)
   const { hasPermission } = usePermissions()
   const [error, setError] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -120,125 +120,7 @@ export default function CaseDetailPage() {
     setCaseFiles(updatedFiles)
   }, [])
 
-  useEffect(() => {
-    fetchCaseDetails()
-    fetchContributions()
-    fetchUpdates()
-    fetchTotalContributions()
-    checkUserPermissions()
-    setupRealtimeSubscriptions()
-
-    return () => {
-      // Cleanup realtime subscriptions
-      realtimeCaseUpdates.unsubscribeFromCaseProgress(caseId)
-      realtimeCaseUpdates.unsubscribeFromCaseUpdates(caseId)
-      realtimeCaseUpdates.unsubscribeFromCaseContributions(caseId)
-    }
-  }, [caseId])
-
-  const setupRealtimeSubscriptions = () => {
-    // Subscribe to case progress updates
-    realtimeCaseUpdates.subscribeToCaseProgress(
-      caseId,
-      (progressUpdate) => {
-        setRealTimeProgress(progressUpdate)
-        // Update case data with new progress
-        if (caseData) {
-          setCaseData(prev => prev ? {
-            ...prev,
-            current_amount: progressUpdate.currentAmount,
-            target_amount: progressUpdate.targetAmount
-          } : null)
-        }
-      },
-      (error) => {
-        console.error('Realtime progress error:', error)
-      }
-    )
-
-    // Subscribe to case updates
-    realtimeCaseUpdates.subscribeToCaseUpdates(
-      caseId,
-      (newUpdate) => {
-        // Convert CaseUpdateNotification to CaseUpdate format
-        const caseUpdate: CaseUpdate = {
-          id: newUpdate.id,
-          caseId: newUpdate.caseId,
-          title: newUpdate.title,
-          content: newUpdate.content,
-          updateType: newUpdate.updateType,
-          isPublic: true, // Assuming new updates are public
-          attachments: [],
-          createdBy: newUpdate.createdBy,
-          created_at: new Date(newUpdate.createdAt),
-          updated_at: new Date(newUpdate.createdAt),
-          createdByUser: {
-            first_name: newUpdate.createdByUser?.firstName,
-            last_name: newUpdate.createdByUser?.lastName
-          }
-        }
-        setUpdates(prev => [caseUpdate, ...prev])
-      },
-      (updatedUpdate) => {
-        // Handle update modifications
-        setUpdates(prev => prev.map(update => 
-          update.id === updatedUpdate.id 
-            ? {
-                ...update,
-                title: updatedUpdate.title,
-                content: updatedUpdate.content,
-                updateType: updatedUpdate.updateType,
-                updated_at: new Date(updatedUpdate.createdAt)
-              }
-            : update
-        ))
-      },
-      (deletedUpdateId) => {
-        // Handle update deletions
-        setUpdates(prev => prev.filter(update => update.id !== deletedUpdateId))
-      }
-    )
-
-    // Subscribe to contributions
-    realtimeCaseUpdates.subscribeToCaseContributions(
-      caseId,
-      (newContribution) => {
-        const c = newContribution as {
-          id: string
-          amount: string | number
-          donor_name?: string
-          notes?: string
-          created_at: string
-          anonymous?: boolean
-        }
-        const contribution : Contribution = {
-          ...newContribution as Contribution,
-        }
-      }
-    )
-  }
-
-  const checkUserPermissions = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        // Check if user is admin or case creator
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-
-        if (userProfile?.role === 'admin' || caseData?.created_by === user.id) {
-          setCanCreateUpdates(true)
-        }
-      }
-    } catch (error) {
-      console.error('Error checking user permissions:', error)
-    }
-  }
-
-  const fetchCaseDetails = async () => {
+  const fetchCaseDetails = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -302,9 +184,9 @@ export default function CaseDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [caseId, supabase])
 
-  const fetchContributions = async () => {
+  const fetchContributions = useCallback(async () => {
     try {
       console.log('Fetching contributions for case:', caseId)
       
@@ -354,9 +236,9 @@ export default function CaseDetailPage() {
     } catch (error) {
       console.error('Error fetching contributions:', error)
     }
-  }
+  }, [caseId, supabase, t])
 
-  const fetchTotalContributions = async () => {
+  const fetchTotalContributions = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('contributions')
@@ -377,9 +259,9 @@ export default function CaseDetailPage() {
     } catch (error) {
       console.error('Error calculating total contributions:', error)
     }
-  }
+  }, [caseId, supabase])
 
-  const fetchUpdates = async () => {
+  const fetchUpdates = useCallback(async () => {
     try {
       const response = await fetch(`/api/cases/${caseId}/updates`)
       if (response.ok) {
@@ -389,7 +271,115 @@ export default function CaseDetailPage() {
     } catch (error) {
       console.error('Error fetching updates:', error)
     }
-  }
+  }, [caseId])
+
+  const checkUserPermissions = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Check if user is admin or case creator
+        const { data: userProfile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        if (userProfile?.role === 'admin' || caseData?.created_by === user.id) {
+          setCanCreateUpdates(true)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user permissions:', error)
+    }
+  }, [supabase, caseData])
+
+  const setupRealtimeSubscriptions = useCallback(() => {
+    // Subscribe to case progress updates
+    realtimeCaseUpdates.subscribeToCaseProgress(
+      caseId,
+      (progressUpdate) => {
+        setRealTimeProgress(progressUpdate)
+        // Update case data with new progress
+        setCaseData(prev => prev ? {
+          ...prev,
+          current_amount: progressUpdate.currentAmount,
+          target_amount: progressUpdate.targetAmount
+        } : null)
+      },
+      (error) => {
+        console.error('Realtime progress error:', error)
+      }
+    )
+
+    // Subscribe to case updates
+    realtimeCaseUpdates.subscribeToCaseUpdates(
+      caseId,
+      (newUpdate) => {
+        // Convert CaseUpdateNotification to CaseUpdate format
+        const caseUpdate: CaseUpdate = {
+          id: newUpdate.id,
+          caseId: newUpdate.caseId,
+          title: newUpdate.title,
+          content: newUpdate.content,
+          updateType: newUpdate.updateType,
+          isPublic: true, // Assuming new updates are public
+          attachments: [],
+          createdBy: newUpdate.createdBy,
+          created_at: new Date(newUpdate.createdAt),
+          updated_at: new Date(newUpdate.createdAt),
+          createdByUser: {
+            first_name: newUpdate.createdByUser?.firstName,
+            last_name: newUpdate.createdByUser?.lastName
+          }
+        }
+        setUpdates(prev => [caseUpdate, ...prev])
+      },
+      (updatedUpdate) => {
+        // Handle update modifications
+        setUpdates(prev => prev.map(update => 
+          update.id === updatedUpdate.id 
+            ? {
+                ...update,
+                title: updatedUpdate.title,
+                content: updatedUpdate.content,
+                updateType: updatedUpdate.updateType,
+                updated_at: new Date(updatedUpdate.createdAt)
+              }
+            : update
+        ))
+      },
+      (deletedUpdateId) => {
+        // Handle update deletions
+        setUpdates(prev => prev.filter(update => update.id !== deletedUpdateId))
+      }
+    )
+
+    // Subscribe to contributions
+    realtimeCaseUpdates.subscribeToCaseContributions(
+      caseId,
+      (newContribution) => {
+        // TODO: Handle real-time contribution updates if needed
+        // Contributions are managed by useApprovedContributions hook
+        console.log('New contribution received:', newContribution)
+      }
+    )
+  }, [caseId])
+
+  useEffect(() => {
+    fetchCaseDetails()
+    fetchContributions()
+    fetchUpdates()
+    fetchTotalContributions()
+    checkUserPermissions()
+    setupRealtimeSubscriptions()
+
+    return () => {
+      // Cleanup realtime subscriptions
+      realtimeCaseUpdates.unsubscribeFromCaseProgress(caseId)
+      realtimeCaseUpdates.unsubscribeFromCaseUpdates(caseId)
+      realtimeCaseUpdates.unsubscribeFromCaseContributions(caseId)
+    }
+  }, [caseId, fetchCaseDetails, fetchContributions, fetchUpdates, fetchTotalContributions, checkUserPermissions, setupRealtimeSubscriptions])
 
   const handleBack = () => {
     router.push(`/${locale}/cases`)
@@ -451,10 +441,6 @@ export default function CaseDetailPage() {
 
   const handleUpdateCreated = (newUpdate: CaseUpdate) => {
     setUpdates(prev => [newUpdate, ...prev])
-  }
-
-  const getProgressPercentage = (current: number, target: number) => {
-    return Math.min((current / target) * 100, 100)
   }
 
   // Helper functions now use centralized hook data
@@ -545,7 +531,7 @@ export default function CaseDetailPage() {
         month: 'short',
         day: 'numeric'
       })
-    } catch (error) {
+    } catch {
       return t('unknown')
     }
   }
@@ -701,7 +687,7 @@ export default function CaseDetailPage() {
     if (diffInHours < 24) return t('hoursAgo', { hours: diffInHours })
     if (diffInHours < 48) return t('yesterday')
     return formatDate(dateString)
-    } catch (error) {
+    } catch {
       return t('unknown')
     }
   }

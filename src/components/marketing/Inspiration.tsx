@@ -1,7 +1,6 @@
 'use client'
 
 import { useTranslations, useLocale } from 'next-intl'
-import { Heart } from 'lucide-react'
 
 export default function Inspiration() {
   const t = useTranslations('landing.inspiration')

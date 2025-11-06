@@ -19,7 +19,6 @@ import {
   Users,
   AlertCircle
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import CaseCard from '@/components/cases/CaseCard'
 import FilterSidebar from '@/components/cases/FilterSidebar'
 import PermissionGuard from '@/components/auth/PermissionGuard'

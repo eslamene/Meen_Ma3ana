@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertCircle, Send, MessageSquare, User as UserIcon, Building2, Calendar, Plus } from 'lucide-react'
+import { AlertCircle, Send, MessageSquare, User as UserIcon, Calendar, Plus } from 'lucide-react'
 
 interface Message {
   id: string
@@ -95,7 +95,6 @@ interface SponsorshipQueryResult {
 }
 
 export default function SponsorCommunicationsPage() {
-  const t = useTranslations('sponsorships')
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -112,11 +111,7 @@ export default function SponsorCommunicationsPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    checkAuthentication()
-  }, [])
-
-  const checkAuthentication = async () => {
+  const checkAuthentication = useCallback(async () => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser()
       
@@ -131,7 +126,11 @@ export default function SponsorCommunicationsPage() {
       console.error('Error checking authentication:', err)
       router.push('/auth/login')
     }
-  }
+  }, [supabase.auth, router])
+
+  useEffect(() => {
+    checkAuthentication()
+  }, [checkAuthentication])
 
   const fetchData = async () => {
     try {
@@ -302,10 +301,6 @@ export default function SponsorCommunicationsPage() {
     } catch (err) {
       console.error('Error marking message as read:', err)
     }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString()
   }
 
   const receivedMessages = messages.filter(m => m.recipient_id === user?.id)

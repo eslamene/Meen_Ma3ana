@@ -1,4 +1,4 @@
-import { db, client } from '@/lib/db'
+import { client } from '@/lib/db'
 import { defaultLogger } from '@/lib/logger'
 
 export interface AuditLogEntry {
@@ -333,7 +333,8 @@ export class AuditService {
     return null
   }
 
-  static async getRoleAssignmentAudit(params?: {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static async getRoleAssignmentAudit(_params?: {
     limit?: number
     offset?: number
     user_id?: string
@@ -352,7 +353,8 @@ export class AuditService {
     return []
   }
 
-  static async getPermissionChangeAudit(params?: {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static async getPermissionChangeAudit(_params?: {
     limit?: number
     offset?: number
     role_name?: string

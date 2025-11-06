@@ -86,6 +86,7 @@ export function hasHigherOrEqualRole(userRole: UserRole, requiredRole: UserRole)
 export function getRolesWithEqualOrHigherPermissions(role: UserRole): UserRole[] {
   const roleLevel = ROLE_HIERARCHY[role]
   return Object.entries(ROLE_HIERARCHY)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     .filter(([_, level]) => level >= roleLevel)
     .map(([roleName]) => roleName as UserRole)
 }

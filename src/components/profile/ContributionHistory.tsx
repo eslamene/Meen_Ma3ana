@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useTranslations } from 'next-intl'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calendar, DollarSign, Eye, Download, Heart, Target, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
@@ -23,7 +22,6 @@ interface Contribution {
 }
 
 export default function ContributionHistory() {
-  const t = useTranslations('cases')
   const router = useRouter()
   const params = useParams()
   const [contributions, setContributions] = useState<Contribution[]>([])
@@ -40,11 +38,7 @@ export default function ContributionHistory() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchContributions()
-  }, [pagination.page])
-
-  const fetchContributions = async () => {
+  const fetchContributions = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -65,14 +59,18 @@ export default function ContributionHistory() {
       const data = await response.json()
       console.log('API Response:', data)
       setContributions(data.contributions || [])
-      setPagination(data.pagination || pagination)
+      setPagination(prev => data.pagination || prev)
     } catch (error) {
       console.error('Error fetching contributions:', error)
       setError('Failed to load contributions')
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, pagination.page, pagination.limit])
+
+  useEffect(() => {
+    fetchContributions()
+  }, [fetchContributions])
 
   const getStatusBadge = (status: string) => {
     switch (status) {

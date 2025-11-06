@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { createClient } from '@/lib/supabase/client'
 import { caseUpdates, users, contributions, contributionApprovalStatus } from '@/drizzle/schema'
-import { eq, desc, and, asc, or, like, sql } from 'drizzle-orm'
+import { eq, desc, and, or, like, sql } from 'drizzle-orm'
 
 import { defaultLogger } from '@/lib/logger'
 
@@ -366,12 +366,6 @@ export class CaseUpdateService {
       // Generate dynamic updates for each approved contribution
       return filteredContributions.map((contribution) => {
         const user = Array.isArray(contribution.users) ? contribution.users[0] : contribution.users
-        const donorName = contribution.anonymous 
-          ? 'Anonymous Donor' 
-          : user?.first_name && user?.last_name
-            ? `${user.first_name} ${user.last_name}`
-            : user?.email || 'Anonymous Donor'
-
         const donorEmail = contribution.anonymous ? 'anonymous@donor.com' : user?.email
 
         return {

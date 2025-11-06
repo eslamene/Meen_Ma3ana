@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -12,7 +12,6 @@ import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 import { 
-  Menu, 
   X, 
   Home, 
   User as UserIcon, 
@@ -52,12 +51,34 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
   // Use the new simplified RBAC hook
   const { 
     modules, 
-    loading: modulesLoading,
-    hasPermission,
-    hasRole
+    loading: modulesLoading
   } = useSimpleRBAC()
   
   // Note: useSimpleRBAC handles refresh internally
+
+  const fetchUnreadNotifications = useCallback(async (userId: string) => {
+    try {
+      const notificationService = createContributionNotificationService(supabase)
+      const count = await notificationService.getUnreadNotificationCount(userId)
+      setUnreadNotifications(count)
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+    }
+  }, [supabase])
+
+  const fetchUserAndNotifications = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUser(user)
+        await fetchUnreadNotifications(user.id)
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase.auth, fetchUnreadNotifications])
 
   useEffect(() => {
     fetchUserAndNotifications()
@@ -76,7 +97,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [fetchUserAndNotifications, fetchUnreadNotifications, supabase.auth])
 
   // Auto-expand module based on current path
   useEffect(() => {
@@ -102,30 +123,6 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
   }, [pathname, locale, modules, modulesLoading, expandedModules])
 
   // Note: useSimpleRBAC handles RBAC update events automatically
-
-  const fetchUserAndNotifications = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUser(user)
-        await fetchUnreadNotifications(user.id)
-      }
-    } catch (error) {
-      console.error('Error fetching user:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchUnreadNotifications = async (userId: string) => {
-    try {
-      const notificationService = createContributionNotificationService(supabase)
-      const count = await notificationService.getUnreadNotificationCount(userId)
-      setUnreadNotifications(count)
-    } catch (error) {
-      console.error('Error fetching notifications:', error)
-    }
-  }
 
   const handleSignOut = async () => {
     try {

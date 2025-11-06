@@ -74,11 +74,12 @@ export class NotificationService {
   /**
    * Get notification template based on status change
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static getStatusChangeTemplate(
     data: NotificationData,
-    caseData: any,
-    creator: any,
-    changedByUser: any
+    _caseData: any,
+    _creator: any,
+    _changedByUser: any
   ): NotificationTemplate {
     const statusLabels = {
       draft: 'Draft',

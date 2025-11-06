@@ -25,7 +25,7 @@ interface DonorReplyModalProps {
 export default function DonorReplyModal({
   isOpen,
   onClose,
-  contributionId,
+  contributionId: _contributionId, // eslint-disable-line @typescript-eslint/no-unused-vars
   rejectionReason,
   adminComment,
   resubmissionCount,
@@ -57,7 +57,7 @@ export default function DonorReplyModal({
       setDonorReply('')
       setPaymentProofUrl('')
       onClose()
-    } catch (err) {
+    } catch (_err) { // eslint-disable-line @typescript-eslint/no-unused-vars
       setError('Failed to submit reply. Please try again.')
     } finally {
       setIsSubmitting(false)

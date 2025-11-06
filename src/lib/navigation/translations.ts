@@ -120,7 +120,7 @@ export function getRequiredTranslationKeys(): string[] {
  */
 export function validateNavigationTranslations(
   messages: Record<string, any>, 
-  locale: string
+  _locale: string // eslint-disable-line @typescript-eslint/no-unused-vars
 ): string[] {
   const requiredKeys = getRequiredTranslationKeys()
   const navigationMessages = messages.navigation || {}

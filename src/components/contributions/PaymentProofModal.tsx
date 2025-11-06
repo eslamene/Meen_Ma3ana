@@ -1,21 +1,19 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { 
   Eye, 
   Download, 
   ExternalLink,
-  Copy,
   X,
   FileText,
   Image as ImageIcon,
   File
 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
 
 interface PaymentProofModalProps {
   isOpen: boolean
@@ -34,29 +32,10 @@ export default function PaymentProofModal({
   amount,
   paymentMethod
 }: PaymentProofModalProps) {
-  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
 
   const formatAmount = (amount: number) => `EGP ${amount.toLocaleString()}`
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      toast({
-        title: 'Copied!',
-        description: 'URL copied to clipboard',
-        type: 'success'
-      })
-    } catch (err) {
-      console.error('Failed to copy: ', err)
-      toast({
-        title: 'Error',
-        description: 'Failed to copy to clipboard',
-        type: 'error'
-      })
-    }
-  }
 
   const handleDownload = () => {
     // Create a temporary link to download the file
@@ -127,12 +106,15 @@ export default function PaymentProofModal({
               </div>
             </div>
           ) : (
-            <img
+            <Image
               src={proofUrl}
               alt="Payment proof"
+              width={800}
+              height={600}
               className={`w-full h-auto rounded-lg ${isLoading ? 'hidden' : 'block'}`}
               onLoad={handleImageLoad}
               onError={handleImageError}
+              unoptimized
             />
           )}
         </div>

@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -62,28 +62,7 @@ export default function SponsorDashboardPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    checkAuthentication()
-  }, [])
-
-  const checkAuthentication = async () => {
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser()
-      
-      if (error || !user) {
-        router.push('/auth/login')
-        return
-      }
-
-      setUser(user)
-      fetchSponsorships(user.id)
-    } catch (err) {
-      console.error('Error checking authentication:', err)
-      router.push('/auth/login')
-    }
-  }
-
-  const fetchSponsorships = async (userId: string) => {
+  const fetchSponsorships = useCallback(async (userId: string) => {
     try {
       setLoading(true)
       
@@ -141,24 +120,28 @@ export default function SponsorDashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
-      case 'approved':
-        return <Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
-      case 'rejected':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
+  const checkAuthentication = useCallback(async () => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      
+      if (error || !user) {
+        router.push('/auth/login')
+        return
+      }
+
+      setUser(user)
+      fetchSponsorships(user.id)
+    } catch (err) {
+      console.error('Error checking authentication:', err)
+      router.push('/auth/login')
     }
-  }
+  }, [supabase.auth, router, fetchSponsorships])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString()
-  }
+  useEffect(() => {
+    checkAuthentication()
+  }, [checkAuthentication])
 
   const pendingSponsorships = sponsorships.filter(s => s.status === 'pending')
   const approvedSponsorships = sponsorships.filter(s => s.status === 'approved')

@@ -335,6 +335,7 @@ export async function isAdminUser(userId: string): Promise<boolean> {
 /**
  * Require admin permission guard for API routes
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function requireAdminPermission(_request: NextRequest): Promise<{ user: { id: string; email?: string; user_metadata?: Record<string, unknown> }; supabase: SupabaseClient } | NextResponse> {
   try {
     const cookieStore = await cookies()

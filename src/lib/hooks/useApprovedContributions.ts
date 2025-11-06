@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 import { defaultLogger } from '@/lib/logger'
@@ -32,7 +32,7 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
 
   const supabase = createClient()
 
-  const fetchApprovedContributions = async () => {
+  const fetchApprovedContributions = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -109,13 +109,13 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [caseId, supabase])
 
   useEffect(() => {
     if (caseId) {
       fetchApprovedContributions()
     }
-  }, [caseId])
+  }, [caseId, fetchApprovedContributions])
 
   return {
     contributions,

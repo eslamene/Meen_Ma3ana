@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,21 +13,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { 
-  CheckCircle, 
   XCircle, 
-  Clock, 
-  AlertTriangle, 
-  Eye, 
-  Download, 
-  DollarSign, 
   FileText,
   RefreshCw,
   Send,
   X,
   Upload,
-  MessageSquare,
-  User,
-  Calendar
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -233,7 +225,7 @@ export default function ContributionRevisionModal({
       })
       
       onClose()
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Submission Failed',
         description: 'Failed to submit revision. Please try again.',
@@ -269,13 +261,13 @@ export default function ContributionRevisionModal({
         throw new Error(errorData.error || 'Failed to upload proof')
       }
 
-      const data = await response.json()
+      const _data = await response.json()
       toast({
         title: 'Proof Uploaded',
         description: 'Payment proof uploaded successfully.',
         type: 'success'
       })
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Upload Failed',
         description: 'Failed to upload payment proof. Please try again.',
@@ -457,10 +449,13 @@ export default function ContributionRevisionModal({
                   {proofPreview && (
                     <div className="mt-2">
                       <Label className="text-sm font-medium text-gray-600">Preview:</Label>
-                      <img 
+                      <Image 
                         src={proofPreview} 
                         alt="Payment proof preview" 
+                        width={400}
+                        height={300}
                         className="mt-1 max-w-xs rounded border"
+                        unoptimized
                       />
                     </div>
                   )}

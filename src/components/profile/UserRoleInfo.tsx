@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,11 +21,8 @@ interface UserRoleInfoProps {
 }
 
 export default function UserRoleInfo({ showDetails = false, className = '' }: UserRoleInfoProps) {
-  const t = useTranslations('profile')
   const { 
     user, 
-    roles, 
-    permissions, 
     loading 
   } = useDatabasePermissions()
   

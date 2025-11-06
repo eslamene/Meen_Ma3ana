@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,12 +14,8 @@ import {
   Upload, 
   X, 
   FileText, 
-  Image, 
+  Image as ImageIcon, 
   Heart,
-  User, 
-  MessageSquare,
-  AlertCircle,
-  CheckCircle,
   Building2,
   Smartphone,
   Banknote,
@@ -27,7 +24,6 @@ import {
   TrendingUp,
   Eye
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/toast'
 
 interface ContributionFormProps {
@@ -68,8 +64,8 @@ const QUICK_AMOUNTS = [10, 25, 50, 100, 250, 500, 1000]
 export default function ContributionForm({
   caseId,
   caseTitle,
-  targetAmount,
-  currentAmount,
+  targetAmount: _targetAmount, // eslint-disable-line @typescript-eslint/no-unused-vars
+  currentAmount: _currentAmount, // eslint-disable-line @typescript-eslint/no-unused-vars
   onContributionSubmitted,
   onCancel
 }: ContributionFormProps) {
@@ -83,13 +79,10 @@ export default function ContributionForm({
     paymentMethod: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [success, setSuccess] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
   const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const supabase = createClient()
 
   // Fetch payment methods on component mount
   useEffect(() => {
@@ -255,7 +248,6 @@ export default function ContributionForm({
       }
 
       const contribution = await response.json()
-      setSuccess(true)
       onContributionSubmitted?.(contribution)
 
       // Show success toast
@@ -275,7 +267,6 @@ export default function ContributionForm({
           paymentProof: null,
           paymentMethod: ''
         })
-        setSuccess(false)
         setUploadProgress(0)
       }, 3000)
 
@@ -301,7 +292,7 @@ export default function ContributionForm({
 
   const getFileIcon = (file: File) => {
     if (file.type.startsWith('image/')) {
-      return <Image className="h-4 w-4" />
+      return <ImageIcon className="h-4 w-4" />
     }
     return <FileText className="h-4 w-4" />
   }
@@ -442,10 +433,13 @@ export default function ContributionForm({
                 {/* Image Preview */}
                 {formData.paymentProof.type.startsWith('image/') && (
                   <div className="relative group">
-                    <img
+                    <Image
                       src={URL.createObjectURL(formData.paymentProof)}
                       alt="Payment proof preview"
+                      width={800}
+                      height={300}
                       className="w-full h-48 object-cover rounded-lg border border-gray-200 shadow-sm"
+                      unoptimized
                     />
                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">

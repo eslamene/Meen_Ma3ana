@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { cases, caseStatusHistory, users } from '@/drizzle/schema'
 import { NotificationService } from '@/lib/notifications'
@@ -248,7 +247,6 @@ export class CaseLifecycleService {
     changeReason?: string
   ): { title: string; content: string; updateType: 'progress' | 'milestone' | 'general' | 'emergency'; isPublic: boolean } | null {
     const reasonText = changeReason ? ` Reason: ${changeReason}` : ''
-    const systemText = systemTriggered ? ' (Automatically)' : ''
 
     switch (newStatus) {
       case 'published':

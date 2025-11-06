@@ -1,6 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
-import { notifications, users, cases } from '@/drizzle/schema'
+import { notifications, cases } from '@/drizzle/schema'
 import { eq, and, desc } from 'drizzle-orm'
 
 import { defaultLogger } from '@/lib/logger'

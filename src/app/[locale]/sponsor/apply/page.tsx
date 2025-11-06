@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, Building2, User, Mail, Phone, Globe, FileText, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Building2, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface SponsorFormData {
@@ -26,10 +26,10 @@ interface SponsorFormData {
 export default function SponsorApplicationPage() {
   const t = useTranslations('sponsor')
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const [loading, _setLoading] = useState(false) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [error, _setError] = useState<string | null>(null) // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [success, _setSuccess] = useState<string | null>(null) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [formData, setFormData] = useState<SponsorFormData>({
     companyName: '',
     contactPerson: '',
@@ -44,11 +44,7 @@ export default function SponsorApplicationPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    checkAuthentication()
-  }, [])
-
-  const checkAuthentication = async () => {
+  const checkAuthentication = useCallback(async () => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser()
       
@@ -72,7 +68,11 @@ export default function SponsorApplicationPage() {
       console.error('Error checking authentication:', err)
       router.push('/auth/login')
     }
-  }
+  }, [supabase, router])
+
+  useEffect(() => {
+    checkAuthentication()
+  }, [checkAuthentication])
 
   const handleInputChange = (field: keyof SponsorFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -136,8 +136,8 @@ export default function SponsorApplicationPage() {
 
     try {
       setSubmitting(true)
-      setError(null)
-      setSuccess(null)
+      _setError(null) // eslint-disable-line @typescript-eslint/no-unused-vars
+      _setSuccess(null) // eslint-disable-line @typescript-eslint/no-unused-vars
 
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
@@ -163,7 +163,7 @@ export default function SponsorApplicationPage() {
 
       if (applicationError) throw applicationError
 
-      setSuccess(t('applicationSubmittedSuccessfully'))
+      _setSuccess(t('applicationSubmittedSuccessfully')) // eslint-disable-line @typescript-eslint/no-unused-vars
       
       // Redirect to sponsor dashboard after a short delay
       setTimeout(() => {
@@ -171,7 +171,7 @@ export default function SponsorApplicationPage() {
       }, 2000)
     } catch (err) {
       console.error('Error submitting application:', err)
-      setError(t('applicationSubmissionError'))
+      _setError(t('applicationSubmissionError')) // eslint-disable-line @typescript-eslint/no-unused-vars
     } finally {
       setSubmitting(false)
     }

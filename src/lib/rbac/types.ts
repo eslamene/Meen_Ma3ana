@@ -98,26 +98,33 @@ export function hasPermission(_userRole: UserRole | undefined, permission: Permi
   return false
 }
 
-export function hasAnyPermission(userRole: UserRole | undefined, permissions: Permission[]): boolean {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function hasAnyPermission(_userRole: UserRole | undefined, _permissions: Permission[]): boolean {
   defaultLogger.warn('hasAnyPermission is deprecated. Use useDatabasePermissions hook instead.')
   return false
 }
 
-export function hasAllPermissions(userRole: UserRole | undefined, permissions: Permission[]): boolean {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function hasAllPermissions(_userRole: UserRole | undefined, _permissions: Permission[]): boolean {
   defaultLogger.warn('hasAllPermissions is deprecated. Use useDatabasePermissions hook instead.')
   return false
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function canPerformAction(
-  userRole: UserRole | undefined,
-  resource: string,
-  action: string
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _userRole: UserRole | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _resource: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _action: string
 ): boolean {
   defaultLogger.warn('canPerformAction is deprecated. Use useDatabasePermissions hook instead.')
   return false
 }
 
-export function isRoleAllowed(userRole: UserRole | undefined, allowedRoles: UserRole[]): boolean {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function isRoleAllowed(_userRole: UserRole | undefined, _allowedRoles: UserRole[]): boolean {
   defaultLogger.warn('isRoleAllowed is deprecated. Use useDatabasePermissions hook instead.')
   return false
 }

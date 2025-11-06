@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
 import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
+import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { 
-  Menu, 
   X, 
   Home, 
   User as UserIcon, 
@@ -43,7 +43,26 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
   const [notificationCount, setNotificationCount] = useState(0)
 
   const supabase = createClient()
-  const { user, loading, modules, hasRole } = useSimpleRBAC()
+  const { user, loading, modules } = useSimpleRBAC()
+
+  const fetchUnreadNotifications = useCallback(async (userId: string) => {
+    try {
+      const notificationService = createContributionNotificationService(supabase)
+      const count = await notificationService.getUnreadNotificationCount(userId)
+      setNotificationCount(count)
+    } catch (error) {
+      console.error('Error fetching unread notifications:', error)
+      setNotificationCount(0)
+    }
+  }, [supabase])
+
+  useEffect(() => {
+    if (user) {
+      fetchUnreadNotifications(user.id)
+    } else {
+      setNotificationCount(0)
+    }
+  }, [user, fetchUnreadNotifications])
 
   // Icon mapping - memoized to prevent re-creation
   const getIcon = useMemo(() => {

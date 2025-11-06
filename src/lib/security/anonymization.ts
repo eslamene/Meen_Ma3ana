@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { users, cases, contributions, sponsorships, communications } from '@/lib/db'
+import { users, cases, contributions } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 
 import { defaultLogger } from '@/lib/logger'

@@ -23,8 +23,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('AuthProvider can only be used in client components')
     }
     return createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
   })
 

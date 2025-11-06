@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { projects, projectCycles } from '@/lib/db'
-import { eq, and, lte, gte } from 'drizzle-orm'
+import { eq, and, lte } from 'drizzle-orm'
 
 import { defaultLogger } from '@/lib/logger'
 
