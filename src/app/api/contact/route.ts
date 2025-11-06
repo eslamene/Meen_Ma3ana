@@ -26,21 +26,23 @@ export async function POST(request: NextRequest) {
 
     // Validate name length
     const trimmedName = name.trim()
-    if (trimmedName.length < 2 || trimmedName.length > 100) {
+    if (trimmedName.length < 2 || trimmedName.length > 120) {
       return NextResponse.json(
         { 
           error: trimmedName.length < 2 
             ? 'Name must be at least 2 characters long'
-            : 'Name must not exceed 100 characters',
+            : 'Name must not exceed 120 characters',
           errorCode: trimmedName.length < 2 ? 'NAME_TOO_SHORT' : 'NAME_TOO_LONG'
         },
         { status: 400 }
       )
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    // Validate email format - more robust validation
+    const trimmedEmail = email.trim()
+    // RFC 5322 compliant email regex (simplified but more accurate)
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+    if (!emailRegex.test(trimmedEmail)) {
       return NextResponse.json(
         { 
           error: 'Invalid email format',
@@ -51,7 +53,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate email length
-    const trimmedEmail = email.trim()
     if (trimmedEmail.length > 255) {
       return NextResponse.json(
         { 

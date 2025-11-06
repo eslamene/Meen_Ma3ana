@@ -1443,7 +1443,7 @@
         "missingFields": "Please fill in all required fields.",
         "invalidEmail": "Please enter a valid email address.",
         "nameTooShort": "Name must be at least 2 characters long.",
-        "nameTooLong": "Name must not exceed 100 characters.",
+        "nameTooLong": "Name must not exceed 120 characters.",
         "emailTooLong": "Email must not exceed 255 characters.",
         "messageTooShort": "Message must be at least 3 characters long.",
         "messageTooLong": "Message must not exceed 5000 characters.",
