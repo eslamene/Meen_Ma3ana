@@ -55,6 +55,12 @@ export default function ContactForm() {
           return t('errors.messageTooShort')
         case 'MESSAGE_TOO_LONG':
           return t('errors.messageTooLong')
+        case 'NAME_TOO_SHORT':
+          return t('errors.nameTooShort')
+        case 'NAME_TOO_LONG':
+          return t('errors.nameTooLong')
+        case 'EMAIL_TOO_LONG':
+          return t('errors.emailTooLong')
         case 'INVALID_REQUEST':
           return t('errors.invalidRequest')
       }
@@ -63,14 +69,48 @@ export default function ContactForm() {
       if (errorMsg.toLowerCase().includes('missing') || errorMsg.toLowerCase().includes('required')) {
         return t('errors.missingFields')
       }
-      if (errorMsg.toLowerCase().includes('email') || errorMsg.toLowerCase().includes('invalid email')) {
+      if (errorMsg.toLowerCase().includes('email') && errorMsg.toLowerCase().includes('format')) {
         return t('errors.invalidEmail')
       }
+      if (errorMsg.toLowerCase().includes('email') && errorMsg.toLowerCase().includes('exceed')) {
+        return t('errors.emailTooLong')
+      }
+      if (errorMsg.toLowerCase().includes('name') && errorMsg.toLowerCase().includes('at least')) {
+        return t('errors.nameTooShort')
+      }
+      if (errorMsg.toLowerCase().includes('name') && errorMsg.toLowerCase().includes('exceed')) {
+        return t('errors.nameTooLong')
+      }
+      // Handle "between X and Y" format
+      if (errorMsg.toLowerCase().includes('between') && errorMsg.toLowerCase().includes('characters')) {
+        // Extract numbers from the error message
+        const numbers = errorMsg.match(/\d+/g)
+        if (numbers && numbers.length >= 2) {
+          const min = parseInt(numbers[0], 10)
+          const max = parseInt(numbers[1], 10)
+          return t('errors.messageLengthRange', { min, max })
+        }
+      }
+      // Handle "at least X" format for message
+      if ((errorMsg.toLowerCase().includes('at least') || errorMsg.toLowerCase().includes('minimum')) && 
+          (errorMsg.toLowerCase().includes('message') || errorMsg.toLowerCase().includes('character'))) {
+        return t('errors.messageTooShort')
+      }
+      // Handle "exceed" or "maximum" format for message
+      if ((errorMsg.toLowerCase().includes('exceed') || errorMsg.toLowerCase().includes('maximum')) && 
+          (errorMsg.toLowerCase().includes('message') || errorMsg.toLowerCase().includes('character'))) {
+        return t('errors.messageTooLong')
+      }
+      // Handle specific number mentions
       if (errorMsg.toLowerCase().includes('message') && errorMsg.toLowerCase().includes('3')) {
         return t('errors.messageTooShort')
       }
       if (errorMsg.toLowerCase().includes('message') && errorMsg.toLowerCase().includes('5000')) {
         return t('errors.messageTooLong')
+      }
+      if (errorMsg.toLowerCase().includes('message') && errorMsg.toLowerCase().includes('10')) {
+        // Handle old "10 characters" minimum
+        return t('errors.messageTooShort')
       }
       if (errorMsg.toLowerCase().includes('format') || errorMsg.toLowerCase().includes('invalid request')) {
         return t('errors.invalidRequest')

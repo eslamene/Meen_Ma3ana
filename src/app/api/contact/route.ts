@@ -24,6 +24,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate name length
+    const trimmedName = name.trim()
+    if (trimmedName.length < 2 || trimmedName.length > 100) {
+      return NextResponse.json(
+        { 
+          error: trimmedName.length < 2 
+            ? 'Name must be at least 2 characters long'
+            : 'Name must not exceed 100 characters',
+          errorCode: trimmedName.length < 2 ? 'NAME_TOO_SHORT' : 'NAME_TOO_LONG'
+        },
+        { status: 400 }
+      )
+    }
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
@@ -36,14 +50,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate message length (reduced minimum to 3 characters for better UX)
-    if (message.trim().length < 3 || message.length > 5000) {
+    // Validate email length
+    const trimmedEmail = email.trim()
+    if (trimmedEmail.length > 255) {
       return NextResponse.json(
         { 
-          error: message.trim().length < 3 
+          error: 'Email must not exceed 255 characters',
+          errorCode: 'EMAIL_TOO_LONG'
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate message length (minimum 3 characters, maximum 5000)
+    const trimmedMessage = message.trim()
+    if (trimmedMessage.length < 3 || message.length > 5000) {
+      return NextResponse.json(
+        { 
+          error: trimmedMessage.length < 3 
             ? 'Message must be at least 3 characters long'
             : 'Message must not exceed 5000 characters',
-          errorCode: message.trim().length < 3 ? 'MESSAGE_TOO_SHORT' : 'MESSAGE_TOO_LONG'
+          errorCode: trimmedMessage.length < 3 ? 'MESSAGE_TOO_SHORT' : 'MESSAGE_TOO_LONG'
         },
         { status: 400 }
       )
@@ -56,9 +83,9 @@ export async function POST(request: NextRequest) {
       // Try to insert into landing_contacts table
       // If table doesn't exist, we'll log it but still return success
       const { error } = await supabase.from('landing_contacts').insert({
-        name: name.trim(),
-        email: email.trim(),
-        message: message.trim(),
+        name: trimmedName,
+        email: trimmedEmail,
+        message: trimmedMessage,
         created_at: new Date().toISOString(),
       })
 
