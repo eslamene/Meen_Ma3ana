@@ -1,7 +1,7 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "installCommand": "npm install --prefer-offline",
+  "installCommand": "npm install",
   "regions": ["fra1"],
   "build": {
     "env": {
