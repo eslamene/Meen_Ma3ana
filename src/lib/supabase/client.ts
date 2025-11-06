@@ -1,13 +1,27 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { CookieOptions } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+// Create a no-op client for SSR
+function createNoOpClient(): SupabaseClient<any, 'public', any> {
+  return {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: async () => ({ error: null }),
+    },
+  } as any
+}
+
+let clientInstance: SupabaseClient<any, 'public', any> | null = null
 
 export function createClient() {
-  // Guard against SSR - createBrowserClient should only be called in browser
+  // Guard against SSR - return no-op client during SSR
   if (typeof window === 'undefined') {
-    throw new Error(
-      'createClient from @/lib/supabase/client cannot be used in server components. ' +
-      'Use createClient from @/lib/supabase/server instead.'
-    )
+    if (!clientInstance) {
+      clientInstance = createNoOpClient()
+    }
+    return clientInstance
   }
 
   return createBrowserClient(
