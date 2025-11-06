@@ -1,7 +1,7 @@
 'use client'
 
 import { User } from '@supabase/supabase-js'
-import { useDatabasePermissions } from './useDatabasePermissions'
+import { useDatabasePermissions } from '@/lib/hooks/useDatabasePermissions'
 import { UserRole, Permission } from '@/lib/rbac/types'
 
 interface UsePermissionsReturn {
@@ -36,20 +36,14 @@ export function usePermissions(): UsePermissionsReturn {
     canPerformAction,
     hasRole,
     canCreateCase,
-    canEditCase,
-    canDeleteCase,
-    canApproveCase,
-    canCreateContribution,
     canApproveContribution,
-    canRejectContribution,
+    
     canAccessAdminDashboard,
     canAccessAnalytics,
     canManageUsers,
     canCreateProject,
     canEditProject,
-    canDeleteProject,
-    canCreateSponsorship,
-    canApproveSponsorship
+    canDeleteProject
   } = useDatabasePermissions()
 
   // Get user role from database roles (fallback to first role)

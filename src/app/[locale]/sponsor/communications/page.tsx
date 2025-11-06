@@ -1,5 +1,5 @@
 'use client'
-
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
@@ -46,6 +46,52 @@ interface Sponsorship {
     title: string
     description: string
   }
+}
+
+interface MessageQueryResult {
+  id: string
+  sender_id: string
+  recipient_id: string
+  subject: string
+  message: string
+  is_read: boolean
+  created_at: string
+  sender?: {
+    first_name: string | null
+    last_name: string | null
+    email: string | null
+    role: string | null
+  } | null | Array<{
+    first_name: string | null
+    last_name: string | null
+    email: string | null
+    role: string | null
+  }>
+  recipient?: {
+    first_name: string | null
+    last_name: string | null
+    email: string | null
+    role: string | null
+  } | null | Array<{
+    first_name: string | null
+    last_name: string | null
+    email: string | null
+    role: string | null
+  }>
+}
+
+interface SponsorshipQueryResult {
+  id: string
+  case_id: string
+  amount: string | number
+  status: string
+  case?: {
+    title: string | null
+    description: string | null
+  } | null | Array<{
+    title: string | null
+    description: string | null
+  }>
 }
 
 export default function SponsorCommunicationsPage() {
@@ -139,43 +185,62 @@ export default function SponsorCommunicationsPage() {
       if (sponsorshipsError) throw sponsorshipsError
 
       // Transform the data to match the interfaces
-      const transformedMessages = (messagesData || []).map((item: any) => ({
-        id: item.id,
-        sender_id: item.sender_id,
-        recipient_id: item.recipient_id,
-        subject: item.subject,
-        message: item.message,
-        is_read: item.is_read,
-        created_at: item.created_at,
-        sender: {
-          first_name: item.sender?.first_name || '',
-          last_name: item.sender?.last_name || '',
-          email: item.sender?.email || '',
-          role: item.sender?.role || ''
-        },
-        recipient: {
-          first_name: item.recipient?.first_name || '',
-          last_name: item.recipient?.last_name || '',
-          email: item.recipient?.email || '',
-          role: item.recipient?.role || ''
-        }
-      }))
+      const transformedMessages = (messagesData || []).map((item: MessageQueryResult) => {
+        // Normalize sender - handle both array and single object cases
+        const senderData = Array.isArray(item.sender) 
+          ? item.sender[0] 
+          : item.sender
+        
+        // Normalize recipient - handle both array and single object cases
+        const recipientData = Array.isArray(item.recipient)
+          ? item.recipient[0]
+          : item.recipient
 
-      const transformedSponsorships = (sponsorshipsData || []).map((item: any) => ({
-        id: item.id,
-        case_id: item.case_id,
-        amount: parseFloat(item.amount),
-        status: item.status,
-        case: {
-          title: item.case?.title || '',
-          description: item.case?.description || ''
+        return {
+          id: item.id,
+          sender_id: item.sender_id,
+          recipient_id: item.recipient_id,
+          subject: item.subject,
+          message: item.message,
+          is_read: item.is_read,
+          created_at: item.created_at,
+          sender: {
+            first_name: senderData?.first_name || '',
+            last_name: senderData?.last_name || '',
+            email: senderData?.email || '',
+            role: senderData?.role || ''
+          },
+          recipient: {
+            first_name: recipientData?.first_name || '',
+            last_name: recipientData?.last_name || '',
+            email: recipientData?.email || '',
+            role: recipientData?.role || ''
+          }
         }
-      }))
+      })
+
+      const transformedSponsorships = (sponsorshipsData || []).map((item: SponsorshipQueryResult) => {
+        // Normalize case - handle both array and single object cases
+        const caseData = Array.isArray(item.case)
+          ? item.case[0]
+          : item.case
+
+        return {
+          id: item.id,
+          case_id: item.case_id,
+          amount: parseFloat(String(item.amount)),
+          status: item.status,
+          case: {
+            title: caseData?.title || '',
+            description: caseData?.description || ''
+          }
+        }
+      })
 
       setMessages(transformedMessages)
       setSponsorships(transformedSponsorships)
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch data')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch data')
     } finally {
       setLoading(false)
     }
@@ -218,8 +283,8 @@ export default function SponsorCommunicationsPage() {
       setNewMessage({ recipient_id: '', subject: '', message: '' })
       setShowNewMessage(false)
       await fetchData()
-    } catch (err: any) {
-      setError(err.message || 'Failed to send message')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send message')
     } finally {
       setSending(false)
     }

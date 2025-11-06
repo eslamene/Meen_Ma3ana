@@ -1,13 +1,13 @@
-import { createClient } from '../supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { db } from '../db'
-import { users, cases, contributions, sponsorships, communications } from '../db'
+import { db } from '@/lib/db'
+import { users, cases, contributions, sponsorships, communications } from '@/lib/db'
 import { eq, sql } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { defaultLogger } from '../logger'
+import { defaultLogger } from '@/lib/logger'
 
 /**
  * Security service for handling Row Level Security (RLS) context

@@ -1,6 +1,7 @@
 import { cache } from 'react'
-import { getMenuModules } from './menu'
-import { createClient } from '../supabase/server'
+import { getMenuModules } from '@/lib/server/menu'
+import { createClient } from '@/lib/supabase/server' 
+import { User } from '@supabase/supabase-js'
 
 /**
  * Cached version of getMenuModules for better performance
@@ -18,5 +19,5 @@ export const getCachedMenuModules = cache(async () => {
  * This is useful when you need to pass user data explicitly
  */
 export const getMenuModulesWithUser = cache(async (user: { id: string; email?: string } | null) => {
-  return getMenuModules(user as any)
+  return getMenuModules(user as User | null)
 })

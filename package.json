@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -20,11 +20,10 @@
     "i18n:unused": "node scripts/i18n/find-unused-keys.js",
     "i18n:check": "npm run i18n:validate && npm run i18n:unused",
     "disable:rls": "node scripts/disable-storage-rls.js",
-    "test:upload": "node scripts/test-upload.js",
     "setup:all": "npm run setup:env && npm run setup:storage && npm run setup:rls && npm run disable:rls",
     "validate:lockfile": "npm ci --dry-run",
     "precommit:check": "npm run validate:lockfile && npm run build",
-    "check:all": "tsc --noEmit && next lint && next build"
+    "check:all": "tsc --noEmit && eslint . && next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -65,7 +64,6 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "3.2.0",
     "@tailwindcss/postcss": "^4.1.16",
     "@types/node": "22.8.4",
     "@types/react": "19.0.1",

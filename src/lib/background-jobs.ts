@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { cases, contributions } from '@/drizzle/schema'
 import { eq, sum, and, gte } from 'drizzle-orm'
-import { CaseLifecycleService } from './case-lifecycle'
+import { CaseLifecycleService } from '@/lib/case-lifecycle'
 
 import { defaultLogger } from '@/lib/logger'
 

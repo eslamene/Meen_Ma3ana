@@ -94,7 +94,7 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
       const total = formattedContributions.reduce((sum, contribution) => sum + contribution.amount, 0)
       setTotalAmount(total)
 
-    } catch (err) {
+    } catch (err: unknown) {
       // Log both to console and structured logger for better visibility in devtools
       // Some non-Error objects (e.g., PostgrestError) don't render well in Next DevTools
       // so we also emit a plain console.error.
@@ -102,8 +102,8 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
       defaultLogger.error('Error fetching approved contributions', err)
       const message = err instanceof Error
         ? err.message
-        : (typeof err === 'object' && err !== null && 'message' in (err as any))
-          ? String((err as any).message)
+        : (typeof err === 'object' && err !== null && 'message' in err)
+          ? String((err as { message: unknown }).message)
           : 'Failed to fetch contributions'
       setError(message)
     } finally {

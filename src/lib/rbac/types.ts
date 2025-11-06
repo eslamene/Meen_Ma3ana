@@ -4,7 +4,7 @@
  * All actual permission data is now stored in the database
  */
 
-import { defaultLogger } from '../logger'
+import { defaultLogger } from '@/lib/logger'
 
 export type UserRole = 'admin' | 'sponsor' | 'donor' | 'moderator' | 'volunteer'
 
@@ -145,7 +145,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   sponsor: [],
   volunteer: [],
   donor: [],
-} as const
+}
 
 /**
  * Legacy role definitions (deprecated)

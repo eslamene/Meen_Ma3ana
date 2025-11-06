@@ -5,12 +5,6 @@ import { requirePermission } from '@/lib/security/guards'
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
-// Create admin client for API routes
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 /**
  * GET /api/admin/rbac/users
  * Get all users with their assigned roles
@@ -20,13 +14,21 @@ export async function GET(request: NextRequest) {
   const logger = new Logger(correlationId)
   
   try {
+    // Admin client (service role) for DB and auth admin operations
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     // Use permission guard
     const guardResult = await requirePermission('manage:rbac')(request)
     if (guardResult instanceof NextResponse) {
       return guardResult
     }
     
-    const { user, supabase } = guardResult
+    const supabase = await createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     // Get all users with their roles
     const { data: userRoleAssignments, error: assignmentsError } = await supabaseAdmin
       .from('rbac_user_roles')
@@ -49,8 +51,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch user roles' }, { status: 500 })
     }
 
+    // Typed assignment shape
+    type RoleInfo = {
+      id: string
+      role_id: string
+      name: string
+      display_name: string
+      description?: string | null
+    }
+    type UserRoleAssignment = {
+      user_id: string
+      assigned_at: string
+      assigned_by: string
+      rbac_roles: RoleInfo | null
+    }
+
     // Get unique user IDs
-    const userIds = [...new Set(userRoleAssignments?.map((assignment: any) => assignment.user_id) || [])]
+    const assignments = (userRoleAssignments as unknown as UserRoleAssignment[] | undefined) ?? []
+    const userIds = [...new Set(assignments.map((assignment) => assignment.user_id))]
     
     // Fetch actual user data from Supabase Auth
     let userData: Array<{ id: string; email?: string; user_metadata?: { full_name?: string } }> = []
@@ -72,8 +90,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Group users by user_id
-    const userMap = new Map()
-    userRoleAssignments?.forEach((assignment: any) => {
+    type UserAggregate = {
+      id: string
+      email: string
+      display_name: string
+      created_at: string
+      roles: Array<{
+        id: string
+        role_id: string
+        name: string
+        display_name: string
+        description?: string | null
+        assigned_at: string
+        assigned_by: string
+      }>
+    }
+
+    const userMap = new Map<string, UserAggregate>()
+    assignments.forEach((assignment) => {
       const userId = assignment.user_id
       if (!userMap.has(userId)) {
         const authUser = userData.find(u => u.id === userId)
@@ -89,7 +123,7 @@ export async function GET(request: NextRequest) {
       }
       
       if (assignment.rbac_roles) {
-        userMap.get(userId).roles.push({
+        userMap.get(userId)!.roles.push({
           id: assignment.rbac_roles.id,
           role_id: assignment.rbac_roles.role_id,
           name: assignment.rbac_roles.name,
@@ -138,7 +172,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Remove existing role assignments for this user
-    const { error: deleteError } = await supabaseAdmin
+    const { error: deleteError } = await supabase
       .from('rbac_user_roles')
       .delete()
       .eq('user_id', userId)
@@ -157,7 +191,7 @@ export async function POST(request: NextRequest) {
       assigned_at: new Date().toISOString()
     }))
 
-    const { error: insertError } = await supabaseAdmin
+    const { error: insertError } = await supabase
       .from('rbac_user_roles')
       .insert(roleAssignments)
 

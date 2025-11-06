@@ -1,6 +1,6 @@
 import { getMenuModules } from '@/lib/server/menu'
 import { createClient } from '@/lib/supabase/server'
-import ClientSidebarNavigation from './ClientSidebarNavigation'
+import ClientSidebarNavigation from '@/components/navigation/ClientSidebarNavigation'
 
 interface ServerSidebarNavigationProps {
   isOpen: boolean

@@ -1,8 +1,8 @@
 import createMiddleware from 'next-intl/middleware';
-import { locales, defaultLocale } from './src/i18n/request';
-import { addCorrelationId } from './src/lib/correlation';
+import { locales, defaultLocale } from '@/i18n/request';
+import { addCorrelationId } from '@/lib/correlation';
 import { NextRequest, NextResponse } from 'next/server';
-import { rateLimit, shouldRateLimit, getRateLimitConfig } from './src/lib/middleware/rateLimit';
+import { rateLimit, shouldRateLimit, getRateLimitConfig } from '@/lib/middleware/rateLimit';
 import { createServerClient } from '@supabase/ssr';
 
 const intlMiddleware = createMiddleware({
@@ -40,7 +40,7 @@ export default async function middleware(request: NextRequest) {
   }
   
   // Create response to handle auth session refresh
-  let response = NextResponse.next({
+  const response = NextResponse.next({
     request: requestWithCorrelationId,
   });
   

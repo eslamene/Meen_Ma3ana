@@ -1,6 +1,6 @@
 import { getMenuModules } from '@/lib/server/menu'
 import { createClient } from '@/lib/supabase/server'
-import ClientLayout from './ClientLayout'
+import ClientLayout from '@/components/layout/ClientLayout'
 
 interface ServerLayoutProps {
   children: React.ReactNode

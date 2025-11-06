@@ -1,9 +1,9 @@
-import { db } from './db'
-import { createClient } from './supabase/client'
-import { caseUpdates, users, contributions, contributionApprovalStatus } from '../../drizzle/schema'
+import { db } from '@/lib/db'
+import { createClient } from '@/lib/supabase/client'
+import { caseUpdates, users, contributions, contributionApprovalStatus } from '@/drizzle/schema'
 import { eq, desc, and, asc, or, like, sql } from 'drizzle-orm'
 
-import { defaultLogger } from './logger'
+import { defaultLogger } from '@/lib/logger'
 
 export interface CaseUpdate {
   id: string

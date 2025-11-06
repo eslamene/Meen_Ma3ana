@@ -1,5 +1,5 @@
 'use client'
-
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
@@ -27,6 +27,29 @@ interface Sponsorship {
     current_amount: number
     status: string
   }
+}
+
+interface SponsorshipQueryResult {
+  id: string
+  case_id: string
+  amount: string | number
+  status: string
+  start_date: string
+  end_date: string
+  created_at: string
+  case?: {
+    title: string | null
+    description: string | null
+    target_amount: string | number | null
+    current_amount: string | number | null
+    status: string | null
+  } | null | Array<{
+    title: string | null
+    description: string | null
+    target_amount: string | number | null
+    current_amount: string | number | null
+    status: string | null
+  }>
 }
 
 export default function SponsorDashboardPage() {
@@ -88,26 +111,33 @@ export default function SponsorDashboardPage() {
       if (error) throw error
       
       // Transform the data to match the interface
-      const transformedData = (data || []).map((item: any) => ({
-        id: item.id,
-        case_id: item.case_id,
-        amount: parseFloat(item.amount),
-        status: item.status,
-        start_date: item.start_date,
-        end_date: item.end_date,
-        created_at: item.created_at,
-        case: {
-          title: item.case?.title || '',
-          description: item.case?.description || '',
-          target_amount: parseFloat(item.case?.target_amount || '0'),
-          current_amount: parseFloat(item.case?.current_amount || '0'),
-          status: item.case?.status || ''
+      const transformedData = (data || []).map((item: SponsorshipQueryResult) => {
+        // Normalize case - handle both array and single object cases
+        const caseData = Array.isArray(item.case)
+          ? item.case[0]
+          : item.case
+
+        return {
+          id: item.id,
+          case_id: item.case_id,
+          amount: parseFloat(String(item.amount)),
+          status: item.status,
+          start_date: item.start_date,
+          end_date: item.end_date,
+          created_at: item.created_at,
+          case: {
+            title: caseData?.title || '',
+            description: caseData?.description || '',
+            target_amount: parseFloat(String(caseData?.target_amount || '0')),
+            current_amount: parseFloat(String(caseData?.current_amount || '0')),
+            status: caseData?.status || ''
+          }
         }
-      }))
+      })
       
       setSponsorships(transformedData)
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch sponsorships')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch sponsorships')
     } finally {
       setLoading(false)
     }

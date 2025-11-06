@@ -1,8 +1,8 @@
-import { db } from '../db'
-import { users, cases, contributions, sponsorships, communications } from '../../../drizzle/schema'
-import { eq, and, like } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { users, cases, contributions, sponsorships, communications } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 
-import { defaultLogger } from '../logger'
+import { defaultLogger } from '@/lib/logger'
 
 /**
  * Data anonymization service for protecting sensitive information

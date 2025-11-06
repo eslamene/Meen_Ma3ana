@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '../supabase/server';
-import { hasPermission, isAdminUser } from './rls';
-import { Logger, defaultLogger } from '../logger';
+import { createClient } from '@/lib/supabase/server';
+import { hasPermission, isAdminUser } from '@/lib/security/rls';
+import { Logger, defaultLogger } from '@/lib/logger';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 
 /**

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { useAuth } from './AuthProvider'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 interface ProtectedRouteProps {
   children: React.ReactNode

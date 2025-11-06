@@ -1,7 +1,7 @@
-import { createClient } from '../supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { User } from '@supabase/supabase-js'
 
-import { defaultLogger } from '../logger'
+import { defaultLogger } from '@/lib/logger'
 
 export interface MenuModule {
   id: string

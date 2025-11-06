@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 
 import { defaultLogger } from '@/lib/logger'
 
@@ -8,7 +8,7 @@ export interface ContributionNotification {
   recipient_id: string
   title: string
   message: string
-  data?: Record<string, any>
+  data?: Record<string, unknown>
   read: boolean
   created_at: string
 }
@@ -32,18 +32,17 @@ export class ContributionNotificationService {
         // Remove created_at to let database set the timestamp
       }
 
-      const { error } = await this.supabase
-        .from('notifications')
+      const { error } = await (await this.supabase).from('notifications')
         .insert(notification)
 
       if (error) {
-        defaultLogger.error('Error sending approval notification:', error)
+        defaultLogger.logStableError('INTERNAL_SERVER_ERROR', error)
         return false
       }
 
       return true
     } catch (error) {
-      defaultLogger.error('Error sending approval notification:', error)
+      defaultLogger.logStableError('INTERNAL_SERVER_ERROR', error)
       return false
     }
   }
@@ -65,18 +64,18 @@ export class ContributionNotificationService {
         // Remove created_at to let database set the timestamp
       }
 
-      const { error } = await this.supabase
+      const { error } = await (await this.supabase)
         .from('notifications')
         .insert(notification)
 
       if (error) {
-        defaultLogger.error('Error sending rejection notification:', error)
+        defaultLogger.logStableError('INTERNAL_SERVER_ERROR', error)
         return false
       }
 
       return true
     } catch (error) {
-      defaultLogger.error('Error sending rejection notification:', error)
+      defaultLogger.logStableError('INTERNAL_SERVER_ERROR', error)
       return false
     }
   }
@@ -97,7 +96,7 @@ export class ContributionNotificationService {
         // Remove created_at to let database set the timestamp
       }
 
-      const { error } = await this.supabase
+      const { error } = await (await this.supabase)
         .from('notifications')
         .insert(notification)
 
@@ -108,7 +107,7 @@ export class ContributionNotificationService {
 
       return true
     } catch (error) {
-      defaultLogger.error('Error sending pending notification:', error)
+      defaultLogger.logStableError('INTERNAL_SERVER_ERROR', error)
       return false
     }
   }
@@ -116,7 +115,7 @@ export class ContributionNotificationService {
   async getUserNotifications(userId: string): Promise<ContributionNotification[]> {
     try {
       // Get all notifications and sort them properly on the client side
-      const { data, error } = await this.supabase
+      const { data, error } = await (await this.supabase)
         .from('notifications')
         .select('*')
         .eq('recipient_id', userId)
@@ -167,7 +166,7 @@ export class ContributionNotificationService {
 
   async markNotificationAsReadSimple(notificationId: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
+      const { error } = await (await this.supabase)
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId)
@@ -186,7 +185,7 @@ export class ContributionNotificationService {
 
   async markAllNotificationsAsRead(userId: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
+      const { error } = await (await this.supabase)
         .from('notifications')
         .update({ read: true })
         .eq('recipient_id', userId)
@@ -206,7 +205,7 @@ export class ContributionNotificationService {
 
   async markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
+      const { error } = await (await this.supabase)
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId)
@@ -226,7 +225,7 @@ export class ContributionNotificationService {
 
   async getUnreadNotificationCount(userId: string): Promise<number> {
     try {
-      const { count, error } = await this.supabase
+      const { count, error } = await (await this.supabase)
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('recipient_id', userId)

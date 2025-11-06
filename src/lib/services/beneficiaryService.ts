@@ -3,8 +3,8 @@
  * Handles all beneficiary-related API operations
  */
 
-import { createClient } from '../supabase/client'
-import { defaultLogger } from '../logger'
+import { createClient } from '@/lib/supabase/client'
+import { defaultLogger } from '@/lib/logger'  
 
 import type {
   Beneficiary,
@@ -12,7 +12,7 @@ import type {
   UpdateBeneficiaryData,
   BeneficiarySearchParams,
   BeneficiaryStats
-} from '../../types/beneficiary'
+} from '@/types/beneficiary'  
 
 export class BeneficiaryService {
   /**

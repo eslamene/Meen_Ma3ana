@@ -9,10 +9,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../../components/ui/dialog"
-import { Button } from "../../../components/ui/button"
-import { Checkbox } from "../../../components/ui/checkbox"
-import { Input } from "../../../components/ui/input"
+} from "@/omponents/ui/dialog"
+import { Button } from "@/omponents/ui/button"
+import { Checkbox } from "@/omponents/ui/checkbox"
+import { Input } from "@/omponents/ui/input"
 
 interface DeleteConfirmationDialogProps {
   open: boolean

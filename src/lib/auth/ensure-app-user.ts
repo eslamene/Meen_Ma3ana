@@ -1,6 +1,6 @@
-import { db , users} from '../db'
-import { defaultLogger } from '../logger';
-import { createClient } from '../supabase/client'
+import { db , users} from '@/lib/db'
+import { defaultLogger } from '@/lib/logger';
+import { createClient } from '@/lib/supabase/client'
 
 type AuthUser = { id: string; email: string | null }
 

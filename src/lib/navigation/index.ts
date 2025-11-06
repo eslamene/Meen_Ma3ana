@@ -14,7 +14,7 @@ export {
   hasModuleAccess,
   type NavigationItem,
   type ModuleNavigationConfig
-} from './config'
+} from '@/lib/navigation/config'
 
 // Export icon registry
 export {
@@ -27,7 +27,7 @@ export {
   isValidIconName,
   type IconProps,
   type IconComponentProps
-} from '../icons/registry'
+} from '@/lib/icons/registry'
 
 // Export translation utilities
 export {
@@ -37,7 +37,7 @@ export {
   translateNavigationItems,
   getRequiredTranslationKeys,
   validateNavigationTranslations
-} from './translations'
+} from '@/lib/navigation/translations'
 
 // Re-export commonly used types
 export type { LucideIcon } from 'lucide-react'

@@ -24,9 +24,9 @@ import {
   ArrowLeft
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import ContributionRejectionModal from './ContributionRejectionModal'
-import ContributionDetailsModal from './ContributionDetailsModal'
-import PaymentProofModal from './PaymentProofModal'
+import ContributionRejectionModal from '@/components/contributions/ContributionRejectionModal'
+import ContributionDetailsModal from '@/components/contributions/ContributionDetailsModal'
+import PaymentProofModal from '@/components/contributions/PaymentProofModal'
 
 // Utility functions
 const formatAmount = (amount: number) => `EGP ${amount.toLocaleString()}`

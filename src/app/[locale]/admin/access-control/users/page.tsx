@@ -2,18 +2,18 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import PermissionGuard from '../../../../../components/auth/PermissionGuard'
-import { useDatabasePermissions } from '../../../../../lib/hooks/useDatabasePermissions'
-import { UserRoleAssignmentModal } from '../../../../../components/admin/rbac/UserRoleAssignmentModal'
-import { Card, CardContent, CardHeader, CardTitle } from '../../../../../components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../../../components/ui/dialog'
-import { Avatar, AvatarImage, AvatarFallback } from '../../../../../components/ui/avatar'
-import { Badge } from '../../../../../components/ui/badge'
-import { Checkbox } from '../../../../../components/ui/checkbox'
-import { Input } from '../../../../../components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../../components/ui/select'
-import { useToast } from '../../../../../hooks/use-toast'
-import { Button } from '../../../../../components/ui/button' // Assuming this exists
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { useDatabasePermissions } from '@/lib/hooks/useDatabasePermissions'
+import { UserRoleAssignmentModal } from '@/components/admin/rbac/UserRoleAssignmentModal'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+  import { useToast } from '@/hooks/use-toast'
+import { Button } from '@/components/ui/button' // Assuming this exists
 import { 
   Users, 
   UserCheck, 

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { createBrowserClient } from '@supabase/ssr'
 import { UserRole, userRoles, getRoleDisplayName, getRoleDescription } from '@/lib/rbac/types'
-import PermissionGuard from './PermissionGuard'
+import PermissionGuard from '@/components/auth/PermissionGuard'
 
 interface RoleManagerProps {
   userId: string

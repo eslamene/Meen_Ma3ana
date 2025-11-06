@@ -1,6 +1,6 @@
-import { db } from '../db'
+import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
-import { defaultLogger } from '../logger'
+import { defaultLogger } from '@/lib/logger'
 
 export interface AuditLogEntry {
   id?: string

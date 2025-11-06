@@ -7,20 +7,18 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
-import { Search, Plus, User, Phone, IdCard, MapPin, AlertCircle, CheckCircle } from 'lucide-react'
+import { Search, Plus, User, Phone, IdCard, MapPin, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { BeneficiaryService } from '@/lib/services/beneficiaryService'
 import { LookupService } from '@/lib/services/lookupService'
 import { BeneficiaryDocumentService } from '@/lib/services/beneficiaryDocumentService'
-import BeneficiaryDocumentUpload from './BeneficiaryDocumentUpload'
-import type { Beneficiary, CreateBeneficiaryData, IdType, City, BeneficiaryDocument, DocumentType } from '@/types/beneficiary'
+import BeneficiaryDocumentUpload from '@/components/beneficiaries/BeneficiaryDocumentUpload'
+import type { Beneficiary, CreateBeneficiaryData, IdType, City, BeneficiaryDocument } from '@/types/beneficiary'
 
 interface BeneficiarySelectorProps {
   selectedBeneficiary?: Beneficiary | null

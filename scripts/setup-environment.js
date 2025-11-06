@@ -1,6 +1,7 @@
-const fs = require('fs')
-const path = require('path')
-require('dotenv').config()
+import fs from 'fs'
+import path from 'path'
+import dotenv from 'dotenv'
+dotenv.config()
 
 console.log('🔧 Setting up environment variables...\n')
 

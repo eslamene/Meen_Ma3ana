@@ -5,7 +5,7 @@
  * and managing translation keys consistently across the application.
  */
 
-import { NavigationItem } from './config'
+import { NavigationItem } from '@/lib/navigation/config'
 
 /**
  * Translation key mapping for navigation items

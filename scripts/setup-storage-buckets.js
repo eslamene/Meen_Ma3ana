@@ -1,17 +1,8 @@
-const { createClient } = require('@supabase/supabase-js')
-require('dotenv').config()
+import { createClient } from '@/lib/supabase/client'
+import dotenv from 'dotenv'
+dotenv.config()
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing required environment variables:')
-  console.error('- NEXT_PUBLIC_SUPABASE_URL')
-  console.error('- SUPABASE_SERVICE_ROLE_KEY')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const supabase = createClient()
 
 const buckets = [
   {
@@ -55,7 +46,7 @@ async function createBucket(bucketConfig) {
   try {
     console.log(`Creating bucket: ${bucketConfig.name}...`)
     
-    const { data, error } = await supabase.storage.createBucket(bucketConfig.name, {
+    const { error } = await supabase.storage.createBucket(bucketConfig.name, {
       public: bucketConfig.public,
       allowedMimeTypes: bucketConfig.allowedMimeTypes,
       fileSizeLimit: bucketConfig.fileSizeLimit

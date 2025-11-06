@@ -1,15 +1,8 @@
-const { createClient } = require('@supabase/supabase-js')
-require('dotenv').config()
+import { createClient } from '@/lib/supabase/server'
+import dotenv from 'dotenv'
+dotenv.config()
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing required environment variables')
-  process.exit(1)
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const supabase = await createClient()
 
 async function disableStorageRLS() {
   console.log('🔓 Dropping all storage RLS policies...\n')
@@ -35,7 +28,7 @@ async function disableStorageRLS() {
     for (const policy of policies) {
       try {
         // Try to drop the policy using direct SQL
-        const { error } = await supabase.storage
+        const { error } = await (await supabase).storage
           .from('contributions')
           .remove([`policy/${policy}`])
         
@@ -53,7 +46,7 @@ async function disableStorageRLS() {
     
     for (const bucket of buckets) {
       try {
-        const { error } = await supabase.storage.updateBucket(bucket, {
+        const { error } = await (await supabase).storage.updateBucket(bucket, {
           public: true
         })
         

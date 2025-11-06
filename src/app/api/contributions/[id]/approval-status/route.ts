@@ -33,6 +33,7 @@ export async function GET(
 
     return NextResponse.json(approvalStatus)
   } catch (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -67,7 +68,7 @@ export async function POST(
 
     if (existingStatus) {
       // Update existing status
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status,
         updated_at: new Date().toISOString()
       }
@@ -155,9 +156,10 @@ export async function POST(
 
         if (contribution) {
           const notificationService = new ContributionNotificationService()
+          type CaseJoin = { title?: string } | Array<{ title?: string }> | null | undefined
           
           if (status === 'approved') {
-            const casesData = contribution.cases as any
+            const casesData = contribution.cases as CaseJoin
             const caseTitle = Array.isArray(casesData) ? casesData[0]?.title : casesData?.title
             await notificationService.sendApprovalNotification(
               id,
@@ -166,7 +168,7 @@ export async function POST(
               caseTitle || 'Unknown Case'
             )
           } else if (status === 'rejected' && rejection_reason) {
-            const casesData = contribution.cases as any
+            const casesData = contribution.cases as CaseJoin
             const caseTitle = Array.isArray(casesData) ? casesData[0]?.title : casesData?.title
             await notificationService.sendRejectionNotification(
               id,
@@ -185,6 +187,7 @@ export async function POST(
 
     return NextResponse.json(result)
   } catch (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 } 

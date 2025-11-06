@@ -32,8 +32,8 @@ export const MODULE_NAVIGATION_ITEMS: ModuleNavigationConfig[] = []
  * Get navigation items for a specific module
  */
 export function getModuleNavigationItems(moduleId: string): NavigationItem[] {
-  const module = MODULE_NAVIGATION_ITEMS.find(m => m.id === moduleId)
-  return module?.items || []
+  const moduleConfig = MODULE_NAVIGATION_ITEMS.find((m: ModuleNavigationConfig) => m.id === moduleId)
+  return moduleConfig?.items || []
 }
 
 /**
@@ -67,12 +67,12 @@ export function hasModuleAccess(
   moduleId: string,
   hasPermission: (permission: string) => boolean
 ): boolean {
-  const module = MODULE_NAVIGATION_ITEMS.find(m => m.id === moduleId)
-  if (!module) return false
+  const moduleConfig = MODULE_NAVIGATION_ITEMS.find(m => m.id === moduleId)
+  if (!moduleConfig) return false
   
   // If module has items, check if user has permission for at least one item
-  if (module.items.length > 0) {
-    return module.items.some(
+  if (moduleConfig.items.length > 0) {
+    return moduleConfig.items.some(
       item => !item.permission || hasPermission(item.permission)
     )
   }

@@ -4,9 +4,9 @@
  * instead of hardcoded permissions
  */
 
-import { createClient } from '../supabase/client'
+import { createClient } from '@/lib/supabase/client'
 
-import { defaultLogger } from '../logger'
+import { defaultLogger } from '@/lib/logger'
 
 export type DatabaseUserRole = {
   id: string

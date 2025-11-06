@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import '../globals.css'
+import '@/globals.css'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { locales } from '@/i18n/request'
@@ -8,8 +7,6 @@ import { AuthProvider } from '@/components/auth/AuthProvider'
 import LocaleProvider from '@/components/LocaleProvider'
 import PageLayout from '@/components/layout/PageLayout'
 import { ToastProvider } from '@/components/ui/toast'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Meen Ma3ana - Charity Platform',

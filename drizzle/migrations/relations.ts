@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { users, cases, caseCategories, caseImages, caseStatusHistory, caseUpdates, communications, contributions, projectCycles, projects, sponsorships, notifications } from "./schema";
+import { users, cases, caseCategories, caseImages, caseStatusHistory, caseUpdates, communications, contributions, projectCycles, projects, sponsorships, notifications } from "@/drizzle/schema";
 
 export const casesRelations = relations(cases, ({one, many}) => ({
 	user_assignedTo: one(users, {

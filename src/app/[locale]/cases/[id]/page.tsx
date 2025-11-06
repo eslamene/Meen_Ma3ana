@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
@@ -221,13 +222,21 @@ export default function CaseDetailPage() {
     realtimeCaseUpdates.subscribeToCaseContributions(
       caseId,
       (newContribution) => {
+        const c = newContribution as {
+          id: string
+          amount: string | number
+          donor_name?: string
+          notes?: string
+          created_at: string
+          anonymous?: boolean
+        }
         const contribution: Contribution = {
-          id: newContribution.id,
-          amount: parseFloat(newContribution.amount),
-          donorName: newContribution.donor_name || t('anonymousDonor'),
-          message: newContribution.notes,
-          createdAt: newContribution.created_at,
-          anonymous: newContribution.anonymous || false
+          id: c.id,
+          amount: parseFloat(String(c.amount)),
+          donorName: c.donor_name || t('anonymousDonor'),
+          message: c.notes,
+          createdAt: c.created_at,
+          anonymous: c.anonymous || false
         }
         setContributions(prev => [contribution, ...prev])
       }
@@ -565,10 +574,24 @@ export default function CaseDetailPage() {
     }
   }
 
+  // Activity timeline item type
+  type ActivityItem = {
+    id: string
+    title: string
+    description: string
+    date: string
+    icon: React.ElementType
+    bgColor: string
+    borderColor: string
+    dotColor: string
+    iconColor: string
+    extraInfo?: string
+  }
+
   // Generate sorted activity timeline
-  const generateSortedActivities = () => {
+  const generateSortedActivities = (): ActivityItem[] => {
     if (!caseData) return []
-    const activities = []
+    const activities: ActivityItem[] = []
     
     // Case Published/Created
     if (caseData.status !== 'draft') {

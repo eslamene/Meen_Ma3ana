@@ -10,7 +10,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
 const colors = {
   reset: '\x1b[0m',

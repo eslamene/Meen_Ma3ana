@@ -5,6 +5,48 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
+interface RbacPermission {
+  name: string
+}
+
+interface RbacRolePermission {
+  rbac_permissions?: RbacPermission | null | RbacPermission[]
+}
+
+interface RbacRole {
+  rbac_role_permissions?: RbacRolePermission | null | RbacRolePermission[]
+}
+
+interface RbacModule {
+  id: string
+  name: string
+  display_name: string | null
+  icon: string | null
+  color: string | null
+}
+
+interface PermissionWithModule {
+  [key: string]: unknown
+  rbac_modules?: RbacModule | null | RbacModule[]
+}
+
+interface UserRoleWithPermissions {
+  rbac_roles?: {
+    rbac_role_permissions?: Array<{
+      rbac_permissions?: {
+        name: string
+      } | null
+    }> | null
+  } | null
+}
+
+interface GroupedPermissionsAccumulator {
+  [moduleName: string]: {
+    module: RbacModule | null
+    permissions: Array<PermissionWithModule>
+  }
+}
+
 export async function GET(request: NextRequest) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
@@ -36,8 +78,8 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasPermission = userRoles?.some((ur: any) => 
-      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+    const hasPermission = (userRoles as UserRoleWithPermissions[] | null)?.some((ur) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp) => 
         rp.rbac_permissions?.name === 'admin:rbac'
       )
     )
@@ -69,17 +111,17 @@ export async function GET(request: NextRequest) {
       if (permissionsError) throw permissionsError
 
       // Group permissions by module
-      const groupedPermissions = permissions.reduce((acc: any, permission: any) => {
-        const moduleName = permission.rbac_modules?.name || 'uncategorized'
+      const groupedPermissions = (permissions as Array<PermissionWithModule>).reduce((acc: GroupedPermissionsAccumulator, permission) => {
+        const moduleName = (permission.rbac_modules as RbacModule | null)?.name || 'uncategorized'
         if (!acc[moduleName]) {
           acc[moduleName] = {
-            module: permission.rbac_modules,
+            module: permission.rbac_modules as RbacModule | null,
             permissions: []
           }
         }
         acc[moduleName].permissions.push(permission)
         return acc
-      }, {})
+      }, {} as GroupedPermissionsAccumulator)
 
       return NextResponse.json({ groupedPermissions })
     } else {
@@ -94,9 +136,10 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ modules })
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Permission Modules API Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -133,8 +176,8 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasPermission = userRoles?.some((ur: any) => 
-      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+    const hasPermission = (userRoles as UserRoleWithPermissions[] | null)?.some((ur) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp) => 
         rp.rbac_permissions?.name === 'admin:rbac'
       )
     )
@@ -160,9 +203,10 @@ export async function POST(request: NextRequest) {
     if (createError) throw createError
 
     return NextResponse.json({ module })
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Create Module API Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -205,8 +249,8 @@ export async function PUT(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasPermission = userRoles?.some((ur: any) => 
-      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+    const hasPermission = (userRoles as UserRoleWithPermissions[] | null)?.some((ur) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp) => 
         rp.rbac_permissions?.name === 'admin:rbac'
       )
     )
@@ -231,9 +275,10 @@ export async function PUT(request: NextRequest) {
     if (updateError) throw updateError
 
     return NextResponse.json({ module })
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Update Module API Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -275,8 +320,8 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const hasPermission = userRoles?.some((ur: any) => 
-      ur.rbac_roles?.rbac_role_permissions?.some((rp: any) => 
+    const hasPermission = (userRoles as UserRoleWithPermissions[] | null)?.some((ur) => 
+      ur.rbac_roles?.rbac_role_permissions?.some((rp) => 
         rp.rbac_permissions?.name === 'admin:rbac'
       )
     )
@@ -291,8 +336,9 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Delete Module API Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

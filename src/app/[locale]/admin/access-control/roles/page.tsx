@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import PermissionGuard from '../../../../../components/auth/PermissionGuard'
-import { DeleteConfirmationDialog } from '../../../../../components/admin/rbac/DeleteConfirmationDialog'
-import { RoleFormModal } from '../../../../../components/admin/rbac/RoleFormModal'
-import { RolesDataTable } from '../../../../../components/admin/rbac/RolesDataTable'
-import { PermissionAssignmentModal } from '../../../../../components/admin/rbac/PermissionAssignmentModal'
-import { Card, CardContent } from '../../../../../components/ui/card'
-import { useToast } from '../../../../../hooks/use-toast'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { DeleteConfirmationDialog } from '@/components/admin/rbac/DeleteConfirmationDialog'
+import { RoleFormModal } from '@/components/admin/rbac/RoleFormModal'
+import { RolesDataTable } from '@/components/admin/rbac/RolesDataTable'
+import { PermissionAssignmentModal } from '@/components/admin/rbac/PermissionAssignmentModal'
+import { Card, CardContent } from '@/components/ui/card'
+import { useToast } from '@/hooks/use-toast'
 import { Shield, Users, Plus } from 'lucide-react'
 
 // Types

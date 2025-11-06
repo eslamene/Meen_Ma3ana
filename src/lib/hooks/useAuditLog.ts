@@ -4,10 +4,15 @@
 import { useCallback } from 'react'
 import { auditService, AuditLogEntry } from '@/lib/services/auditService'
 
-// Re-export types for convenience
-export type { AuditLogEntry }
+export interface PermissionChangeAudit {
+  id: string
+  role_name: string
+  permission_name: string
+  action: 'grant' | 'revoke'
+  performed_by?: string
+  created_at: Date
+}
 
-// Define types for role assignment and permission change audits
 export interface RoleAssignmentAudit {
   id: string
   user_id: string
@@ -18,29 +23,20 @@ export interface RoleAssignmentAudit {
   created_at: Date
 }
 
-export interface PermissionChangeAudit {
-  id: string
-  role_name: string
-  permission_name: string
-  action: 'grant' | 'revoke'
-  performed_by?: string
-  created_at: Date
-}
-
 export interface UseAuditLogReturn {
   // Logging functions
   logChange: (params: {
     action: string
     table_name: string
     record_id?: string
-    old_values?: Record<string, any>
-    new_values?: Record<string, any>
+    old_values?: Record<string, unknown>
+    new_values?: Record<string, unknown>
     session_id?: string
     request_id?: string
     severity?: 'info' | 'warning' | 'error' | 'critical'
     category?: string
-    details?: Record<string, any>
-    metadata?: Record<string, any>
+    details?: Record<string, unknown>
+    metadata?: Record<string, unknown>
   }) => Promise<string | null>
 
   logRoleAssignment: (params: {
@@ -74,7 +70,7 @@ export interface UseAuditLogReturn {
     role_name?: string
     permission_name?: string
     action?: string
-  }) => Promise<PermissionChangeAudit[]>
+    }) => Promise<PermissionChangeAudit[]>
 
   getAllAuditLogs: (params?: {
     limit?: number
@@ -93,14 +89,14 @@ export function useAuditLog(): UseAuditLogReturn {
     action: string
     table_name: string
     record_id?: string
-    old_values?: Record<string, any>
-    new_values?: Record<string, any>
+    old_values?: Record<string, unknown>
+    new_values?: Record<string, unknown>
     session_id?: string
     request_id?: string
     severity?: 'info' | 'warning' | 'error' | 'critical'
     category?: string
-    details?: Record<string, any>
-    metadata?: Record<string, any>
+    details?: Record<string, unknown>
+    metadata?: Record<string, unknown>
   }) => {
     return await auditService.logChange(params)
   }, [])

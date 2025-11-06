@@ -29,6 +29,12 @@ export interface CaseUpdateNotification {
   }
 }
 
+interface CaseData {
+  id: string
+  current_amount?: string | number | null
+  target_amount?: string | number | null
+}
+
 export class RealtimeCaseUpdates {
   private supabase = createClient()
   private channels: Map<string, RealtimeChannel> = new Map()
@@ -39,7 +45,7 @@ export class RealtimeCaseUpdates {
   subscribeToCaseProgress(
     caseId: string,
     onProgressUpdate: (update: CaseProgressUpdate) => void,
-    onError?: (error: any) => void
+    onError?: (error: unknown) => void
   ) {
     const channelKey = `case-progress-${caseId}`
     
@@ -58,13 +64,15 @@ export class RealtimeCaseUpdates {
           filter: `id=eq.${caseId}`
         },
         (payload) => {
-          const caseData = payload.new as any
+          const caseData = payload.new as CaseData
+          const currentAmount = parseFloat(String(caseData.current_amount || 0))
+          const targetAmount = parseFloat(String(caseData.target_amount || 0))
           const update: CaseProgressUpdate = {
             caseId: caseData.id,
-            currentAmount: parseFloat(caseData.current_amount || 0),
-            targetAmount: parseFloat(caseData.target_amount || 0),
-            progressPercentage: caseData.target_amount > 0 
-              ? (parseFloat(caseData.current_amount || 0) / parseFloat(caseData.target_amount)) * 100 
+            currentAmount,
+            targetAmount,
+            progressPercentage: targetAmount > 0 
+              ? (currentAmount / targetAmount) * 100 
               : 0
           }
           onProgressUpdate(update)
@@ -91,7 +99,7 @@ export class RealtimeCaseUpdates {
     onUpdateCreated: (update: CaseUpdateNotification) => void,
     onUpdateUpdated?: (update: CaseUpdateNotification) => void,
     onUpdateDeleted?: (updateId: string) => void,
-    onError?: (error: any) => void
+    onError?: (error: unknown) => void
   ) {
     const channelKey = `case-updates-${caseId}`
     
@@ -110,17 +118,8 @@ export class RealtimeCaseUpdates {
           filter: `case_id=eq.${caseId}`
         },
         (payload) => {
-          const updateData = payload.new as any
-          const update: CaseUpdateNotification = {
-            id: updateData.id,
-            caseId: updateData.case_id,
-            title: updateData.title,
-            content: updateData.content,
-            updateType: updateData.update_type,
-            createdAt: updateData.created_at,
-            createdBy: updateData.created_by
-          }
-          onUpdateCreated(update)
+          const updateData = payload.new as CaseUpdateNotification
+          onUpdateCreated(updateData)
         }
       )
       .on(
@@ -132,17 +131,8 @@ export class RealtimeCaseUpdates {
           filter: `case_id=eq.${caseId}`
         },
         (payload) => {
-          const updateData = payload.new as any
-          const update: CaseUpdateNotification = {
-            id: updateData.id,
-            caseId: updateData.case_id,
-            title: updateData.title,
-            content: updateData.content,
-            updateType: updateData.update_type,
-            createdAt: updateData.created_at,
-            createdBy: updateData.created_by
-          }
-          onUpdateUpdated?.(update)
+          const updateData = payload.new as CaseUpdateNotification
+          onUpdateUpdated?.(updateData)
         }
       )
       .on(
@@ -154,7 +144,7 @@ export class RealtimeCaseUpdates {
           filter: `case_id=eq.${caseId}`
         },
         (payload) => {
-          const updateData = payload.old as any
+          const updateData = payload.old as { id: string }
           onUpdateDeleted?.(updateData.id)
         }
       )
@@ -176,9 +166,9 @@ export class RealtimeCaseUpdates {
    */
   subscribeToCaseContributions(
     caseId: string,
-    onContributionAdded: (contribution: any) => void,
-    onContributionUpdated?: (contribution: any) => void,
-    onError?: (error: any) => void
+    onContributionAdded: (contribution: unknown) => void,
+    onContributionUpdated?: (contribution: unknown) => void,
+    onError?: (error: unknown) => void
   ) {
     const channelKey = `case-contributions-${caseId}`
     

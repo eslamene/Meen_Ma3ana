@@ -5,8 +5,8 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Upload, X, FileText, Image as ImageIcon, File, CheckCircle } from 'lucide-react'
-import { FILE_CATEGORIES, FileCategory } from './CaseFileManager'
+import { Upload, X, FileText, Image as ImageIcon, File} from 'lucide-react'
+import { FILE_CATEGORIES, FileCategory } from '@/components/cases/CaseFileManager'
 
 interface PendingFile {
   file: File

@@ -4,12 +4,12 @@ import React from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
-import ProtectedRoute from '../../../components/auth/ProtectedRoute'
-import PermissionGuard from '../../../components/auth/PermissionGuard'
-import { usePermissions } from '../../../lib/hooks/usePermissions'
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
-import { Button } from '../../../components/ui/button'
-import { Badge } from '../../../components/ui/badge'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import PermissionGuard from '@/components/auth/PermissionGuard'
+import { usePermissions } from '@/lib/hooks/usePermissions'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { 
   Users, 
   Heart, 
@@ -26,8 +26,8 @@ import {
   Shield,
   ArrowRight
 } from 'lucide-react'
-import { createClient } from '../../../lib/supabase/client'
-import { useSimpleRBAC } from '../../../lib/hooks/useSimpleRBAC'
+import { createClient } from '@/lib/supabase/client'
+import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {

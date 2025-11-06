@@ -6,11 +6,11 @@ import { useTranslations } from 'next-intl'
 import { useRouter, usePathname } from 'next/navigation'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
-import { Button } from '../../../components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs'
-import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar'
-import { Badge } from '../../../components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { 
   Calendar, 
   Mail, 
@@ -35,9 +35,9 @@ import {
   Activity,
   Award
 } from 'lucide-react'
-import { createClient } from '../../../lib/supabase/client'
-import ContributionHistory from '../../../components/profile/ContributionHistory'
-import UserRoleInfo from '../../../components/profile/UserRoleInfo'
+import { createClient } from '@/lib/supabase/client'
+import ContributionHistory from '@/components/profile/ContributionHistory'
+import UserRoleInfo from '@/components/profile/UserRoleInfo'
 
 interface UserProfile {
   id: string
