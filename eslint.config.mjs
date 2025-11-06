@@ -16,9 +16,10 @@ const eslintConfig = [
     ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts"],
     settings: {
       // Ensure '@/*' paths resolve for ESLint import rules
+      // Point resolver at the tsconfig project file rather than a single path
       "import/resolver": {
         typescript: {
-          project: tsconfig.compilerOptions.paths["@/*"][0]
+          project: "./tsconfig.json"
         }
       }
     },

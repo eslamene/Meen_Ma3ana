@@ -5,6 +5,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit, shouldRateLimit, getRateLimitConfig } from '@/lib/middleware/rateLimit';
 import { createServerClient } from '@supabase/ssr';
 
+// Pin middleware to Node.js runtime for Supabase SSR compatibility
+export const runtime = 'nodejs';
+
 const intlMiddleware = createMiddleware({
   // A list of all locales that are supported
   locales: locales,
@@ -25,15 +28,20 @@ export default async function middleware(request: NextRequest) {
   if (isPrelaunch) {
     const pathname = requestWithCorrelationId.nextUrl.pathname
     
-    // Allow landing pages and static assets
-    const isLanding = pathname.includes('/landing')
+    // Extract locale from pathname (first segment after /)
+    const pathSegments = pathname.split('/').filter(Boolean);
+    const firstSegment = pathSegments[0] || '';
+    const locale = locales.includes(firstSegment as typeof locales[number]) ? firstSegment : defaultLocale;
+    
+    // Explicit allowlist for prelaunch mode
+    const isLandingRoute = pathname === `/${locale}/landing` || pathname === '/landing';
+    const isContactApi = pathname === '/api/contact';
     const isStaticAsset = pathname.startsWith('/_next/') || 
                          pathname.startsWith('/_static/') ||
                          pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot)$/)
     
     // Block app routes (except landing and assets)
-    if (!isLanding && !isStaticAsset && !pathname.startsWith('/api/contact')) {
-      const locale = pathname.split('/')[1] || defaultLocale
+    if (!isLandingRoute && !isStaticAsset && !isContactApi) {
       const landingUrl = new URL(`/${locale}/landing`, requestWithCorrelationId.url)
       return NextResponse.redirect(landingUrl)
     }
@@ -87,9 +95,11 @@ export default async function middleware(request: NextRequest) {
   const intlResponse = intlMiddleware(requestWithCorrelationId);
   
   // Merge cookies from auth refresh into intl response
+  // Use getAll() and preserve full cookie attributes via toString()
   if (intlResponse instanceof Response) {
     response.cookies.getAll().forEach(cookie => {
-      intlResponse.headers.append('Set-Cookie', `${cookie.name}=${cookie.value}`);
+      // Preserve all cookie attributes (path, domain, secure, httpOnly, etc.)
+      intlResponse.headers.append('Set-Cookie', cookie.toString());
     });
     return intlResponse;
   }
