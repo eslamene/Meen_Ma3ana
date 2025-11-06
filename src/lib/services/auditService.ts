@@ -1,5 +1,4 @@
-import { db } from '@/lib/db'
-import { sql } from 'drizzle-orm'
+import { db, client } from '@/lib/db'
 import { defaultLogger } from '@/lib/logger'
 
 export interface AuditLogEntry {
@@ -31,7 +30,7 @@ export class AuditService {
     userAgent?: string
   ): Promise<void> {
     try {
-      await db.execute(sql`
+      await client`
         INSERT INTO rbac_audit_log (
           user_id,
           action,
@@ -53,7 +52,7 @@ export class AuditService {
           ${userAgent || null},
           NOW()
         )
-      `)
+      `
     } catch (error) {
       defaultLogger.error('Error logging audit action:', error)
       // Don't throw error for audit failures to avoid breaking main functionality
@@ -150,7 +149,7 @@ export class AuditService {
     offset: number = 0
   ): Promise<AuditLogEntry[]> {
     try {
-      const result = await db.execute(sql`
+      const result = await client`
         SELECT 
           id,
           user_id,
@@ -166,7 +165,7 @@ export class AuditService {
         ORDER BY created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
-      `)
+      `
 
       // Extract rows from drizzle result (handles both array and object with rows property)
       const extractedRows = Array.isArray(result)
@@ -193,7 +192,7 @@ export class AuditService {
     offset: number = 0
   ): Promise<AuditLogEntry[]> {
     try {
-      const result = await db.execute(sql`
+      const result = await client`
         SELECT 
           id,
           user_id,
@@ -210,7 +209,7 @@ export class AuditService {
         ORDER BY created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
-      `)
+      `
 
       // Extract rows from drizzle result (handles both array and object with rows property)
       const extractedRows = Array.isArray(result)
@@ -235,7 +234,7 @@ export class AuditService {
     offset: number = 0
   ): Promise<AuditLogEntry[]> {
     try {
-      const result = await db.execute(sql`
+      const result = await client`
         SELECT 
           id,
           user_id,
@@ -250,7 +249,7 @@ export class AuditService {
         ORDER BY created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
-      `)
+      `
 
       // Extract rows from drizzle result (handles both array and object with rows property)
       const extractedRows = Array.isArray(result)

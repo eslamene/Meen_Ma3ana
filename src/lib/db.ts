@@ -40,6 +40,7 @@ try {
 }
 
 export const db = drizzle(client, { schema })
+export { client }
 
 // Export schema for use in other files
 export { schema }
