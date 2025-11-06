@@ -59,9 +59,6 @@ export default function CaseDetailsPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
   const [user, setUser] = useState<User | null>(null)
 
   const supabase = createClient()
@@ -277,7 +274,7 @@ export default function CaseDetailsPage() {
     }
 
     // Prevent multiple submissions
-    if (saving || submitting) {
+    if (saving) {
       return
     }
 
@@ -313,7 +310,6 @@ export default function CaseDetailsPage() {
       }
 
       const result = await response.json()
-      setLastSaved(new Date())
       
       // Show success message
       toast({
@@ -581,7 +577,7 @@ export default function CaseDetailsPage() {
           <Button 
             variant="outline" 
             onClick={handleSaveDraft}
-            disabled={saving || submitting}
+            disabled={saving}
           >
             {saving ? (
               <>
@@ -594,7 +590,7 @@ export default function CaseDetailsPage() {
           </Button>
           <Button 
             onClick={handleNext}
-            disabled={saving || submitting}
+            disabled={saving}
           >
             {t('continue')}
             <ArrowRight className="h-4 w-4 ml-2" />

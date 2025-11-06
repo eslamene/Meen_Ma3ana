@@ -21,7 +21,7 @@ async function disableRLSForTesting() {
     try {
       console.log(`Disabling RLS for bucket: ${bucket}...`)
       
-      const { data, error } = await (await supabase).storage.updateBucket(bucket, {
+      const { error } = await (await supabase).storage.updateBucket(bucket, {
         public: true
       })
 

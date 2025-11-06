@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Layout } from 'lucide-react'
@@ -59,8 +58,16 @@ interface Filters {
   sortOrder: 'asc' | 'desc'
 }
 
+// Default filters - currently static but kept for potential future filter UI
+const defaultFilters: Filters = {
+  status: 'all',
+  search: '',
+  dateFrom: '',
+  dateTo: '',
+  sortOrder: 'desc' // Default: newest first
+}
+
 export default function ContributionsPage() {
-  const t = useTranslations('cases')
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -75,16 +82,9 @@ export default function ContributionsPage() {
     hasNextPage: false,
     hasPrevPage: false
   })
-  const [filters, setFilters] = useState<Filters>({
-    status: 'all',
-    search: '',
-    dateFrom: '',
-    dateTo: '',
-    sortOrder: 'desc' // Default: newest first
-  })
+  // Use default filters (static for now, can be converted to state when filter UI is added)
+  const filters = defaultFilters
   const [highlightedTxId, setHighlightedTxId] = useState<string | null>(null)
-
-  const supabase = createClient()
 
   // Handle tx parameter from URL (for notification redirects)
   useEffect(() => {
@@ -150,27 +150,6 @@ export default function ContributionsPage() {
   useEffect(() => {
     fetchContributions()
   }, [fetchContributions])
-
-  const handleSearch = (search: string) => {
-    setFilters(prev => ({ ...prev, search }))
-    setPagination(prev => ({ ...prev, page: 1 }))
-  }
-
-  const handleFilterChange = (key: keyof Filters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
-    setPagination(prev => ({ ...prev, page: 1 }))
-  }
-
-  const handleClearFilters = () => {
-    setFilters({
-      status: 'all',
-      search: '',
-      dateFrom: '',
-      dateTo: '',
-      sortOrder: 'desc' // Reset to default
-    })
-    setPagination(prev => ({ ...prev, page: 1 }))
-  }
 
   const handlePageChange = (page: number) => {
     setPagination(prev => ({ ...prev, page }))

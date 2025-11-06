@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
@@ -26,7 +26,8 @@ export async function POST(
       )
     }
 
-    const success = await contributionNotificationService.markNotificationAsReadSimple(id)
+    const notificationService = createContributionNotificationService(supabase)
+    const success = await notificationService.markNotificationAsReadSimple(id)
     
     if (success) {
       return NextResponse.json({ success: true })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,7 +37,6 @@ interface StatusManagementPanelProps {
 export default function StatusManagementPanel({
   caseId,
   currentStatus,
-  userRole,
   onStatusChange
 }: StatusManagementPanelProps) {
   const t = useTranslations('admin')
@@ -48,12 +47,7 @@ export default function StatusManagementPanel({
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([])
   const [availableTransitions, setAvailableTransitions] = useState<CaseStatus[]>([])
 
-  useEffect(() => {
-    fetchStatusHistory()
-    fetchAvailableTransitions()
-  }, [caseId])
-
-  const fetchStatusHistory = async () => {
+  const fetchStatusHistory = useCallback(async () => {
     try {
       const response = await fetch(`/api/cases/${caseId}/status`)
       if (response.ok) {
@@ -63,9 +57,9 @@ export default function StatusManagementPanel({
     } catch (error) {
       console.error('Error fetching status history:', error)
     }
-  }
+  }, [caseId])
 
-  const fetchAvailableTransitions = async () => {
+  const fetchAvailableTransitions = useCallback(async () => {
     try {
       const response = await fetch(`/api/cases/${caseId}/transitions`)
       if (response.ok) {
@@ -75,7 +69,12 @@ export default function StatusManagementPanel({
     } catch (error) {
       console.error('Error fetching available transitions:', error)
     }
-  }
+  }, [caseId])
+
+  useEffect(() => {
+    fetchStatusHistory()
+    fetchAvailableTransitions()
+  }, [fetchStatusHistory, fetchAvailableTransitions])
 
   const handleStatusChange = async () => {
     if (!selectedStatus || selectedStatus === currentStatus) {
@@ -96,7 +95,7 @@ export default function StatusManagementPanel({
       // Refresh data
       await fetchStatusHistory()
       await fetchAvailableTransitions()
-    } catch (error) {
+    } catch {
       setError('Failed to change status')
     } finally {
       setIsLoading(false)

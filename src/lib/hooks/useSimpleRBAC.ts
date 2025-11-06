@@ -41,7 +41,13 @@ export function useSimpleRBAC(): SimpleRBACReturn {
   const [userPermissions, setUserPermissions] = useState<string[]>([])
   const [hasFetched, setHasFetched] = useState(false)
 
-  const supabase = createClient()
+  // Create client lazily - only in browser environment
+  const [supabase] = useState(() => {
+    if (typeof window === 'undefined') {
+      throw new Error('useSimpleRBAC can only be used in client components')
+    }
+    return createClient()
+  })
 
   // Simple permission check
   const hasPermission = useCallback((permission: string) => {

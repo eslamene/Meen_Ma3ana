@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -68,7 +68,7 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
     total: 0
   })
 
-  const loadAuditLogs = async () => {
+  const loadAuditLogs = useCallback(async () => {
     setLoading(true)
     try {
       const offset = (pagination.page - 1) * pagination.limit
@@ -102,11 +102,11 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab, pagination.page, pagination.limit, filters, getAllAuditLogs, getRoleAssignmentAudit, getPermissionChangeAudit])
 
   useEffect(() => {
     loadAuditLogs()
-  }, [activeTab, pagination.page, filters])
+  }, [loadAuditLogs])
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {

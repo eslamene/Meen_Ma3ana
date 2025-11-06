@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase'
-
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { defaultLogger } from '@/lib/logger'
 
 export interface ContributionNotification {
@@ -14,7 +13,7 @@ export interface ContributionNotification {
 }
 
 export class ContributionNotificationService {
-  private supabase = supabase
+  constructor(private supabase: SupabaseClient) {}
 
   async sendApprovalNotification(contributionId: string, donorId: string, amount: number, caseTitle: string) {
     try {
@@ -249,4 +248,16 @@ export class ContributionNotificationService {
   }
 }
 
-export const contributionNotificationService = new ContributionNotificationService() 
+// Note: This service now requires a Supabase client to be passed.
+// Use createContributionNotificationService(client) helper function instead.
+// This export is kept for backward compatibility but will throw an error if used.
+// It will be removed in a future version.
+export const contributionNotificationService = null as unknown as ContributionNotificationService
+
+/**
+ * Factory function to create a ContributionNotificationService instance
+ * with the appropriate Supabase client (server or client)
+ */
+export function createContributionNotificationService(supabase: SupabaseClient): ContributionNotificationService {
+  return new ContributionNotificationService(supabase)
+} 

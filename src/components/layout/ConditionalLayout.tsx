@@ -14,7 +14,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   useEffect(() => {
     // Get initial user

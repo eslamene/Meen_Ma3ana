@@ -61,7 +61,6 @@ interface Filters {
 }
 
 export default function AdminContributionsPage() {
-  const t = useTranslations('admin')
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -94,8 +93,6 @@ export default function AdminContributionsPage() {
     approved: 0,
     rejected: 0
   })
-
-  const supabase = createClient()
 
   // Update filter when URL changes
   useEffect(() => {
@@ -158,11 +155,6 @@ export default function AdminContributionsPage() {
     fetchContributions()
   }, [fetchContributions])
 
-  const handleSearch = (search: string) => {
-    setFilters(prev => ({ ...prev, search }))
-    setPagination(prev => ({ ...prev, page: 1 }))
-  }
-
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }))
     setPagination(prev => ({ ...prev, page: 1 }))
@@ -178,17 +170,6 @@ export default function AdminContributionsPage() {
       const newUrl = `/${params.locale}/admin/contributions${newSearchParams.toString() ? '?' + newSearchParams.toString() : ''}`
       router.push(newUrl, { scroll: false })
     }
-  }
-
-  const handleClearFilters = () => {
-    setFilters({
-      status: 'all',
-      search: '',
-      dateFrom: '',
-      dateTo: '',
-      sortOrder: 'desc' // Reset to default
-    })
-    setPagination(prev => ({ ...prev, page: 1 }))
   }
 
   const handlePageChange = (page: number) => {

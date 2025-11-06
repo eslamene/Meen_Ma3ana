@@ -6,10 +6,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, DollarSign, User, MapPin, Calendar, TrendingUp, Target } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Target } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import ContributionForm from '@/components/contributions/ContributionForm'
-import ProgressBar from '@/components/cases/ProgressBar'
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
 
 interface Case {
@@ -47,42 +46,42 @@ export default function DonatePage() {
   const supabase = createClient()
   
   // Use centralized hook for approved contributions
-  const { totalAmount: approvedTotal, isLoading: contributionsLoading, error: contributionsError, refetch: refetchContributions } = useApprovedContributions(caseId)
+  const { totalAmount: approvedTotal } = useApprovedContributions(caseId)
 
   useEffect(() => {
-    fetchCaseDetails()
-  }, [caseId])
+    const fetchCaseDetails = async () => {
+      try {
+        setLoading(true)
+        setError(null)
 
-  const fetchCaseDetails = async () => {
-    try {
-      setLoading(true)
-      setError(null)
+        const { data, error } = await supabase
+          .from('cases')
+          .select('*')
+          .eq('id', caseId)
+          .single()
 
-      const { data, error } = await supabase
-        .from('cases')
-        .select('*')
-        .eq('id', caseId)
-        .single()
+        if (error) {
+          console.error('Error fetching case:', error)
+          setError('Case not found')
+          return
+        }
 
-      if (error) {
-        console.error('Error fetching case:', error)
-        setError('Case not found')
-        return
+        if (data.status !== 'published') {
+          setError('This case is not available for donations')
+          return
+        }
+
+        setCaseData(data)
+      } catch (error) {
+        console.error('Error fetching case details:', error)
+        setError('Failed to load case details')
+      } finally {
+        setLoading(false)
       }
-
-      if (data.status !== 'published') {
-        setError('This case is not available for donations')
-        return
-      }
-
-      setCaseData(data)
-    } catch (error) {
-      console.error('Error fetching case details:', error)
-      setError('Failed to load case details')
-    } finally {
-      setLoading(false)
     }
-  }
+
+    fetchCaseDetails()
+  }, [caseId, supabase])
 
   const handleBack = () => {
     router.push(`/${locale}/cases/${caseId}`)

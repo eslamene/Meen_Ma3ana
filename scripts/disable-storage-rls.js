@@ -36,7 +36,7 @@ async function disableStorageRLS() {
           console.log(`✅ Dropped policy: ${policy}`)
           droppedCount++
         }
-      } catch (e) {
+      } catch {
         // Policy might not exist, continue
       }
     }

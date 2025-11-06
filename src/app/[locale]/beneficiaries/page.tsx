@@ -27,7 +27,6 @@ export default function BeneficiariesPage() {
   const [cityFilter, setCityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [cities, setCities] = useState<City[]>([])
-  const [idTypes, setIdTypes] = useState<IdType[]>([])
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<Beneficiary | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -37,7 +36,7 @@ export default function BeneficiariesPage() {
     const loadData = async () => {
       try {
         setLoading(true)
-        const [beneficiariesData, citiesData, idTypesData] = await Promise.all([
+        const [beneficiariesData, citiesData] = await Promise.all([
           BeneficiaryService.getAll(),
           LookupService.getCities(),
           LookupService.getIdTypes()
@@ -45,7 +44,6 @@ export default function BeneficiariesPage() {
         setBeneficiaries(beneficiariesData)
         setFilteredBeneficiaries(beneficiariesData)
         setCities(citiesData)
-        setIdTypes(idTypesData)
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {

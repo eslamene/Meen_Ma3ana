@@ -3,28 +3,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { 
   Search, 
-  Filter, 
   Grid, 
   List, 
   Plus, 
   Target, 
   TrendingUp, 
-  Heart,
-  MapPin,
-  Calendar,
   DollarSign,
   Users,
-  Eye,
-  Share2,
-  ArrowRight,
-  Sparkles,
   AlertCircle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -69,7 +61,6 @@ export default function CasesPage() {
 
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<CaseFilters>({
     search: '',
     type: 'all',
@@ -89,12 +80,9 @@ export default function CasesPage() {
     totalPages: 0
   })
 
-  const supabase = createClient()
-
   const fetchCases = useCallback(async () => {
     try {
       setLoading(true)
-      setError(null)
       console.log('Fetching cases...')
 
       const params = new URLSearchParams({
@@ -135,7 +123,6 @@ export default function CasesPage() {
       setPagination(data.pagination || {})
     } catch (error) {
       console.error('Error fetching cases:', error)
-      setError('Failed to load cases')
     } finally {
       setLoading(false)
       console.log('Fetch completed, loading set to false')
@@ -200,10 +187,6 @@ export default function CasesPage() {
 
   const getTotalRaised = () => {
     return cases.reduce((total, caseItem) => total + caseItem.currentAmount, 0)
-  }
-
-  const getTotalTarget = () => {
-    return cases.reduce((total, caseItem) => total + caseItem.targetAmount, 0)
   }
 
   const getActiveCases = () => {

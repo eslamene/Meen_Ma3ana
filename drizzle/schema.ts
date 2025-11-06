@@ -449,7 +449,7 @@ export const communicationsRelations = relations(communications, ({ one }) => ({
   }),
 }))
 
-export const recurringContributionsRelations = relations(recurringContributions, ({ one, many }) => ({
+export const recurringContributionsRelations = relations(recurringContributions, ({ one }) => ({
   donor: one(users, {
     fields: [recurringContributions.donor_id],
     references: [users.id],

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
@@ -25,8 +25,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '20')
 
-    const notifications = await contributionNotificationService.getUserNotifications(user.id)
-    const unreadCount = await contributionNotificationService.getUnreadNotificationCount(user.id)
+    const notificationService = createContributionNotificationService(supabase)
+    const notifications = await notificationService.getUserNotifications(user.id)
+    const unreadCount = await notificationService.getUnreadNotificationCount(user.id)
 
     return NextResponse.json({
       notifications,
@@ -61,8 +62,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { action, notificationId } = body
 
+    const notificationService = createContributionNotificationService(supabase)
+
     if (action === 'markAllAsRead' || action === 'mark-all-read') {
-      const success = await contributionNotificationService.markAllNotificationsAsRead(user.id)
+      const success = await notificationService.markAllNotificationsAsRead(user.id)
       
       if (success) {
         return NextResponse.json({ success: true })
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'markAsRead' && notificationId) {
-      const success = await contributionNotificationService.markNotificationAsRead(notificationId, user.id)
+      const success = await notificationService.markNotificationAsRead(notificationId, user.id)
       
       if (success) {
         return NextResponse.json({ success: true })

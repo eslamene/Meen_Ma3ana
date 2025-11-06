@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,7 +74,6 @@ interface SponsorshipFromSupabase {
 }
 
 export default function AdminSponsorshipsPage() {
-  const [user, setUser] = useState<User | null>(null)
   const [sponsorships, setSponsorships] = useState<SponsorshipRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,7 +104,6 @@ export default function AdminSponsorshipsPage() {
         return
       }
 
-      setUser(user)
     } catch (err) {
       console.error('Error checking authentication:', err)
       window.location.href = '/auth/login'
@@ -267,19 +264,6 @@ export default function AdminSponsorshipsPage() {
       setError(err instanceof Error ? err.message : 'Failed to reject sponsorship request')
     } finally {
       setProcessing(false)
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
-      case 'approved':
-        return <Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
-      case 'rejected':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
     }
   }
 

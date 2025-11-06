@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
-import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
@@ -119,7 +119,8 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
 
   const fetchUnreadNotifications = async (userId: string) => {
     try {
-      const count = await contributionNotificationService.getUnreadNotificationCount(userId)
+      const notificationService = createContributionNotificationService(supabase)
+      const count = await notificationService.getUnreadNotificationCount(userId)
       setUnreadNotifications(count)
     } catch (error) {
       console.error('Error fetching notifications:', error)

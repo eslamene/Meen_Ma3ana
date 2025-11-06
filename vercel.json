@@ -3,6 +3,11 @@
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
   "regions": ["fra1"],
+  "build": {
+    "env": {
+      "SKIP_ENV_VALIDATION": "true"
+    }
+  },
   "functions": {
     "app/**/*.{js,ts,tsx}": {
       "runtime": "nodejs22.x"

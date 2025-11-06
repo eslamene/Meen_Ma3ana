@@ -143,7 +143,7 @@ The admin menu automatically shows/hides items based on user permissions. The Ac
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 22.x
 - Supabase account
 - PostgreSQL database
 
@@ -193,7 +193,35 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
    npm run dev
    ```
 
+## Documentation
+
+All project documentation is organized in the `docs/` directory:
+
+### Setup & Configuration
+- **[Quick Setup Guide](./docs/setup/QUICK_SETUP.md)** - Get started quickly
+- **[Database Setup](./docs/setup/DATABASE_SETUP.md)** - Database configuration and migrations
+- **[Storage Setup](./docs/setup/STORAGE_SETUP.md)** - Supabase Storage configuration
+- **[Landing Page Setup](./docs/setup/LANDING_PAGE_SETUP.md)** - Marketing page configuration
+
+### Deployment
+- **[Vercel Deployment](./docs/deployment/VERCEL_DEPLOYMENT.md)** - Complete deployment guide
+
+### System Documentation
+- **[Tech Stack Overview](./docs/TECH_STACK_OVERVIEW.md)** - Technology stack and architecture
+- **[Business Requirements Document](./docs/Meen-Ma3ana_BRD.md)** - Project requirements and specifications
+- **[RBAC System](./docs/RBAC_SYSTEM.md)** - Role-Based Access Control documentation
+- **[RBAC User Guide](./docs/RBAC_USER_GUIDE.md)** - User guide for RBAC features
+- **[Performance Optimization](./docs/PERFORMANCE_OPTIMIZATION.md)** - Performance best practices
+
+### Development & Integration
+- **[Integration Guide](./docs/integration-guide.md)** - Third-party integrations
+- **[Server Menu System](./docs/server-menu-system.md)** - Navigation system documentation
+
 ## Deployment to Vercel
+
+This project is optimized for Vercel deployment and includes specific configuration in `vercel.json`. For complete deployment instructions, see **[VERCEL_DEPLOYMENT.md](./docs/deployment/VERCEL_DEPLOYMENT.md)**.
+
+**Important**: The `package-lock.json` file must be kept in sync with `package.json` (using `npm install` after any dependency changes) to ensure successful deployments. This prevents lock file synchronization issues during the build process.
 
 ### Prerequisites
 - Vercel account (free or paid)
@@ -257,7 +285,7 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 - Ensure Supabase project is in production mode
 - Run database migrations if needed
 - Verify RLS (Row Level Security) policies are enabled
-- Reference existing database setup documentation in `DATABASE_SETUP.md`
+- Reference existing database setup documentation in `docs/setup/DATABASE_SETUP.md`
 
 ### Post-Deployment Checklist
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
-import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 
 interface Contribution {
   id: string
@@ -113,7 +113,8 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
 
           // Send notification
           if (contribution) {
-            await contributionNotificationService.sendApprovalNotification(
+            const notificationService = createContributionNotificationService(supabase)
+            await notificationService.sendApprovalNotification(
               contributionId,
               contribution.donor_id,
               contribution.amount,
@@ -141,7 +142,8 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
           // Send notification
           const contribution = contributions.find(c => c.id === contributionId)
           if (contribution) {
-            await contributionNotificationService.sendRejectionNotification(
+            const notificationService = createContributionNotificationService(supabase)
+            await notificationService.sendRejectionNotification(
               contributionId,
               contribution.donor_id,
               contribution.amount,

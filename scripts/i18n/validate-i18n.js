@@ -187,7 +187,7 @@ class I18nValidator {
     if (!arData) return this.printSummary();
 
     // Compare files
-    const { missing, extra } = this.compareFiles(enData, arData, 'en', 'ar');
+    this.compareFiles(enData, arData, 'en', 'ar');
 
     return this.printSummary();
   }

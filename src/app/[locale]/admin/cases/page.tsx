@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
@@ -522,10 +523,12 @@ export default function AdminCasesPage() {
                         {/* Case Image */}
                         {case_.image_url && (
                           <div className="flex-shrink-0">
-                            <img
+                            <Image
                               src={case_.image_url}
                               alt={case_.title}
                               className="w-20 h-20 object-cover rounded-lg"
+                              width={80}
+                              height={80}
                             />
                           </div>
                         )}

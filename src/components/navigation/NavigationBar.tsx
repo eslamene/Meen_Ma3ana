@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
-import { contributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
@@ -33,14 +33,15 @@ export default function NavigationBar() {
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
-      const count = await contributionNotificationService.getUnreadNotificationCount(userId)
+      const notificationService = createContributionNotificationService(supabase)
+      const count = await notificationService.getUnreadNotificationCount(userId)
       setUnreadNotifications(count)
     } catch (error) {
       console.error('Error fetching unread notifications:', error)
       // Don't set error state, just keep count at 0
       setUnreadNotifications(0)
     }
-  }, [])
+  }, [supabase])
 
   const fetchUserAndNotifications = useCallback(async () => {
     try {

@@ -22,10 +22,8 @@ import {
   Share2, 
   Calendar, 
   MapPin, 
-  DollarSign, 
   User, 
   Phone, 
-  Mail,
   Clock,
   RefreshCw,
   Target,
@@ -34,7 +32,6 @@ import {
   Type,
   Users,
   Eye,
-  Download,
   MessageCircle,
   AlertCircle,
   CheckCircle,
@@ -43,10 +40,9 @@ import {
   Edit
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import ProgressBar from '@/components/cases/ProgressBar'
 import UpdatesTimeline from '@/components/cases/UpdatesTimeline'
 import CaseFileManager, { CaseFile, FileCategory } from '@/components/cases/CaseFileManager'
-import { realtimeCaseUpdates, CaseProgressUpdate, CaseUpdateNotification } from '@/lib/realtime-case-updates'
+import { realtimeCaseUpdates, CaseProgressUpdate } from '@/lib/realtime-case-updates'
 import { CaseUpdate } from '@/lib/case-updates'
 
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
@@ -95,19 +91,6 @@ interface Contribution {
   }
 }
 
-// Interface for the centralized hook contributions
-interface HookContribution {
-  id: string
-  amount: number
-  created_at: string
-  anonymous: boolean
-  notes?: string
-  status: string
-  approval_status?: {
-    status: string
-  } | Array<{ status: string }>
-}
-
 export default function CaseDetailPage() {
   const t = useTranslations('cases')
   const params = useParams()
@@ -116,7 +99,6 @@ export default function CaseDetailPage() {
   const caseId = params.id as string
 
   const [caseData, setCaseData] = useState<Case | null>(null)
-  const [contributions, setContributions] = useState<Contribution[]>([])
   const [updates, setUpdates] = useState<CaseUpdate[]>([])
   const [caseFiles, setCaseFiles] = useState<CaseFile[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,7 +111,6 @@ export default function CaseDetailPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'contributions' | 'updates' | 'files'>('overview')
   const [realTimeProgress, setRealTimeProgress] = useState<CaseProgressUpdate | null>(null)
   const [canCreateUpdates, setCanCreateUpdates] = useState(false)
-  const [showNotifications, setShowNotifications] = useState(false)
   const [totalContributions, setTotalContributions] = useState(0)
 
   const supabase = createClient()
@@ -230,15 +211,9 @@ export default function CaseDetailPage() {
           created_at: string
           anonymous?: boolean
         }
-        const contribution: Contribution = {
-          id: c.id,
-          amount: parseFloat(String(c.amount)),
-          donorName: c.donor_name || t('anonymousDonor'),
-          message: c.notes,
-          createdAt: c.created_at,
-          anonymous: c.anonymous || false
+        const contribution : Contribution = {
+          ...newContribution as Contribution,
         }
-        setContributions(prev => [contribution, ...prev])
       }
     )
   }
@@ -374,7 +349,8 @@ export default function CaseDetailPage() {
       })
 
       console.log('Formatted contributions:', formattedContributions)
-      setContributions(formattedContributions)
+      // Note: Approved contributions are managed by useApprovedContributions hook
+      // This function fetches all contributions for logging/debugging purposes
     } catch (error) {
       console.error('Error fetching contributions:', error)
     }
@@ -781,9 +757,6 @@ export default function CaseDetailPage() {
             {t('backToCases')}
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowNotifications(true)}>
-              <Bell className="h-4 w-4" />
-            </Button>
             <Button variant="outline" size="sm" onClick={handleFavorite}>
               <Heart className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
             </Button>

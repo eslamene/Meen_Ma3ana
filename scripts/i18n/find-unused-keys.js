@@ -115,7 +115,7 @@ class UnusedKeyFinder {
         }
       }
       
-    } catch (error) {
+    } catch {
       // Skip files that can't be read
     }
   }

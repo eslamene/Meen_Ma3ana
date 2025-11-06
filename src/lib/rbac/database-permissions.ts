@@ -72,11 +72,24 @@ interface UserRoleWithRole {
  * Handles all RBAC operations using the database
  */
 export class DatabaseRBACService {
-  private supabase = createClient()
+  private _supabase: ReturnType<typeof createClient> | null = null
   private permissionCache = new Map<string, DatabasePermission[]>()
   private roleCache = new Map<string, DatabaseUserRole[]>()
   private cacheExpiry = 5 * 60 * 1000 // 5 minutes
   private lastCacheUpdate = 0
+
+  /**
+   * Get Supabase client (lazy initialization)
+   */
+  private get supabase() {
+    if (!this._supabase) {
+      if (typeof window === 'undefined') {
+        throw new Error('DatabaseRBACService can only be used in client-side code')
+      }
+      this._supabase = createClient()
+    }
+    return this._supabase
+  }
 
   /**
    * Get all permissions from database
