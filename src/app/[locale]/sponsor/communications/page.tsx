@@ -1,7 +1,6 @@
 'use client'
 import React from 'react'
 import { useState, useEffect, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
@@ -111,28 +110,7 @@ export default function SponsorCommunicationsPage() {
 
   const supabase = createClient()
 
-  const checkAuthentication = useCallback(async () => {
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser()
-      
-      if (error || !user) {
-        router.push('/auth/login')
-        return
-      }
-
-      setUser(user)
-      fetchData()
-    } catch (err) {
-      console.error('Error checking authentication:', err)
-      router.push('/auth/login')
-    }
-  }, [supabase.auth, router])
-
-  useEffect(() => {
-    checkAuthentication()
-  }, [checkAuthentication])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -243,7 +221,28 @@ export default function SponsorCommunicationsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, user?.id])
+
+  const checkAuthentication = useCallback(async () => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      
+      if (error || !user) {
+        router.push('/auth/login')
+        return
+      }
+
+      setUser(user)
+      fetchData()
+    } catch (err) {
+      console.error('Error checking authentication:', err)
+      router.push('/auth/login')
+    }
+  }, [supabase.auth, router, fetchData])
+
+  useEffect(() => {
+    checkAuthentication()
+  }, [checkAuthentication])
 
   const handleSendMessage = async () => {
     if (!newMessage.recipient_id || !newMessage.subject || !newMessage.message) {

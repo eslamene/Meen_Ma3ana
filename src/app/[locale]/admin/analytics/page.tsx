@@ -72,7 +72,7 @@ export default function AdminAnalyticsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Fetch real data from API
-  const fetchData = async (showRefreshIndicator = false) => {
+  const fetchData = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) {
       setIsRefreshing(true)
     } else {
@@ -123,11 +123,11 @@ export default function AdminAnalyticsPage() {
       setLoading(false)
       setIsRefreshing(false)
     }
-  }
+  }, [dateRange, customStartDate, customEndDate])
 
   useEffect(() => {
     fetchData()
-  }, [dateRange, customStartDate, customEndDate])
+  }, [fetchData])
 
   // Auto-refresh functionality
   useEffect(() => {
@@ -139,7 +139,7 @@ export default function AdminAnalyticsPage() {
     }, refreshInterval * 1000)
 
     return () => clearInterval(interval)
-  }, [autoRefresh, refreshInterval, dateRange, customStartDate, customEndDate])
+  }, [autoRefresh, refreshInterval, fetchData])
 
   const formatCurrency = (amount: number) => {
     return `EGP ${amount.toLocaleString('en-US', {
@@ -193,8 +193,9 @@ export default function AdminAnalyticsPage() {
     )
   }
 
-  const handleExport = (format: 'csv' | 'pdf' | 'excel') => {
-    console.log(`Exporting data in ${format} format...`)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleExport = (_format: 'csv' | 'pdf' | 'excel') => {
+    console.log(`Exporting data in ${_format} format...`)
     // Implementation for export functionality
   }
 

@@ -1,11 +1,11 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import PermissionGuard from '@/components/auth/PermissionGuard'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -45,7 +45,6 @@ interface Case {
 }
 
 export default function AdminCasesPage() {
-  const t = useTranslations('admin')
   const router = useRouter()
   const params = useParams()
   const [cases, setCases] = useState<Case[]>([])
@@ -76,11 +75,7 @@ export default function AdminCasesPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchCases()
-  }, [])
-
-  const fetchCases = async () => {
+  const fetchCases = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -118,7 +113,11 @@ export default function AdminCasesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    fetchCases()
+  }, [fetchCases])
 
   const fetchCaseContributions = async (caseId: string) => {
     try {
