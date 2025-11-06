@@ -35,10 +35,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate message length
-    if (message.length < 10 || message.length > 5000) {
+    // Validate message length (reduced minimum to 3 characters for better UX)
+    if (message.trim().length < 3 || message.length > 5000) {
       return NextResponse.json(
-        { error: 'Message must be between 10 and 5000 characters' },
+        { error: 'Message must be between 3 and 5000 characters' },
         { status: 400 }
       )
     }
@@ -72,9 +72,17 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     )
   } catch (error) {
+    // Handle JSON parsing errors and other errors
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { error: 'Invalid request format' },
+        { status: 400 }
+      )
+    }
+    
     console.error('Contact form error:', error)
     return NextResponse.json(
-      { error: 'Failed to process request' },
+      { error: 'Failed to process request. Please try again later.' },
       { status: 500 }
     )
   }

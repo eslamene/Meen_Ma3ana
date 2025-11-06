@@ -13,11 +13,13 @@ export default function ContactForm() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState<string>('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     setSubmitStatus('idle')
+    setErrorMessage('')
 
     try {
       const response = await fetch('/api/contact', {
@@ -28,17 +30,40 @@ export default function ContactForm() {
         body: JSON.stringify(formData),
       })
 
+      let data
+      try {
+        data = await response.json()
+      } catch (parseError) {
+        // If response is not JSON, use default error message
+        setSubmitStatus('error')
+        setErrorMessage(t('error'))
+        setTimeout(() => {
+          setSubmitStatus('idle')
+          setErrorMessage('')
+        }, 5000)
+        return
+      }
+
       if (response.ok) {
         setSubmitStatus('success')
         setFormData({ name: '', email: '', message: '' })
         setTimeout(() => setSubmitStatus('idle'), 5000)
       } else {
         setSubmitStatus('error')
-        setTimeout(() => setSubmitStatus('idle'), 5000)
+        // Display the actual error message from the API
+        setErrorMessage(data.error || t('error'))
+        setTimeout(() => {
+          setSubmitStatus('idle')
+          setErrorMessage('')
+        }, 5000)
       }
-    } catch (_error) { // eslint-disable-line @typescript-eslint/no-unused-vars
+    } catch (error) {
       setSubmitStatus('error')
-      setTimeout(() => setSubmitStatus('idle'), 5000)
+      setErrorMessage(t('error'))
+      setTimeout(() => {
+        setSubmitStatus('idle')
+        setErrorMessage('')
+      }, 5000)
     } finally {
       setIsSubmitting(false)
     }
@@ -116,7 +141,7 @@ export default function ContactForm() {
             )}
             {submitStatus === 'error' && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-                {t('error')}
+                {errorMessage || t('error')}
               </div>
             )}
             <Button
