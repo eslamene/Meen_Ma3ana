@@ -381,7 +381,8 @@ export class AuditService {
     return await this.getRecentAuditLogs(params?.limit, params?.offset)
   }
 
-  static async cleanupAuditLogs(retentionDays?: number): Promise<number> {
+  static async cleanupAuditLogs(_retentionDays?: number): Promise<number> {
+    void _retentionDays
     defaultLogger.warn('cleanupAuditLogs not implemented')
     return 0
   }
