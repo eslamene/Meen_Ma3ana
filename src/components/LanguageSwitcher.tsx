@@ -52,7 +52,7 @@ export default function LanguageSwitcher() {
             >
               {/* Flag Icon */}
               <span className="text-base leading-none">
-                {loc === 'en' ? '🇺🇸' : '🇪🇬'}
+                {loc === 'en' ? '🇬🇧' : '🇪🇬'}
               </span>
               
               {/* Language Label - Hidden on small screens */}
