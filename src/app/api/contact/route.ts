@@ -77,14 +77,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate message length (minimum 3 characters, maximum 5000)
+    // Validate message length (minimum 3 characters, maximum 10000)
     const trimmedMessage = message.trim()
-    if (trimmedMessage.length < 3 || message.length > 5000) {
+    if (trimmedMessage.length < 20 || message.length > 10000) {
       return NextResponse.json(
         { 
           error: trimmedMessage.length < 3 
             ? 'Message must be at least 3 characters long'
-            : 'Message must not exceed 5000 characters',
+            : 'Message must not exceed 10000 characters',
           errorCode: trimmedMessage.length < 3 ? 'MESSAGE_TOO_SHORT' : 'MESSAGE_TOO_LONG'
         },
         { status: 400 }

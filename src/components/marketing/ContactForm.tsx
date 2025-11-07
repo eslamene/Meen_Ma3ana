@@ -118,7 +118,7 @@ export default function ContactForm() {
       if (errorMsg.toLowerCase().includes('message') && errorMsg.toLowerCase().includes('3')) {
         return t('errors.messageTooShort')
       }
-      if (errorMsg.toLowerCase().includes('message') && errorMsg.toLowerCase().includes('5000')) {
+      if (errorMsg.toLowerCase().includes('message') && (errorMsg.toLowerCase().includes('5000') || errorMsg.toLowerCase().includes('10000'))) {
         return t('errors.messageTooLong')
       }
       if (errorMsg.toLowerCase().includes('message') && errorMsg.toLowerCase().includes('10')) {
