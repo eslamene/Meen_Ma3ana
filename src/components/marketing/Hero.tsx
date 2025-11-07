@@ -53,7 +53,7 @@ export default function Hero() {
 
         {/* Center Shape - Animated fade in - Right side behind hand */}
         <div className="absolute top-0 right-0 w-full h-full z-0" style={{ animation: 'fadeIn 1.5s ease-out 0.6s forwards', opacity: 0 }}>
-          <div className="absolute top-1/2 -translate-y-1/2 w-[80%] h-full opacity-50 relative" style={{ right: '-2vw' }}>
+          <div className="absolute top-1/2 -translate-y-1/2 w-[90%] h-[90%] left-1/2 -translate-x-1/2 md:w-[80%] md:h-full md:left-auto md:translate-x-0 md:right-[-2vw] opacity-50 relative">
             <Image
               src="/banner/svg/bg_center.svg"
               alt=""
