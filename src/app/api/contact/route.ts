@@ -40,13 +40,27 @@ export async function POST(request: NextRequest) {
 
     // Validate email format - more robust validation
     const trimmedEmail = email.trim()
+    
+    // Check if email is empty after trimming
+    if (!trimmedEmail) {
+      return NextResponse.json(
+        { 
+          error: 'Email is required',
+          errorCode: 'MISSING_FIELDS'
+        },
+        { status: 400 }
+      )
+    }
+    
     // RFC 5322 compliant email regex (simplified but more accurate)
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+    
     if (!emailRegex.test(trimmedEmail)) {
       return NextResponse.json(
         { 
-          error: 'Invalid email format',
-          errorCode: 'INVALID_EMAIL'
+          error: 'Invalid email format. Please enter a valid email address.',
+          errorCode: 'INVALID_EMAIL',
+          message: 'The email address format is not valid'
         },
         { status: 400 }
       )

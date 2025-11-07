@@ -69,11 +69,24 @@ export default function ContactForm() {
       if (errorMsg.toLowerCase().includes('missing') || errorMsg.toLowerCase().includes('required')) {
         return t('errors.missingFields')
       }
-      if (errorMsg.toLowerCase().includes('email') && errorMsg.toLowerCase().includes('format')) {
-        return t('errors.invalidEmail')
+      // Enhanced email format detection - catch various error message formats
+      if (errorMsg.toLowerCase().includes('email')) {
+        if (errorMsg.toLowerCase().includes('format') || 
+            errorMsg.toLowerCase().includes('invalid') ||
+            errorMsg.toLowerCase().includes('not valid') ||
+            errorMsg.toLowerCase().includes('incorrect') ||
+            errorMsg.toLowerCase().includes('malformed')) {
+          return t('errors.invalidEmail')
+        }
+        if (errorMsg.toLowerCase().includes('exceed') || errorMsg.toLowerCase().includes('too long')) {
+          return t('errors.emailTooLong')
+        }
       }
-      if (errorMsg.toLowerCase().includes('email') && errorMsg.toLowerCase().includes('exceed')) {
-        return t('errors.emailTooLong')
+      // Also catch generic "invalid email" patterns
+      if (errorMsg.toLowerCase().includes('invalid email') || 
+          errorMsg.toLowerCase().includes('email is not valid') ||
+          errorMsg.toLowerCase().includes('email format is invalid')) {
+        return t('errors.invalidEmail')
       }
       if (errorMsg.toLowerCase().includes('name') && errorMsg.toLowerCase().includes('at least')) {
         return t('errors.nameTooShort')
