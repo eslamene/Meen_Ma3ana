@@ -5,7 +5,6 @@ import Image from 'next/image'
 
 export default function Hero() {
   const t = useTranslations('landing.hero')
-  const tCTA = useTranslations('landing.cta')
 
   return (
     <section className="relative overflow-hidden py-20 lg:py-32 bg-gradient-to-br from-yellow-100 via-orange-100 to-red-100">
@@ -107,14 +106,8 @@ export default function Hero() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center" style={{ animation: 'fadeInUp 0.8s ease-out 0.6s forwards', opacity: 0 }}>
             <a
-              href={`mailto:${tCTA('email')}`}
-              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-[#E74C3C] rounded-lg hover:bg-[#d63a2a] transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
-            >
-              {t('ctaPrimary')}
-            </a>
-            <a
               href="#features"
-              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-gray-700 bg-white rounded-lg border-2 border-gray-300 hover:border-[#6B8E7E] hover:text-[#6B8E7C] transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
+              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-gray-700 bg-transparent rounded-lg border-2 border-gray-300 hover:border-[#6B8E7E] hover:text-[#6B8E7C] transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
             >
               {t('ctaSecondary')}
             </a>
