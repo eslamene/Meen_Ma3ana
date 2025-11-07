@@ -26,7 +26,7 @@ export default function Hero() {
 
         {/* Left Shape - Animated slide in from left */}
         <div className="absolute top-0 left-0 w-full h-full hidden md:block" style={{ animation: 'fadeInLeft 1.2s ease-out 0.2s forwards', opacity: 0 }}>
-          <div className="opacity-50">
+          <div className="relative opacity-50 w-full h-full">
             <Image
               src="/banner/svg/bg_left.svg"
               alt=""
@@ -52,8 +52,8 @@ export default function Hero() {
         </div>
 
         {/* Center Shape - Animated fade in - Right side behind hand */}
-        <div className="absolute top-0 right-0 w-full h-full" style={{ animation: 'fadeIn 1.5s ease-out 0.6s forwards', opacity: 0 }}>
-          <div className="absolute top-1/2 -translate-y-1/2 w-[60%] h-full opacity-50" style={{ right: '10vw' }}>
+        <div className="absolute top-0 right-0 w-full h-full z-0" style={{ animation: 'fadeIn 1.5s ease-out 0.6s forwards', opacity: 0 }}>
+          <div className="absolute top-1/2 -translate-y-1/2 w-[80%] h-full opacity-50 relative" style={{ right: '-2vw' }}>
             <Image
               src="/banner/svg/bg_center.svg"
               alt=""
