@@ -8,7 +8,7 @@ export default function Hero() {
   const tCTA = useTranslations('landing.cta')
 
   return (
-    <section className="relative overflow-hidden py-20 lg:py-32 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <section className="relative overflow-hidden py-20 lg:py-32 bg-gradient-to-br from-yellow-100 via-orange-100 to-red-100">
       {/* Animated Background Banner */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Top Shape - Animated fade in from top - Top left aligned at 30vw */}
@@ -67,7 +67,7 @@ export default function Hero() {
 
         {/* Hand with Heart - Animated slide in from right, enlarge, then settle */}
         <div className="absolute top-1/2 right-0 -translate-y-1/2 w-full h-full z-10" style={{ animation: 'slideInRightScale 1.5s ease-out 0.8s forwards', opacity: 0 }}>
-          <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[50%] h-[80%] opacity-90" style={{ right: '-2vw' }}>
+          <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[50%] h-[80%]" style={{ right: '-2vw' }}>
             <Image
               src="/banner/svg/bg_hand.svg"
               alt=""
