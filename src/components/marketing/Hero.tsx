@@ -12,7 +12,7 @@ export default function Hero() {
       {/* Animated Background Banner */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Top Shape - Animated fade in from top - Top left aligned at 30vw */}
-        <div className="absolute top-0 left-0 w-full h-full" style={{ animation: 'fadeInDown 1s ease-out 0s forwards', opacity: 0 }}>
+        <div className="absolute top-0 left-0 w-full h-full hidden md:block" style={{ animation: 'fadeInDown 1s ease-out 0s forwards', opacity: 0 }}>
           <div className="absolute top-0 opacity-50" style={{ left: '5vw', width: '40%', height: '35%' }}>
             <Image
               src="/banner/svg/bg_top.svg"
@@ -25,7 +25,7 @@ export default function Hero() {
         </div>
 
         {/* Left Shape - Animated slide in from left */}
-        <div className="absolute top-0 left-0 w-full h-full" style={{ animation: 'fadeInLeft 1.2s ease-out 0.2s forwards', opacity: 0 }}>
+        <div className="absolute top-0 left-0 w-full h-full hidden md:block" style={{ animation: 'fadeInLeft 1.2s ease-out 0.2s forwards', opacity: 0 }}>
           <div className="opacity-50">
             <Image
               src="/banner/svg/bg_left.svg"
@@ -38,7 +38,7 @@ export default function Hero() {
         </div>
 
         {/* Right Shape - Animated slide in from right */}
-        <div className="absolute top-0 right-0 w-full h-full" style={{ animation: 'fadeInRight 1.2s ease-out 0.4s forwards', opacity: 0 }}>
+        <div className="absolute top-0 right-0 w-full h-full hidden md:block" style={{ animation: 'fadeInRight 1.2s ease-out 0.4s forwards', opacity: 0 }}>
           <div className="absolute top-0 right-0 w-[60%] h-full opacity-50">
             <Image
               src="/banner/svg/bg_right.svg"
@@ -67,7 +67,7 @@ export default function Hero() {
 
         {/* Hand with Heart - Animated slide in from right, enlarge, then settle */}
         <div className="absolute top-1/2 right-0 -translate-y-1/2 w-full h-full z-10" style={{ animation: 'slideInRightScale 1.5s ease-out 0.8s forwards', opacity: 0 }}>
-          <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[50%] h-[80%]" style={{ right: '-2vw' }}>
+          <div className="absolute top-1/2 -translate-y-[55%] md:-translate-y-1/2 right-0 w-[70%] h-[90%] md:w-[50%] md:h-[80%]" style={{ right: '-2vw' }}>
             <Image
               src="/banner/svg/bg_hand.svg"
               alt=""
@@ -80,7 +80,7 @@ export default function Hero() {
         </div>
 
         {/* Bottom Shape - Animated fade in from bottom - Bottom right aligned at 10vw */}
-        <div className="absolute bottom-0 right-0 w-full h-full" style={{ animation: 'fadeInUp 1.2s ease-out 1.0s forwards', opacity: 0 }}>
+        <div className="absolute bottom-0 right-0 w-full h-full hidden md:block" style={{ animation: 'fadeInUp 1.2s ease-out 1.0s forwards', opacity: 0 }}>
           <div className="absolute bottom-0 opacity-50" style={{ right: '40vw', width: '40%', height: '30%' }}>
             <Image
               src="/banner/svg/bg_bottom.svg"
