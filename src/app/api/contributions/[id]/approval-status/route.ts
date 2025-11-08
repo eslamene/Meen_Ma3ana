@@ -140,6 +140,65 @@ export async function POST(
       .update({ status })
       .eq('id', id)
 
+    // Update case current_amount when contribution is approved or rejected
+    if (status === 'approved' || status === 'rejected') {
+      try {
+        // Get contribution details including case_id and amount
+        const { data: contribution } = await supabase
+          .from('contributions')
+          .select('case_id, amount')
+          .eq('id', id)
+          .single()
+
+        if (contribution && contribution.case_id) {
+          // Get current case amount
+          const { data: caseData } = await supabase
+            .from('cases')
+            .select('current_amount')
+            .eq('id', contribution.case_id)
+            .single()
+
+          if (caseData) {
+            const currentAmount = parseFloat(caseData.current_amount || '0')
+            const contributionAmount = parseFloat(contribution.amount || '0')
+            
+            let newAmount = currentAmount
+            if (status === 'approved') {
+              // Add contribution amount if approved
+              // Check if this contribution was previously rejected (to avoid double counting)
+              if (existingStatus && existingStatus.status === 'rejected') {
+                // Was rejected, now approved - add the amount
+                newAmount = currentAmount + contributionAmount
+              } else if (!existingStatus) {
+                // New approval - add the amount
+                newAmount = currentAmount + contributionAmount
+              }
+              // If it was already approved, don't change the amount
+            } else if (status === 'rejected') {
+              // Subtract contribution amount if rejected
+              // Only subtract if it was previously approved
+              if (existingStatus && existingStatus.status === 'approved') {
+                newAmount = Math.max(0, currentAmount - contributionAmount)
+              }
+              // If it was already rejected or pending, don't change the amount
+            }
+
+            // Update case current_amount
+            await supabase
+              .from('cases')
+              .update({ 
+                current_amount: newAmount.toString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', contribution.case_id)
+          }
+        }
+      } catch (amountUpdateError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating case amount:', amountUpdateError)
+        // Don't fail the main operation if amount update fails
+      }
+    }
+
     // Send notification to donor
     if (status === 'approved' || status === 'rejected') {
       try {

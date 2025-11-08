@@ -27,7 +27,11 @@ import { usePermissions } from '@/lib/hooks/usePermissions'
 interface Case {
   id: string
   title: string
+  titleEn?: string
+  titleAr?: string
   description: string
+  descriptionEn?: string
+  descriptionAr?: string
   targetAmount: number
   currentAmount: number
   status: string
@@ -78,6 +82,11 @@ export default function CasesPage() {
     total: 0,
     totalPages: 0
   })
+  const [statistics, setStatistics] = useState({
+    totalCases: 0,
+    activeCases: 0,
+    totalRaised: 0
+  })
 
   const fetchCases = useCallback(async () => {
     try {
@@ -118,8 +127,22 @@ export default function CasesPage() {
 
       const data = await response.json()
       console.log('Cases data:', data)
+      
+      // Debug: Log first case's language fields
+      if (data.cases && data.cases.length > 0) {
+        const firstCase = data.cases[0]
+        console.log('First case language fields:', {
+          titleEn: firstCase.titleEn,
+          titleAr: firstCase.titleAr,
+          descriptionEn: firstCase.descriptionEn,
+          descriptionAr: firstCase.descriptionAr,
+          locale: params.locale
+        })
+      }
+      
       setCases(data.cases || [])
       setPagination(data.pagination || {})
+      setStatistics(data.statistics || { totalCases: 0, activeCases: 0, totalRaised: 0 })
     } catch (error) {
       console.error('Error fetching cases:', error)
     } finally {
@@ -184,12 +207,65 @@ export default function CasesPage() {
     return count
   }
 
+  // Statistics are now calculated from all filtered cases, not just the current page
   const getTotalRaised = () => {
-    return cases.reduce((total, caseItem) => total + caseItem.currentAmount, 0)
+    return statistics.totalRaised
   }
 
   const getActiveCases = () => {
-    return cases.filter(caseItem => caseItem.status === 'published').length
+    return statistics.activeCases
+  }
+
+  const getTotalCases = () => {
+    return statistics.totalCases
+  }
+
+  // Generate pagination page numbers with ellipses
+  const getPaginationPages = () => {
+    const { page, totalPages } = pagination
+    const pages: (number | string)[] = []
+    const maxVisible = 7 // Maximum number of page buttons to show
+    
+    if (totalPages <= maxVisible) {
+      // Show all pages if total is less than max visible
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // Always show first page
+      pages.push(1)
+      
+      // Calculate start and end of visible range around current page
+      let start = Math.max(2, page - 1)
+      let end = Math.min(totalPages - 1, page + 1)
+      
+      // Adjust range to show more pages if we're near the edges
+      if (page <= 3) {
+        end = Math.min(5, totalPages - 1)
+      } else if (page >= totalPages - 2) {
+        start = Math.max(totalPages - 4, 2)
+      }
+      
+      // Add ellipsis after first page if needed
+      if (start > 2) {
+        pages.push('ellipsis-start')
+      }
+      
+      // Add visible pages around current page
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+      
+      // Add ellipsis before last page if needed
+      if (end < totalPages - 1) {
+        pages.push('ellipsis-end')
+      }
+      
+      // Always show last page
+      pages.push(totalPages)
+    }
+    
+    return pages
   }
 
   return (
@@ -267,7 +343,7 @@ export default function CasesPage() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">{t('totalCases')}</p>
-                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{cases.length}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{getTotalCases()}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -425,40 +501,58 @@ export default function CasesPage() {
               </div>
             )}
 
-            {/* Enhanced Pagination */}
+            {/* Enhanced Pagination with Ellipses */}
             {pagination.totalPages > 1 && (
               <div className="flex justify-center mt-8">
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                   <CardContent className="p-4">
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2 flex-wrap justify-center">
                       <Button
                         variant="outline"
                         disabled={pagination.page === 1}
                         onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                        className="border-2 border-gray-200 hover:border-blue-500"
+                        className="border-2 border-gray-200 hover:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {t('previous')}
                       </Button>
                       
-                      {[...Array(pagination.totalPages)].map((_, i) => (
-                        <Button
-                          key={i + 1}
-                          variant={pagination.page === i + 1 ? 'default' : 'outline'}
-                          onClick={() => setPagination(prev => ({ ...prev, page: i + 1 }))}
-                          className={pagination.page === i + 1 
-                            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' 
-                            : 'border-2 border-gray-200 hover:border-blue-500'
-                          }
-                        >
-                          {i + 1}
-                        </Button>
-                      ))}
+                      {getPaginationPages().map((pageNum, index) => {
+                        if (pageNum === 'ellipsis-start' || pageNum === 'ellipsis-end') {
+                          return (
+                            <span
+                              key={`ellipsis-${index}`}
+                              className="px-2 text-gray-500 font-medium"
+                            >
+                              ...
+                            </span>
+                          )
+                        }
+                        
+                        const page = pageNum as number
+                        const isActive = pagination.page === page
+                        
+                        return (
+                          <Button
+                            key={page}
+                            variant={isActive ? 'default' : 'outline'}
+                            onClick={() => setPagination(prev => ({ ...prev, page }))}
+                            className={
+                              isActive
+                                ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-0 shadow-md'
+                                : 'border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50'
+                            }
+                            size="sm"
+                          >
+                            {page}
+                          </Button>
+                        )
+                      })}
                       
                       <Button
                         variant="outline"
                         disabled={pagination.page === pagination.totalPages}
                         onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                        className="border-2 border-gray-200 hover:border-blue-500"
+                        className="border-2 border-gray-200 hover:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {t('next')}
                       </Button>

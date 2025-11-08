@@ -18,7 +18,11 @@ import { ArrowLeft, Save, AlertCircle, CheckCircle, FileText, Trash2, AlertTrian
 interface Case {
   id: string
   title: string | null
+  title_en: string | null
+  title_ar: string | null
   description: string | null
+  description_en: string | null
+  description_ar: string | null
   target_amount: number | null
   current_amount: number | null
   status: string | null
@@ -152,7 +156,23 @@ export default function CaseEditPage() {
       const { data, error } = await supabase
         .from('cases')
         .select(`
-          *,
+          id,
+          title_en,
+          title_ar,
+          description_en,
+          description_ar,
+          target_amount,
+          current_amount,
+          status,
+          priority,
+          category_id,
+          location,
+          beneficiary_name,
+          beneficiary_contact,
+          created_at,
+          updated_at,
+          created_by,
+          supporting_documents,
           case_categories(name)
         `)
         .eq('id', caseId)
@@ -172,6 +192,8 @@ export default function CaseEditPage() {
       // Map database fields to UI fields
       const mappedCase = {
         ...data,
+        title: data.title_en || data.title_ar || '', // Fallback for compatibility
+        description: data.description_en || data.description_ar || '', // Fallback for compatibility
         goal_amount: data.target_amount,
         urgency_level: data.priority,
         category: (data.case_categories as { name: string } | null)?.name || null
@@ -291,8 +313,10 @@ export default function CaseEditPage() {
       }
 
       const updateData: Record<string, string | number | null> = {
-        title: case_.title || '',
-        description: case_.description || '',
+        title_en: case_.title_en || '',
+        title_ar: case_.title_ar || '',
+        description_en: case_.description_en || '',
+        description_ar: case_.description_ar || '',
         target_amount: case_.target_amount || case_.goal_amount || 0,
         status: case_.status || 'draft',
         priority: case_.priority || case_.urgency_level || 'medium',
@@ -407,7 +431,7 @@ export default function CaseEditPage() {
       // Show success message
       toast.success(
         "Case Deleted Successfully",
-        `Case "${case_?.title}" and all related data have been permanently deleted.`
+        `Case "${case_?.title_en || case_?.title_ar || case_?.title || 'Untitled'}" and all related data have been permanently deleted.`
       )
 
       // Redirect to cases list after successful deletion
@@ -574,27 +598,58 @@ export default function CaseEditPage() {
                 <CardTitle>{t('basicInformation')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('caseTitle')}
-                  </label>
-                  <Input
-                    value={case_.title || ''}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
-                    placeholder={t('titlePlaceholder')}
-                  />
+                {/* Bilingual Title Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('caseTitle')} (English)
+                    </label>
+                    <Input
+                      value={case_.title_en || ''}
+                      onChange={(e) => handleInputChange('title_en', e.target.value)}
+                      placeholder="Enter case title in English"
+                      dir="ltr"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('caseTitle')} (Arabic)
+                    </label>
+                    <Input
+                      value={case_.title_ar || ''}
+                      onChange={(e) => handleInputChange('title_ar', e.target.value)}
+                      placeholder="أدخل عنوان الحالة بالعربية"
+                      dir="rtl"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('description')}
-                  </label>
-                  <Textarea
-                    value={case_.description || ''}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    placeholder={t('descriptionPlaceholder')}
-                    rows={4}
-                  />
+                {/* Bilingual Description Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('description')} (English)
+                    </label>
+                    <Textarea
+                      value={case_.description_en || ''}
+                      onChange={(e) => handleInputChange('description_en', e.target.value)}
+                      placeholder="Enter case description in English"
+                      rows={4}
+                      dir="ltr"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('description')} (Arabic)
+                    </label>
+                    <Textarea
+                      value={case_.description_ar || ''}
+                      onChange={(e) => handleInputChange('description_ar', e.target.value)}
+                      placeholder="أدخل وصف الحالة بالعربية"
+                      rows={4}
+                      dir="rtl"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -806,7 +861,7 @@ export default function CaseEditPage() {
               <div>
                 {deleteDialog.step === 'confirm' ? (
                   <>
-                    <p>Are you sure you want to delete the case <strong>&quot;{case_?.title}&quot;</strong>?</p>
+                    <p>Are you sure you want to delete the case <strong>&quot;{case_?.title_en || case_?.title_ar || case_?.title || 'Untitled'}&quot;</strong>?</p>
                     <p className="mt-2">This action will permanently delete:</p>
                     <ul className="list-disc list-inside mt-2 space-y-1 ml-4">
                       <li>The case and all its data</li>
@@ -824,7 +879,7 @@ export default function CaseEditPage() {
                       <strong className="text-red-600">FINAL WARNING!</strong>
                     </p>
                     <p className="mt-2">
-                      You are about to permanently delete case <strong>&quot;{case_?.title}&quot;</strong> and ALL its related data.
+                      You are about to permanently delete case <strong>&quot;{case_?.title_en || case_?.title_ar || case_?.title || 'Untitled'}&quot;</strong> and ALL its related data.
                     </p>
                     <p className="mt-2">
                       <strong className="text-red-600">This action cannot be undone!</strong>

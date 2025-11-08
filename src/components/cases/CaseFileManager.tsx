@@ -350,11 +350,20 @@ export default function CaseFileManager({
         .eq('case_id', caseId)
 
       if (dbError) {
-        console.error('Database delete error:', dbError)
+        // Properly serialize error for logging
+        const errorDetails = {
+          message: dbError.message || 'Unknown error',
+          code: dbError.code || 'unknown',
+          details: dbError.details || null,
+          hint: dbError.hint || null,
+          error: dbError
+        }
+        console.error('Database delete error:', JSON.stringify(errorDetails, null, 2))
+        console.error('Full error object:', dbError)
         toast({
           type: 'error',
           title: 'Error',
-          description: `Failed to delete file: ${dbError.message}`
+          description: `Failed to delete file: ${errorDetails.message}`
         })
         return
       }
@@ -366,7 +375,14 @@ export default function CaseFileManager({
           .remove([fileToDelete.path])
 
         if (storageError) {
-          console.warn('Storage delete warning:', storageError)
+          // Properly serialize error for logging
+          const errorDetails = {
+            message: storageError.message || 'Unknown error',
+            statusCode: (storageError as any).statusCode || null,
+            error: storageError
+          }
+          console.warn('Storage delete warning:', JSON.stringify(errorDetails, null, 2))
+          console.warn('Full storage error object:', storageError)
           // Continue even if storage delete fails
         }
       }
@@ -383,11 +399,18 @@ export default function CaseFileManager({
         description: 'File deleted successfully'
       })
     } catch (error) {
-      console.error('Error deleting file:', error)
+      // Properly serialize error for logging
+      const errorDetails = {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : null,
+        error: error
+      }
+      console.error('Error deleting file:', JSON.stringify(errorDetails, null, 2))
+      console.error('Full error object:', error)
       toast({
         type: 'error',
         title: 'Error',
-        description: 'Failed to delete file'
+        description: `Failed to delete file: ${errorDetails.message}`
       })
     }
   }

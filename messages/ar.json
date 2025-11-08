@@ -1492,6 +1492,21 @@
         }
       ]
     },
+    "monthlyBreakdown": {
+      "title": "التأثير الشهري",
+      "subtitle": "تقدمنا شهرًا بشهر",
+      "cases": "حالة",
+      "totalAmount": "المبلغ الإجمالي",
+      "contributors": "المساهمون",
+      "topCategory": "الفئة الأبرز"
+    },
+    "categorySummary": {
+      "title": "التأثير حسب الفئة",
+      "subtitle": "كيف نحدث فرقًا في مجالات مختلفة",
+      "totalCases": "إجمالي الحالات",
+      "totalAmount": "المبلغ الإجمالي",
+      "averagePerCase": "المتوسط لكل حالة"
+    },
     "inspiration": {
       "title": "كلمات من مؤسستنا",
       "subtitle": "أفكار ملهمة توجه رسالتنا",

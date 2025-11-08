@@ -1,20 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { 
   Eye, 
   Heart, 
   Calendar, 
   MapPin, 
   DollarSign, 
-  Target, 
   TrendingUp,
   Share2,
-  ArrowRight,
   Clock,
   User,
   AlertTriangle,
@@ -23,15 +20,19 @@ import {
   Utensils,
   Gift,
   ChevronDown,
-  ChevronUp,
-  MoreHorizontal
+  ChevronUp
 } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
+import { useParams } from 'next/navigation'
 
 interface Case {
   id: string
   title: string
+  titleEn?: string
+  titleAr?: string
   description: string
+  descriptionEn?: string
+  descriptionAr?: string
   targetAmount: number
   currentAmount: number
   status: string
@@ -60,7 +61,53 @@ export default function CaseCard({
   viewMode = 'grid'
 }: CaseCardProps) {
   const t = useTranslations('cases')
+  const params = useParams()
+  const localeFromParams = params?.locale as string
+  const localeFromHook = useLocale() as string
+  // Use params first (more reliable), fallback to hook
+  const locale = localeFromParams || localeFromHook || 'en'
   const [showDetails, setShowDetails] = useState(false)
+
+  // Get the correct language content - SIMPLE and DIRECT
+  // For English (locale === 'en'): use titleEn/descriptionEn
+  // For Arabic (locale === 'ar'): use titleAr/descriptionAr
+  const titleEn = caseItem.titleEn?.trim() || null
+  const titleAr = caseItem.titleAr?.trim() || null
+  const descriptionEn = caseItem.descriptionEn?.trim() || null
+  const descriptionAr = caseItem.descriptionAr?.trim() || null
+
+  // Simple logic: show the language that matches the locale
+  // If English locale and English content exists, show English. Otherwise fallback to Arabic.
+  // If Arabic locale and Arabic content exists, show Arabic. Otherwise fallback to English.
+  const displayTitle = locale === 'ar' 
+    ? (titleAr || titleEn || caseItem.title || 'Untitled Case')
+    : (titleEn || titleAr || caseItem.title || 'Untitled Case')
+  
+  const displayDescription = locale === 'ar'
+    ? (descriptionAr || descriptionEn || caseItem.description || 'No description available')
+    : (descriptionEn || descriptionAr || caseItem.description || 'No description available')
+  
+  const titleDir = locale === 'ar' ? 'rtl' : 'ltr'
+  const descriptionDir = locale === 'ar' ? 'rtl' : 'ltr'
+
+  // Debug: Log first case only to avoid spam
+  if (process.env.NODE_ENV === 'development' && caseItem.id === caseItem.id) {
+    const debugKey = `casecard-debug-${caseItem.id}`
+    if (!sessionStorage.getItem(debugKey)) {
+      console.log('🔍 CaseCard Debug:', {
+        caseId: caseItem.id,
+        locale,
+        localeFromParams,
+        localeFromHook,
+        hasTitleEn: !!titleEn,
+        hasTitleAr: !!titleAr,
+        titleEn: titleEn?.substring(0, 30),
+        titleAr: titleAr?.substring(0, 30),
+        displayTitle: displayTitle.substring(0, 50)
+      })
+      sessionStorage.setItem(debugKey, 'true')
+    }
+  }
 
   const getProgressPercentage = (current: number, target: number) => {
     return Math.min((current / target) * 100, 100)
@@ -186,12 +233,12 @@ export default function CaseCard({
           </div>
         </div>
         
-        <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors">
-          {caseItem.title}
+        <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors" dir={titleDir}>
+          {displayTitle}
         </CardTitle>
-        <CardDescription className="line-clamp-2 text-gray-600 text-sm leading-relaxed">
-          {caseItem.description}
-        </CardDescription>
+        <div className="text-gray-600 text-sm leading-relaxed line-clamp-3" dir={descriptionDir}>
+          {displayDescription}
+        </div>
       </CardHeader>
 
       <CardContent className="pt-0 flex-1 flex flex-col">
@@ -361,12 +408,12 @@ export default function CaseCard({
                     </Badge>
                   )}
                 </div>
-                <CardTitle className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                  {caseItem.title}
+                <CardTitle className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors truncate" dir={titleDir}>
+                  {displayTitle}
                 </CardTitle>
-                <CardDescription className="text-sm text-gray-600 line-clamp-1 mt-1">
-                  {caseItem.description}
-                </CardDescription>
+                <div className="text-sm text-gray-600 line-clamp-2 mt-1" dir={descriptionDir}>
+                  {displayDescription}
+                </div>
               </div>
             </div>
 

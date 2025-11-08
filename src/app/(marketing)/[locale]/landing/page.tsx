@@ -6,6 +6,8 @@ import Hero from '@/components/marketing/Hero'
 import Stats from '@/components/marketing/Stats'
 import Features from '@/components/marketing/Features'
 import Stories from '@/components/marketing/Stories'
+import MonthlyBreakdown from '@/components/marketing/MonthlyBreakdown'
+import CategorySummary from '@/components/marketing/CategorySummary'
 import Values from '@/components/marketing/Values'
 import Inspiration from '@/components/marketing/Inspiration'
 import CTA from '@/components/marketing/CTA'
@@ -25,6 +27,8 @@ export default function LandingPage() {
         <Stats />
         <Features />
         <Stories />
+        <MonthlyBreakdown />
+        <CategorySummary />
         <Values />
         <Inspiration />
         <CTA />

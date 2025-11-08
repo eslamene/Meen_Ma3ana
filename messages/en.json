@@ -1492,6 +1492,21 @@
         }
       ]
     },
+    "monthlyBreakdown": {
+      "title": "Monthly Impact",
+      "subtitle": "Our progress month by month",
+      "cases": "cases",
+      "totalAmount": "Total Amount",
+      "contributors": "Contributors",
+      "topCategory": "Top Category"
+    },
+    "categorySummary": {
+      "title": "Impact by Category",
+      "subtitle": "How we're making a difference across different areas",
+      "totalCases": "Total Cases",
+      "totalAmount": "Total Amount",
+      "averagePerCase": "Average per Case"
+    },
     "inspiration": {
       "title": "Words from Our Founder",
       "subtitle": "Inspiring thoughts that guide our mission",

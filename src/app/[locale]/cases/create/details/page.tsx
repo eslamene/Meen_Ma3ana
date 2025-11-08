@@ -21,7 +21,11 @@ type Frequency = '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 
 interface CaseFormData {
   title: string
+  title_en: string
+  title_ar: string
   description: string
+  description_en: string
+  description_ar: string
   targetAmount: string
   category: string
   priority: Priority
@@ -45,7 +49,11 @@ export default function CaseDetailsPage() {
 
   const [formData, setFormData] = useState<CaseFormData>({
     title: '',
+    title_en: '',
+    title_ar: '',
     description: '',
+    description_en: '',
+    description_ar: '',
     targetAmount: '',
     category: '',
     priority: '',
@@ -100,7 +108,32 @@ export default function CaseDetailsPage() {
     }
     
     // Validate the changed field (ONLY REQUIRED FIELDS)
-    if (field === 'title') {
+    if (field === 'title_en' || field === 'title_ar') {
+      const titleEn = field === 'title_en' ? value : formData.title_en
+      const titleAr = field === 'title_ar' ? value : formData.title_ar
+      const finalTitle = titleEn || titleAr
+      
+      if (!finalTitle.trim()) {
+        newErrors.title = t('validation.titleRequired')
+      } else if (finalTitle.trim().length < 10) {
+        newErrors.title = t('validation.titleTooShort')
+      } else if (finalTitle.trim().length > 100) {
+        newErrors.title = t('validation.titleTooLong')
+      }
+    } else if (field === 'description_en' || field === 'description_ar') {
+      const descEn = field === 'description_en' ? value : formData.description_en
+      const descAr = field === 'description_ar' ? value : formData.description_ar
+      const finalDesc = descEn || descAr
+      
+      if (!finalDesc.trim()) {
+        newErrors.description = t('validation.descriptionRequired')
+      } else if (finalDesc.trim().length < 50) {
+        newErrors.description = t('validation.descriptionTooShort')
+      } else if (finalDesc.trim().length > 2000) {
+        newErrors.description = t('validation.descriptionTooLong')
+      }
+    } else if (field === 'title') {
+      // Legacy support
       if (!value.trim()) {
         newErrors.title = t('validation.titleRequired')
       } else if (value.trim().length < 10) {
@@ -109,6 +142,7 @@ export default function CaseDetailsPage() {
         newErrors.title = t('validation.titleTooLong')
       }
     } else if (field === 'description') {
+      // Legacy support
       if (!value.trim()) {
         newErrors.description = t('validation.descriptionRequired')
       } else if (value.trim().length < 50) {
@@ -154,21 +188,29 @@ export default function CaseDetailsPage() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    // Title validation (REQUIRED)
-    if (!formData.title.trim()) {
+    // Title validation (REQUIRED) - at least one language must be provided
+    const hasTitleEn = formData.title_en.trim().length > 0
+    const hasTitleAr = formData.title_ar.trim().length > 0
+    const finalTitle = formData.title_en || formData.title_ar || formData.title
+    
+    if (!finalTitle.trim()) {
       newErrors.title = t('validation.titleRequired')
-    } else if (formData.title.trim().length < 10) {
+    } else if (finalTitle.trim().length < 10) {
       newErrors.title = t('validation.titleTooShort')
-    } else if (formData.title.trim().length > 100) {
+    } else if (finalTitle.trim().length > 100) {
       newErrors.title = t('validation.titleTooLong')
     }
 
-    // Description validation (REQUIRED)
-    if (!formData.description.trim()) {
+    // Description validation (REQUIRED) - at least one language must be provided
+    const hasDescEn = formData.description_en.trim().length > 0
+    const hasDescAr = formData.description_ar.trim().length > 0
+    const finalDesc = formData.description_en || formData.description_ar || formData.description
+    
+    if (!finalDesc.trim()) {
       newErrors.description = t('validation.descriptionRequired')
-    } else if (formData.description.trim().length < 50) {
+    } else if (finalDesc.trim().length < 50) {
       newErrors.description = t('validation.descriptionTooShort')
-    } else if (formData.description.trim().length > 2000) {
+    } else if (finalDesc.trim().length > 2000) {
       newErrors.description = t('validation.descriptionTooLong')
     }
 
@@ -287,8 +329,10 @@ export default function CaseDetailsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: formData.title || 'Untitled Draft',
-          description: formData.description,
+          title_en: formData.title_en || formData.title || '',
+          title_ar: formData.title_ar || formData.title || '',
+          description_en: formData.description_en || formData.description || '',
+          description_ar: formData.description_ar || formData.description || '',
           targetAmount: formData.targetAmount,
           category: formData.category,
           priority: formData.priority,
@@ -374,15 +418,17 @@ export default function CaseDetailsPage() {
           <CardContent className="space-y-6">
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Bilingual Title Fields */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('title')} *
+                  {t('title')} (English) *
                 </label>
                 <Input
-                  value={formData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
-                  placeholder={t('titlePlaceholder')}
+                  value={formData.title_en}
+                  onChange={(e) => handleInputChange('title_en', e.target.value)}
+                  placeholder="Enter case title in English"
                   className={errors.title ? 'border-red-500' : ''}
+                  dir="ltr"
                 />
                 {errors.title && (
                   <p className="text-red-500 text-sm mt-1">{errors.title}</p>
@@ -391,14 +437,49 @@ export default function CaseDetailsPage() {
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('description')} *
+                  {t('title')} (Arabic) *
+                </label>
+                <Input
+                  value={formData.title_ar}
+                  onChange={(e) => handleInputChange('title_ar', e.target.value)}
+                  placeholder="أدخل عنوان الحالة بالعربية"
+                  className={errors.title ? 'border-red-500' : ''}
+                  dir="rtl"
+                />
+                {errors.title && (
+                  <p className="text-red-500 text-sm mt-1">{errors.title}</p>
+                )}
+              </div>
+
+              {/* Bilingual Description Fields */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('description')} (English) *
                 </label>
                 <Textarea
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder={t('descriptionPlaceholder')}
+                  value={formData.description_en}
+                  onChange={(e) => handleInputChange('description_en', e.target.value)}
+                  placeholder="Enter case description in English"
                   rows={4}
                   className={errors.description ? 'border-red-500' : ''}
+                  dir="ltr"
+                />
+                {errors.description && (
+                  <p className="text-red-500 text-sm mt-1">{errors.description}</p>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('description')} (Arabic) *
+                </label>
+                <Textarea
+                  value={formData.description_ar}
+                  onChange={(e) => handleInputChange('description_ar', e.target.value)}
+                  placeholder="أدخل وصف الحالة بالعربية"
+                  rows={4}
+                  className={errors.description ? 'border-red-500' : ''}
+                  dir="rtl"
                 />
                 {errors.description && (
                   <p className="text-red-500 text-sm mt-1">{errors.description}</p>
