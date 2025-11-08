@@ -150,14 +150,16 @@ export default function DashboardPage() {
   const router = useRouter()
   const params = useParams()
   const { user, signOut } = useAuth()
-  const { roles, loading: rolesLoading } = useAdmin()
+  const { roles, loading: rolesLoading, refresh: refreshAdminData } = useAdmin()
   
   // Debug: Log roles to help diagnose issues
   useEffect(() => {
     if (!rolesLoading && roles.length > 0) {
       console.log('User roles:', roles.map(r => ({ name: r.name, level: r.level, display_name: r.display_name })))
+      console.log('Primary role (highest level):', roles.sort((a, b) => (b.level || 0) - (a.level || 0))[0]?.name)
     } else if (!rolesLoading && roles.length === 0) {
       console.warn('No roles found for user. User ID:', user?.id)
+      console.warn('This might indicate the user needs roles assigned in /admin/manage')
     }
   }, [roles, rolesLoading, user?.id])
   
@@ -239,23 +241,9 @@ export default function DashboardPage() {
   const refreshUserRole = async () => {
     try {
       setRefreshingRole(true)
-      
-      const response = await fetch('/api/refresh-role', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        console.log('Role refreshed successfully:', data.role)
-        // Force a page refresh to update the UI
-        window.location.reload()
-      } else {
-        console.error('Failed to refresh role:', data.message)
-      }
+      // Refresh admin data from the hook
+      await refreshAdminData()
+      console.log('Roles refreshed. Current roles:', roles.map(r => ({ name: r.name, level: r.level })))
     } catch (error) {
       console.error('Error refreshing role:', error)
     } finally {

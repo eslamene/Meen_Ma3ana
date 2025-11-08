@@ -129,24 +129,6 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
   )
 }
 
-// Role display function
-const getRoleDisplayName = (role: string) => {
-  switch (role) {
-    case 'admin':
-      return 'Administrator'
-    case 'moderator':
-      return 'Moderator'
-    case 'sponsor':
-      return 'Sponsor'
-    case 'volunteer':
-      return 'Volunteer'
-    case 'donor':
-      return 'Donor'
-    default:
-      return 'User'
-  }
-}
-
 interface SystemStats {
   totalUsers: number
   totalContributions: number
@@ -172,7 +154,8 @@ export default function AdminPage() {
   const params = useParams()
   const { roles } = useAdmin()
   // Get primary role (first role or highest level)
-  const userRole = roles.length > 0 ? roles[0].name : null
+  const primaryRole = roles.length > 0 ? roles[0] : null
+  const userRoleDisplayName = primaryRole?.display_name || 'User'
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
     totalContributions: 0,
@@ -372,7 +355,7 @@ export default function AdminPage() {
                 <div className="flex items-center gap-3">
                   <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
                     <Shield className="h-3 w-3 mr-1" />
-                    {getRoleDisplayName(userRole || '')}
+                    {userRoleDisplayName}
                   </Badge>
                 </div>
               </div>

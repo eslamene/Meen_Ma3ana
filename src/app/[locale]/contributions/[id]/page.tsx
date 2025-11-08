@@ -81,10 +81,15 @@ export default function ContributionDetailsPage() {
       const response = await fetch(`/api/contributions/${contributionId}`)
       
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
         if (response.status === 404) {
-          setError('Contribution not found')
+          setError(errorData.error || 'Contribution not found')
+        } else if (response.status === 403) {
+          setError(errorData.error || errorData.message || 'You do not have permission to view this contribution')
+        } else if (response.status === 401) {
+          setError('Please log in to view contribution details')
         } else {
-          setError('Failed to load contribution details')
+          setError(errorData.error || errorData.message || 'Failed to load contribution details')
         }
         return
       }

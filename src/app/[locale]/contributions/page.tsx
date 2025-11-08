@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Layout } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import ContributionsList from '@/components/contributions/ContributionsList'
 
 interface Contribution {
@@ -202,14 +202,6 @@ export default function ContributionsPage() {
               <p className="text-gray-600 mt-2">View and manage all your contributions</p>
             </div>
             <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/${params.locale}/contributions/compare`)}
-                className="flex items-center gap-2"
-              >
-                <Layout className="h-4 w-4" />
-                Compare Designs
-              </Button>
               <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-lg px-4 py-2">
                 {pagination.total} contributions
               </Badge>

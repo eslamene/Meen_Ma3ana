@@ -88,18 +88,10 @@ function createLogger() {
   const logLevel = process.env.LOG_LEVEL || 'info'
   const isDevelopment = process.env.NODE_ENV === 'development'
   
-  const logger = pino({
+  // In Next.js, pino-pretty worker threads can cause issues
+  // Use a simpler configuration that's more reliable
+  const loggerConfig: pino.LoggerOptions = {
     level: logLevel,
-    ...(isDevelopment && {
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-        }
-      }
-    }),
     serializers: {
       req: (req) => ({
         method: req.method,
@@ -118,8 +110,35 @@ function createLogger() {
         code: err.code,
       }),
     },
-  })
+  }
 
+  // Disable pino-pretty by default in Next.js to avoid worker thread issues
+  // Next.js can have issues with worker threads used by pino-pretty
+  // Use basic JSON logging instead, which is more reliable
+  // Set ENABLE_PINO_PRETTY=true to enable pretty logging (may cause worker errors)
+  const usePretty = isDevelopment && 
+                    typeof process !== 'undefined' && 
+                    process.env.NEXT_RUNTIME !== 'edge' &&
+                    process.env.ENABLE_PINO_PRETTY === 'true'
+  
+  if (usePretty) {
+    try {
+      loggerConfig.transport = {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:standard',
+          ignore: 'pid,hostname',
+          singleLine: false,
+        }
+      }
+    } catch (error) {
+      // If pino-pretty fails, fall back to basic logger
+      console.warn('Failed to initialize pino-pretty, using basic logger:', error)
+    }
+  }
+
+  const logger = pino(loggerConfig)
   return logger
 }
 
@@ -155,45 +174,68 @@ export class Logger {
   }
 
   info(message: string, data?: unknown): void {
-    logger.info(this.formatMessage(message, data))
+    try {
+      logger.info(this.formatMessage(message, data))
+    } catch (error) {
+      // Fallback to console if logger worker fails
+      console.info('[Logger]', message, data || '')
+    }
   }
 
   warn(message: string, data?: unknown): void {
-    logger.warn(this.formatMessage(message, data))
+    try {
+      logger.warn(this.formatMessage(message, data))
+    } catch (error) {
+      // Fallback to console if logger worker fails
+      console.warn('[Logger]', message, data || '')
+    }
   }
 
   error(message: string, error?: Error | unknown, data?: unknown): void {
-    const logData: Record<string, unknown> = { ...this.formatMessage(message, data) }
-    
-    // Ensure logData always has at least a message
-    if (!logData.message) {
-      logData.message = message
-    }
-    
-    if (error instanceof Error) {
-      logData.error = {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
+    try {
+      const logData: Record<string, unknown> = { ...this.formatMessage(message, data) }
+      
+      // Ensure logData always has at least a message
+      if (!logData.message) {
+        logData.message = message
       }
-    } else if (error) {
-      const redactedError = redactPII(error)
-      // Only add error if redactPII returned something meaningful
-      if (redactedError !== null && redactedError !== undefined) {
-        logData.error = redactedError
+      
+      if (error instanceof Error) {
+        logData.error = {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        }
+      } else if (error) {
+        const redactedError = redactPII(error)
+        // Only add error if redactPII returned something meaningful
+        if (redactedError !== null && redactedError !== undefined) {
+          logData.error = redactedError
+        }
+      }
+      
+      // Ensure we always log something meaningful
+      if (Object.keys(logData).length === 0) {
+        logData.message = message || 'Unknown error'
+      }
+      
+      logger.error(logData)
+    } catch (loggerError) {
+      // Fallback to console if logger worker fails
+      console.error('[Logger]', message, error || '', data || '')
+      if (loggerError instanceof Error) {
+        console.error('[Logger Error]', loggerError.message)
       }
     }
-    
-    // Ensure we always log something meaningful
-    if (Object.keys(logData).length === 0) {
-      logData.message = message || 'Unknown error'
-    }
-    
-    logger.error(logData)
   }
 
   debug(message: string, data?: unknown): void {
-    logger.debug(this.formatMessage(message, data))
+    try {
+      logger.debug(this.formatMessage(message, data))
+    } catch (error) {
+      // Fallback to console if logger worker fails
+      console.debug('[Logger]', message, data || '')
+    }
   }
 
   // Stable error messages for common scenarios

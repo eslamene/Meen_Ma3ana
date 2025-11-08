@@ -73,10 +73,24 @@ export function useAdmin(): UseAdminReturn {
         supabase.rpc('get_user_menu_items', { user_id: currentUser.id }),
       ])
 
-      // Extract roles first
+      // Extract roles first - handle both array and object formats
       const userRoles = (rolesRes.data || [])
-        .map((ur: any) => ur.admin_roles)
+        .map((ur: any) => {
+          // Handle both array and object formats from Supabase
+          const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
+          return role
+        })
         .filter(Boolean) as AdminRole[]
+      
+      // Sort roles by level (highest first) to ensure consistent ordering
+      userRoles.sort((a, b) => (b.level || 0) - (a.level || 0))
+      
+      defaultLogger.info('Fetched user roles:', {
+        userId: currentUser.id,
+        rolesCount: userRoles.length,
+        roles: userRoles.map(r => ({ name: r.name, level: r.level, display_name: r.display_name }))
+      })
+      
       setRoles(userRoles)
 
       // Handle permissions with fallback
