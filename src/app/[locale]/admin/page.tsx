@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import PermissionGuard from '@/components/auth/PermissionGuard'
-import { usePermissions } from '@/lib/hooks/usePermissions'
+import { useAdmin } from '@/lib/admin/hooks'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,7 +27,6 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {
@@ -37,7 +36,7 @@ interface AdminQuickActionsSectionProps {
 }
 
 function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionProps) {
-  const { hasPermission } = useSimpleRBAC()
+  const { hasPermission } = useAdmin()
   
   // Define all possible admin actions with their permissions
   const allActions = [
@@ -171,7 +170,9 @@ export default function AdminPage() {
   const t = useTranslations('admin')
   const router = useRouter()
   const params = useParams()
-  const { userRole } = usePermissions()
+  const { roles } = useAdmin()
+  // Get primary role (first role or highest level)
+  const userRole = roles.length > 0 ? roles[0].name : null
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
     totalContributions: 0,
@@ -354,7 +355,7 @@ export default function AdminPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="view:admin_dashboard">
+      <PermissionGuard permission="admin:dashboard">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}

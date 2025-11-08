@@ -123,33 +123,39 @@ export default function PermissionsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [permissionsRes, modulesRes, rolesRes] = await Promise.all([
-        fetch('/api/admin/rbac/permissions', { credentials: 'include' }),
-        fetch('/api/admin/rbac/modules', { credentials: 'include' }),
-        fetch('/api/admin/rbac/roles', { credentials: 'include' })
+      const [permissionsRes, rolesRes] = await Promise.all([
+        fetch('/api/admin/permissions', { credentials: 'include' }),
+        fetch('/api/admin/roles', { credentials: 'include' })
       ])
 
       if (permissionsRes.ok) {
         const permissionsData = await permissionsRes.json()
-        setPermissionsByModule(permissionsData.permissionsByModule)
+        // Group permissions by resource (module)
+        const grouped: Record<string, Permission[]> = {}
+        if (permissionsData.permissions) {
+          permissionsData.permissions.forEach((p: Permission) => {
+            const module = p.resource || 'other'
+            if (!grouped[module]) grouped[module] = []
+            grouped[module].push(p)
+          })
+        }
+        setPermissionsByModule(grouped)
       } else {
-        const errorData = await permissionsRes.json()
-        console.error('Permissions fetch error:', errorData)
-      }
-
-      if (modulesRes.ok) {
-        const modulesData = await modulesRes.json()
-        setModules(modulesData.modules)
-      } else {
-        const errorData = await modulesRes.json()
-        console.error('Modules fetch error:', errorData)
+        // Handle non-JSON responses
+        const contentType = permissionsRes.headers.get('content-type')
+        if (contentType?.includes('application/json')) {
+          const errorData = await permissionsRes.json().catch(() => ({}))
+          console.error('Permissions fetch error:', errorData)
+        } else {
+          console.error('Permissions fetch error: Non-JSON response', permissionsRes.status)
+        }
       }
 
       if (rolesRes.ok) {
         const rolesData = await rolesRes.json()
         setRoles(rolesData.roles || [])
       } else {
-        const errorData = await rolesRes.json()
+        const errorData = await rolesRes.json().catch(() => ({}))
         console.error('Roles fetch error:', errorData)
       }
     } catch (error) {

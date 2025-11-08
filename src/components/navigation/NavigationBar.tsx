@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
-import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
+import { useAdmin } from '@/lib/admin/hooks'
 import GuestPermissionGuard from '@/components/auth/GuestPermissionGuard'
 
 export default function NavigationBar() {
@@ -26,10 +26,17 @@ export default function NavigationBar() {
 
   const supabase = createClient()
   
-  // Use the new simplified RBAC hook
-  const { modules, loading: modulesLoading } = useSimpleRBAC()
+  // Use the new admin hook
+  const { menuItems, loading: modulesLoading } = useAdmin()
   
-  // Note: useSimpleRBAC handles refresh internally
+  // Convert menuItems to modules format for compatibility
+  const modules = menuItems.map(item => ({
+    id: item.id,
+    name: item.label.toLowerCase().replace(/\s+/g, '_'),
+    display_name: item.label,
+    icon: item.icon || 'FileText',
+    items: item.children || []
+  }))
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
@@ -63,7 +70,7 @@ export default function NavigationBar() {
       if (session?.user) {
         setUser(session.user)
         fetchUnreadNotifications(session.user.id)
-        // Permissions are handled automatically by useSimpleRBAC
+        // Permissions are handled automatically by useAdmin
       } else {
         setUser(null)
         setUnreadNotifications(0)
@@ -73,11 +80,11 @@ export default function NavigationBar() {
     return () => subscription.unsubscribe()
   }, [supabase.auth, fetchUserAndNotifications, fetchUnreadNotifications])
 
-  // Note: useSimpleRBAC handles permission refresh automatically
+  // Note: useAdmin handles permission refresh automatically
 
-  // Note: useSimpleRBAC handles cross-tab synchronization automatically
+  // Note: useAdmin handles cross-tab synchronization automatically
 
-  // Note: useSimpleRBAC handles RBAC update events automatically
+  // Note: useAdmin handles admin system update events automatically
 
 
   const handleSignOut = async () => {

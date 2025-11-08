@@ -13,7 +13,7 @@ import {
   CheckCircle,
   Info
 } from 'lucide-react'
-import { useDatabasePermissions } from '@/lib/hooks/useDatabasePermissions'
+import { useAdmin } from '@/lib/admin/hooks'
 
 interface UserRoleInfoProps {
   showDetails?: boolean
@@ -23,8 +23,10 @@ interface UserRoleInfoProps {
 export default function UserRoleInfo({ showDetails = false, className = '' }: UserRoleInfoProps) {
   const { 
     user, 
-    loading 
-  } = useDatabasePermissions()
+    loading,
+    roles,
+    permissions
+  } = useAdmin()
   
   const [showPermissions, setShowPermissions] = useState(showDetails)
   const [roleData, setRoleData] = useState<any>(null)

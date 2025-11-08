@@ -8,7 +8,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Heart, Clock, CheckCircle, XCircle, Layout } from 'lucide-react'
+import { ArrowLeft, Heart, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import ContributionsList from '@/components/contributions/ContributionsList'
@@ -219,7 +219,7 @@ export default function AdminContributionsPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="view:admin_contributions">
+      <PermissionGuard permission="contributions:manage">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Header */}
@@ -239,19 +239,9 @@ export default function AdminContributionsPage() {
                   <h1 className="text-3xl font-bold text-gray-900">Contribution Management</h1>
                   <p className="text-gray-600 mt-2">Review and manage all contributions</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push(`/${params.locale}/contributions/compare`)}
-                    className="flex items-center gap-2"
-                  >
-                    <Layout className="h-4 w-4" />
-                    Compare Designs
-                  </Button>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-lg px-4 py-2">
-                    {pagination.total} contributions
-                  </Badge>
-                </div>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-lg px-4 py-2">
+                  {pagination.total} contributions
+                </Badge>
               </div>
             </div>
 

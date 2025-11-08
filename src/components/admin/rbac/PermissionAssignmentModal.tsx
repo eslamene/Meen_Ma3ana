@@ -1,308 +1,228 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { getIconWithFallback } from '@/lib/icons/registry'
-import { useToast } from '@/hooks/use-toast'
-import { ChevronDown, Search, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Search } from 'lucide-react'
 
-interface PermissionAssignmentModalProps {
-  roleId: string
-  roleName: string
-  currentPermissions: string[]
-  onSave: (permissionIds: string[]) => Promise<void>
-  onClose: () => void
-  open: boolean
+interface Permission {
+  id: string
+  name: string
+  display_name: string
+  description: string
+  resource: string
+  action: string
+  is_system: boolean
 }
 
-const colorMap: Record<string, string> = {
-  blue: '#3b82f6',
-  green: '#10b981',
-  red: '#ef4444',
-  purple: '#8b5cf6',
-  yellow: '#f59e0b',
-  indigo: '#6366f1',
-  gray: '#6b7280',
-  emerald: '#059669',
-  orange: '#f97316'
+interface PermissionAssignmentModalProps {
+  open: boolean
+  onClose: () => void
+  role: {
+    id: string
+    display_name: string
+  }
+  permissions: Permission[]
+  onSave: (permissionIds: string[]) => Promise<void>
 }
 
 export function PermissionAssignmentModal({
-  roleId,
-  roleName,
-  currentPermissions,
-  onSave,
+  open,
   onClose,
-  open
+  role,
+  permissions,
+  onSave
 }: PermissionAssignmentModalProps) {
-  const [permissionsByModule, setPermissionsByModule] = useState<Record<string, any>>({})
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(currentPermissions)
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [openModules, setOpenModules] = useState<Set<string>>(new Set())
-  const [changesOpen, setChangesOpen] = useState(false)
-  const { toast } = useToast()
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (open) {
-      fetchPermissions()
-      setSelectedPermissions(currentPermissions)
-      setSearchTerm('')
-      setChangesOpen(false)
+  // Group permissions by resource
+  const permissionsByResource = permissions.reduce((acc, perm) => {
+    if (!acc[perm.resource]) {
+      acc[perm.resource] = []
     }
-  }, [open, currentPermissions])
+    acc[perm.resource].push(perm)
+    return acc
+  }, {} as Record<string, Permission[]>)
 
-  const fetchPermissions = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/admin/rbac/permissions')
-      if (res.ok) {
-        const data = await res.json()
-        setPermissionsByModule(data.permissionsByModule)
+  // Filter permissions by search term
+  const filteredPermissions = permissions.filter(perm =>
+    perm.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    perm.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    perm.resource.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const handlePermissionToggle = (permissionId: string) => {
+    setSelectedPermissions(prev => {
+      if (prev.includes(permissionId)) {
+        return prev.filter(id => id !== permissionId)
       } else {
-        toast({ title: 'Error', description: 'Failed to fetch permissions', type: 'error' })
-      }
-    } catch (error) {
-      toast({ title: 'Error', description: 'Failed to fetch permissions', type: 'error' })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const filteredPermissionsByModule = useMemo(() => {
-    if (!searchTerm) return permissionsByModule
-    const filtered: Record<string, any> = {}
-    Object.entries(permissionsByModule).forEach(([moduleName, moduleData]) => {
-      const filteredPerms = moduleData.permissions.filter((p: any) =>
-        p.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      if (filteredPerms.length > 0) {
-        filtered[moduleName] = { ...moduleData, permissions: filteredPerms }
+        return [...prev, permissionId]
       }
     })
-    return filtered
-  }, [permissionsByModule, searchTerm])
-
-  const handlePermissionChange = (permissionId: string, checked: boolean) => {
-    setSelectedPermissions(prev =>
-      checked ? [...prev, permissionId] : prev.filter(id => id !== permissionId)
-    )
   }
 
-  const handleSelectAll = (moduleName: string, select: boolean) => {
-    const permissionModule = filteredPermissionsByModule[moduleName]
-    if (!permissionModule) return
-    const permIds = permissionModule.permissions.map((p: any) => p.id)
-    setSelectedPermissions(prev =>
-      select ? [...new Set([...prev, ...permIds])] : prev.filter(id => !permIds.includes(id))
-    )
-  }
-
-  const isModuleFullySelected = (moduleName: string) => {
-    const permissionModule = filteredPermissionsByModule[moduleName]
-    if (!permissionModule) return false
-    return permissionModule.permissions.every((p: any) => selectedPermissions.includes(p.id))
-  }
-
-  const isModulePartiallySelected = (moduleName: string) => {
-    const permissionModule = filteredPermissionsByModule[moduleName]
-    if (!permissionModule) return false
-    const selectedInModule = permissionModule.permissions.filter((p: any) => selectedPermissions.includes(p.id))
-    return selectedInModule.length > 0 && selectedInModule.length < permissionModule.permissions.length
-  }
-
-  const totalPermissions = Object.values(filteredPermissionsByModule).reduce((sum, mod: any) => sum + mod.permissions.length, 0)
-  const selectedCount = selectedPermissions.length
-  const addedPermissions = selectedPermissions.filter(id => !currentPermissions.includes(id))
-  const removedPermissions = currentPermissions.filter(id => !selectedPermissions.includes(id))
-
-  const findPermissionById = (id: string) => {
-    for (const mod of Object.values(permissionsByModule) as any[]) {
-      const perm = mod.permissions.find((p: any) => p.id === id)
-      if (perm) return perm
+  const handleSelectAll = () => {
+    if (selectedPermissions.length === filteredPermissions.length) {
+      setSelectedPermissions([])
+    } else {
+      setSelectedPermissions(filteredPermissions.map(p => p.id))
     }
-    return null
   }
 
   const handleSave = async () => {
-    setSaving(true)
     try {
+      setSaving(true)
       await onSave(selectedPermissions)
-      toast({ title: 'Success', description: 'Permissions updated successfully', type: 'success' })
       onClose()
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to update permissions', type: 'error' })
+      console.error('Error saving permissions:', error)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleQuickPreset = (preset: string) => {
-    let newSelected: string[] = []
-    if (preset === 'read-only') {
-      newSelected = Object.values(permissionsByModule).flatMap((mod: any) =>
-        mod.permissions.filter((p: any) => p.action === 'view').map((p: any) => p.id)
-      )
-    } else if (preset === 'full-access') {
-      newSelected = Object.values(permissionsByModule).flatMap((mod: any) =>
-        mod.permissions.map((p: any) => p.id)
-      )
-    } else if (preset === 'moderator') {
-      newSelected = Object.values(permissionsByModule).flatMap((mod: any) =>
-        mod.permissions.filter((p: any) => ['view', 'create', 'update'].includes(p.action)).map((p: any) => p.id)
-      )
-    }
-    setSelectedPermissions(newSelected)
-  }
-
+  // Load current permissions when modal opens
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 's') {
-        e.preventDefault()
-        handleSave()
-      } else if (e.key === 'Escape') {
-        onClose()
-      }
+    if (open && role.id) {
+      // Fetch current permissions for this role
+      fetch(`/api/admin/roles/${role.id}/permissions`, {
+        credentials: 'include'
+      })
+        .then(res => {
+          if (res.ok) {
+            return res.json()
+          }
+          throw new Error('Failed to fetch permissions')
+        })
+        .then(data => {
+          if (data.permissions) {
+            setSelectedPermissions(data.permissions.map((p: Permission) => p.id))
+          } else {
+            setSelectedPermissions([])
+          }
+        })
+        .catch(() => {
+          setSelectedPermissions([])
+        })
+    } else if (!open) {
+      setSelectedPermissions([])
+      setSearchTerm('')
     }
-    if (open) {
-      document.addEventListener('keydown', handleKeyDown)
-      return () => document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [open])
+  }, [open, role.id])
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Assign Permissions to {roleName}</DialogTitle>
+          <DialogTitle>Assign Permissions to {role.display_name}</DialogTitle>
           <DialogDescription>
-            Select the permissions you want to assign to the {roleName} role. Changes will be saved when you click Save.
+            Select the permissions to assign to this role. Users with this role will have access to all selected permissions.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex items-center gap-2 mb-4">
-            <Search className="h-4 w-4" />
+
+        <div className="space-y-4 py-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search permissions..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
+              className="pl-10"
             />
           </div>
-          <div className="flex gap-2 mb-4">
-            <Button variant="outline" size="sm" onClick={() => handleQuickPreset('read-only')}>Read Only</Button>
-            <Button variant="outline" size="sm" onClick={() => handleQuickPreset('moderator')}>Moderator</Button>
-            <Button variant="outline" size="sm" onClick={() => handleQuickPreset('full-access')}>Full Access</Button>
+
+          {/* Select All */}
+          <div className="flex items-center justify-between p-2 border rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="select-all"
+                checked={filteredPermissions.length > 0 && selectedPermissions.length === filteredPermissions.length}
+                onCheckedChange={handleSelectAll}
+              />
+              <Label htmlFor="select-all" className="cursor-pointer font-medium">
+                Select All ({filteredPermissions.length} permissions)
+              </Label>
+            </div>
+            <Badge variant="outline">
+              {selectedPermissions.length} selected
+            </Badge>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>
-            ) : (
-              Object.entries(filteredPermissionsByModule).map(([moduleName, moduleData]: [string, any]) => {
-                const IconComp = getIconWithFallback(moduleData.module?.icon || 'Shield')
-                const isOpen = openModules.has(moduleName)
-                const fullySelected = isModuleFullySelected(moduleName)
-                const partiallySelected = isModulePartiallySelected(moduleName)
-                return (
-                  <Collapsible key={moduleName} open={isOpen} onOpenChange={(open) =>
-                    setOpenModules(prev => {
-                      const newSet = new Set(prev)
-                      if (open) newSet.add(moduleName)
-                      else newSet.delete(moduleName)
-                      return newSet
-                    })
-                  }>
-                    <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/50 rounded-md mb-2 hover:bg-muted">
-                      <div className="flex items-center gap-2">
-                        <IconComp 
-                          className="h-5 w-5" 
-                          style={{ color: colorMap[moduleData.module?.color] || colorMap.blue }} 
-                        />
-                        <span className="font-medium">{moduleData.module?.display_name || moduleName}</span>
-                        <Badge variant="secondary">{moduleData.permissions.length}</Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span 
-                          className="text-sm text-muted-foreground hover:text-foreground cursor-pointer px-2 py-1 rounded hover:bg-muted/50"
-                          onClick={(e) => { e.stopPropagation(); handleSelectAll(moduleName, !fullySelected) }}
-                        >
-                          {fullySelected ? 'Deselect All' : 'Select All'}
-                        </span>
-                        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                      </div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-4 pb-2">
-                      <div className="space-y-2">
-                        {moduleData.permissions.map((perm: any) => (
-                          <div key={perm.id} className="flex items-start gap-2 p-2 rounded border bg-background">
+
+          {/* Permissions by Resource */}
+          <div className="space-y-4">
+            {Object.entries(permissionsByResource)
+              .filter(([resource]) => 
+                filteredPermissions.some(p => p.resource === resource)
+              )
+              .map(([resource, perms]) => (
+                <div key={resource} className="border rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 capitalize">{resource}</h4>
+                  <div className="space-y-2">
+                    {perms
+                      .filter(perm => filteredPermissions.includes(perm))
+                      .map((perm) => {
+                        const isSelected = selectedPermissions.includes(perm.id)
+                        return (
+                          <div
+                            key={perm.id}
+                            className={`flex items-start space-x-3 p-2 rounded border transition-colors ${
+                              isSelected
+                                ? 'bg-blue-50 border-blue-200'
+                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            }`}
+                          >
                             <Checkbox
-                              checked={selectedPermissions.includes(perm.id)}
-                              onCheckedChange={(checked) => handlePermissionChange(perm.id, checked as boolean)}
+                              id={`perm-${perm.id}`}
+                              checked={isSelected}
+                              onCheckedChange={() => handlePermissionToggle(perm.id)}
                             />
-                            <div className="flex-1">
-                              <div className="font-medium">{perm.display_name}</div>
-                              <div className="text-sm text-muted-foreground">{perm.description}</div>
-                              <div className="text-xs text-muted-foreground">{perm.name}</div>
+                            <div className="flex-1 min-w-0">
+                              <Label
+                                htmlFor={`perm-${perm.id}`}
+                                className="cursor-pointer flex items-center gap-2"
+                              >
+                                <span className="font-medium">{perm.display_name}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {perm.action}
+                                </Badge>
+                                {perm.is_system && (
+                                  <Badge variant="outline" className="text-xs">
+                                    System
+                                  </Badge>
+                                )}
+                              </Label>
+                              {perm.description && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {perm.description}
+                                </p>
+                              )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )
-              })
-            )}
-          </div>
-          <div className="border-t pt-4 mt-4">
-            <div className="text-sm text-muted-foreground mb-2">
-              {selectedCount} of {totalPermissions} permissions selected
-            </div>
-            {(addedPermissions.length > 0 || removedPermissions.length > 0) && (
-              <Collapsible open={changesOpen} onOpenChange={setChangesOpen}>
-                <CollapsibleTrigger className="flex items-center gap-2 text-sm">
-                  <span>Changes Preview</span>
-                  <ChevronDown className="h-4 w-4" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2 space-y-1">
-                  {addedPermissions.map(id => {
-                    const perm = findPermissionById(id)
-                    return perm ? (
-                      <div key={id} className="flex items-center gap-2 text-green-600">
-                        <CheckCircle className="h-4 w-4" />
-                        <span>+ {perm.display_name}</span>
-                      </div>
-                    ) : null
-                  })}
-                  {removedPermissions.map(id => {
-                    const perm = findPermissionById(id)
-                    return perm ? (
-                      <div key={id} className="flex items-center gap-2 text-red-600">
-                        <XCircle className="h-4 w-4" />
-                        <span>- {perm.display_name}</span>
-                      </div>
-                    ) : null
-                  })}
-                </CollapsibleContent>
-              </Collapsible>
-            )}
+                        )
+                      })}
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
+
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save
+            {saving ? 'Saving...' : 'Save Permissions'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
+

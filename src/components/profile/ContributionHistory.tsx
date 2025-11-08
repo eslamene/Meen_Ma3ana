@@ -53,7 +53,9 @@ export default function ContributionHistory() {
       const response = await fetch(`/api/contributions?page=${pagination.page}&limit=${pagination.limit}`)
       
       if (!response.ok) {
-        throw new Error('Failed to fetch contributions')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('API Error Response:', errorData)
+        throw new Error(errorData.error || 'Failed to fetch contributions')
       }
       
       const data = await response.json()

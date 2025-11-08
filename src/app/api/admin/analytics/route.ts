@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Use permission guard
-    const guardResult = await requirePermission('view:analytics')(request)
+    const guardResult = await requirePermission('admin:analytics')(request)
     if (guardResult instanceof NextResponse) {
       return guardResult
     }

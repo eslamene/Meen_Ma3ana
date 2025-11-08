@@ -509,7 +509,7 @@ export default function CaseEditPage() {
   }
 
   return (
-    <PermissionGuard permissions={["update:cases"]} fallback={
+    <PermissionGuard permissions={["cases:update"]} fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">

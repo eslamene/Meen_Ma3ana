@@ -47,7 +47,7 @@ export default function RolesPage() {
 
   const fetchRoles = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/rbac/roles', {
+      const res = await fetch('/api/admin/roles', {
         credentials: 'include'
       })
       if (res.ok) {
@@ -93,7 +93,7 @@ export default function RolesPage() {
   // Handlers
   const handleCreate = async (roleData: { name: string; display_name: string; description: string; is_system: boolean }) => {
     try {
-      const res = await fetch('/api/admin/rbac/roles', {
+      const res = await fetch('/api/admin/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

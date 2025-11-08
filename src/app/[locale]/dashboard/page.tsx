@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useAuth } from '@/components/auth/AuthProvider'
-import { usePermissions } from '@/lib/hooks/usePermissions'
+import { useAdmin } from '@/lib/admin/hooks'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import ContributionHistory from '@/components/profile/ContributionHistory'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,7 +30,6 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 
 // Dynamic Quick Actions Component
 interface QuickActionsSectionProps {
@@ -47,7 +46,7 @@ interface QuickActionsSectionProps {
 }
 
 function QuickActionsSection({ quickActions, t }: QuickActionsSectionProps) {
-  const { hasPermission } = useSimpleRBAC()
+  const { hasPermission } = useAdmin()
   
   // Filter actions based on permissions
   const visibleActions = quickActions.filter(action => 
@@ -99,6 +98,8 @@ function QuickActionsSection({ quickActions, t }: QuickActionsSectionProps) {
 // Role display functions
 const getRoleDisplayName = (role: string) => {
   switch (role) {
+    case 'super_admin':
+      return 'Super Administrator'
     case 'admin':
       return 'Administrator'
     case 'moderator':
@@ -109,6 +110,8 @@ const getRoleDisplayName = (role: string) => {
       return 'Volunteer'
     case 'donor':
       return 'Donor'
+    case 'visitor':
+      return 'Visitor'
     default:
       return 'User'
   }
@@ -116,6 +119,8 @@ const getRoleDisplayName = (role: string) => {
 
 const getRoleDescription = (role: string) => {
   switch (role) {
+    case 'super_admin':
+      return 'Full system access with system management privileges'
     case 'admin':
       return 'Full system access with all administrative privileges'
     case 'moderator':
@@ -126,6 +131,8 @@ const getRoleDescription = (role: string) => {
       return 'Can help with case management and project updates'
     case 'donor':
       return 'Can make contributions and view cases'
+    case 'visitor':
+      return 'Unauthenticated user with limited access'
     default:
       return 'Basic user access'
   }
@@ -143,7 +150,21 @@ export default function DashboardPage() {
   const router = useRouter()
   const params = useParams()
   const { user, signOut } = useAuth()
-  const { userRole } = usePermissions()
+  const { roles, loading: rolesLoading } = useAdmin()
+  
+  // Debug: Log roles to help diagnose issues
+  useEffect(() => {
+    if (!rolesLoading && roles.length > 0) {
+      console.log('User roles:', roles.map(r => ({ name: r.name, level: r.level, display_name: r.display_name })))
+    } else if (!rolesLoading && roles.length === 0) {
+      console.warn('No roles found for user. User ID:', user?.id)
+    }
+  }, [roles, rolesLoading, user?.id])
+  
+  // Get primary role (highest level role, or first if levels are equal)
+  const userRole = roles.length > 0 
+    ? roles.sort((a, b) => (b.level || 0) - (a.level || 0))[0].name 
+    : null
   const [stats, setStats] = useState<DashboardStats>({
     totalContributions: 0,
     totalAmount: 0,
@@ -244,12 +265,18 @@ export default function DashboardPage() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
+      case 'super_admin':
+        return 'bg-gradient-to-r from-red-100 to-orange-100 text-red-900 border-red-300 font-semibold'
       case 'admin':
         return 'bg-red-100 text-red-800 border-red-200'
       case 'moderator':
         return 'bg-purple-100 text-purple-800 border-purple-200'
       case 'donor':
         return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'sponsor':
+        return 'bg-green-100 text-green-800 border-green-200'
+      case 'visitor':
+        return 'bg-gray-100 text-gray-600 border-gray-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }

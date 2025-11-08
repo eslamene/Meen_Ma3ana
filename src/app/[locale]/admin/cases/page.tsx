@@ -25,14 +25,20 @@ import {
   ArrowLeft,
   Calendar,
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Case {
   id: string
-  title: string
-  description: string
+  title?: string
+  title_en?: string
+  title_ar?: string
+  description?: string
+  description_en?: string
+  description_ar?: string
   target_amount: number
   current_amount: number
   status: 'draft' | 'submitted' | 'published' | 'closed' | 'under_review'
@@ -51,6 +57,8 @@ export default function AdminCasesPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
   const [stats, setStats] = useState({
     total: 0,
     published: 0,
@@ -230,11 +238,71 @@ export default function AdminCasesPage() {
   }
 
   const filteredCases = cases.filter(case_ => {
-    const matchesSearch = case_.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         case_.description.toLowerCase().includes(searchTerm.toLowerCase())
+    // Handle search with null/undefined checks and bilingual fields
+    const searchLower = searchTerm.toLowerCase()
+    const title = case_.title || case_.title_en || case_.title_ar || ''
+    const description = case_.description || case_.description_en || case_.description_ar || ''
+    
+    const matchesSearch = !searchTerm || 
+                         (title && title.toLowerCase().includes(searchLower)) ||
+                         (description && description.toLowerCase().includes(searchLower))
+    
     const matchesStatus = statusFilter === 'all' || case_.status === statusFilter
     return matchesSearch && matchesStatus
   })
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredCases.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedCases = filteredCases.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+    // Scroll to top when page changes
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = []
+    const maxVisible = 5
+    
+    if (totalPages <= maxVisible) {
+      // Show all pages if total pages is less than max visible
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // Always show first page
+      pages.push(1)
+      
+      if (currentPage > 3) {
+        pages.push('...')
+      }
+      
+      // Show pages around current page
+      const start = Math.max(2, currentPage - 1)
+      const end = Math.min(totalPages - 1, currentPage + 1)
+      
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+      
+      if (currentPage < totalPages - 2) {
+        pages.push('...')
+      }
+      
+      // Always show last page
+      pages.push(totalPages)
+    }
+    
+    return pages
+  }
 
   const handleDeleteClick = (caseId: string, caseTitle: string) => {
     setDeleteDialog({
@@ -351,7 +419,7 @@ export default function AdminCasesPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="view:admin_cases">
+      <PermissionGuard permission="cases:manage">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}
@@ -483,6 +551,20 @@ export default function AdminCasesPage() {
                       <SelectItem value="submitted">Submitted</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                    setItemsPerPage(Number(value))
+                    setCurrentPage(1)
+                  }}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Per page" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 per page</SelectItem>
+                      <SelectItem value="25">25 per page</SelectItem>
+                      <SelectItem value="50">50 per page</SelectItem>
+                      <SelectItem value="100">100 per page</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
@@ -514,8 +596,19 @@ export default function AdminCasesPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {filteredCases.map((case_) => (
+              <>
+                {/* Results Info */}
+                <div className="mb-4 text-sm text-gray-600">
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredCases.length)} of {filteredCases.length} cases
+                  {(searchTerm || statusFilter !== 'all') && (
+                    <span className="ml-2">
+                      (filtered from {cases.length} total)
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  {paginatedCases.map((case_) => (
                   <Card key={case_.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-200">
                     <CardContent className="p-6">
                       <div className="flex items-start gap-4">
@@ -524,7 +617,7 @@ export default function AdminCasesPage() {
                           <div className="flex-shrink-0">
                             <Image
                               src={case_.image_url}
-                              alt={case_.title}
+                              alt={case_.title || case_.title_en || case_.title_ar || 'Case image'}
                               className="w-20 h-20 object-cover rounded-lg"
                               width={80}
                               height={80}
@@ -537,10 +630,10 @@ export default function AdminCasesPage() {
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
                               <h3 className="text-lg font-semibold text-gray-900 truncate">
-                                {case_.title}
+                                {case_.title || case_.title_en || case_.title_ar || 'Untitled Case'}
                               </h3>
                               <p className="text-gray-600 text-sm mt-1 line-clamp-2">
-                                {case_.description}
+                                {case_.description || case_.description_en || case_.description_ar || 'No description'}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 ml-4">
@@ -606,7 +699,7 @@ export default function AdminCasesPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDeleteClick(case_.id, case_.title)}
+                            onClick={() => handleDeleteClick(case_.id, case_.title || case_.title_en || case_.title_ar || 'Untitled Case')}
                             className="border-2 border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="h-3 w-3 mr-1" />
@@ -616,8 +709,70 @@ export default function AdminCasesPage() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-6">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="flex items-center gap-1"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            Previous
+                          </Button>
+                          
+                          <div className="flex items-center gap-1">
+                            {getPageNumbers().map((page, index) => (
+                              page === '...' ? (
+                                <span key={`ellipsis-${index}`} className="px-2 text-gray-400">
+                                  ...
+                                </span>
+                              ) : (
+                                <Button
+                                  key={page}
+                                  variant={currentPage === page ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => handlePageChange(page as number)}
+                                  className={`min-w-[40px] ${
+                                    currentPage === page
+                                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                      : ''
+                                  }`}
+                                >
+                                  {page}
+                                </Button>
+                              )
+                            ))}
+                          </div>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="flex items-center gap-1"
+                          >
+                            Next
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        <div className="text-sm text-gray-600">
+                          Page {currentPage} of {totalPages}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         </div>

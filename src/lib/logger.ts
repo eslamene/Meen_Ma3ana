@@ -139,8 +139,12 @@ export class Logger {
   private formatMessage(message: string, data?: unknown): { message: string; data?: unknown; correlationId?: string } {
     const result: { message: string; data?: unknown; correlationId?: string } = { message }
     
-    if (data !== undefined) {
-      result.data = redactPII(data)
+    if (data !== undefined && data !== null) {
+      const redacted = redactPII(data)
+      // Only add data if redactPII returned something meaningful
+      if (redacted !== null && redacted !== undefined) {
+        result.data = redacted
+      }
     }
     
     if (this.correlationId) {
@@ -161,6 +165,11 @@ export class Logger {
   error(message: string, error?: Error | unknown, data?: unknown): void {
     const logData: Record<string, unknown> = { ...this.formatMessage(message, data) }
     
+    // Ensure logData always has at least a message
+    if (!logData.message) {
+      logData.message = message
+    }
+    
     if (error instanceof Error) {
       logData.error = {
         name: error.name,
@@ -168,7 +177,16 @@ export class Logger {
         stack: error.stack,
       }
     } else if (error) {
-      logData.error = redactPII(error)
+      const redactedError = redactPII(error)
+      // Only add error if redactPII returned something meaningful
+      if (redactedError !== null && redactedError !== undefined) {
+        logData.error = redactedError
+      }
+    }
+    
+    // Ensure we always log something meaningful
+    if (Object.keys(logData).length === 0) {
+      logData.message = message || 'Unknown error'
     }
     
     logger.error(logData)

@@ -922,7 +922,7 @@ function FilePreviewModal({ file, open, onOpenChange, canEdit, onFileUpdate, onD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-xl border-2 shadow-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white/80 backdrop-blur-2xl border border-white/20 shadow-2xl">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

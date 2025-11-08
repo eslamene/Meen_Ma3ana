@@ -22,7 +22,7 @@ import {
 import CaseCard from '@/components/cases/CaseCard'
 import FilterSidebar from '@/components/cases/FilterSidebar'
 import PermissionGuard from '@/components/auth/PermissionGuard'
-import { usePermissions } from '@/lib/hooks/usePermissions'
+import { useAdmin } from '@/lib/admin/hooks'
 
 interface Case {
   id: string
@@ -60,7 +60,9 @@ export default function CasesPage() {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
-  const { canCreateCase } = usePermissions()
+  const { hasPermission } = useAdmin()
+  // Check if user can create cases
+  const canCreateCase = hasPermission('cases:create')
 
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
@@ -269,7 +271,7 @@ export default function CasesPage() {
   }
 
   return (
-    <PermissionGuard permissions={["view:cases"]} fallback={
+    <PermissionGuard permissions={["cases:view"]} fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">

@@ -46,7 +46,7 @@ import { realtimeCaseUpdates, CaseProgressUpdate } from '@/lib/realtime-case-upd
 import { CaseUpdate } from '@/lib/case-updates'
 
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
-import { usePermissions } from '@/lib/hooks/usePermissions'
+import { useAdmin } from '@/lib/admin/hooks'
 
 interface Case {
   id: string
@@ -113,7 +113,7 @@ export default function CaseDetailPage() {
   
   // Use centralized hook for approved contributions
   const { contributions: approvedContributions, totalAmount: approvedTotal } = useApprovedContributions(caseId)
-  const { hasPermission } = usePermissions()
+  const { hasPermission } = useAdmin()
   const [error, setError] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'contributions' | 'updates' | 'files'>('overview')
@@ -744,7 +744,7 @@ export default function CaseDetailPage() {
   }
 
   return (
-    <PermissionGuard permissions={["view:cases"]} fallback={
+    <PermissionGuard permissions={["cases:view"]} fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">

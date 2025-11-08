@@ -287,17 +287,16 @@ export function requireRole(requiredRole: string) {
 }
 
 /**
- * Check if user has specific permission via RBAC system
+ * Check if user has specific permission via admin_permissions system
  */
 export async function hasPermission(userId: string, permission: string): Promise<boolean> {
   try {
     const result = await db.execute(sql`
-      SELECT 1 FROM rbac_user_roles ur
-      JOIN rbac_role_permissions rp ON ur.role_id = rp.role_id
-      JOIN rbac_permissions p ON rp.permission_id = p.id
+      SELECT 1 FROM admin_user_roles ur
+      JOIN admin_role_permissions rp ON ur.role_id = rp.role_id
+      JOIN admin_permissions p ON rp.permission_id = p.id
       WHERE ur.user_id = ${userId}
         AND ur.is_active = true
-        AND rp.is_active = true
         AND p.is_active = true
         AND p.name = ${permission}
       LIMIT 1
@@ -311,17 +310,17 @@ export async function hasPermission(userId: string, permission: string): Promise
 }
 
 /**
- * Check if user has admin role via RBAC system
+ * Check if user has admin role via admin_user_roles system
  */
 export async function isAdminUser(userId: string): Promise<boolean> {
   try {
     const result = await db.execute(sql`
-      SELECT 1 FROM rbac_user_roles ur
-      JOIN rbac_roles r ON ur.role_id = r.id
+      SELECT 1 FROM admin_user_roles ur
+      JOIN admin_roles r ON ur.role_id = r.id
       WHERE ur.user_id = ${userId}
         AND ur.is_active = true
         AND r.is_active = true
-        AND r.name = 'admin'
+        AND r.name IN ('admin', 'super_admin')
       LIMIT 1
     `)
     

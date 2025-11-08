@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
-import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
+import { useAdmin } from '@/lib/admin/hooks'
 import { 
   X, 
   Home, 
@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { getIconWithFallback } from '@/lib/icons/registry'
 
-// Note: useSimpleRBAC handles permissions internally
+// Note: useAdmin handles permissions internally
 
 interface SidebarNavigationProps {
   isOpen: boolean
@@ -48,13 +48,21 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
 
   const supabase = createClient()
   
-  // Use the new simplified RBAC hook
+  // Use the new admin hook
   const { 
-    modules, 
-    loading: modulesLoading
-  } = useSimpleRBAC()
+    menuItems, 
+    loading: modulesLoading,
+    user: rbacUser
+  } = useAdmin()
   
-  // Note: useSimpleRBAC handles refresh internally
+  // Convert menuItems to modules format for compatibility
+  const modules = menuItems.map(item => ({
+    id: item.id,
+    name: item.label.toLowerCase().replace(/\s+/g, '_'),
+    display_name: item.label,
+    icon: item.icon || 'FileText',
+    items: item.children || []
+  }))
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
@@ -88,7 +96,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
       if (session?.user) {
         setUser(session.user)
         fetchUnreadNotifications(session.user.id)
-        // Permissions are handled automatically by useSimpleRBAC
+        // Permissions are handled automatically by useAdmin
       } else {
         setUser(null)
         setUnreadNotifications(0)
@@ -122,7 +130,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     }
   }, [pathname, locale, modules, modulesLoading, expandedModules])
 
-  // Note: useSimpleRBAC handles RBAC update events automatically
+  // Note: useAdmin handles admin system update events automatically
 
   const handleSignOut = async () => {
     try {
@@ -268,7 +276,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
               const IconComponent = getIconWithFallback(module.icon)
               if (!module.name) return null // Ensure module name is present for navigation item retrieval
 
-              // With useSimpleRBAC, module.items are already filtered based on permissions
+              // With useAdmin, module.items are already filtered based on permissions
               const filteredItems = module.items || []
               const isExpanded = expandedModules.has(module.id)
 
