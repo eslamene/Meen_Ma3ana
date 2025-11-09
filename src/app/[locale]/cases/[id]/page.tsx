@@ -207,7 +207,9 @@ export default function CaseDetailPage() {
         description: data.description_en || data.description_ar || '',
         descriptionEn: data.description_en,
         descriptionAr: data.description_ar,
-        category: (data.case_categories as { name: string } | null)?.name || null,
+        category: (data.case_categories && !Array.isArray(data.case_categories) 
+          ? (data.case_categories as { name: string }).name 
+          : null) || null,
         target_amount: parseFloat(data.target_amount || '0'),
         current_amount: parseFloat(data.current_amount || '0'),
       }

@@ -379,7 +379,7 @@ export default function BeneficiaryForm({
               <div>
                 <Label>{t('idType') || 'ID Type'}</Label>
                 <Select 
-                  value={formData.id_type_id ? (typeof formData.id_type_id === 'string' ? formData.id_type_id : formData.id_type_id.toString()) : ''} 
+                  value={formData.id_type_id ? String(formData.id_type_id) : ''} 
                   onValueChange={(value) => handleChange('id_type_id', value || undefined)}
                 >
                   <SelectTrigger>
@@ -387,7 +387,7 @@ export default function BeneficiaryForm({
                   </SelectTrigger>
                   <SelectContent>
                     {idTypes.filter(type => type.id && (typeof type.id === 'string' ? type.id.trim() !== '' : true)).map((type) => (
-                      <SelectItem key={type.id} value={typeof type.id === 'string' ? type.id : type.id.toString()}>
+                      <SelectItem key={type.id} value={String(type.id)}>
                         {type.name_en}
                       </SelectItem>
                     ))}

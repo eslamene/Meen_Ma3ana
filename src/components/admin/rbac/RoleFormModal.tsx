@@ -18,14 +18,17 @@ interface Role {
 interface RoleFormModalProps {
   open: boolean
   onClose: () => void
-  onSubmit: (data: { name: string; display_name: string; description: string }) => Promise<void>
+  onSubmit?: (data: { name: string; display_name: string; description: string }) => Promise<void>
+  onSave?: (data: { name: string; display_name: string; description: string; is_system?: boolean }) => Promise<void>
   role?: Role
+  existingNames?: string[]
 }
 
 export function RoleFormModal({
   open,
   onClose,
   onSubmit,
+  onSave,
   role
 }: RoleFormModalProps) {
   const [name, setName] = useState('')
@@ -51,11 +54,15 @@ export function RoleFormModal({
 
     try {
       setSaving(true)
-      await onSubmit({
+      const submitHandler = onSave || onSubmit
+      if (submitHandler) {
+        await submitHandler({
         name: name.trim(),
         display_name: displayName.trim(),
-        description: description.trim()
+          description: description.trim(),
+          ...(onSave && { is_system: false })
       })
+      }
       onClose()
     } catch (error) {
       console.error('Error saving role:', error)

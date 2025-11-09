@@ -51,12 +51,17 @@ export async function GET(request: NextRequest) {
     const { data: authUsers, error: usersError } = await serviceRoleClient.auth.admin.listUsers()
     if (usersError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users:', usersError)
-      logger.error('Users fetch error details:', {
+      const errorDetails: any = {
         code: usersError.code,
-        message: usersError.message,
-        details: usersError.details,
-        hint: usersError.hint
-      })
+        message: usersError.message
+      }
+      if ((usersError as any).details) {
+        errorDetails.details = (usersError as any).details
+      }
+      if ((usersError as any).hint) {
+        errorDetails.hint = (usersError as any).hint
+      }
+      logger.error('Users fetch error details:', errorDetails)
       throw usersError
     }
 
@@ -79,12 +84,17 @@ export async function GET(request: NextRequest) {
 
     if (rolesError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user roles:', rolesError)
-      logger.error('User roles error details:', {
+      const rolesErrorDetails: any = {
         code: rolesError.code,
-        message: rolesError.message,
-        details: rolesError.details,
-        hint: rolesError.hint
-      })
+        message: rolesError.message
+      }
+      if ((rolesError as any).details) {
+        rolesErrorDetails.details = (rolesError as any).details
+      }
+      if ((rolesError as any).hint) {
+        rolesErrorDetails.hint = (rolesError as any).hint
+      }
+      logger.error('User roles error details:', rolesErrorDetails)
       // Don't throw, just return empty array - this allows the API to still return users
     }
 

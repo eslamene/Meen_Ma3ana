@@ -22,11 +22,14 @@ interface Permission {
 interface PermissionAssignmentModalProps {
   open: boolean
   onClose: () => void
-  role: {
+  role?: {
     id: string
     display_name: string
   }
-  permissions: Permission[]
+  roleId?: string
+  roleName?: string
+  currentPermissions?: string[]
+  permissions?: Permission[]
   onSave: (permissionIds: string[]) => Promise<void>
 }
 
@@ -34,15 +37,22 @@ export function PermissionAssignmentModal({
   open,
   onClose,
   role,
-  permissions,
+  roleId,
+  roleName,
+  currentPermissions = [],
+  permissions = [],
   onSave
 }: PermissionAssignmentModalProps) {
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(currentPermissions)
   const [searchTerm, setSearchTerm] = useState('')
   const [saving, setSaving] = useState(false)
+  const [allPermissions, setAllPermissions] = useState<Permission[]>(permissions)
+
+  // Use role prop if available, otherwise use roleId/roleName
+  const effectiveRole = role || (roleId && roleName ? { id: roleId, display_name: roleName } : undefined)
 
   // Group permissions by resource
-  const permissionsByResource = permissions.reduce((acc, perm) => {
+  const permissionsByResource = allPermissions.reduce((acc, perm) => {
     if (!acc[perm.resource]) {
       acc[perm.resource] = []
     }
@@ -51,7 +61,7 @@ export function PermissionAssignmentModal({
   }, {} as Record<string, Permission[]>)
 
   // Filter permissions by search term
-  const filteredPermissions = permissions.filter(perm =>
+  const filteredPermissions = allPermissions.filter(perm =>
     perm.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     perm.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     perm.resource.toLowerCase().includes(searchTerm.toLowerCase())
@@ -89,9 +99,9 @@ export function PermissionAssignmentModal({
 
   // Load current permissions when modal opens
   useEffect(() => {
-    if (open && role.id) {
+    if (open && effectiveRole?.id) {
       // Fetch current permissions for this role
-      fetch(`/api/admin/roles/${role.id}/permissions`, {
+      fetch(`/api/admin/rbac/roles/${effectiveRole.id}/permissions`, {
         credentials: 'include'
       })
         .then(res => {
@@ -101,26 +111,50 @@ export function PermissionAssignmentModal({
           throw new Error('Failed to fetch permissions')
         })
         .then(data => {
-          if (data.permissions) {
-            setSelectedPermissions(data.permissions.map((p: Permission) => p.id))
-          } else {
-            setSelectedPermissions([])
+          setSelectedPermissions(data.permissions?.map((p: Permission) => p.id) || currentPermissions)
+        })
+        .catch(error => {
+          console.error('Error fetching permissions:', error)
+          setSelectedPermissions(currentPermissions)
+        })
+
+      // Fetch all available permissions if not provided
+      if (allPermissions.length === 0) {
+        fetch('/api/admin/rbac/permissions', {
+          credentials: 'include'
+        })
+          .then(res => {
+            if (res.ok) {
+              return res.json()
+            }
+            throw new Error('Failed to fetch all permissions')
+          })
+          .then(data => {
+            // Flatten permissions from modules
+            const flatPermissions: Permission[] = []
+            if (data.permissionsByModule) {
+              Object.values(data.permissionsByModule).forEach((modulePerms: any) => {
+                if (Array.isArray(modulePerms)) {
+                  flatPermissions.push(...modulePerms)
           }
+              })
+            }
+            setAllPermissions(flatPermissions)
         })
-        .catch(() => {
-          setSelectedPermissions([])
+          .catch(error => {
+            console.error('Error fetching all permissions:', error)
         })
-    } else if (!open) {
-      setSelectedPermissions([])
-      setSearchTerm('')
+      }
+    } else if (open && currentPermissions.length > 0) {
+      setSelectedPermissions(currentPermissions)
     }
-  }, [open, role.id])
+  }, [open, effectiveRole?.id, currentPermissions.length])
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Assign Permissions to {role.display_name}</DialogTitle>
+          <DialogTitle>Assign Permissions to {effectiveRole?.display_name || roleName || 'Role'}</DialogTitle>
           <DialogDescription>
             Select the permissions to assign to this role. Users with this role will have access to all selected permissions.
           </DialogDescription>

@@ -21,14 +21,16 @@ interface Permission {
 interface PermissionFormModalProps {
   open: boolean
   onClose: () => void
-  onSubmit: (data: {
+  onSubmit?: (data: {
     name: string
     display_name: string
     description: string
     resource: string
     action: string
   }) => Promise<void>
+  onSave?: (data: Partial<Permission>) => Promise<void>
   permission?: Permission
+  modules?: any[]
 }
 
 const ACTIONS = ['view', 'create', 'update', 'delete', 'manage', 'read', 'approve']
@@ -38,7 +40,9 @@ export function PermissionFormModal({
   open,
   onClose,
   onSubmit,
-  permission
+  onSave,
+  permission,
+  modules
 }: PermissionFormModalProps) {
   const [name, setName] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -79,6 +83,17 @@ export function PermissionFormModal({
 
     try {
       setSaving(true)
+      const submitHandler = onSave || onSubmit
+      if (submitHandler) {
+        if (onSave) {
+          await onSave({
+            name: name.trim(),
+            display_name: displayName.trim(),
+            description: description.trim(),
+            resource,
+            action
+          })
+        } else if (onSubmit) {
       await onSubmit({
         name: name.trim(),
         display_name: displayName.trim(),
@@ -86,6 +101,8 @@ export function PermissionFormModal({
         resource,
         action
       })
+        }
+      }
       onClose()
     } catch (error) {
       console.error('Error saving permission:', error)

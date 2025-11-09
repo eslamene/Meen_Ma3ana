@@ -139,7 +139,7 @@ export default function PermissionsPage() {
             grouped[module].push(p)
           })
         }
-        setPermissionsByModule(grouped)
+        setPermissionsByModule(grouped as unknown as PermissionsByModule)
       } else {
         // Handle non-JSON responses
         const contentType = permissionsRes.headers.get('content-type')
@@ -497,7 +497,7 @@ export default function PermissionsPage() {
           onClose={() => setEditingPermission(undefined)}
           permission={editingPermission}
           modules={modules}
-          onSave={async (data) => {
+          onSave={async (data: Partial<Permission>) => {
             if (editingPermission) {
               await handleUpdatePermission(editingPermission.id, data)
               setEditingPermission(undefined)

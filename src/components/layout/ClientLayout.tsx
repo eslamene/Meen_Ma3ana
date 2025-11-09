@@ -13,7 +13,7 @@ interface ClientLayoutProps {
     id: string
     name: string
     display_name: string
-    description: string
+    description?: string
     icon: string
     color: string
     sort_order: number
@@ -21,7 +21,7 @@ interface ClientLayoutProps {
       label: string
       href: string
       icon: string
-      description: string
+      description?: string
       sortOrder: number
       permission?: string
     }>

@@ -55,7 +55,7 @@ export class BackgroundJobService {
 
               if (result.success) {
                 closedCount++
-                defaultLogger.info(`✅ Automatically closed case: ${caseData.title} (${caseData.id})`)
+                defaultLogger.info(`✅ Automatically closed case: ${caseData.title_en || caseData.title_ar || 'Untitled'} (${caseData.id})`)
                 
                 // TODO: Send notifications to case creator and donors
                 // await sendCaseClosedNotifications(caseData.id)
@@ -205,7 +205,7 @@ export class BackgroundJobService {
             // TODO: Send reminder notification to case creator
             // await sendDeadlineReminder(caseData.id, caseData.createdBy)
             reminderCount++
-            defaultLogger.info(`📧 Sent deadline reminder for case: ${caseData.title}`)
+            defaultLogger.info(`📧 Sent deadline reminder for case: ${caseData.title_en || caseData.title_ar || 'Untitled'}`)
           }
         } catch (error) {
           defaultLogger.error(`❌ Error sending reminder for case ${caseData.id}:`, error)

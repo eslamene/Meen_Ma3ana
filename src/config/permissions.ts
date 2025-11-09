@@ -65,7 +65,7 @@ export const DEFAULT_USER_ROLE: UserRole = 'donor'
  * Role Hierarchy (higher number = more permissions)
  * Used for role comparison and inheritance
  */
-export const ROLE_HIERARCHY: Record<UserRole, number> = {
+export const ROLE_HIERARCHY: Partial<Record<UserRole, number>> & Record<string, number> = {
   donor: 1,
   volunteer: 2,
   sponsor: 3,
@@ -77,7 +77,12 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
  * Check if a role has higher or equal permissions than another role
  */
 export function hasHigherOrEqualRole(userRole: UserRole, requiredRole: UserRole): boolean {
-  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole]
+  const userLevel = ROLE_HIERARCHY[userRole]
+  const requiredLevel = ROLE_HIERARCHY[requiredRole]
+  if (userLevel === undefined || requiredLevel === undefined) {
+    return false
+  }
+  return userLevel >= requiredLevel
 }
 
 /**
@@ -85,8 +90,11 @@ export function hasHigherOrEqualRole(userRole: UserRole, requiredRole: UserRole)
  */
 export function getRolesWithEqualOrHigherPermissions(role: UserRole): UserRole[] {
   const roleLevel = ROLE_HIERARCHY[role]
+  if (roleLevel === undefined) {
+    return []
+  }
   return Object.entries(ROLE_HIERARCHY)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    .filter(([_, level]) => level >= roleLevel)
+    .filter(([_, level]) => level !== undefined && level >= roleLevel)
     .map(([roleName]) => roleName as UserRole)
 }

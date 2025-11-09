@@ -91,7 +91,7 @@ export default function RolesPage() {
   const filteredRoles = roles
 
   // Handlers
-  const handleCreate = async (roleData: { name: string; display_name: string; description: string; is_system: boolean }) => {
+  const handleCreate = async (roleData: { name: string; display_name: string; description: string; is_system?: boolean }) => {
     try {
       const res = await fetch('/api/admin/roles', {
         method: 'POST',
@@ -118,7 +118,7 @@ export default function RolesPage() {
     }
   }
 
-  const handleEdit = async (roleData: { name: string; display_name: string; description: string; is_system: boolean }) => {
+  const handleEdit = async (roleData: { name: string; display_name: string; description: string; is_system?: boolean }) => {
     if (!selectedRole) return
     try {
       const res = await fetch(`/api/admin/rbac/roles/${selectedRole.id}`, {

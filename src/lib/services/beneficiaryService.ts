@@ -220,7 +220,7 @@ export class BeneficiaryService {
     const dataToUpdate: Record<string, unknown> = {}
     
     // Convert age to year of birth if age is provided
-    if (data.age !== undefined && data.age !== null && data.age !== '') {
+    if (data.age !== undefined && data.age !== null && String(data.age).trim() !== '') {
       const currentYear = new Date().getFullYear()
       dataToUpdate.year_of_birth = currentYear - Number(data.age)
     }
@@ -233,7 +233,7 @@ export class BeneficiaryService {
     if (data.name_ar !== undefined && data.name_ar !== null && data.name_ar !== '') {
       dataToUpdate.name_ar = data.name_ar
     }
-    if (data.gender !== undefined && data.gender !== null && data.gender !== '') {
+    if (data.gender !== undefined && data.gender !== null && String(data.gender).trim() !== '') {
       dataToUpdate.gender = data.gender
     }
     if (data.mobile_number !== undefined && data.mobile_number !== null && data.mobile_number !== '') {
@@ -251,7 +251,7 @@ export class BeneficiaryService {
     if (data.national_id !== undefined && data.national_id !== null && data.national_id !== '') {
       dataToUpdate.national_id = data.national_id
     }
-    if (data.id_type !== undefined && data.id_type !== null && data.id_type !== '') {
+    if (data.id_type !== undefined && data.id_type !== null && String(data.id_type).trim() !== '') {
       dataToUpdate.id_type = data.id_type
     }
     // Prefer city_id over city if both are provided
@@ -288,7 +288,7 @@ export class BeneficiaryService {
     if (data.notes !== undefined && data.notes !== null && data.notes !== '') {
       dataToUpdate.notes = data.notes
     }
-    if (data.risk_level !== undefined && data.risk_level !== null && data.risk_level !== '') {
+    if (data.risk_level !== undefined && data.risk_level !== null && String(data.risk_level).trim() !== '') {
       dataToUpdate.risk_level = data.risk_level
     }
     if (data.is_verified !== undefined && data.is_verified !== null) {

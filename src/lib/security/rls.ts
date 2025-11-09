@@ -170,7 +170,7 @@ export class SecurityService {
       switch (resourceType) {
         case 'cases':
           const casesResult = await db
-            .select({ id: cases.id, title: cases.title, status: cases.status })
+            .select({ id: cases.id, title: cases.title_en, status: cases.status })
             .from(cases)
             .orderBy(cases.created_at)
           return casesResult

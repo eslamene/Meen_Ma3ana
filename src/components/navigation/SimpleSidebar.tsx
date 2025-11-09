@@ -241,7 +241,7 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
                   {isExpanded && (
                     <div className="ml-6 space-y-1">
                       {module.items.map((item, index) => {
-                        const ItemIcon = getIcon(item.icon)
+                        const ItemIcon = item.icon ? getIcon(item.icon) : null
                         return (
                           <Link
                             key={index}
@@ -252,7 +252,7 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
                                 : 'text-gray-600 hover:bg-gray-50'
                             }`}
                           >
-                            <ItemIcon className="mr-3 h-4 w-4" />
+                            {ItemIcon && <ItemIcon className="mr-3 h-4 w-4" />}
                             {item.label}
                           </Link>
                         )

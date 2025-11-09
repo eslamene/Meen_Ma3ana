@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       // Test cases access
       const casesResult = await db.select({
         id: cases.id,
-        title: cases.title,
+        title: cases.title_en,
         status: cases.status,
         createdBy: cases.created_by
       }).from(cases).limit(5)

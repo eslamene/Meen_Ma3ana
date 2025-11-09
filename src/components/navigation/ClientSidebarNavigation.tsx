@@ -39,7 +39,7 @@ interface ClientSidebarNavigationProps {
     id: string
     name: string
     display_name: string
-    description: string
+    description?: string
     icon: string
     color: string
     sort_order: number
@@ -47,14 +47,14 @@ interface ClientSidebarNavigationProps {
       label: string
       href: string
       icon: string
-      description: string
+      description?: string
       sortOrder: number
       permission?: string
       children?: Array<{
         label: string
         href: string
         icon: string
-        description: string
+        description?: string
         sortOrder: number
         permission?: string
       }>
@@ -133,7 +133,7 @@ interface ModuleSectionProps {
     id: string
     name: string
     display_name: string
-    description: string
+    description?: string
     icon: string
     color: string
     sort_order: number
@@ -141,14 +141,14 @@ interface ModuleSectionProps {
       label: string
       href: string
       icon: string
-      description: string
+      description?: string
       sortOrder: number
       permission?: string
       children?: Array<{
         label: string
         href: string
         icon: string
-        description: string
+        description?: string
         sortOrder: number
         permission?: string
       }>
@@ -190,7 +190,7 @@ function ModuleSection({ module, locale, pathname }: ModuleSectionProps) {
                 {module.display_name}
               </div>
               <div className="text-xs">
-                {module.description}
+                {module.description || ''}
               </div>
             </div>
           </div>
@@ -245,14 +245,14 @@ interface MenuItemWithChildrenProps {
     label: string
     href: string
     icon: string
-    description: string
+    description?: string
     sortOrder: number
     permission?: string
     children?: Array<{
       label: string
       href: string
       icon: string
-      description: string
+      description?: string
       sortOrder: number
       permission?: string
     }>
@@ -307,7 +307,7 @@ function MenuItemWithChildren({ item, locale, ItemIcon, pathname }: MenuItemWith
               <ChildIcon className="h-3 w-3" />
               <div>
                 <div className="font-medium">{child.label}</div>
-                <div className="text-xs text-gray-400">{child.description}</div>
+                <div className="text-xs text-gray-400">{child.description || ''}</div>
               </div>
             </Link>
           )

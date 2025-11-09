@@ -12,9 +12,10 @@ import { defaultLogger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -30,7 +31,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const userRoles = await adminService.getUserRoles(params.userId)
+    const userRoles = await adminService.getUserRoles(userId)
     return NextResponse.json({ userRoles })
   } catch (error) {
     defaultLogger.error('Error fetching user roles:', error)
@@ -43,9 +44,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -66,7 +68,7 @@ export async function POST(
     const { role_ids, roleId, expiresAt } = body
 
     defaultLogger.info('Role assignment request:', {
-      userId: params.userId,
+      userId,
       role_ids,
       roleId,
       bodyKeys: Object.keys(body),
@@ -102,7 +104,7 @@ export async function POST(
     }
 
     // Get current user roles
-    const currentUserRoles = await adminService.getUserRoles(params.userId)
+    const currentUserRoles = await adminService.getUserRoles(userId)
     const currentRoleIds = currentUserRoles.map(ur => ur.role_id || (ur as any).role?.id).filter(Boolean)
 
     // SECURITY: Prevent regular admins from removing super_admin role
@@ -110,7 +112,7 @@ export async function POST(
       const { data: currentRoles } = await supabase
         .from('admin_user_roles')
         .select('role_id, admin_roles(name)')
-        .eq('user_id', params.userId)
+        .eq('user_id', userId)
         .eq('is_active', true)
 
       const hasSuperAdminRole = currentRoles?.some((ur: any) => {
@@ -135,7 +137,7 @@ export async function POST(
     }
 
     // SECURITY: Prevent users from assigning roles to themselves (except super_admin)
-    if (params.userId === user.id && !isSuperAdmin) {
+    if (userId === user.id && !isSuperAdmin) {
       return NextResponse.json(
         { error: 'You cannot modify your own roles' },
         { status: 403 }
@@ -143,7 +145,7 @@ export async function POST(
     }
 
     defaultLogger.info('Current user roles:', {
-      userId: params.userId,
+      userId,
       currentRoleIds,
       requestedRoleIds: roleIds,
       currentUserRolesStructure: currentUserRoles.map(ur => ({
@@ -172,7 +174,7 @@ export async function POST(
     const removeResults = []
     for (const roleId of rolesToRemove) {
       try {
-        const removed = await adminService.removeRoleFromUser(params.userId, roleId)
+        const removed = await adminService.removeRoleFromUser(userId, roleId)
         removeResults.push({ roleId, success: removed })
         defaultLogger.info(`Removed role ${roleId}:`, removed)
         if (!removed) {
@@ -189,7 +191,7 @@ export async function POST(
     for (const roleId of rolesToAdd) {
       try {
         const added = await adminService.assignRoleToUser(
-          params.userId,
+          userId,
           roleId,
           user.id,
           expiresAt

@@ -222,7 +222,7 @@ export class CaseLifecycleService {
       // Send notifications
       await this.sendStatusChangeNotifications({
         caseId,
-        caseTitle: currentCase.title,
+        caseTitle: currentCase.title_en || currentCase.title_ar || 'Untitled',
         oldStatus: currentCase.status as CaseStatus,
         newStatus,
         changedBy,

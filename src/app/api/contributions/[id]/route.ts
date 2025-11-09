@@ -175,7 +175,18 @@ export async function GET(
     }
 
     // Fetch approval status separately to handle RLS gracefully
-    let approvalStatus = []
+    let approvalStatus: Array<{
+      id: string
+      status: string
+      rejection_reason?: string
+      admin_comment?: string
+      donor_reply?: string
+      donor_reply_date?: string
+      payment_proof_url?: string
+      resubmission_count: number
+      created_at: string
+      updated_at: string
+    }> = []
     try {
       const { data: approvalData, error: approvalError } = await supabase
         .from('contribution_approval_status')

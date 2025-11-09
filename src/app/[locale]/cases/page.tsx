@@ -138,7 +138,7 @@ export default function CasesPage() {
           titleAr: firstCase.titleAr,
           descriptionEn: firstCase.descriptionEn,
           descriptionAr: firstCase.descriptionAr,
-          locale: params.locale
+          locale: params.get('locale') || locale
         })
       }
       
