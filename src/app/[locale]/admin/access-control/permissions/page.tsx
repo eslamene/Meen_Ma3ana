@@ -134,9 +134,9 @@ export default function PermissionsPage() {
         const grouped: Record<string, Permission[]> = {}
         if (permissionsData.permissions) {
           permissionsData.permissions.forEach((p: Permission) => {
-            const module = p.resource || 'other'
-            if (!grouped[module]) grouped[module] = []
-            grouped[module].push(p)
+            const moduleName = p.resource || 'other'
+            if (!grouped[moduleName]) grouped[moduleName] = []
+            grouped[moduleName].push(p)
           })
         }
         setPermissionsByModule(grouped as unknown as PermissionsByModule)
