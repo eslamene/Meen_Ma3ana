@@ -174,6 +174,21 @@ export class BeneficiaryService {
       dataToInsert.year_of_birth = currentYear - data.age
       delete dataToInsert.age // Remove age from the data to insert
     }
+    
+    // Filter out empty strings for UUID fields (convert to undefined/null)
+    if (dataToInsert.id_type_id === '' || dataToInsert.id_type_id === null) {
+      delete dataToInsert.id_type_id
+    }
+    if (dataToInsert.city_id === '' || dataToInsert.city_id === null) {
+      delete dataToInsert.city_id
+    }
+    
+    // Remove undefined values to avoid sending them to the database
+    Object.keys(dataToInsert).forEach(key => {
+      if (dataToInsert[key as keyof typeof dataToInsert] === undefined) {
+        delete dataToInsert[key as keyof typeof dataToInsert]
+      }
+    })
 
     const { data: beneficiary, error } = await supabase
       .from('beneficiaries')
@@ -195,12 +210,103 @@ export class BeneficiaryService {
   static async update(id: string, data: UpdateBeneficiaryData): Promise<Beneficiary> {
     const supabase = createClient()
     
+    // Verify beneficiary exists first
+    const existing = await this.getById(id)
+    if (!existing) {
+      throw new Error('Beneficiary not found')
+    }
+    
+    // Start with a clean object - only include fields that should be updated
+    const dataToUpdate: Record<string, unknown> = {}
+    
     // Convert age to year of birth if age is provided
-    const dataToUpdate: Partial<UpdateBeneficiaryData> & { year_of_birth?: number } = { ...data }
-    if (data.age) {
+    if (data.age !== undefined && data.age !== null && data.age !== '') {
       const currentYear = new Date().getFullYear()
-      dataToUpdate.year_of_birth = currentYear - data.age
-      delete dataToUpdate.age // Remove age from the data to update
+      dataToUpdate.year_of_birth = currentYear - Number(data.age)
+    }
+    
+    // Only include fields that exist in the database schema and should be updatable
+    // Explicitly list fields to avoid sending computed or invalid fields
+    if (data.name !== undefined && data.name !== null && data.name !== '') {
+      dataToUpdate.name = data.name
+    }
+    if (data.name_ar !== undefined && data.name_ar !== null && data.name_ar !== '') {
+      dataToUpdate.name_ar = data.name_ar
+    }
+    if (data.gender !== undefined && data.gender !== null && data.gender !== '') {
+      dataToUpdate.gender = data.gender
+    }
+    if (data.mobile_number !== undefined && data.mobile_number !== null && data.mobile_number !== '') {
+      dataToUpdate.mobile_number = data.mobile_number
+    }
+    if (data.additional_mobile_number !== undefined && data.additional_mobile_number !== null && data.additional_mobile_number !== '') {
+      dataToUpdate.additional_mobile_number = data.additional_mobile_number
+    }
+    if (data.email !== undefined && data.email !== null && data.email !== '') {
+      dataToUpdate.email = data.email
+    }
+    if (data.alternative_contact !== undefined && data.alternative_contact !== null && data.alternative_contact !== '') {
+      dataToUpdate.alternative_contact = data.alternative_contact
+    }
+    if (data.national_id !== undefined && data.national_id !== null && data.national_id !== '') {
+      dataToUpdate.national_id = data.national_id
+    }
+    if (data.id_type !== undefined && data.id_type !== null && data.id_type !== '') {
+      dataToUpdate.id_type = data.id_type
+    }
+    // Prefer city_id over city if both are provided
+    if (data.city_id !== undefined && data.city_id !== null && data.city_id !== '') {
+      dataToUpdate.city_id = data.city_id
+    } else if (data.city !== undefined && data.city !== null && data.city !== '') {
+      dataToUpdate.city = data.city
+    }
+    // id_type_id - only if not empty
+    if (data.id_type_id !== undefined && data.id_type_id !== null && data.id_type_id !== '') {
+      dataToUpdate.id_type_id = data.id_type_id
+    }
+    if (data.address !== undefined && data.address !== null && data.address !== '') {
+      dataToUpdate.address = data.address
+    }
+    if (data.governorate !== undefined && data.governorate !== null && data.governorate !== '') {
+      dataToUpdate.governorate = data.governorate
+    }
+    if (data.country !== undefined && data.country !== null && data.country !== '') {
+      dataToUpdate.country = data.country
+    }
+    if (data.medical_condition !== undefined && data.medical_condition !== null && data.medical_condition !== '') {
+      dataToUpdate.medical_condition = data.medical_condition
+    }
+    if (data.social_situation !== undefined && data.social_situation !== null && data.social_situation !== '') {
+      dataToUpdate.social_situation = data.social_situation
+    }
+    if (data.family_size !== undefined && data.family_size !== null) {
+      dataToUpdate.family_size = data.family_size
+    }
+    if (data.dependents !== undefined && data.dependents !== null) {
+      dataToUpdate.dependents = data.dependents
+    }
+    if (data.notes !== undefined && data.notes !== null && data.notes !== '') {
+      dataToUpdate.notes = data.notes
+    }
+    if (data.risk_level !== undefined && data.risk_level !== null && data.risk_level !== '') {
+      dataToUpdate.risk_level = data.risk_level
+    }
+    if (data.is_verified !== undefined && data.is_verified !== null) {
+      dataToUpdate.is_verified = data.is_verified
+    }
+    if (data.verification_date !== undefined && data.verification_date !== null && data.verification_date !== '') {
+      dataToUpdate.verification_date = data.verification_date
+    }
+    if (data.verification_notes !== undefined && data.verification_notes !== null && data.verification_notes !== '') {
+      dataToUpdate.verification_notes = data.verification_notes
+    }
+    if (data.tags !== undefined && data.tags !== null && Array.isArray(data.tags) && data.tags.length > 0) {
+      dataToUpdate.tags = data.tags
+    }
+    
+    // Ensure we have at least one field to update
+    if (Object.keys(dataToUpdate).length === 0) {
+      throw new Error('No fields to update')
     }
 
     const { data: beneficiary, error } = await supabase
@@ -211,8 +317,12 @@ export class BeneficiaryService {
       .single()
 
     if (error) {
-      defaultLogger.error('Error updating beneficiary:', error)
+      defaultLogger.error('Error updating beneficiary:', error, { beneficiaryId: id, updateData: dataToUpdate })
       throw new Error(error.message)
+    }
+
+    if (!beneficiary) {
+      throw new Error('Beneficiary not found after update')
     }
 
     return this.transformBeneficiary(beneficiary)

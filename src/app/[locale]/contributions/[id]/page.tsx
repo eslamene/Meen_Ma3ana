@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -18,10 +19,14 @@ interface Contribution {
   amount: number
   proofUrl?: string
   payment_method?: string
+  payment_method_id?: string
+  payment_method_name?: string
+  payment_method_name_ar?: string
   status: 'pending' | 'approved' | 'rejected'
   anonymous: boolean
   createdAt: string
   caseTitle: string
+  caseTitleAr?: string
   donorName: string
   donorId?: string
   donorEmail?: string
@@ -58,6 +63,7 @@ export default function ContributionDetailsPage() {
   const locale = params.locale as string
   const contributionId = params.id as string
   const { toast } = useToast()
+  const t = useTranslations('contributions.details')
   
   const [contribution, setContribution] = useState<Contribution | null>(null)
   const [loading, setLoading] = useState(true)
@@ -74,7 +80,7 @@ export default function ContributionDetailsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
-        setError('Please log in to view contribution details')
+        setError(t('pleaseLogIn'))
         return
       }
 
@@ -83,13 +89,13 @@ export default function ContributionDetailsPage() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         if (response.status === 404) {
-          setError(errorData.error || 'Contribution not found')
+          setError(errorData.error || t('contributionNotFound'))
         } else if (response.status === 403) {
-          setError(errorData.error || errorData.message || 'You do not have permission to view this contribution')
+          setError(errorData.error || errorData.message || t('accessDenied'))
         } else if (response.status === 401) {
-          setError('Please log in to view contribution details')
+          setError(t('pleaseLogIn'))
         } else {
-          setError(errorData.error || errorData.message || 'Failed to load contribution details')
+          setError(errorData.error || errorData.message || t('failedToLoad'))
         }
         return
       }
@@ -98,20 +104,20 @@ export default function ContributionDetailsPage() {
       setContribution(data)
     } catch (error) {
       console.error('Error fetching contribution:', error)
-      setError('Failed to load contribution details')
+      setError(t('failedToLoad'))
     } finally {
       setLoading(false)
     }
-  }, [contributionId, supabase])
+  }, [contributionId, supabase, t])
 
   useEffect(() => {
     fetchContribution()
   }, [fetchContribution])
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'No date available'
+    if (!dateString) return t('noDateAvailable')
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
+      return new Date(dateString).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -119,7 +125,7 @@ export default function ContributionDetailsPage() {
         minute: '2-digit'
       })
     } catch {
-      return 'Invalid date'
+      return t('invalidDate')
     }
   }
 
@@ -140,8 +146,8 @@ export default function ContributionDetailsPage() {
     try {
       await navigator.clipboard.writeText(text)
       toast({
-        title: 'Copied',
-        description: 'Transaction ID copied to clipboard'
+        title: t('copied'),
+        description: t('transactionIdCopied')
       })
     } catch (error) {
       console.error('Failed to copy:', error)
@@ -229,21 +235,21 @@ export default function ContributionDetailsPage() {
         return (
           <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Approved
+            {t('statuses.approved')}
           </Badge>
         )
       case 'rejected':
         return (
           <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
             <XCircle className="h-3 w-3 mr-1" />
-            Rejected
+            {t('statuses.rejected')}
           </Badge>
         )
       case 'pending':
         return (
           <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
             <Clock className="h-3 w-3 mr-1" />
-            Pending Review
+            {t('statuses.pending')}
           </Badge>
         )
       default:
@@ -285,11 +291,11 @@ export default function ContributionDetailsPage() {
             <CardContent className="p-8">
               <div className="text-center">
                 <AlertCircle className="h-20 w-20 text-red-500 mx-auto mb-6" />
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Error</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('error')}</h3>
                 <p className="text-gray-600 mb-6 text-lg">{error}</p>
                 <Button onClick={() => router.back()} variant="outline" size="lg" className="hover:bg-gray-50 transition-colors">
                   <ArrowLeft className="h-5 w-5 mr-2" />
-                  Go Back
+                  {t('goBack')}
                 </Button>
               </div>
             </CardContent>
@@ -307,11 +313,11 @@ export default function ContributionDetailsPage() {
             <CardContent className="p-8">
               <div className="text-center">
                 <AlertCircle className="h-20 w-20 text-gray-400 mx-auto mb-6" />
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Contribution Not Found</h3>
-                <p className="text-gray-600 mb-6 text-lg">The contribution you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.</p>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('contributionNotFound')}</h3>
+                <p className="text-gray-600 mb-6 text-lg">{t('contributionNotFoundMessage')}</p>
                 <Button onClick={() => router.back()} variant="outline" size="lg" className="hover:bg-gray-50 transition-colors">
                   <ArrowLeft className="h-5 w-5 mr-2" />
-                  Go Back
+                  {t('goBack')}
                 </Button>
               </div>
             </CardContent>
@@ -334,15 +340,13 @@ export default function ContributionDetailsPage() {
               className="flex items-center gap-2 hover:bg-gray-50 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back
+              {t('back')}
             </Button>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Contribution Details</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('title')}</h1>
               <div className="flex items-center gap-4">
-                <p className="text-gray-600">Transaction ID: {truncateId(contribution.id)}</p>
-                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                  {contribution.status.charAt(0).toUpperCase() + contribution.status.slice(1)}
-                </Badge>
+                <p className="text-gray-600">{t('transactionId')}: {truncateId(contribution.id)}</p>
+                {getStatusBadge(contribution.status)}
               </div>
             </div>
           </div>
@@ -356,27 +360,32 @@ export default function ContributionDetailsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5 text-green-600" />
-                  Contribution Overview
+                  {t('contributionOverview')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Amount</label>
+                    <label className="text-sm font-medium text-gray-600">{t('amount')}</label>
                     <p className="text-2xl font-bold text-green-600">{formatAmount(contribution.amount)}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <label className="text-sm font-medium text-gray-600">{t('status')}</label>
                     <div className="mt-1">
                       {getStatusBadge(contribution.status)}
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Case</label>
-                    <p className="text-lg font-semibold text-gray-900">{contribution.caseTitle}</p>
+                    <label className="text-sm font-medium text-gray-600">{t('case')}</label>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {locale === 'ar' 
+                        ? (contribution.caseTitleAr || contribution.caseTitle)
+                        : (contribution.caseTitle || contribution.caseTitleAr)
+                      }
+                    </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Date</label>
+                    <label className="text-sm font-medium text-gray-600">{t('date')}</label>
                     <p className="text-gray-900">{formatDate(contribution.createdAt)}</p>
                   </div>
                 </div>
@@ -384,7 +393,7 @@ export default function ContributionDetailsPage() {
 
                 {contribution.notes && (
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Notes</label>
+                    <label className="text-sm font-medium text-gray-600">{t('notes')}</label>
                     <p className="text-gray-900 bg-gray-50 p-3 rounded-md mt-1">{contribution.notes}</p>
                   </div>
                 )}
@@ -396,31 +405,31 @@ export default function ContributionDetailsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5 text-blue-600" />
-                  Donor Information
+                  {t('donorInformation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Name</label>
-                    <p className="text-gray-900">{contribution.anonymous ? 'Anonymous' : contribution.donorName}</p>
+                    <label className="text-sm font-medium text-gray-600">{t('name')}</label>
+                    <p className="text-gray-900">{contribution.anonymous ? t('anonymous') : contribution.donorName}</p>
                   </div>
                   {!contribution.anonymous && contribution.donorEmail && (
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Email</label>
+                      <label className="text-sm font-medium text-gray-600">{t('email')}</label>
                       <p className="text-gray-900">{contribution.donorEmail}</p>
                     </div>
                   )}
                   {!contribution.anonymous && contribution.donorPhone && (
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Phone</label>
+                      <label className="text-sm font-medium text-gray-600">{t('phone')}</label>
                       <p className="text-gray-900">{contribution.donorPhone}</p>
                     </div>
                   )}
                 </div>
                 {contribution.anonymous && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                    <p className="text-sm text-yellow-800">This contribution was made anonymously</p>
+                    <p className="text-sm text-yellow-800">{t('anonymousMessage')}</p>
                   </div>
                 )}
               </CardContent>
@@ -433,31 +442,31 @@ export default function ContributionDetailsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-red-800">
                     <XCircle className="h-5 w-5 text-red-600" />
-                    Original Rejected Contribution
+                    {t('originalRejectedContribution')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium text-red-700">Original Transaction ID</label>
+                      <label className="text-sm font-medium text-red-700">{t('originalTransactionId')}</label>
                       <p className="text-sm font-mono text-red-800 bg-red-100 p-2 rounded">
                         {truncateId(contribution.original_contribution.id)}
                       </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-red-700">Original Amount</label>
+                      <label className="text-sm font-medium text-red-700">{t('originalAmount')}</label>
                       <p className="text-lg font-bold text-red-600">{contribution.original_contribution.amount} EGP</p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-red-700">Original Date</label>
+                      <label className="text-sm font-medium text-red-700">{t('originalDate')}</label>
                       <p className="text-red-800">{formatDate(contribution.original_contribution.created_at)}</p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-red-700">Original Status</label>
+                      <label className="text-sm font-medium text-red-700">{t('originalStatus')}</label>
                       <div className="mt-1">
                         <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
                           <XCircle className="h-3 w-3 mr-1" />
-                          Rejected
+                          {t('statuses.rejected')}
                         </Badge>
                       </div>
                     </div>
@@ -467,7 +476,7 @@ export default function ContributionDetailsPage() {
                     <div className="bg-red-100 border border-red-200 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="font-medium text-red-800">Rejection Reason</span>
+                        <span className="font-medium text-red-800">{t('rejectionReason')}</span>
                       </div>
                       <p className="text-red-700 text-sm">{contribution.original_contribution.rejection_reason}</p>
                     </div>
@@ -477,7 +486,7 @@ export default function ContributionDetailsPage() {
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <MessageSquare className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium text-blue-800">Admin Comment</span>
+                        <span className="font-medium text-blue-800">{t('adminComment')}</span>
                       </div>
                       <p className="text-blue-700 text-sm">{contribution.original_contribution.admin_comment}</p>
                     </div>
@@ -492,7 +501,7 @@ export default function ContributionDetailsPage() {
                 <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-purple-600" />
-                  Approval History</CardTitle>
+                  {t('approvalHistory')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -505,7 +514,7 @@ export default function ContributionDetailsPage() {
                           </span>
                           {status.resubmission_count > 0 && (
                             <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                              Resubmission #{status.resubmission_count}
+                              {t('resubmission')} #{status.resubmission_count}
                             </Badge>
                           )}
                         </div>
@@ -514,7 +523,7 @@ export default function ContributionDetailsPage() {
                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
                             <div className="flex items-center gap-2 mb-1">
                               <MessageSquare className="h-4 w-4 text-blue-600" />
-                              <span className="font-medium text-blue-800">Admin Comment</span>
+                              <span className="font-medium text-blue-800">{t('adminComment')}</span>
                             </div>
                             <p className="text-blue-700 text-sm">{status.admin_comment}</p>
                           </div>
@@ -524,7 +533,7 @@ export default function ContributionDetailsPage() {
                           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
                             <div className="flex items-center gap-2 mb-1">
                               <XCircle className="h-4 w-4 text-red-600" />
-                              <span className="font-medium text-red-800">Rejection Reason</span>
+                              <span className="font-medium text-red-800">{t('rejectionReason')}</span>
                             </div>
                             <p className="text-red-700 text-sm">{status.rejection_reason}</p>
                           </div>
@@ -534,7 +543,7 @@ export default function ContributionDetailsPage() {
                           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-1">
                               <User className="h-4 w-4 text-green-600" />
-                              <span className="font-medium text-green-800">Donor Reply</span>
+                              <span className="font-medium text-green-800">{t('donorReply')}</span>
                               {status.donor_reply_date && (
                                 <span className="text-xs text-green-600">
                                   ({formatDate(status.donor_reply_date)})
@@ -557,7 +566,7 @@ export default function ContributionDetailsPage() {
             {/* Transaction ID */}
             <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg">Transaction ID</CardTitle>
+                <CardTitle className="text-lg">{t('transactionId')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
@@ -571,7 +580,7 @@ export default function ContributionDetailsPage() {
                     className="flex items-center gap-1"
                   >
                     <Copy className="h-4 w-4" />
-                    Copy
+                    {t('copy')}
                   </Button>
                 </div>
               </CardContent>
@@ -580,7 +589,7 @@ export default function ContributionDetailsPage() {
             {/* Quick Actions */}
             <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
+                <CardTitle className="text-lg">{t('quickActions')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <Button
@@ -589,7 +598,7 @@ export default function ContributionDetailsPage() {
                   onClick={() => router.push(`/${locale}/cases/${contribution.caseId}`)}
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  View Case
+                  {t('viewCase')}
                 </Button>
                 <Button
                   variant="outline"
@@ -597,7 +606,7 @@ export default function ContributionDetailsPage() {
                   onClick={() => router.push(`/${locale}/contributions`)}
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  All Contributions
+                  {t('allContributions')}
                 </Button>
                 {contribution.status === 'rejected' && (
                   <Button
@@ -606,7 +615,7 @@ export default function ContributionDetailsPage() {
                     onClick={() => setShowRevisionModal(true)}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Revise Contribution
+                    {t('reviseContribution')}
                   </Button>
                 )}
               </CardContent>
@@ -616,17 +625,25 @@ export default function ContributionDetailsPage() {
             <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
               <CardHeader>
               <CardTitle className="text-lg">
-                  Payment Information
+                  {t('paymentInformation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-600"><strong>Payment Method</strong></label>
-                  <p className="text-gray-900">{contribution.payment_method || 'Not specified'}</p>
+                  <label className="text-sm font-medium text-gray-600"><strong>{t('paymentMethod')}</strong></label>
+                  <p className="text-gray-900">
+                    {(() => {
+                      // For Arabic locale, use Arabic name; for English locale, use English name
+                      const paymentMethodName = locale === 'ar' 
+                        ? (contribution.payment_method_name_ar || contribution.payment_method || t('notSpecified'))
+                        : (contribution.payment_method_name || contribution.payment_method || t('notSpecified'))
+                      return paymentMethodName
+                    })()}
+                  </p>
                 </div>
                 {contribution.proofUrl && (
                   <div>
-                    <label className="text-sm font-medium text-gray-600"><strong>Payment Proof</strong></label>
+                    <label className="text-sm font-medium text-gray-600"><strong>{t('paymentProof')}</strong></label>
                     <div className="mt-1">
                       <Dialog>
                         <DialogTrigger asChild>
@@ -636,12 +653,12 @@ export default function ContributionDetailsPage() {
                             className="flex items-center gap-2 w-full"
                           >
                             <Eye className="h-4 w-4" />
-                            View Proof
+                            {t('viewProof')}
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
                           <DialogHeader>
-                            <DialogTitle>Payment Proof</DialogTitle>
+                            <DialogTitle>{t('paymentProof')}</DialogTitle>
                           </DialogHeader>
                           <div className="flex-1 overflow-auto">
                             {contribution.proofUrl && (

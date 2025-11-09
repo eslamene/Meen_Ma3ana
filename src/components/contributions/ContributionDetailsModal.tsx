@@ -33,6 +33,9 @@ interface Contribution {
   amount: number
   proofUrl?: string
   payment_method?: string
+  payment_method_id?: string
+  payment_method_name?: string
+  payment_method_name_ar?: string
   status: 'pending' | 'approved' | 'rejected' | 'revised' | 'acknowledged'
   anonymous: boolean
   createdAt: string
@@ -76,6 +79,7 @@ export default function ContributionDetailsModal({
 }: ContributionDetailsModalProps) {
   const params = useParams()
   const router = useRouter()
+  const locale = params.locale as string
   const { toast } = useToast()
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -240,7 +244,12 @@ export default function ContributionDetailsModal({
               {contribution.payment_method && (
                 <div>
                   <Label className="text-sm font-medium">Payment Method:</Label>
-                  <p className="text-sm text-gray-600 capitalize">{contribution.payment_method}</p>
+                  <p className="text-sm text-gray-600">
+                    {locale === 'ar' 
+                      ? (contribution.payment_method_name_ar || contribution.payment_method)
+                      : (contribution.payment_method_name || contribution.payment_method)
+                    }
+                  </p>
                 </div>
               )}
 

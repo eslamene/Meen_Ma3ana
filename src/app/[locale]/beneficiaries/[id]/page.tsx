@@ -18,6 +18,7 @@ export default function BeneficiaryDetailPage() {
   const router = useRouter()
   
   const beneficiaryId = params.id as string
+  const locale = params.locale as string
   
   // State
   const [beneficiary, setBeneficiary] = useState<Beneficiary | null>(null)
@@ -36,7 +37,7 @@ export default function BeneficiaryDetailPage() {
         setBeneficiary(beneficiaryData)
       } catch (error) {
         console.error('Error loading beneficiary:', error)
-        router.push('/beneficiaries')
+        router.push(`/${locale}/beneficiaries`)
       } finally {
         setLoading(false)
       }
@@ -72,7 +73,7 @@ export default function BeneficiaryDetailPage() {
     try {
       setDeleting(true)
       await BeneficiaryService.delete(beneficiary.id)
-      router.push('/beneficiaries')
+      router.push(`/${locale}/beneficiaries`)
     } catch (error) {
       console.error('Error deleting beneficiary:', error)
       alert('Failed to delete beneficiary')
@@ -137,7 +138,7 @@ export default function BeneficiaryDetailPage() {
             <p className="text-gray-600 mb-4">
               {t('beneficiaryNotFoundDescription') || 'The beneficiary you are looking for does not exist.'}
             </p>
-            <Button onClick={() => router.push('/beneficiaries')}>
+            <Button onClick={() => router.push(`/${locale}/beneficiaries`)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               {t('backToBeneficiaries') || 'Back to Beneficiaries'}
             </Button>
@@ -168,7 +169,7 @@ export default function BeneficiaryDetailPage() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => router.push(`/beneficiaries/${beneficiary.id}/edit`)}
+            onClick={() => router.push(`/${locale}/beneficiaries/${beneficiary.id}/edit`)}
           >
             <Edit className="h-4 w-4 mr-2" />
             {t('edit') || 'Edit'}

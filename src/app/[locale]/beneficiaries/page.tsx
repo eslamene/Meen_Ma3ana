@@ -17,7 +17,9 @@ import type { City, IdType } from '@/types/beneficiary'
 
 export default function BeneficiariesPage() {
   const t = useTranslations('beneficiaries')
+  const params = useParams()
   const router = useRouter()
+  const locale = params.locale as string
   
   // State
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([])
@@ -83,11 +85,11 @@ export default function BeneficiariesPage() {
   }
 
   const handleViewBeneficiary = (beneficiary: Beneficiary) => {
-    router.push(`/beneficiaries/${beneficiary.id}`)
+    router.push(`/${locale}/beneficiaries/${beneficiary.id}`)
   }
 
   const handleEditBeneficiary = (beneficiary: Beneficiary) => {
-    router.push(`/beneficiaries/${beneficiary.id}/edit`)
+    router.push(`/${locale}/beneficiaries/${beneficiary.id}/edit`)
   }
 
   const handleDeleteBeneficiary = async (beneficiary: Beneficiary) => {
@@ -142,7 +144,7 @@ export default function BeneficiariesPage() {
           <h1 className="text-3xl font-bold text-gray-900">{t('title') || 'Beneficiaries'}</h1>
           <p className="text-gray-600 mt-2">{t('subtitle') || 'Manage beneficiary profiles and documents'}</p>
         </div>
-        <Button onClick={() => router.push('/beneficiaries/create')} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => router.push(`/${locale}/beneficiaries/create`)} className="bg-blue-600 hover:bg-blue-700">
           <Plus className="h-4 w-4 mr-2" />
           {t('addBeneficiary') || 'Add Beneficiary'}
         </Button>
@@ -323,7 +325,7 @@ export default function BeneficiariesPage() {
                 : t('noBeneficiariesDescription') || 'Get started by adding your first beneficiary'
               }
             </p>
-            <Button onClick={() => router.push('/beneficiaries/create')}>
+            <Button onClick={() => router.push(`/${locale}/beneficiaries/create`)}>
               <Plus className="h-4 w-4 mr-2" />
               {t('addFirstBeneficiary') || 'Add First Beneficiary'}
             </Button>

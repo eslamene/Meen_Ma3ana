@@ -235,10 +235,19 @@ async function getContributionsDirectQuery(
   logger: Logger
 ) {
   try {
-    // Start with a simple query - fetch contributions first
+    // Start with a simple query - fetch contributions with payment methods
     let query = supabase
       .from('contributions')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        payment_methods (
+          id,
+          code,
+          name,
+          name_en,
+          name_ar
+        )
+      `, { count: 'exact' })
 
     // Filter by user if not admin
     if (!isAdmin) {
@@ -409,7 +418,10 @@ async function getContributionsDirectQuery(
         notes: c.notes || null,
         message: c.message || null,
         anonymous: !!c.anonymous,
-        payment_method: c.payment_method || c.payment_method_id || null,
+        payment_method: c.payment_methods?.code || c.payment_method || c.payment_method_id || null,
+        payment_method_id: c.payment_method_id || null,
+        payment_method_name: c.payment_methods?.name_en || c.payment_methods?.name || null,
+        payment_method_name_ar: c.payment_methods?.name_ar || null,
         createdAt: c.created_at || null,
         updatedAt: c.updated_at || null,
         caseId: c.case_id || null,
@@ -535,6 +547,32 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Convert payment method code to UUID if needed
+    let paymentMethodId: string | null = null
+    
+    // If paymentMethod is already a UUID, use it directly
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (uuidRegex.test(paymentMethod)) {
+      paymentMethodId = paymentMethod
+    } else {
+      // Otherwise, look up by code
+      const { data: paymentMethodData, error: pmError } = await supabase
+        .from('payment_methods')
+        .select('id')
+        .eq('code', paymentMethod)
+        .eq('is_active', true)
+        .single()
+
+      if (pmError || !paymentMethodData) {
+        logger.error('Payment method lookup error:', pmError)
+        return NextResponse.json({ 
+          error: `Invalid payment method: ${paymentMethod}` 
+        }, { status: 400 })
+      }
+
+      paymentMethodId = paymentMethodData.id
+    }
+
     if (amount <= 0) {
       return NextResponse.json({ 
         error: 'Amount must be greater than 0' 
@@ -564,7 +602,7 @@ export async function POST(request: NextRequest) {
       .insert({
         type: 'donation',
         amount: amount,
-        payment_method: paymentMethod,
+        payment_method_id: paymentMethodId,
         status: 'pending',
         proof_of_payment: proofOfPayment || null,
         anonymous: anonymous || false,

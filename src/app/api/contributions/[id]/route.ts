@@ -59,7 +59,7 @@ export async function GET(
         case_id,
         amount,
         proof_of_payment,
-        payment_method,
+        payment_method_id,
         status,
         anonymous,
         created_at,
@@ -77,6 +77,13 @@ export async function GET(
           last_name,
           email,
           phone
+        ),
+        payment_methods (
+          id,
+          code,
+          name,
+          name_en,
+          name_ar
         )
       `)
       .eq('id', params.id)
@@ -113,9 +120,9 @@ export async function GET(
             { status: 404 }
           )
         }
-        return NextResponse.json(
-          { error: 'Contribution not found' },
-          { status: 404 }
+      return NextResponse.json(
+        { error: 'Contribution not found' },
+        { status: 404 }
         )
       }
       
@@ -261,20 +268,26 @@ export async function GET(
     // Format the response
     const caseData = Array.isArray(contribution.cases) ? contribution.cases[0] : contribution.cases
     const userData = Array.isArray(contribution.users) ? contribution.users[0] : contribution.users
+    const paymentMethodData = Array.isArray(contribution.payment_methods) ? contribution.payment_methods[0] : contribution.payment_methods
     
-    // Get case title (prefer title_en, fallback to title_ar, then default)
+    // Get case title based on locale (prefer locale-specific, fallback to other)
     const caseTitle = caseData?.title_en || caseData?.title_ar || 'Unknown Case'
+    const caseTitleAr = caseData?.title_ar || caseData?.title_en || 'Unknown Case'
     
     const formattedContribution = {
       id: contribution.id,
       caseId: contribution.case_id,
       amount: contribution.amount || 0,
       proofUrl: contribution.proof_of_payment || null,
-      payment_method: contribution.payment_method || null,
+      payment_method: paymentMethodData?.code || null,
+      payment_method_id: contribution.payment_method_id || null,
+      payment_method_name: paymentMethodData?.name_en || null, // Only use name_en, don't fallback to name
+      payment_method_name_ar: paymentMethodData?.name_ar || null, // Only use name_ar
       status: contribution.status || 'pending',
       anonymous: contribution.anonymous || false,
       createdAt: contribution.created_at || new Date().toISOString(),
-      caseTitle,
+      caseTitle, // English title
+      caseTitleAr, // Arabic title
       donorName: contribution.anonymous 
         ? 'Anonymous' 
         : `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim() || 'Unknown Donor',
