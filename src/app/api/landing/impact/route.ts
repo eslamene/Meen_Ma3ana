@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { cases, contributions } from '@/drizzle/schema'
+import { db, client } from '@/lib/db'
+import { cases, contributions, caseCategories } from '@/drizzle/schema'
 import { eq, and, sql, sum, countDistinct, gte, lte } from 'drizzle-orm'
 
 // Helper function to categorize case by description
@@ -194,151 +194,142 @@ export async function GET() {
       ],
     }
 
-    // 2. Calculate monthly breakdown from contributions
-    const monthlyData = await db
-      .select({
-        month: sql<number>`EXTRACT(MONTH FROM ${contributions.created_at})`,
-        year: sql<number>`EXTRACT(YEAR FROM ${contributions.created_at})`,
-        totalAmount: sum(contributions.amount),
-        contributorCount: sql<number>`COUNT(DISTINCT ${contributions.donor_id})`,
-        caseCount: sql<number>`COUNT(DISTINCT ${contributions.case_id})`,
-      })
-      .from(contributions)
-      .where(
-        and(
-          eq(contributions.status, 'approved'),
-          gte(contributions.created_at, new Date('2025-07-01')),
-          lte(contributions.created_at, new Date('2025-11-30'))
-        )
-      )
-      .groupBy(
-        sql`EXTRACT(MONTH FROM ${contributions.created_at})`,
-        sql`EXTRACT(YEAR FROM ${contributions.created_at})`
-      )
-      .orderBy(sql`EXTRACT(YEAR FROM ${contributions.created_at})`, sql`EXTRACT(MONTH FROM ${contributions.created_at})`)
+    // 2. Get monthly breakdown from database view
+    const monthlyBreakdownData = await client`
+      SELECT 
+        month,
+        year,
+        total_cases,
+        total_amount,
+        contributors,
+        top_category_name_en,
+        top_category_name_ar,
+        top_category_id,
+        top_category_amount,
+        top_category_cases
+      FROM monthly_breakdown_view
+      ORDER BY year DESC, month DESC
+    `
 
-    // Get all cases for category analysis
+    // Transform the view data to match the expected format
+    const monthlyBreakdown = monthlyBreakdownData.map((row) => {
+      const monthNum = Number(row.month)
+      const yearNum = Number(row.year)
+      const monthInfo = monthNames[monthNum] || { en: `Month ${monthNum}`, ar: `شهر ${monthNum}` }
+      
+      return {
+        month: monthNum,
+        year: yearNum,
+        monthName: monthInfo.en,
+        monthNameArabic: monthInfo.ar,
+        totalCases: Number(row.total_cases) || 0,
+        totalAmount: Number(row.total_amount) || 0,
+        totalAmountFormatted: formatAmount(Number(row.total_amount) || 0),
+        contributors: Number(row.contributors) || 0,
+        topCategory: {
+          name: row.top_category_name_en || 'Other Support',
+          nameArabic: row.top_category_name_ar || 'دعم آخر',
+          amount: Number(row.top_category_amount) || 0,
+          cases: Number(row.top_category_cases) || 0,
+        },
+      }
+    })
+
+    // 3. Get category summary from database view
+    const categorySummaryData = await client`
+      SELECT 
+        category_id,
+        name_en,
+        name_ar,
+        description_en,
+        description_ar,
+        icon,
+        color,
+        total_cases,
+        total_amount,
+        average_per_case
+      FROM category_summary_view
+      WHERE total_cases > 0
+      ORDER BY total_amount DESC
+    `
+
+    // Transform the view data to match the expected format
+    const categorySummary: Record<string, any> = {}
+    for (const row of categorySummaryData) {
+      // Use category_id as key, or generate a slug from name_en
+      const categoryKey = (row.name_en as string)?.toLowerCase().replace(/\s+/g, '').replace(/&/g, '') || `category_${row.category_id}`
+      
+      categorySummary[categoryKey] = {
+        name: row.name_en || '',
+        nameArabic: row.name_ar || '',
+        totalCases: Number(row.total_cases) || 0,
+        totalAmount: Number(row.total_amount) || 0,
+        totalAmountFormatted: formatAmount(Number(row.total_amount) || 0),
+        averagePerCase: Number(row.average_per_case) || 0,
+        description: row.description_en || '',
+        descriptionAr: row.description_ar || '',
+        icon: row.icon || '',
+        color: row.color || '',
+      }
+    }
+
+    // 4. Get success stories from top cases by category (using actual category_id)
     const allCases = await db
       .select({
         id: cases.id,
         titleEn: cases.title_en,
         titleAr: cases.title_ar,
-        description: cases.description_ar, // Use Arabic description for categorization
         descriptionAr: cases.description_ar,
         descriptionEn: cases.description_en,
         currentAmount: cases.current_amount,
         createdAt: cases.created_at,
+        categoryId: cases.category_id,
       })
       .from(cases)
       .where(eq(cases.status, 'published'))
 
-    // Calculate monthly breakdown with top categories
-    const monthlyBreakdown = await Promise.all(
-      monthlyData.map(async (month) => {
-        const monthNum = Number(month.month)
-        const monthInfo = monthNames[monthNum] || { en: `Month ${monthNum}`, ar: `شهر ${monthNum}` }
-        
-        // Get contributions for this month to find top category
-        const monthContributions = await db
-          .select({
-            caseId: contributions.case_id,
-            amount: contributions.amount,
-          })
-          .from(contributions)
-          .where(
-            and(
-              eq(contributions.status, 'approved'),
-              sql`EXTRACT(MONTH FROM ${contributions.created_at}) = ${monthNum}`,
-              sql`EXTRACT(YEAR FROM ${contributions.created_at}) = ${Number(month.year)}`
-            )
-          )
-
-        // Calculate top category for this month
-        const categoryAmounts: Record<string, number> = {}
-        const categoryCases: Record<string, Set<string>> = {}
-        
-        for (const contrib of monthContributions) {
-          if (!contrib.caseId) continue
-          const caseItem = allCases.find(c => c.id === contrib.caseId)
-          if (!caseItem) continue
-          
-          const category = categorizeCase(caseItem.description || '')
-          if (!categoryAmounts[category]) {
-            categoryAmounts[category] = 0
-            categoryCases[category] = new Set()
-          }
-          categoryAmounts[category] += Number(contrib.amount || 0)
-          categoryCases[category].add(contrib.caseId)
-        }
-
-        const topCategoryKey = Object.entries(categoryAmounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'other'
-        const topCategoryInfo = categoryNames[topCategoryKey] || categoryNames.other
-
-        return {
-          month: monthNum,
-          monthName: monthInfo.en,
-          monthNameArabic: monthInfo.ar,
-          totalCases: Number(month.caseCount) || 0,
-          totalAmount: Number(month.totalAmount) || 0,
-          totalAmountFormatted: formatAmount(Number(month.totalAmount) || 0),
-          contributors: Number(month.contributorCount) || 0,
-          topCategory: {
-            name: topCategoryInfo.en,
-            nameArabic: topCategoryInfo.ar,
-            amount: categoryAmounts[topCategoryKey] || 0,
-            cases: categoryCases[topCategoryKey]?.size || 0,
-          },
-        }
-      })
+    // Get categories to match by category_id
+    const categories = await db.select().from(caseCategories).where(eq(caseCategories.is_active, true))
+    const medicalCategory = categories.find(c => 
+      (c.name_en || c.name || '').toLowerCase().includes('medical')
+    )
+    const educationCategory = categories.find(c => 
+      (c.name_en || c.name || '').toLowerCase().includes('education')
+    )
+    const housingCategory = categories.find(c => 
+      (c.name_en || c.name || '').toLowerCase().includes('housing')
     )
 
-    // 3. Calculate category summary from cases
-    const categoryMap: Record<string, {
-      totalCases: number
-      totalAmount: number
-      cases: Array<{ id: string; amount: number }>
-    }> = {}
+    // Get top cases by actual category_id, fallback to text matching if category not found
+    const topMedicalCaseByCategory = medicalCategory 
+      ? allCases
+          .filter(c => c.categoryId === medicalCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      : null
 
-    for (const caseItem of allCases) {
-      const category = categorizeCase(caseItem.description || '')
-      if (!categoryMap[category]) {
-        categoryMap[category] = {
-          totalCases: 0,
-          totalAmount: 0,
-          cases: [],
-        }
-      }
-      const amount = Number(caseItem.currentAmount || 0)
-      categoryMap[category].totalCases++
-      categoryMap[category].totalAmount += amount
-      categoryMap[category].cases.push({ id: caseItem.id, amount })
-    }
+    const topEducationCaseByCategory = educationCategory
+      ? allCases
+          .filter(c => c.categoryId === educationCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      : null
 
-    const categorySummary: Record<string, any> = {}
-    for (const [category, data] of Object.entries(categoryMap)) {
-      const categoryInfo = categoryNames[category] || categoryNames.other
-      categorySummary[category] = {
-        name: categoryInfo.en,
-        nameArabic: categoryInfo.ar,
-        totalCases: data.totalCases,
-        totalAmount: data.totalAmount,
-        totalAmountFormatted: formatAmount(data.totalAmount),
-        averagePerCase: data.totalCases > 0 ? Math.round(data.totalAmount / data.totalCases) : 0,
-        description: categoryDescriptions[category] || '',
-      }
-    }
+    const topHousingCaseByCategory = housingCategory
+      ? allCases
+          .filter(c => c.categoryId === housingCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      : null
 
-    // 4. Get success stories from top cases by category
-    const topMedicalCase = allCases
-      .filter(c => categorizeCase(c.description || '') === 'medical')
+    // Use the category-based results, fallback to old method if needed
+    const topMedicalCase = topMedicalCaseByCategory || allCases
+      .filter(c => categorizeCase(c.descriptionAr || '') === 'medical')
       .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
 
-    const topEducationCase = allCases
-      .filter(c => categorizeCase(c.description || '') === 'education')
+    const topEducationCase = topEducationCaseByCategory || allCases
+      .filter(c => categorizeCase(c.descriptionAr || '') === 'education')
       .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
 
-    const topHousingCase = allCases
-      .filter(c => categorizeCase(c.description || '') === 'housing')
+    const topHousingCase = topHousingCaseByCategory || allCases
+      .filter(c => categorizeCase(c.descriptionAr || '') === 'housing')
       .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
 
     // Get contributor counts for featured stories

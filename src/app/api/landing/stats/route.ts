@@ -41,21 +41,11 @@ function categorizeCase(description: string): string {
 export async function GET() {
   try {
     // Calculate stats directly from cases and contributions tables
-    const now = new Date()
-    const startDate = new Date('2025-07-01')
-    const endDate = new Date('2025-11-30')
-    
-    // Get total raised from approved contributions
+    // Get total raised from ALL approved contributions (no date filter)
     const totalRaisedResult = await db
       .select({ total: sum(contributions.amount) })
       .from(contributions)
-      .where(
-        and(
-          eq(contributions.status, 'approved'),
-          gte(contributions.created_at, startDate),
-          lte(contributions.created_at, endDate)
-        )
-      )
+      .where(eq(contributions.status, 'approved'))
     
     const totalRaised = Number(totalRaisedResult[0]?.total || 0)
     
@@ -70,17 +60,11 @@ export async function GET() {
     // Get beneficiaries count (same as active cases for now, one case = one beneficiary)
     const beneficiaries = activeCases
     
-    // Get unique contributors count
+    // Get unique contributors count from ALL approved contributions
     const contributorsResult = await db
       .select({ count: countDistinct(contributions.donor_id) })
       .from(contributions)
-      .where(
-        and(
-          eq(contributions.status, 'approved'),
-          gte(contributions.created_at, startDate),
-          lte(contributions.created_at, endDate)
-        )
-      )
+      .where(eq(contributions.status, 'approved'))
     
     const contributors = Number(contributorsResult[0]?.count || 0)
     

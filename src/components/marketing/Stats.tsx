@@ -15,10 +15,20 @@ function formatNumber(num: number): string {
     return '0'
   }
   if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M+`
+    // Round to 2 decimal places for more precision
+    const millions = num / 1000000
+    // If it's close to a whole number (within 0.005), show as whole number
+    if (millions % 1 < 0.005) {
+      return `${Math.floor(millions)}M+`
+    }
+    return `${millions.toFixed(2)}M+`
   }
   if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K+`
+    const thousands = num / 1000
+    if (thousands % 1 < 0.005) {
+      return `${Math.floor(thousands)}K+`
+    }
+    return `${thousands.toFixed(2)}K+`
   }
   return `${num.toLocaleString()}`
 }
