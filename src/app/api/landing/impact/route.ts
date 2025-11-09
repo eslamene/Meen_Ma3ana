@@ -291,13 +291,13 @@ export async function GET() {
     // Get categories to match by category_id
     const categories = await db.select().from(caseCategories).where(eq(caseCategories.is_active, true))
     const medicalCategory = categories.find(c => 
-      (c.name_en || c.name || '').toLowerCase().includes('medical')
+      (c.name || '').toLowerCase().includes('medical')
     )
     const educationCategory = categories.find(c => 
-      (c.name_en || c.name || '').toLowerCase().includes('education')
+      (c.name || '').toLowerCase().includes('education')
     )
     const housingCategory = categories.find(c => 
-      (c.name_en || c.name || '').toLowerCase().includes('housing')
+      (c.name || '').toLowerCase().includes('housing')
     )
 
     // Get top cases by actual category_id, fallback to text matching if category not found
