@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import PermissionGuard from '@/components/auth/PermissionGuard'
-import { usePermissions } from '@/lib/hooks/usePermissions'
+import { useAdmin } from '@/lib/admin/hooks'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,7 +27,6 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
 
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {
@@ -37,7 +36,7 @@ interface AdminQuickActionsSectionProps {
 }
 
 function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionProps) {
-  const { hasPermission } = useSimpleRBAC()
+  const { hasPermission } = useAdmin()
   
   // Define all possible admin actions with their permissions
   const allActions = [
@@ -130,24 +129,6 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
   )
 }
 
-// Role display function
-const getRoleDisplayName = (role: string) => {
-  switch (role) {
-    case 'admin':
-      return 'Administrator'
-    case 'moderator':
-      return 'Moderator'
-    case 'sponsor':
-      return 'Sponsor'
-    case 'volunteer':
-      return 'Volunteer'
-    case 'donor':
-      return 'Donor'
-    default:
-      return 'User'
-  }
-}
-
 interface SystemStats {
   totalUsers: number
   totalContributions: number
@@ -171,7 +152,10 @@ export default function AdminPage() {
   const t = useTranslations('admin')
   const router = useRouter()
   const params = useParams()
-  const { userRole } = usePermissions()
+  const { roles } = useAdmin()
+  // Get primary role (first role or highest level)
+  const primaryRole = roles.length > 0 ? roles[0] : null
+  const userRoleDisplayName = primaryRole?.display_name || 'User'
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
     totalContributions: 0,
@@ -354,7 +338,7 @@ export default function AdminPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permission="view:admin_dashboard">
+      <PermissionGuard permission="admin:dashboard">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}
@@ -371,7 +355,7 @@ export default function AdminPage() {
                 <div className="flex items-center gap-3">
                   <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
                     <Shield className="h-3 w-3 mr-1" />
-                    {getRoleDisplayName(userRole || '')}
+                    {userRoleDisplayName}
                   </Badge>
                 </div>
               </div>

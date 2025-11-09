@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Use permission guard
-    const guardResult = await requirePermission('view:analytics')(request)
+    const guardResult = await requirePermission('admin:analytics')(request)
     if (guardResult instanceof NextResponse) {
       return guardResult
     }
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
           ${contributions.id} as id,
           'contribution' as type,
           'New Contribution' as title,
-          CONCAT('Contribution to Case - ', COALESCE(${cases.title}, 'Unknown Case')) as description,
+          CONCAT('Contribution to Case - ', COALESCE(${cases.title_en}, ${cases.title_ar}, 'Unknown Case')) as description,
           ${contributions.amount} as amount,
           ${contributions.status} as status,
           ${contributions.created_at} as timestamp,
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
           ${sponsorships.id} as id,
           'sponsorship' as type,
           'Sponsorship Request' as title,
-          CONCAT('Sponsorship for Case - ', COALESCE(${cases.title}, 'Unknown Case')) as description,
+          CONCAT('Sponsorship for Case - ', COALESCE(${cases.title_en}, ${cases.title_ar}, 'Unknown Case')) as description,
           ${sponsorships.amount} as amount,
           ${sponsorships.status} as status,
           ${sponsorships.created_at} as timestamp,
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
           ${cases.id} as id,
           'case' as type,
           'Case Status Update' as title,
-          CONCAT('Case - ', ${cases.title}, ' (', ${cases.status}, ')') as description,
+          CONCAT('Case - ', COALESCE(${cases.title_en}, ${cases.title_ar}, 'Untitled'), ' (', ${cases.status}, ')') as description,
           NULL as amount,
           ${cases.status} as status,
           ${cases.created_at} as timestamp,

@@ -79,8 +79,10 @@ export const caseCategories = pgTable('case_categories', {
 // Updated cases table with enhanced fields
 export const cases = pgTable('cases', {
   id: uuid('id').primaryKey().defaultRandom(),
-  title: text('title').notNull(),
-  description: text('description').notNull(),
+  title_en: text('title_en').notNull(), // English title
+  title_ar: text('title_ar'), // Arabic title
+  description_ar: text('description_ar').notNull(), // Arabic description
+  description_en: text('description_en'), // English description
   type: text('type', { enum: caseTypes }).notNull().default('one-time'),
   category_id: uuid('category_id').references(() => caseCategories.id),
   priority: text('priority').notNull(),
@@ -281,6 +283,7 @@ export const landingStats = pgTable('landing_stats', {
   updatedBy: uuid('updated_by').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
+
 
 export const systemConfig = pgTable('system_config', {
   id: uuid('id').primaryKey().defaultRandom(),

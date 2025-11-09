@@ -1,18 +1,9 @@
-"use client"
+'use client'
 
-import React from "react"
-import { AlertTriangle, Info, AlertOctagon, Loader2 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
+import React from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle } from 'lucide-react'
 
 interface DeleteConfirmationDialogProps {
   open: boolean
@@ -20,9 +11,8 @@ interface DeleteConfirmationDialogProps {
   onConfirm: () => void
   title: string
   description: string
-  itemName: string
-  itemType: string
-  loading?: boolean
+  itemName?: string
+  itemType?: string
   dangerLevel?: 'low' | 'medium' | 'high'
 }
 
@@ -32,124 +22,64 @@ export function DeleteConfirmationDialog({
   onConfirm,
   title,
   description,
-  itemName,
-  itemType,
-  loading = false,
-  dangerLevel = 'medium',
+  itemName = '',
+  itemType = 'item',
+  dangerLevel = 'medium'
 }: DeleteConfirmationDialogProps) {
-  const [understandChecked, setUnderstandChecked] = React.useState(false)
-  const [confirmText, setConfirmText] = React.useState("")
-
-  const handleClose = () => {
-    setUnderstandChecked(false)
-    setConfirmText("")
+  const handleConfirm = () => {
+    onConfirm()
     onClose()
   }
 
-  const handleConfirm = () => {
-    if (canConfirm) {
-      onConfirm()
-    }
+  const dangerColors = {
+    low: 'text-yellow-600',
+    medium: 'text-orange-600',
+    high: 'text-red-600'
   }
 
-  const canConfirm = React.useMemo(() => {
-    if (dangerLevel === 'high') {
-      return understandChecked && confirmText === itemName
-    }
-    return understandChecked
-  }, [understandChecked, confirmText, itemName, dangerLevel])
-
-  const getIcon = () => {
-    switch (dangerLevel) {
-      case 'low':
-        return <Info className="h-6 w-6 text-blue-500" />
-      case 'medium':
-        return <AlertTriangle className="h-6 w-6 text-yellow-500" />
-      case 'high':
-        return <AlertOctagon className="h-6 w-6 text-red-500" />
-      default:
-        return <AlertTriangle className="h-6 w-6 text-yellow-500" />
-    }
+  const dangerBgColors = {
+    low: 'bg-yellow-50 border-yellow-200',
+    medium: 'bg-orange-50 border-orange-200',
+    high: 'bg-red-50 border-red-200'
   }
 
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!open) return
-
-      if (event.key === 'Escape') {
-        handleClose()
-      } else if (event.key === 'Enter' && canConfirm) {
-        handleConfirm()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open, canConfirm])
+  const formattedDescription = description.replace('{itemName}', itemName)
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            {getIcon()}
-            <DialogTitle>{title}</DialogTitle>
-          </div>
-          <DialogDescription className="text-left">
-            {description.replace('{itemName}', `<strong>${itemName}</strong>`)}
+          <DialogTitle className={`flex items-center gap-2 ${dangerColors[dangerLevel]}`}>
+            <AlertTriangle className="h-5 w-5" />
+            {title}
+          </DialogTitle>
+          <DialogDescription>
+            {formattedDescription}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="understand"
-              checked={understandChecked}
-              onCheckedChange={(checked: boolean | "indeterminate") => setUnderstandChecked(!!checked && checked !== "indeterminate")}
-            />
-            <label
-              htmlFor="understand"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              I understand this action cannot be undone
-            </label>
+        {dangerLevel === 'high' && (
+          <div className={`p-3 rounded-lg border ${dangerBgColors[dangerLevel]}`}>
+            <p className="text-sm font-medium text-red-800">
+              Warning: This action cannot be undone and may have serious consequences.
+            </p>
           </div>
-
-          {dangerLevel === 'high' && (
-            <div className="space-y-2">
-              <label htmlFor="confirm-text" className="text-sm font-medium">
-                Type &quot;{itemName}&quot; to confirm deletion:
-              </label>
-              <Input
-                id="confirm-text"
-                value={confirmText}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmText(e.target.value)}
-                placeholder={`Type ${itemName} here`}
-              />
-            </div>
-          )}
-
-          <div className="text-sm text-muted-foreground">
-            <a href="#" className="text-blue-600 hover:underline">
-              Learn more about the implications of deleting a {itemType}
-            </a>
-          </div>
-        </div>
+        )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
             variant="destructive"
             onClick={handleConfirm}
-            disabled={!canConfirm || loading}
+            className={dangerLevel === 'high' ? 'bg-red-600 hover:bg-red-700' : ''}
           >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Delete {itemType}
+            Delete {itemType.charAt(0).toUpperCase() + itemType.slice(1)}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
+

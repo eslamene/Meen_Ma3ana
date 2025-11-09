@@ -177,8 +177,8 @@ export class AnonymizationService {
     try {
       const casesData = await db.select({
         id: cases.id,
-        title: cases.title,
-        description: cases.description,
+        title: cases.title_en,
+        description: cases.description_en,
         targetAmount: cases.target_amount,
         currentAmount: cases.current_amount,
         status: cases.status,

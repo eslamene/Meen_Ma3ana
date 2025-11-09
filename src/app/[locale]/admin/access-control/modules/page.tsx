@@ -29,6 +29,17 @@ interface Module {
   permissions_count: number
 }
 
+interface Permission {
+  id: string
+  name: string
+  display_name: string
+  description?: string
+  resource: string
+  action: string
+  is_system: boolean
+  module_id?: string
+}
+
 
 // Manage Permissions Content Component
 function ManagePermissionsContent({ 
@@ -51,7 +62,7 @@ function ManagePermissionsContent({
   const [isMoving, setIsMoving] = useState(false)
   const { toast } = useToast()
 
-  const modulePermissions = permissionsByModule[module.name]?.permissions || []
+  const modulePermissions = permissionsByModule[module.name] || []
   const availableModules = modules.filter(m => m.id !== module.id)
 
   const handlePermissionToggle = (permissionId: string) => {
@@ -66,7 +77,7 @@ function ManagePermissionsContent({
     if (selectedPermissions.length === modulePermissions.length) {
       setSelectedPermissions([])
     } else {
-      setSelectedPermissions(modulePermissions.map(p => p.id))
+      setSelectedPermissions(modulePermissions.map((p: Permission) => p.id))
     }
   }
 
@@ -145,7 +156,7 @@ function ManagePermissionsContent({
               </span>
             </div>
             <div className="space-y-1">
-              {modulePermissions.map(permission => (
+              {modulePermissions.map((permission: Permission) => (
                 <div key={permission.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded">
                   <Checkbox
                     checked={selectedPermissions.includes(permission.id)}
@@ -499,7 +510,7 @@ export default function ModulesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredModules.map(module => {
             const IconComponent = getIcon(module.icon) || getIcon('Circle')
-            const modulePermissions = permissionsByModule[module.name]?.permissions || []
+            const modulePermissions = permissionsByModule[module.name] || []
             const usageCount = getModuleUsage()
             const visibleInMenu = isModuleVisibleInMenu(module)
 
@@ -558,7 +569,7 @@ export default function ModulesPage() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                        {modulePermissions.map(p => (
+                        {modulePermissions.map((p: Permission) => (
                           <div key={p.id} className="text-xs p-1 bg-gray-50 rounded">
                             {p.display_name}
                           </div>
@@ -601,7 +612,16 @@ export default function ModulesPage() {
         <ModuleFormModal
           open={createModalOpen}
           onClose={() => setCreateModalOpen(false)}
-          onSave={async (data) => {
+          onSave={async (data: {
+            name: string
+            display_name: string
+            description?: string
+            icon: string
+            color: string
+            sort_order: number
+            is_system?: boolean
+            permissions_count?: number
+          }) => {
             await createModule({
               ...data,
               description: data.description || '',

@@ -5,21 +5,21 @@
  * Allows searching for existing beneficiaries or creating new ones
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { Search, Plus, User, Phone, IdCard, MapPin, CheckCircle, AlertCircle } from 'lucide-react'
+import { useParams } from 'next/navigation'
+import { Search, Plus, User, Phone, IdCard, MapPin, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { BeneficiaryService } from '@/lib/services/beneficiaryService'
 import { LookupService } from '@/lib/services/lookupService'
 import { BeneficiaryDocumentService } from '@/lib/services/beneficiaryDocumentService'
-import BeneficiaryDocumentUpload from '@/components/beneficiaries/BeneficiaryDocumentUpload'
-import type { Beneficiary, CreateBeneficiaryData, IdType, City, BeneficiaryDocument } from '@/types/beneficiary'
+import BeneficiaryForm from '@/components/beneficiaries/BeneficiaryForm'
+import type { Beneficiary, CreateBeneficiaryData, UpdateBeneficiaryData, IdType, City, DocumentType } from '@/types/beneficiary'
 
 interface BeneficiarySelectorProps {
   selectedBeneficiary?: Beneficiary | null
@@ -39,25 +39,19 @@ export default function BeneficiarySelector({
   showOpenButton = false,
 }: BeneficiarySelectorProps) {
   const t = useTranslations('beneficiaries')
+  const params = useParams()
+  const locale = params.locale as string
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Beneficiary[]>([])
+  const [recentBeneficiaries, setRecentBeneficiaries] = useState<Beneficiary[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [isLoadingRecent, setIsLoadingRecent] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showSearchDialog, setShowSearchDialog] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [idTypes, setIdTypes] = useState<IdType[]>([])
   const [cities, setCities] = useState<City[]>([])
-  const [documents, setDocuments] = useState<BeneficiaryDocument[]>([])
   const [loadingLookups, setLoadingLookups] = useState(true)
-
-  // Load documents function
-  const loadDocuments = async (beneficiaryId: string) => {
-    try {
-      const docs = await BeneficiaryDocumentService.getByBeneficiaryId(beneficiaryId)
-      setDocuments(docs)
-    } catch (error) {
-      console.error('Error loading documents:', error)
-    }
-  }
 
   // Load lookup data on component mount
   useEffect(() => {
@@ -79,21 +73,33 @@ export default function BeneficiarySelector({
     loadLookupData()
   }, [])
 
-  // Auto-search when component mounts with default identifiers
+  // Load recent beneficiaries when search dialog opens
   useEffect(() => {
-    if (defaultMobileNumber || defaultNationalId) {
-      handleSearchByIdentifier()
+    const loadRecentBeneficiaries = async () => {
+      if (showSearchDialog && !searchQuery && searchResults.length === 0) {
+        setIsLoadingRecent(true)
+        try {
+          const recent = await BeneficiaryService.getAll({
+            page: 1,
+            limit: 10
+          })
+          setRecentBeneficiaries(recent)
+        } catch (error) {
+          console.error('Error loading recent beneficiaries:', error)
+          setRecentBeneficiaries([])
+        } finally {
+          setIsLoadingRecent(false)
+        }
+      } else {
+        // Clear recent beneficiaries when searching
+        setRecentBeneficiaries([])
+      }
     }
-  }, [defaultMobileNumber, defaultNationalId])
 
-  // Load documents when beneficiary is selected
-  useEffect(() => {
-    if (selectedBeneficiary) {
-      loadDocuments(selectedBeneficiary.id)
-    }
-  }, [selectedBeneficiary])
+    loadRecentBeneficiaries()
+  }, [showSearchDialog, searchQuery])
 
-  const handleSearchByIdentifier = async () => {
+  const handleSearchByIdentifier = useCallback(async () => {
     if (!defaultMobileNumber && !defaultNationalId) return
 
     setIsSearching(true)
@@ -114,11 +120,19 @@ export default function BeneficiarySelector({
     } finally {
       setIsSearching(false)
     }
-  }
+  }, [defaultMobileNumber, defaultNationalId, onSelect])
+
+  // Auto-search when component mounts with default identifiers
+  useEffect(() => {
+    if (defaultMobileNumber || defaultNationalId) {
+      handleSearchByIdentifier()
+    }
+  }, [defaultMobileNumber, defaultNationalId, handleSearchByIdentifier])
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       setSearchResults([])
+      setRecentBeneficiaries([])
       return
     }
 
@@ -129,6 +143,7 @@ export default function BeneficiarySelector({
         limit: 10
       })
       setSearchResults(results)
+      setRecentBeneficiaries([]) // Clear recent when searching
     } catch (error) {
       console.error('Error searching beneficiaries:', error)
     } finally {
@@ -136,13 +151,72 @@ export default function BeneficiarySelector({
     }
   }
 
-  const handleCreateBeneficiary = async (data: CreateBeneficiaryData) => {
+  const handleCreateBeneficiary = async (data: CreateBeneficiaryData | UpdateBeneficiaryData, documents?: Array<{ file: File; documentType: DocumentType; isPublic: boolean; description?: string }>) => {
     setIsCreating(true)
     try {
-      const newBeneficiary = await BeneficiaryService.create(data)
+      // Cast to CreateBeneficiaryData for API call (create mode only)
+      const createData = data as CreateBeneficiaryData
+      
+      // Use API endpoint instead of direct service call to bypass RLS
+      const response = await fetch('/api/beneficiaries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createData),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create beneficiary')
+      }
+      
+      const result = await response.json()
+      const newBeneficiary = result.data
+      
+      // Upload documents if provided
+      if (documents && documents.length > 0) {
+        for (const docData of documents) {
+          try {
+            const safeName = docData.file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+            const fileName = `beneficiary-documents/${newBeneficiary.id}/${docData.documentType}-${Date.now()}-${safeName}`
+            
+            const formData = new FormData()
+            formData.append('file', docData.file)
+            formData.append('fileName', fileName)
+            formData.append('bucket', 'beneficiaries')
+            
+            const uploadResponse = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+            })
+            
+            if (uploadResponse.ok) {
+              const uploadData = await uploadResponse.json()
+              await BeneficiaryDocumentService.create({
+                beneficiary_id: newBeneficiary.id,
+                document_type: docData.documentType,
+                file_name: docData.file.name,
+                file_url: uploadData.url,
+                file_size: docData.file.size,
+                mime_type: docData.file.type,
+                is_public: docData.isPublic,
+                description: docData.description?.trim() || undefined
+              })
+            }
+          } catch (docError) {
+            console.error('Error uploading document:', docError)
+            // Continue with other documents even if one fails
+          }
+        }
+      }
+      
       onSelect(newBeneficiary)
       setShowCreateDialog(false)
-      setSearchResults([newBeneficiary])
+      setShowSearchDialog(false)
+      setSearchResults([])
+      setRecentBeneficiaries([])
+      setSearchQuery('')
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       console.error('Error creating beneficiary:', error)
@@ -152,125 +226,444 @@ export default function BeneficiarySelector({
     }
   }
 
+  const handleSelectFromResults = (beneficiary: Beneficiary) => {
+    onSelect(beneficiary)
+    setShowSearchDialog(false)
+    setSearchResults([])
+    setRecentBeneficiaries([])
+    setSearchQuery('')
+  }
+
   return (
     <div className="space-y-4">
       {/* Selected Beneficiary Display */}
       {selectedBeneficiary && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-semibold text-lg">{selectedBeneficiary.name}</h3>
-                  {selectedBeneficiary.is_verified && (
-                    <Badge variant="default" className="bg-green-500">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      {t('verified') || 'Verified'}
-                    </Badge>
-                  )}
+        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-md hover:shadow-lg transition-all duration-200">
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+              {/* Left Section - Beneficiary Info */}
+              <div className="flex-1 space-y-4">
+                {/* Header with Name and Verification */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md">
+                      <User className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-xl text-gray-900 truncate">{selectedBeneficiary.name}</h3>
+                      {selectedBeneficiary.is_verified && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white px-2 py-0.5 text-xs">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            {t('verified') || 'Verified'}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 space-y-1">
+
+                {/* Contact Information Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-green-200">
                   {selectedBeneficiary.mobile_number && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      <span>{selectedBeneficiary.mobile_number}</span>
+                    <div className="flex items-center gap-2.5 p-2.5 bg-white/60 rounded-lg hover:bg-white/80 transition-colors">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-blue-100 flex items-center justify-center">
+                        <Phone className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 mb-0.5">{t('mobileNumber') || 'Mobile'}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{selectedBeneficiary.mobile_number}</p>
+                      </div>
                     </div>
                   )}
                   {selectedBeneficiary.national_id && (
-                    <div className="flex items-center gap-2">
-                      <IdCard className="h-4 w-4" />
-                      <span>{selectedBeneficiary.national_id}</span>
+                    <div className="flex items-center gap-2.5 p-2.5 bg-white/60 rounded-lg hover:bg-white/80 transition-colors">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-purple-100 flex items-center justify-center">
+                        <IdCard className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 mb-0.5">{t('nationalId') || 'National ID'}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{selectedBeneficiary.national_id}</p>
+                      </div>
                     </div>
                   )}
                   {selectedBeneficiary.city && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      <span>{selectedBeneficiary.city}</span>
+                    <div className="flex items-center gap-2.5 p-2.5 bg-white/60 rounded-lg hover:bg-white/80 transition-colors">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-orange-100 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 mb-0.5">{t('city') || 'City'}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{selectedBeneficiary.city}</p>
+                      </div>
                     </div>
                   )}
                 </div>
-                <div className="flex gap-4 text-sm">
-                  <span>{t('totalCases') || 'Total Cases'}: <strong>{selectedBeneficiary.total_cases}</strong></span>
-                  <span>{t('activeCases') || 'Active Cases'}: <strong>{selectedBeneficiary.active_cases}</strong></span>
+
+                {/* Case Statistics */}
+                <div className="flex items-center gap-4 pt-2 border-t border-green-200">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/60 rounded-lg">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span className="text-xs text-gray-600">{t('totalCases') || 'Total Cases'}</span>
+                    <span className="text-sm font-bold text-gray-900 ml-1">{selectedBeneficiary.total_cases || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/60 rounded-lg">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span className="text-xs text-gray-600">{t('activeCases') || 'Active Cases'}</span>
+                    <span className="text-sm font-bold text-gray-900 ml-1">{selectedBeneficiary.active_cases || 0}</span>
+                  </div>
                 </div>
               </div>
-              {showOpenButton && (
+
+              {/* Right Section - Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-start sm:justify-end">
+                {showOpenButton && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`/${locale}/beneficiaries/${selectedBeneficiary.id}`, '_blank')}
+                    className="bg-white hover:bg-gray-50 border-gray-300 shadow-sm hover:shadow transition-all"
+                  >
+                    <User className="h-4 w-4 mr-1.5" />
+                    {t('openBeneficiary') || 'Open'}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/beneficiaries/${selectedBeneficiary.id}`, '_blank')}
+                  onClick={() => {
+                    setShowSearchDialog(true)
+                    setSearchQuery('')
+                    setSearchResults([])
+                  }}
+                  className="bg-white hover:bg-gray-50 border-gray-300 shadow-sm hover:shadow transition-all"
                 >
-                  <User className="h-4 w-4 mr-1" />
-                  {t('openBeneficiary') || 'Open'}
+                  {t('change') || 'Change'}
                 </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onSelect(null)}
-              >
-                {t('change') || 'Change'}
-              </Button>
+              </div>
             </div>
           </CardContent>
         </Card>)}
 
-        {/* Document Upload Section */}
-        {selectedBeneficiary && (
-          <BeneficiaryDocumentUpload
-          beneficiaryId={selectedBeneficiary?.id || ''}
-          onDocumentUploaded={(document) => {
-            setDocuments(prev => [document, ...prev])
-          }}
-          onDocumentDeleted={(documentId) => {
-            setDocuments(prev => prev.filter(doc => doc.id !== documentId))
-          }}
-          documents={documents}
-        />
-      )}
+      {/* Search/Select Modal */}
+      <Dialog open={showSearchDialog} onOpenChange={setShowSearchDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <User className="h-6 w-6 text-blue-600" />
+              {t('selectBeneficiary') || 'Select Beneficiary'}
+            </DialogTitle>
+            <DialogDescription className="text-base mt-2">
+              {t('selectDescription') || 'Search for an existing beneficiary or create a new one'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="space-y-6">
+              {/* Search Section */}
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold text-gray-700">{t('search') || 'Search'}</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <Input
+                      placeholder={t('searchPlaceholder') || 'Search by name, mobile, or ID...'}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                      className="pl-10 h-11 text-base"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleSearch} 
+                    disabled={isSearching}
+                    className="h-11 px-6 bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSearching ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        {t('searching') || 'Searching...'}
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-4 w-4 mr-2" />
+                        {t('search') || 'Search'}
+                      </>
+                    )}
+                  </Button>
+                  <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="h-11 px-6 border-2 border-dashed hover:border-blue-500 hover:bg-blue-50">
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t('createNew') || 'Create New'}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-[98vw] w-full max-h-[95vh] overflow-hidden p-0">
+                      <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b">
+                        <DialogTitle className="text-lg sm:text-xl">{t('createBeneficiary') || 'Create New Beneficiary'}</DialogTitle>
+                        <DialogDescription className="text-sm sm:text-base">
+                          {t('createDescription') || 'Create a profile for recurring cases'}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="overflow-y-auto max-h-[calc(95vh-120px)] px-4 sm:px-6">
+                        <BeneficiaryForm
+                          mode="create"
+                          onSubmit={handleCreateBeneficiary}
+                          isSubmitting={isCreating}
+                          idTypes={idTypes}
+                          cities={cities}
+                          showDocuments={true}
+                          defaultValues={{
+                            name: defaultName || '',
+                            mobile_number: defaultMobileNumber || '',
+                            national_id: defaultNationalId || ''
+                          }}
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
 
-      {/* Search Section */}
-      {!selectedBeneficiary && (
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Input
-                placeholder={t('searchPlaceholder') || 'Search by name, mobile, or ID...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-            </div>
-            <Button onClick={handleSearch} disabled={isSearching}>
-              <Search className="h-4 w-4 mr-2" />
-              {t('search') || 'Search'}
-            </Button>
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('createNew') || 'Create New'}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{t('createBeneficiary') || 'Create New Beneficiary'}</DialogTitle>
-                  <DialogDescription>
+            {/* Search Results */}
+            {isSearching && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 border-t-transparent mb-4"></div>
+                <p className="text-gray-600 font-medium">{t('searching') || 'Searching...'}</p>
+              </div>
+            )}
+            
+            {!isSearching && searchResults.length > 0 && (
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  {t('searchResults') || 'Search Results'} ({searchResults.length})
+                </Label>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                  {searchResults.map((beneficiary) => (
+                    <Card
+                      key={beneficiary.id}
+                      className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all duration-200 border-2"
+                      onClick={() => handleSelectFromResults(beneficiary)}
+                    >
+                      <CardContent className="pt-4 pb-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                              <User className="h-5 w-5 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <h4 className="font-semibold text-base text-gray-900 truncate">{beneficiary.name}</h4>
+                                {beneficiary.is_verified && (
+                                  <Badge variant="default" className="bg-green-600 h-5 text-xs">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    {t('verified') || 'Verified'}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-600 space-y-1">
+                                {beneficiary.mobile_number && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Phone className="h-3.5 w-3.5 text-gray-400" />
+                                    <span className="truncate">{beneficiary.mobile_number}</span>
+                                  </div>
+                                )}
+                                {beneficiary.national_id && (
+                                  <div className="flex items-center gap-1.5">
+                                    <IdCard className="h-3.5 w-3.5 text-gray-400" />
+                                    <span className="truncate">{beneficiary.national_id}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1 text-right flex-shrink-0">
+                            <div className="text-sm font-semibold text-gray-900">{beneficiary.total_cases || 0}</div>
+                            <div className="text-xs text-gray-500">{t('cases') || 'cases'}</div>
+                            <div className="text-sm font-semibold text-green-600">{beneficiary.active_cases || 0}</div>
+                            <div className="text-xs text-gray-500">{t('active') || 'active'}</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent Beneficiaries - Show when no search query and no results */}
+            {!isSearching && !searchQuery && searchResults.length === 0 && (
+              <>
+                {isLoadingRecent ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 border-t-transparent mb-4"></div>
+                    <p className="text-gray-600 font-medium">{t('loading') || 'Loading...'}</p>
+                  </div>
+                ) : recentBeneficiaries.length > 0 ? (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      {t('recentBeneficiaries') || 'Recent Beneficiaries'} ({recentBeneficiaries.length})
+                    </Label>
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                      {recentBeneficiaries.map((beneficiary) => (
+                        <Card
+                          key={beneficiary.id}
+                          className="cursor-pointer hover:border-blue-500 hover:shadow-md transition-all duration-200 border-2"
+                          onClick={() => handleSelectFromResults(beneficiary)}
+                        >
+                          <CardContent className="pt-4 pb-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                                  <User className="h-5 w-5 text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <h4 className="font-semibold text-base text-gray-900 truncate">{beneficiary.name}</h4>
+                                    {beneficiary.is_verified && (
+                                      <Badge variant="default" className="bg-green-600 h-5 text-xs">
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        {t('verified') || 'Verified'}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-gray-600 space-y-1">
+                                    {beneficiary.mobile_number && (
+                                      <div className="flex items-center gap-1.5">
+                                        <Phone className="h-3.5 w-3.5 text-gray-400" />
+                                        <span className="truncate">{beneficiary.mobile_number}</span>
+                                      </div>
+                                    )}
+                                    {beneficiary.national_id && (
+                                      <div className="flex items-center gap-1.5">
+                                        <IdCard className="h-3.5 w-3.5 text-gray-400" />
+                                        <span className="truncate">{beneficiary.national_id}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 text-right flex-shrink-0">
+                                <div className="text-sm font-semibold text-gray-900">{beneficiary.total_cases || 0}</div>
+                                <div className="text-xs text-gray-500">{t('cases') || 'cases'}</div>
+                                <div className="text-sm font-semibold text-green-600">{beneficiary.active_cases || 0}</div>
+                                <div className="text-xs text-gray-500">{t('active') || 'active'}</div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Card className="border-2 border-dashed border-gray-300 bg-gray-50">
+                    <CardContent className="pt-8 pb-8">
+                      <div className="text-center space-y-3">
+                        <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto">
+                          <Search className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <div>
+                          <p className="text-gray-700 font-medium text-base">{t('searchPrompt') || 'Enter a search term to find beneficiaries'}</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {t('orCreateNew') || 'Or create a new beneficiary using the "Create New" button'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+
+            {/* No Results Message */}
+            {!isSearching && searchQuery && searchResults.length === 0 && (
+              <Card className="border-2 border-yellow-200 bg-yellow-50">
+                <CardContent className="pt-8 pb-8">
+                  <div className="text-center space-y-3">
+                    <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto">
+                      <AlertCircle className="h-8 w-8 text-yellow-600" />
+                    </div>
+                    <div>
+                      <p className="text-gray-700 font-medium text-base">{t('noResults') || 'No beneficiaries found'}</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {t('tryDifferentSearch') || 'Try a different search term or create a new beneficiary'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Initial State - No Search Yet */}
+            {!isSearching && !searchQuery && searchResults.length === 0 && recentBeneficiaries.length === 0 && !isLoadingRecent && (
+              <Card className="border-2 border-dashed border-gray-300 bg-gray-50">
+                <CardContent className="pt-8 pb-8">
+                  <div className="text-center space-y-3">
+                    <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto">
+                      <Search className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <div>
+                      <p className="text-gray-700 font-medium text-base">{t('searchPrompt') || 'Enter a search term to find beneficiaries'}</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {t('orCreateNew') || 'Or create a new beneficiary using the "Create New" button'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Search Section - Only show when no beneficiary is selected */}
+    {!selectedBeneficiary && (
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Input
+              placeholder={t('searchPlaceholder') || 'Search by name, mobile, or ID...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            />
+          </div>
+          <Button onClick={() => setShowSearchDialog(true)}>
+            <Search className="h-4 w-4 mr-2" />
+            {t('search') || 'Search'}
+          </Button>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                {t('createNew') || 'Create New'}
+              </Button>
+            </DialogTrigger>
+              <DialogContent className="max-w-[98vw] w-full max-h-[95vh] overflow-hidden p-0 sm:max-w-[98vw]">
+                <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b">
+                  <DialogTitle className="text-lg sm:text-xl">{t('createBeneficiary') || 'Create New Beneficiary'}</DialogTitle>
+                  <DialogDescription className="text-sm sm:text-base">
                     {t('createDescription') || 'Create a profile for recurring cases'}
                   </DialogDescription>
                 </DialogHeader>
-                <CreateBeneficiaryForm
-                  onSubmit={handleCreateBeneficiary}
-                  isSubmitting={isCreating}
-                  idTypes={idTypes}
-                  cities={cities}
-                  defaultValues={{
-                    name: defaultName || '',
-                    mobile_number: defaultMobileNumber || '',
-                    national_id: defaultNationalId || ''
-                  }}
-                />
+                  <div className="overflow-y-auto max-h-[calc(95vh-120px)] px-4 sm:px-6">
+                    <BeneficiaryForm
+                      mode="create"
+                      onSubmit={handleCreateBeneficiary}
+                      isSubmitting={isCreating}
+                      idTypes={idTypes}
+                      cities={cities}
+                      showDocuments={true}
+                      defaultValues={{
+                        name: defaultName || '',
+                        mobile_number: defaultMobileNumber || '',
+                        national_id: defaultNationalId || ''
+                      }}
+                    />
+                  </div>
               </DialogContent>
             </Dialog>
           </div>
@@ -284,7 +677,7 @@ export default function BeneficiarySelector({
                   <Card
                     key={beneficiary.id}
                     className="cursor-pointer hover:border-blue-500 transition-colors"
-                    onClick={() => onSelect(beneficiary)}
+                    onClick={() => handleSelectFromResults(beneficiary)}
                   >
                     <CardContent className="pt-4">
                       <div className="flex items-start justify-between">
@@ -343,267 +736,6 @@ export default function BeneficiarySelector({
         </div>
       )}
     </div>
-  )
-}
-
-// Create Beneficiary Form Component
-interface CreateBeneficiaryFormProps {
-  onSubmit: (data: CreateBeneficiaryData) => void
-  isSubmitting: boolean
-  defaultValues?: Partial<CreateBeneficiaryData>
-  idTypes: IdType[]
-  cities: City[]
-}
-
-function CreateBeneficiaryForm({ onSubmit, isSubmitting, defaultValues, idTypes, cities }: CreateBeneficiaryFormProps) {
-  const t = useTranslations('beneficiaries')
-  const [formData, setFormData] = useState<CreateBeneficiaryData>({
-    name: defaultValues?.name || '',
-    mobile_number: defaultValues?.mobile_number || '',
-    additional_mobile_number: defaultValues?.additional_mobile_number || '',
-    national_id: defaultValues?.national_id || '',
-    country: 'Egypt',
-    id_type: 'national_id',
-    id_type_id: defaultValues?.id_type_id || '',
-    city: defaultValues?.city || '',
-    city_id: defaultValues?.city_id || '',
-    risk_level: 'low'
-  })
-  
-  // City search state
-  const [citySearchQuery, setCitySearchQuery] = useState('')
-  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false)
-  const [filteredCities, setFilteredCities] = useState<City[]>(cities)
-  const cityDropdownRef = useRef<HTMLDivElement>(null)
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit(formData)
-  }
-
-  const handleChange = (field: keyof CreateBeneficiaryData, value: string | number | boolean) => {
-    setFormData(prev => {
-      const newData = { ...prev, [field]: value }
-      
-      // When ID type changes, also update the id_type field
-      if (field === 'id_type_id') {
-        const selectedIdType = idTypes.find(type => type.id === value)
-        if (selectedIdType) {
-          newData.id_type = selectedIdType.code as 'national_id' | 'passport' | 'other'
-        }
-      }
-      
-      return newData
-    })
-  }
-
-  // Get dynamic label and placeholder based on ID type
-  const getIDFieldInfo = () => {
-    const selectedIdType = idTypes.find(type => type.id === formData.id_type_id)
-    const idTypeName = selectedIdType?.name_en || 'ID'
-    
-    return {
-      label: idTypeName,
-      placeholder: `Enter ${idTypeName.toLowerCase()} number`
-    }
-  }
-
-  const { label: idFieldLabel, placeholder: idFieldPlaceholder } = getIDFieldInfo()
-
-  // Filter cities based on search query
-  useEffect(() => {
-    if (citySearchQuery.trim() === '') {
-      setFilteredCities(cities)
-    } else {
-      const filtered = cities.filter(city => 
-        city.name_en.toLowerCase().includes(citySearchQuery.toLowerCase()) ||
-        city.name_ar.includes(citySearchQuery)
-      )
-      setFilteredCities(filtered)
-    }
-  }, [citySearchQuery, cities])
-
-  // Handle click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (cityDropdownRef.current && !cityDropdownRef.current.contains(event.target as Node)) {
-        setIsCityDropdownOpen(false)
-      }
-    }
-
-    if (isCityDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isCityDropdownOpen])
-
-  // Handle city selection
-  const handleCitySelect = (city: City) => {
-    setFormData(prev => ({
-      ...prev,
-      city_id: city.id,
-      city: city.name_en
-    }))
-    setCitySearchQuery(city.name_en)
-    setIsCityDropdownOpen(false)
-  }
-
-  // Handle city search input change
-  const handleCitySearchChange = (value: string) => {
-    setCitySearchQuery(value)
-    setIsCityDropdownOpen(true)
-    
-    // Clear city selection if search doesn't match selected city
-    if (formData.city && !value.toLowerCase().includes(formData.city.toLowerCase())) {
-      setFormData(prev => ({
-        ...prev,
-        city_id: '',
-        city: ''
-      }))
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>{t('name') || 'Name'} *</Label>
-          <Input
-            required
-            value={formData.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            placeholder={t('namePlaceholder') || 'Enter full name'}
-          />
-        </div>
-        <div>
-          <Label>{t('age') || 'Age'}</Label>
-          <Input
-            type="number"
-            value={formData.age || ''}
-            onChange={(e) => handleChange('age', parseInt(e.target.value) || 0)}
-            placeholder={t('agePlaceholder') || 'Enter age'}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>{t('mobileNumber') || 'Mobile Number'}</Label>
-          <Input
-            type="tel"
-            value={formData.mobile_number || ''}
-            onChange={(e) => handleChange('mobile_number', e.target.value)}
-            placeholder="+20 XXX XXX XXXX"
-          />
-        </div>
-        <div>
-          <Label>{t('additionalMobileNumber') || 'Additional Mobile Number'}</Label>
-          <Input
-            type="tel"
-            value={formData.additional_mobile_number || ''}
-            onChange={(e) => handleChange('additional_mobile_number', e.target.value)}
-            placeholder="+20 XXX XXX XXXX"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>{t('idType') || 'ID Type'}</Label>
-          <Select value={formData.id_type_id} onValueChange={(value) => handleChange('id_type_id', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder={t('selectIdType') || 'Select ID type'} />
-            </SelectTrigger>
-            <SelectContent>
-              {idTypes.filter(type => type.id && type.id.trim() !== '').map((type) => (
-                <SelectItem key={type.id} value={type.id}>
-                  {type.name_en}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>{idFieldLabel}</Label>
-          <Input
-            value={formData.national_id || ''}
-            onChange={(e) => handleChange('national_id', e.target.value)}
-            placeholder={idFieldPlaceholder}
-          />
-        </div>
-      </div>
-
-      <div className="relative" ref={cityDropdownRef}>
-        <Label>{t('city') || 'City'}</Label>
-        <div className="relative">
-          <Input
-            value={citySearchQuery}
-            onChange={(e) => handleCitySearchChange(e.target.value)}
-            onFocus={() => setIsCityDropdownOpen(true)}
-            placeholder={t('selectCity') || 'Search and select city...'}
-            className="w-full"
-          />
-          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        </div>
-        
-        {/* City Dropdown */}
-        {isCityDropdownOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-            {filteredCities.length > 0 ? (
-              filteredCities.map((city) => (
-                <div
-                  key={city.id}
-                  className="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center justify-between"
-                  onClick={() => handleCitySelect(city)}
-                >
-                  <div>
-                    <div className="font-medium">{city.name_en}</div>
-                    {city.name_ar && (
-                      <div className="text-sm text-gray-500">{city.name_ar}</div>
-                    )}
-                  </div>
-                  {formData.city_id === city.id && (
-                    <CheckCircle className="h-4 w-4 text-blue-600" />
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="px-3 py-2 text-gray-500 text-sm">
-                {t('noCitiesFound') || 'No cities found'}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <Label>{t('medicalCondition') || 'Medical Condition'}</Label>
-        <Input
-          value={formData.medical_condition || ''}
-          onChange={(e) => handleChange('medical_condition', e.target.value)}
-          placeholder={t('medicalConditionPlaceholder') || 'Brief description'}
-        />
-      </div>
-
-      <div>
-        <Label>{t('notes') || 'Notes'}</Label>
-        <textarea
-          className="w-full min-h-[80px] px-3 py-2 rounded-md border border-gray-300"
-          value={formData.notes || ''}
-          onChange={(e) => handleChange('notes', e.target.value)}
-          placeholder={t('notesPlaceholder') || 'Additional information'}
-        />
-      </div>
-
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (t('creating') || 'Creating...') : (t('create') || 'Create Beneficiary')}
-        </Button>
-      </div>
-    </form>
   )
 }
 

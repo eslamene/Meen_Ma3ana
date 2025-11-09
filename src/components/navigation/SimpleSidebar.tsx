@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
-import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
+import { useAdmin } from '@/lib/admin/hooks'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { 
   X, 
@@ -43,7 +43,16 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
   const [notificationCount, setNotificationCount] = useState(0)
 
   const supabase = createClient()
-  const { user, loading, modules } = useSimpleRBAC()
+  const { user, loading, menuItems } = useAdmin()
+  
+  // Convert menuItems to modules format for compatibility
+  const modules = menuItems.map(item => ({
+    id: item.id,
+    name: item.label.toLowerCase().replace(/\s+/g, '_'),
+    display_name: item.label,
+    icon: item.icon || 'FileText',
+    items: item.children || []
+  }))
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
@@ -232,7 +241,7 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
                   {isExpanded && (
                     <div className="ml-6 space-y-1">
                       {module.items.map((item, index) => {
-                        const ItemIcon = getIcon(item.icon)
+                        const ItemIcon = item.icon ? getIcon(item.icon) : null
                         return (
                           <Link
                             key={index}
@@ -243,7 +252,7 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
                                 : 'text-gray-600 hover:bg-gray-50'
                             }`}
                           >
-                            <ItemIcon className="mr-3 h-4 w-4" />
+                            {ItemIcon && <ItemIcon className="mr-3 h-4 w-4" />}
                             {item.label}
                           </Link>
                         )

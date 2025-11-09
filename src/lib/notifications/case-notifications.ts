@@ -41,7 +41,7 @@ export class CaseNotificationService {
       const [caseData] = await db
         .select({
           id: cases.id,
-          title: cases.title,
+          title: cases.title_en,
           created_by: cases.created_by,
         })
         .from(cases)
@@ -88,7 +88,7 @@ export class CaseNotificationService {
       const [caseData] = await db
         .select({
           id: cases.id,
-          title: cases.title,
+          title: cases.title_en,
         })
         .from(cases)
         .where(eq(cases.id, caseId))
@@ -132,7 +132,7 @@ export class CaseNotificationService {
       const [caseData] = await db
         .select({
           id: cases.id,
-          title: cases.title,
+          title: cases.title_en,
           created_by: cases.created_by,
         })
         .from(cases)

@@ -68,14 +68,20 @@ export async function PATCH(
     }
 
     // Handle other fields if provided
-    if (body.title !== undefined) updateData.title = body.title
-    if (body.description !== undefined) updateData.description = body.description
+    if (body.title_en !== undefined) updateData.title_en = body.title_en
+    if (body.title_ar !== undefined) updateData.title_ar = body.title_ar
+    if (body.description_en !== undefined) updateData.description_en = body.description_en
+    if (body.description_ar !== undefined) updateData.description_ar = body.description_ar
+    // Legacy support - map old fields to new structure
+    if (body.title !== undefined && body.title_en === undefined) updateData.title_en = body.title
+    if (body.description !== undefined && body.description_en === undefined) updateData.description_en = body.description
     if (body.targetAmount !== undefined) updateData.target_amount = parseFloat(body.targetAmount)
     if (body.status !== undefined) updateData.status = body.status
     if (body.priority !== undefined) updateData.priority = body.priority
     if (body.location !== undefined) updateData.location = body.location
     if (body.beneficiaryName !== undefined) updateData.beneficiary_name = body.beneficiaryName
     if (body.beneficiaryContact !== undefined) updateData.beneficiary_contact = body.beneficiaryContact
+    if (body.category_id !== undefined) updateData.category_id = body.category_id
 
     // Update the case only if there are fields to update
     if (Object.keys(updateData).length > 1) { // More than just updated_at
@@ -118,7 +124,23 @@ export async function GET(
     const { data: caseData, error } = await supabase
       .from('cases')
       .select(`
-        *,
+        id,
+        title_en,
+        title_ar,
+        description_en,
+        description_ar,
+        target_amount,
+        current_amount,
+        status,
+        type,
+        priority,
+        location,
+        beneficiary_name,
+        beneficiary_contact,
+        created_at,
+        updated_at,
+        created_by,
+        category_id,
         case_categories(name)
       `)
       .eq('id', id)

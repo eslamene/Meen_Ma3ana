@@ -30,13 +30,12 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const supabase = createClient()
-
   const fetchApprovedContributions = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
 
+      const supabase = createClient()
       const { data, error: fetchError } = await supabase
         .from('contributions')
         .select(`
@@ -72,9 +71,11 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
         const user = contribution.users
         const donorName = contribution.anonymous 
           ? 'Anonymous Donor' 
-          : user && user[0].first_name && user[0].last_name
+          : user && Array.isArray(user) && user[0]?.first_name && user[0]?.last_name
             ? `${user[0].first_name} ${user[0].last_name}`
-            : user[0]?.first_name || user[0]?.last_name || user[0]?.email || 'Unknown Donor'
+            : Array.isArray(user) && user[0]
+              ? (user[0].first_name || user[0].last_name || user[0].email || 'Unknown Donor')
+              : 'Unknown Donor'
 
         return {
           id: contribution.id,
@@ -109,7 +110,7 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
     } finally {
       setIsLoading(false)
     }
-  }, [caseId, supabase])
+  }, [caseId])
 
   useEffect(() => {
     if (caseId) {

@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
 export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const search = searchParams.get('search')
+    const dateFrom = searchParams.get('dateFrom')
+    const dateTo = searchParams.get('dateTo')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const sortBy = searchParams.get('sortBy') || 'created_at'
@@ -41,45 +50,86 @@ export async function GET(request: NextRequest) {
       query = query.eq('donor_id', user.id)
     }
 
-    const { data: allContributions, error, count } = await query
-      .order(sortBy, { ascending: sortOrder === 'asc' })
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    // Filter contributions based on status if needed
-    let contributions = allContributions || []
+    // Apply status filter via approval_status conditions
     if (status && status !== 'all') {
       if (status === 'approved') {
-        contributions = contributions.filter(contribution => {
-          const approvalStatus = contribution.approval_status
-          return Array.isArray(approvalStatus) && approvalStatus.length > 0 && approvalStatus[0]?.status === 'approved'
-        })
+        query = query.eq('approval_status.status', 'approved')
       } else if (status === 'rejected') {
-        contributions = contributions.filter(contribution => {
-          const approvalStatus = contribution.approval_status
-          // Include both rejected and revised contributions (revised means it was originally rejected)
-          return Array.isArray(approvalStatus) && approvalStatus.length > 0 && 
-                 (approvalStatus[0]?.status === 'rejected' || approvalStatus[0]?.status === 'revised')
-        })
+        query = query.in('approval_status.status', ['rejected', 'revised'])
       } else if (status === 'pending') {
-        contributions = contributions.filter(contribution => {
-          const approvalStatus = contribution.approval_status
-          return !approvalStatus || 
-                 (Array.isArray(approvalStatus) && approvalStatus.length === 0) ||
-                 (Array.isArray(approvalStatus) && approvalStatus[0]?.status === 'pending')
-        })
+        query = query.or('approval_status.status.is.null,approval_status.status.eq.pending')
       }
     }
 
-    // Apply pagination after filtering
-    const startIndex = offset
-    const endIndex = offset + limit
-    contributions = contributions.slice(startIndex, endIndex)
+    // Note: Search filtering on joined tables (cases, users) will be done in memory after fetching
+    // Supabase doesn't support filtering on joined table columns directly in the query
+
+    // Apply date range filters
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom)
+      fromDate.setHours(0, 0, 0, 0)
+      query = query.gte('created_at', fromDate.toISOString())
+    }
+
+    if (dateTo) {
+      const toDate = new Date(dateTo)
+      toDate.setHours(23, 59, 59, 999)
+      query = query.lte('created_at', toDate.toISOString())
+    }
+
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+
+    // If search is active, fetch all data (we'll filter and paginate in memory)
+    // Otherwise, apply pagination at database level
+    if (!search || !search.trim()) {
+      query = query.range(offset, offset + limit - 1)
+    }
+
+    const { data: contributions, error, count } = await query
+
+    if (error) {
+      logger.error('Error fetching contributions:', error, {
+        query: 'GET /api/contributions',
+        userId: user.id,
+        isAdmin: isActuallyAdmin,
+        errorCode: error.code,
+        errorDetails: error.details,
+        errorHint: error.hint
+      })
+      return NextResponse.json({ 
+        error: error.message || 'Failed to fetch contributions',
+        details: process.env.NODE_ENV === 'development' ? {
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        } : undefined
+      }, { status: 500 })
+    }
+
+    // Apply search filter in memory if provided (since Supabase can't filter on joined tables)
+    let filteredContributions = contributions || []
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase()
+      filteredContributions = filteredContributions.filter((c: any) => {
+        const caseTitle = c.cases?.title?.toLowerCase() || ''
+        const donorEmail = c.users?.email?.toLowerCase() || ''
+        const donorFirstName = c.users?.first_name?.toLowerCase() || ''
+        const donorLastName = c.users?.last_name?.toLowerCase() || ''
+        return caseTitle.includes(searchLower) ||
+               donorEmail.includes(searchLower) ||
+               donorFirstName.includes(searchLower) ||
+               donorLastName.includes(searchLower)
+      })
+      
+      // Apply pagination after filtering
+      const startIndex = offset
+      const endIndex = offset + limit
+      filteredContributions = filteredContributions.slice(startIndex, endIndex)
+    }
 
     // Normalize field names for frontend (camelCase and denormalized fields)
-    const normalizedContributions = (contributions || []).map((c: any) => {
+    const normalizedContributions = filteredContributions.map((c: any) => {
       const approvalArray = Array.isArray(c.approval_status) ? c.approval_status : (c.approval_status ? [c.approval_status] : [])
       const donorFirst = c.users?.first_name || ''
       const donorLast = c.users?.last_name || ''
@@ -169,46 +219,9 @@ export async function GET(request: NextRequest) {
 
     stats.total = stats.approved + stats.pending + stats.rejected
 
-    // Calculate the total count for pagination
-    let totalCount = count || 0
-    if (status && status !== 'all') {
-      // Recalculate total count for filtered results
-      let countQuery = supabase
-        .from('contributions')
-        .select(`
-          id,
-          approval_status:contribution_approval_status!contribution_id(status)
-        `)
-      
-      // Apply the same user filtering for count calculation
-      if (!isActuallyAdmin) {
-        countQuery = countQuery.eq('donor_id', user.id)
-      }
-      
-      const { data: allForCount } = await countQuery
-      
-      if (status === 'approved') {
-        totalCount = (allForCount || []).filter(contribution => {
-          const approvalStatus = contribution.approval_status
-          return Array.isArray(approvalStatus) && approvalStatus.length > 0 && approvalStatus[0]?.status === 'approved'
-        }).length
-      } else if (status === 'rejected') {
-        totalCount = (allForCount || []).filter(contribution => {
-          const approvalStatus = contribution.approval_status
-          // Include both rejected and revised contributions (revised means it was originally rejected)
-          return Array.isArray(approvalStatus) && approvalStatus.length > 0 && 
-                 (approvalStatus[0]?.status === 'rejected' || approvalStatus[0]?.status === 'revised')
-        }).length
-      } else if (status === 'pending') {
-        totalCount = (allForCount || []).filter(contribution => {
-          const approvalStatus = contribution.approval_status
-          return !approvalStatus || 
-                 (Array.isArray(approvalStatus) && approvalStatus.length === 0) ||
-                 (Array.isArray(approvalStatus) && approvalStatus[0]?.status === 'pending')
-        }).length
-      }
-    }
-
+    // Adjust pagination if search filter was applied (since we filtered in memory)
+    const totalCount = search && search.trim() ? normalizedContributions.length : (count || 0)
+    
     return NextResponse.json({
       contributions: normalizedContributions,
       pagination: {
@@ -222,11 +235,18 @@ export async function GET(request: NextRequest) {
       stats
     })
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Unexpected error in GET /api/contributions:', error)
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? String(error) : undefined
+    }, { status: 500 })
   }
 }
     
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
   try {
     const supabase = await createClient()
     
@@ -292,7 +312,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) {
-      console.error('Error inserting contribution:', insertError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting contribution:', insertError)
       return NextResponse.json({ 
         error: 'Failed to create contribution' 
       }, { status: 500 })
@@ -313,7 +333,7 @@ export async function POST(request: NextRequest) {
         .eq('id', caseId)
       
       if (updateError) {
-        console.error('Error updating case amount:', updateError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating case amount:', updateError)
         // Don't fail the request if this fails, just log it
       }
     }
@@ -335,7 +355,9 @@ export async function POST(request: NextRequest) {
             contribution_id: contribution.id,
             case_id: caseId,
             amount: amount
-          }
+          },
+          read: false
+          // created_at will be set automatically by the database DEFAULT NOW()
         }))
 
         await supabase
@@ -343,14 +365,14 @@ export async function POST(request: NextRequest) {
           .insert(notifications)
       }
     } catch (notificationError) {
-      console.error('Error creating notifications:', notificationError)
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating notifications:', notificationError)
       // Don't fail the request if notifications fail
     }
 
     return NextResponse.json(contribution, { status: 201 })
 
   } catch (error) {
-    console.error('Error in POST /api/contributions:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in POST /api/contributions:', error)
     return NextResponse.json({ 
       error: 'Internal server error' 
     }, { status: 500 })

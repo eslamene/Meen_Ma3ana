@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { useState, useEffect, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
-import { useParams, useRouter } from 'next/navigation'
+import { useTranslations, useLocale } from 'next-intl'
+import { useParams as useNextParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,12 +46,16 @@ import { realtimeCaseUpdates, CaseProgressUpdate } from '@/lib/realtime-case-upd
 import { CaseUpdate } from '@/lib/case-updates'
 
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
-import { usePermissions } from '@/lib/hooks/usePermissions'
+import { useAdmin } from '@/lib/admin/hooks'
 
 interface Case {
   id: string
   title: string
+  titleEn?: string
+  titleAr?: string
   description: string
+  descriptionEn?: string
+  descriptionAr?: string
   target_amount: number
   current_amount: number
   status: string
@@ -93,9 +97,13 @@ interface Contribution {
 
 export default function CaseDetailPage() {
   const t = useTranslations('cases')
-  const params = useParams()
+  const params = useNextParams()
+  const localeFromParams = params?.locale as string
+  const localeFromHook = useLocale() as string
+  // Use params first (more reliable), fallback to hook
+  const locale = localeFromParams || localeFromHook || 'en'
+  const isRTL = locale === 'ar'
   const router = useRouter()
-  const locale = params.locale as string
   const caseId = params.id as string
 
   const [caseData, setCaseData] = useState<Case | null>(null)
@@ -105,7 +113,7 @@ export default function CaseDetailPage() {
   
   // Use centralized hook for approved contributions
   const { contributions: approvedContributions, totalAmount: approvedTotal } = useApprovedContributions(caseId)
-  const { hasPermission } = usePermissions()
+  const { hasPermission } = useAdmin()
   const [error, setError] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'contributions' | 'updates' | 'files'>('overview')
@@ -113,7 +121,37 @@ export default function CaseDetailPage() {
   const [canCreateUpdates, setCanCreateUpdates] = useState(false)
   const [totalContributions, setTotalContributions] = useState(0)
 
-  const supabase = createClient()
+  // Helper functions to get locale-aware title and description
+  // Simple logic: show the language that matches the locale
+  // For English (locale === 'en'): use titleEn/descriptionEn
+  // For Arabic (locale === 'ar'): use titleAr/descriptionAr
+  const getDisplayTitle = useCallback((caseItem: Case | null): string => {
+    if (!caseItem) return ''
+    
+    const titleEn = caseItem.titleEn?.trim() || null
+    const titleAr = caseItem.titleAr?.trim() || null
+    
+    // Simple logic: show the language that matches the locale
+    // If English locale and English content exists, show English. Otherwise fallback to Arabic.
+    // If Arabic locale and Arabic content exists, show Arabic. Otherwise fallback to English.
+    if (locale === 'ar') {
+      return titleAr || titleEn || caseItem.title || 'Untitled Case'
+    }
+    return titleEn || titleAr || caseItem.title || 'Untitled Case'
+  }, [locale])
+
+  const getDisplayDescription = useCallback((caseItem: Case | null): string => {
+    if (!caseItem) return ''
+    
+    const descriptionEn = caseItem.descriptionEn?.trim() || null
+    const descriptionAr = caseItem.descriptionAr?.trim() || null
+    
+    // Simple logic: show the language that matches the locale
+    if (locale === 'ar') {
+      return descriptionAr || descriptionEn || caseItem.description || 'No description available'
+    }
+    return descriptionEn || descriptionAr || caseItem.description || 'No description available'
+  }, [locale])
 
   // Memoized callback to prevent infinite loops
   const handleFilesChange = useCallback((updatedFiles: CaseFile[]) => {
@@ -125,10 +163,30 @@ export default function CaseDetailPage() {
       setLoading(true)
       setError(null)
 
-      const { data, error } = await supabase
+      const client = createClient()
+      const { data, error } = await client
         .from('cases')
         .select(`
-          *,
+          id,
+          title_en,
+          title_ar,
+          description_en,
+          description_ar,
+          target_amount,
+          current_amount,
+          status,
+          type,
+          priority,
+          location,
+          beneficiary_name,
+          beneficiary_contact,
+          created_at,
+          updated_at,
+          created_by,
+          assigned_to,
+          sponsored_by,
+          supporting_documents,
+          category_id,
           case_categories(name)
         `)
         .eq('id', caseId)
@@ -140,16 +198,26 @@ export default function CaseDetailPage() {
         return
       }
 
-      // Map database fields to include category name
+      // Map database fields to include category name and use locale-aware fields
       const mappedData = {
         ...data,
-        category: (data.case_categories as { name: string } | null)?.name || null
+        title: data.title_en || data.title_ar || '',
+        titleEn: data.title_en,
+        titleAr: data.title_ar,
+        description: data.description_en || data.description_ar || '',
+        descriptionEn: data.description_en,
+        descriptionAr: data.description_ar,
+        category: (data.case_categories && !Array.isArray(data.case_categories) 
+          ? (data.case_categories as { name: string }).name 
+          : null) || null,
+        target_amount: parseFloat(data.target_amount || '0'),
+        current_amount: parseFloat(data.current_amount || '0'),
       }
       
-      setCaseData(mappedData)
+      setCaseData(mappedData as Case)
       
       // Fetch all files from unified case_files table
-      const { data: filesData, error: filesError } = await supabase
+      const { data: filesData, error: filesError } = await client
         .from('case_files')
         .select('*')
         .eq('case_id', caseId)
@@ -184,63 +252,15 @@ export default function CaseDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [caseId, supabase])
+  }, [caseId])
 
-  const fetchContributions = useCallback(async () => {
-    try {
-      console.log('Fetching contributions for case:', caseId)
-      
-      const { data, error } = await supabase
-        .from('contributions')
-        .select(`
-          *,
-          users!contributions_donor_id_fkey (
-            first_name,
-            last_name,
-            email
-          ),
-          approval_status:contribution_approval_status!contribution_id(*)
-        `)
-        .eq('case_id', caseId)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching contributions:', error)
-        return
-      }
-
-      console.log('Raw contributions data:', data)
-
-      const formattedContributions: Contribution[] = data.map(contribution => {
-        // Build donor name from joined user data
-        const user = contribution.users
-        const donorName = user && user.first_name && user.last_name
-          ? `${user.first_name} ${user.last_name}`
-          : user?.first_name || user?.last_name || user?.email || t('unknownDonor')
-
-        return {
-          id: contribution.id,
-          amount: parseFloat(contribution.amount),
-          donorName: contribution.anonymous ? t('anonymousDonor') : donorName,
-          message: contribution.notes,
-          createdAt: contribution.created_at,
-          anonymous: contribution.anonymous || false,
-          status: contribution.status,
-          approval_status: contribution.approval_status
-        }
-      })
-
-      console.log('Formatted contributions:', formattedContributions)
-      // Note: Approved contributions are managed by useApprovedContributions hook
-      // This function fetches all contributions for logging/debugging purposes
-    } catch (error) {
-      console.error('Error fetching contributions:', error)
-    }
-  }, [caseId, supabase, t])
+  // Removed fetchContributions - contributions are now managed by useApprovedContributions hook
+  // This prevents duplicate fetching and infinite loops
 
   const fetchTotalContributions = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const client = createClient()
+      const { data, error } = await client
         .from('contributions')
         .select('amount')
         .eq('case_id', caseId)
@@ -259,7 +279,7 @@ export default function CaseDetailPage() {
     } catch (error) {
       console.error('Error calculating total contributions:', error)
     }
-  }, [caseId, supabase])
+  }, [caseId])
 
   const fetchUpdates = useCallback(async () => {
     try {
@@ -275,23 +295,24 @@ export default function CaseDetailPage() {
 
   const checkUserPermissions = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      const client = createClient()
+      const { data: { user } } = await client.auth.getUser()
+      if (user && caseData) {
         // Check if user is admin or case creator
-        const { data: userProfile } = await supabase
+        const { data: userProfile } = await client
           .from('users')
           .select('role')
           .eq('id', user.id)
           .single()
 
-        if (userProfile?.role === 'admin' || caseData?.created_by === user.id) {
+        if (userProfile?.role === 'admin' || caseData.created_by === user.id) {
           setCanCreateUpdates(true)
         }
       }
     } catch (error) {
       console.error('Error checking user permissions:', error)
     }
-  }, [supabase, caseData])
+  }, [caseData])
 
   const setupRealtimeSubscriptions = useCallback(() => {
     // Subscribe to case progress updates
@@ -367,10 +388,8 @@ export default function CaseDetailPage() {
 
   useEffect(() => {
     fetchCaseDetails()
-    fetchContributions()
     fetchUpdates()
     fetchTotalContributions()
-    checkUserPermissions()
     setupRealtimeSubscriptions()
 
     return () => {
@@ -379,7 +398,14 @@ export default function CaseDetailPage() {
       realtimeCaseUpdates.unsubscribeFromCaseUpdates(caseId)
       realtimeCaseUpdates.unsubscribeFromCaseContributions(caseId)
     }
-  }, [caseId, fetchCaseDetails, fetchContributions, fetchUpdates, fetchTotalContributions, checkUserPermissions, setupRealtimeSubscriptions])
+  }, [caseId, fetchCaseDetails, fetchUpdates, fetchTotalContributions, setupRealtimeSubscriptions])
+
+  // Check permissions after caseData is loaded
+  useEffect(() => {
+    if (caseData) {
+      checkUserPermissions()
+    }
+  }, [caseData, checkUserPermissions])
 
   const handleBack = () => {
     router.push(`/${locale}/cases`)
@@ -394,8 +420,8 @@ export default function CaseDetailPage() {
     try {
       if (navigator.share && window.isSecureContext) {
         await navigator.share({
-          title: caseData?.title || '',
-          text: caseData?.description || '',
+          title: getDisplayTitle(caseData),
+          text: getDisplayDescription(caseData),
           url: window.location.href
         })
       } else if (navigator.clipboard && window.isSecureContext) {
@@ -720,7 +746,7 @@ export default function CaseDetailPage() {
   }
 
   return (
-    <PermissionGuard permissions={["view:cases"]} fallback={
+    <PermissionGuard permissions={["cases:view"]} fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
@@ -776,11 +802,11 @@ export default function CaseDetailPage() {
                     </div>
                       </div>
                     </div>
-                    <CardTitle className="text-3xl font-bold text-gray-800 mb-3 leading-tight">
-                      {caseData.title}
+                    <CardTitle className="text-3xl font-bold text-gray-800 mb-3 leading-tight" dir={isRTL ? 'rtl' : 'ltr'}>
+                      {getDisplayTitle(caseData)}
                     </CardTitle>
-                    <CardDescription className="text-lg text-gray-700 leading-relaxed">
-                      {caseData.description}
+                    <CardDescription className="text-lg text-gray-700 leading-relaxed" dir={isRTL ? 'rtl' : 'ltr'}>
+                      {getDisplayDescription(caseData)}
                     </CardDescription>
                   </div>
                 </div>

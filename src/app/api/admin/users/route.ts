@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminPermission } from '@/lib/security/rls'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
+import { createClient } from '@supabase/supabase-js'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
@@ -34,47 +35,108 @@ export async function GET(request: NextRequest) {
 
     logger.info('Admin user authenticated', { userId: adminUser.id })
 
-    // Fetch users using admin client (now properly authenticated)
-    const { data: authUsers, error: usersError } = await supabase.auth.admin.listUsers()
+    // Create service role client for admin operations (listUsers requires service role key)
+    const serviceRoleClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+
+    // Fetch users using service role client
+    const { data: authUsers, error: usersError } = await serviceRoleClient.auth.admin.listUsers()
     if (usersError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users:', usersError)
+      const errorDetails: any = {
+        code: usersError.code,
+        message: usersError.message
+      }
+      if ((usersError as any).details) {
+        errorDetails.details = (usersError as any).details
+      }
+      if ((usersError as any).hint) {
+        errorDetails.hint = (usersError as any).hint
+      }
+      logger.error('Users fetch error details:', errorDetails)
       throw usersError
     }
 
     logger.info('Users fetched:', authUsers.users.length)
 
-    // Fetch user roles
+    // Fetch user roles from admin_user_roles table using regular client (respects RLS)
+    // Note: RLS policy allows admins to view all user roles via is_current_user_admin() function
     const { data: userRoles, error: rolesError } = await supabase
-      .from('user_roles')
+      .from('admin_user_roles')
       .select(`
+        id,
         user_id,
         role_id,
-        roles(id, name, display_name)
+        assigned_at,
+        assigned_by,
+        is_active,
+        admin_roles(id, name, display_name, description)
       `)
+      .eq('is_active', true)
 
     if (rolesError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user roles:', rolesError)
-      // Don't throw, just return empty array
+      const rolesErrorDetails: any = {
+        code: rolesError.code,
+        message: rolesError.message
+      }
+      if ((rolesError as any).details) {
+        rolesErrorDetails.details = (rolesError as any).details
+      }
+      if ((rolesError as any).hint) {
+        rolesErrorDetails.hint = (rolesError as any).hint
+      }
+      logger.error('User roles error details:', rolesErrorDetails)
+      // Don't throw, just return empty array - this allows the API to still return users
     }
 
     logger.info('User roles fetched:', userRoles?.length || 0)
 
-    // Sanitize user data - remove sensitive fields
+    // Group roles by user_id
+    const rolesByUserId = new Map<string, any[]>()
+    if (userRoles) {
+      userRoles.forEach((ur: any) => {
+        const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
+        if (role) {
+          if (!rolesByUserId.has(ur.user_id)) {
+            rolesByUserId.set(ur.user_id, [])
+          }
+          rolesByUserId.get(ur.user_id)!.push({
+            id: ur.id,
+            role_id: ur.role_id,
+            name: role.name,
+            display_name: role.display_name,
+            description: role.description,
+            assigned_at: ur.assigned_at,
+            assigned_by: ur.assigned_by
+          })
+        }
+      })
+    }
+
+    // Sanitize user data and attach roles
     const sanitizedUsers = authUsers.users.map(user => ({
       id: user.id,
       email: user.email,
+      display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
       created_at: user.created_at,
       updated_at: user.updated_at,
       email_confirmed_at: user.email_confirmed_at,
       last_sign_in_at: user.last_sign_in_at,
-      role: user.user_metadata?.role || 'donor',
-      // Remove sensitive fields like phone, app_metadata, etc.
+      roles: rolesByUserId.get(user.id) || []
     }))
 
     return NextResponse.json({
       success: true,
-      users: sanitizedUsers,
-      userRoles: userRoles || []
+      users: sanitizedUsers
     })
 
   } catch (error) {

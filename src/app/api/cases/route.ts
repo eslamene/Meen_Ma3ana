@@ -29,22 +29,60 @@ export async function GET(request: NextRequest) {
     // Get category ID if filtering by category
     let categoryId = null
     if (category && category !== 'all') {
-      // Capitalize the first letter to match database format
-      const capitalizedCategory = category.charAt(0).toUpperCase() + category.slice(1)
+      // Map filter values to actual category names in database
+      const categoryNameMap: Record<string, string> = {
+        'medical': 'Medical Support',
+        'education': 'Educational Assistance',
+        'housing': 'Housing & Rent',
+        'appliances': 'Home Appliances',
+        'emergency': 'Emergency Relief',
+        'livelihood': 'Livelihood & Business',
+        'community': 'Community & Social',
+        'basicneeds': 'Basic Needs & Clothing',
+        'food': 'Basic Needs & Clothing', // Map food to Basic Needs
+        'other': 'Other Support'
+      }
+      
+      // Get the actual category name from the map, or use the provided value as-is
+      const categoryName = categoryNameMap[category.toLowerCase()] || category
       
       // Only log category filtering in development
       if (process.env.NODE_ENV === 'development') {
         logger.debug('Filtering by category', { 
           originalCategory: category, 
-          capitalizedCategory 
+          mappedCategoryName: categoryName 
         })
       }
       
-      const { data: categoryData, error: categoryError } = await supabase
+      // Try to find category by name_en first, then fallback to name for backward compatibility
+      let categoryData = null
+      let categoryError = null
+      
+      // First try name_en
+      const { data: dataByNameEn, error: errorByNameEn } = await supabase
         .from('case_categories')
         .select('id')
-        .eq('name', capitalizedCategory)
-        .single()
+        .eq('name_en', categoryName)
+        .maybeSingle()
+      
+      if (dataByNameEn) {
+        categoryData = dataByNameEn
+      } else if (errorByNameEn) {
+        categoryError = errorByNameEn
+      } else {
+        // If not found by name_en, try name (backward compatibility)
+        const { data: dataByName, error: errorByName } = await supabase
+          .from('case_categories')
+          .select('id')
+          .eq('name', categoryName)
+          .maybeSingle()
+        
+        if (dataByName) {
+          categoryData = dataByName
+        } else if (errorByName) {
+          categoryError = errorByName
+        }
+      }
       
       if (categoryError) {
         logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching category:', categoryError)
@@ -54,26 +92,41 @@ export async function GET(request: NextRequest) {
         categoryId = categoryData.id
         // Only log category ID resolution in development
         if (process.env.NODE_ENV === 'development') {
-          logger.debug('Category ID resolved', { categoryId })
+          logger.debug('Category ID resolved', { categoryId, categoryName })
         }
       } else {
         // Only log missing category in development
         if (process.env.NODE_ENV === 'development') {
-          logger.debug('No category found', { capitalizedCategory })
+          logger.debug('No category found', { categoryName, originalCategory: category })
         }
       }
     }
 
-    // Start with base query - use left join to include cases without categories and aggregate approved amounts
+    // Start with base query - use left join to include cases without categories
     let query = supabase
       .from('cases')
       .select(`
-        *,
-        case_categories(name),
-        approved_contributions:contributions!case_id(
-          amount,
-          approval_status:contribution_approval_status!contribution_id(status)
-        )
+        id,
+        title_en,
+        title_ar,
+        description_en,
+        description_ar,
+        target_amount,
+        current_amount,
+        status,
+        type,
+        priority,
+        location,
+        beneficiary_name,
+        beneficiary_contact,
+        created_at,
+        updated_at,
+        created_by,
+        assigned_to,
+        sponsored_by,
+        supporting_documents,
+        category_id,
+        case_categories(name)
       `, { count: 'exact' })
 
     // Apply status filter - default to published cases if no status specified
@@ -83,9 +136,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', 'published')
     }
 
-    // Apply search filter
+    // Apply search filter - search in both English and Arabic fields
     if (search) {
-      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`)
+      query = query.or(`title_en.ilike.%${search}%,title_ar.ilike.%${search}%,description_en.ilike.%${search}%,description_ar.ilike.%${search}%`)
     }
     
     // Apply type filter
@@ -112,7 +165,56 @@ export async function GET(request: NextRequest) {
                       sortBy === 'priority' ? 'priority' : 'created_at'
     query = query.order(sortColumn, { ascending: sortOrder === 'asc' })
 
-    // Apply pagination
+    // First, get statistics from ALL filtered cases (before pagination)
+    // Create a separate query for statistics with the same filters
+    let statsQuery = supabase
+      .from('cases')
+      .select(`
+        id,
+        current_amount,
+        status
+      `, { count: 'exact', head: false })
+
+    // Apply the same filters to stats query
+    if (status) {
+      statsQuery = statsQuery.eq('status', status)
+    } else {
+      statsQuery = statsQuery.eq('status', 'published')
+    }
+
+    if (type && type !== 'all') {
+      statsQuery = statsQuery.eq('type', type)
+    }
+
+    if (categoryId) {
+      statsQuery = statsQuery.eq('category_id', categoryId)
+    }
+
+    if (minAmount) {
+      statsQuery = statsQuery.gte('current_amount', parseFloat(minAmount))
+    }
+
+    if (maxAmount) {
+      statsQuery = statsQuery.lte('current_amount', parseFloat(maxAmount))
+    }
+
+    if (search) {
+      statsQuery = statsQuery.or(`title_en.ilike.%${search}%,title_ar.ilike.%${search}%,description_en.ilike.%${search}%,description_ar.ilike.%${search}%`)
+    }
+
+    // Get all filtered cases for statistics (no pagination)
+    const { data: allFilteredCases, error: statsError } = await statsQuery
+
+    if (statsError) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching statistics:', statsError)
+    }
+
+    // Calculate statistics from all filtered cases
+    const totalCases = allFilteredCases?.length || 0
+    const activeCases = allFilteredCases?.filter(c => c.status === 'published').length || 0
+    const totalRaised = allFilteredCases?.reduce((sum, c) => sum + (parseFloat(c.current_amount || '0') || 0), 0) || 0
+
+    // Apply pagination for the actual cases list
     const from = (page - 1) * limit
     const to = from + limit - 1
     query = query.range(from, to)
@@ -137,10 +239,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform snake_case field names to camelCase for frontend compatibility
+    let firstCaseDebugged = false
     const transformedCases = (data || []).map((caseItem: {
       id: string
-      title: string
-      description: string
+      title_en: string
+      title_ar: string | null
+      description_en: string | null
+      description_ar: string
       target_amount: string
       current_amount: string
       status: string
@@ -155,28 +260,49 @@ export async function GET(request: NextRequest) {
       assigned_to?: string
       sponsored_by?: string
       supporting_documents?: string
-      case_categories?: { name: string } | null
-      approved_contributions?: Array<{
-        amount: string
-        approval_status: Array<{ status: string }> | { status: string } | null
-      }>
+      case_categories?: { name: string } | { name: string }[] | null
     }) => {
-      // Calculate approved contributions total from the joined data
-      const approvedTotal = caseItem.approved_contributions?.reduce((total, contribution) => {
-        const approvalStatus = Array.isArray(contribution.approval_status) 
-          ? contribution.approval_status[0]?.status 
-          : contribution.approval_status?.status || 'pending'
-        return approvalStatus === 'approved' ? total + parseFloat(contribution.amount) : total
-      }, 0) || 0
+      // Use current_amount from cases table (should be updated when contributions are approved)
+      // Fallback to 0 if null or invalid
+      const currentAmount = parseFloat(caseItem.current_amount || '0') || 0
+
+      // Handle empty strings - preserve actual values, only convert truly empty to null
+      // Schema: title_en is NOT NULL, description_ar is NOT NULL
+      // But they might be empty strings if data wasn't properly populated
+      const titleEn = caseItem.title_en && caseItem.title_en.trim() ? caseItem.title_en.trim() : null
+      const titleAr = caseItem.title_ar && caseItem.title_ar.trim() ? caseItem.title_ar.trim() : null
+      const descriptionEn = caseItem.description_en && caseItem.description_en.trim() ? caseItem.description_en.trim() : null
+      const descriptionAr = caseItem.description_ar && caseItem.description_ar.trim() ? caseItem.description_ar.trim() : null
+
+      // Debug logging for first case (in development only)
+      if (process.env.NODE_ENV === 'development' && !firstCaseDebugged) {
+        firstCaseDebugged = true
+        logger.debug('Case transformation', {
+          caseId: caseItem.id,
+          title_en_raw: caseItem.title_en,
+          title_en_type: typeof caseItem.title_en,
+          title_en_length: caseItem.title_en?.length,
+          titleEn_result: titleEn,
+          titleAr_result: titleAr,
+          descriptionEn_result: descriptionEn,
+          descriptionAr_result: descriptionAr
+        })
+      }
 
       return {
         id: caseItem.id,
-        title: caseItem.title,
-        description: caseItem.description,
+        title: titleEn || titleAr || '', // Default fallback (will be overridden by locale-aware fields)
+        titleEn: titleEn, // Will be null only if truly empty
+        titleAr: titleAr, // Will be null only if truly empty
+        description: descriptionEn || descriptionAr || '', // Default fallback (will be overridden by locale-aware fields)
+        descriptionEn: descriptionEn, // Will be null only if truly empty
+        descriptionAr: descriptionAr, // Will be null only if truly empty
         targetAmount: parseFloat(caseItem.target_amount),
-        currentAmount: approvedTotal, // Use approved contributions total from single query
+        currentAmount: currentAmount, // Use current_amount from cases table
         status: caseItem.status,
-        category: caseItem.case_categories?.name || 'other', // Use category name from join
+        category: (Array.isArray(caseItem.case_categories) 
+          ? caseItem.case_categories[0]?.name 
+          : caseItem.case_categories?.name) || 'other', // Use category name from join
         type: caseItem.type,
         location: caseItem.location,
         beneficiaryName: caseItem.beneficiary_name,
@@ -198,6 +324,11 @@ export async function GET(request: NextRequest) {
         limit,
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit)
+      },
+      statistics: {
+        totalCases,
+        activeCases,
+        totalRaised
       }
     })
   } catch (error) {
@@ -228,7 +359,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       title,
+      title_en,
+      title_ar,
       description,
+      description_en,
+      description_ar,
       targetAmount,
       category,
       priority,
@@ -243,10 +378,15 @@ export async function POST(request: NextRequest) {
       endDate
     } = body
 
-    // Validate required fields
-    if (!title || !description || !targetAmount || !category || !priority) {
+    // Validate required fields - support both old and new structure
+    const finalTitleEn = title_en || title || ''
+    const finalTitleAr = title_ar || title || ''
+    const finalDescriptionEn = description_en || description || ''
+    const finalDescriptionAr = description_ar || description || ''
+
+    if ((!finalTitleEn && !finalTitleAr) || (!finalDescriptionEn && !finalDescriptionAr) || !targetAmount || !category || !priority) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields. Please provide at least title_en or title_ar, and description_en or description_ar.' },
         { status: 400 }
       )
     }
@@ -269,8 +409,10 @@ export async function POST(request: NextRequest) {
     const { data: newCase, error: insertError } = await supabase
       .from('cases')
       .insert({
-        title,
-        description,
+        title_en: finalTitleEn,
+        title_ar: finalTitleAr,
+        description_en: finalDescriptionEn,
+        description_ar: finalDescriptionAr,
         target_amount: parseFloat(targetAmount),
         category_id: categoryId,
         priority,
@@ -303,7 +445,7 @@ export async function POST(request: NextRequest) {
       await caseUpdateService.createUpdate({
         caseId: newCase.id,
         title: 'Case Created',
-        content: `A new case "${title}" has been created and is ready for review. Target amount: EGP ${targetAmount}.`,
+        content: `A new case "${finalTitleEn || finalTitleAr}" has been created and is ready for review. Target amount: EGP ${targetAmount}.`,
         updateType: 'general',
         isPublic: false, // Internal update for case creation
         createdBy: user.id,
@@ -316,8 +458,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       case: {
         id: newCase.id,
-        title: newCase.title,
-        description: newCase.description,
+        title: newCase.title_en || newCase.title_ar || '',
+        titleEn: newCase.title_en,
+        titleAr: newCase.title_ar,
+        description: newCase.description_en || newCase.description_ar || '',
+        descriptionEn: newCase.description_en,
+        descriptionAr: newCase.description_ar,
         targetAmount: parseFloat(newCase.target_amount),
         currentAmount: parseFloat(newCase.current_amount),
         status: newCase.status,

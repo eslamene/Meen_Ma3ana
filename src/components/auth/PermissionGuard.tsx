@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useDatabasePermissions } from '@/lib/hooks/useDatabasePermissions'
+import { useAdmin } from '@/lib/admin/hooks'
 import AccessDenied from './AccessDenied'
 
 interface PermissionGuardProps {
@@ -27,7 +27,7 @@ export default function PermissionGuard({
   fallback,
   requireAll = false
 }: PermissionGuardProps) {
-  const { hasPermission, hasRole, loading } = useDatabasePermissions()
+  const { hasPermission, hasRole, loading } = useAdmin()
 
   // Show loading state while checking permissions
   if (loading) {

@@ -19,7 +19,8 @@ import {
   Calendar,
   TrendingUp,
   Clock,
-  Eye
+  Eye,
+  Users
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
@@ -62,8 +63,12 @@ export default function FilterSidebar({
       case 'medical': return <AlertTriangle className="h-4 w-4 text-red-500" />
       case 'education': return <GraduationCap className="h-4 w-4 text-blue-500" />
       case 'housing': return <Home className="h-4 w-4 text-green-500" />
-      case 'food': return <Utensils className="h-4 w-4 text-orange-500" />
+      case 'appliances': return <Home className="h-4 w-4 text-orange-500" />
       case 'emergency': return <AlertTriangle className="h-4 w-4 text-red-600" />
+      case 'livelihood': return <DollarSign className="h-4 w-4 text-green-600" />
+      case 'community': return <Users className="h-4 w-4 text-purple-600" />
+      case 'basicneeds': return <Utensils className="h-4 w-4 text-orange-500" />
+      case 'food': return <Utensils className="h-4 w-4 text-orange-500" />
       default: return <Gift className="h-4 w-4 text-purple-500" />
     }
   }
@@ -178,37 +183,55 @@ export default function FilterSidebar({
                   <SelectItem value="medical">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('medical')}
-                      Medical
+                      Medical Support
                     </div>
                   </SelectItem>
                   <SelectItem value="education">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('education')}
-                      Education
+                      Educational Assistance
                     </div>
                   </SelectItem>
                   <SelectItem value="housing">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('housing')}
-                      Housing
+                      Housing & Rent
                     </div>
                   </SelectItem>
-                  <SelectItem value="food">
+                  <SelectItem value="appliances">
                     <div className="flex items-center gap-2">
-                      {getCategoryIcon('food')}
-                      Food
+                      {getCategoryIcon('appliances')}
+                      Home Appliances
                     </div>
                   </SelectItem>
                   <SelectItem value="emergency">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('emergency')}
-                      Emergency
+                      Emergency Relief
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="livelihood">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('livelihood')}
+                      Livelihood & Business
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="community">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('community')}
+                      Community & Social
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="basicneeds">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('basicneeds')}
+                      Basic Needs & Clothing
                     </div>
                   </SelectItem>
                   <SelectItem value="other">
                     <div className="flex items-center gap-2">
                       {getCategoryIcon('other')}
-                      Other
+                      Other Support
                     </div>
                   </SelectItem>
                 </SelectContent>

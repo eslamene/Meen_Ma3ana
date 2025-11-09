@@ -652,7 +652,7 @@ export default function ProfilePage() {
                                     onClick={() => router.push(`/${params.locale}/cases/${stats.latestContribution?.case_id}`)}
                                     className="text-blue-600 hover:text-blue-800 hover:underline font-medium transition-colors"
                                   >
-                                    {stats.latestContribution.cases.title}
+                                    {(stats.latestContribution.cases as any)?.title_en || (stats.latestContribution.cases as any)?.title_ar || stats.latestContribution.cases?.title || 'Untitled Case'}
                                   </button>
                                 )}
                               </p>

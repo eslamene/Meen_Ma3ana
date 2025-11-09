@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
-import { useSimpleRBAC } from '@/lib/hooks/useSimpleRBAC'
+import { useAdmin } from '@/lib/admin/hooks'
 import { useAuth } from '@/components/auth/AuthProvider'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -40,7 +40,7 @@ export function GuestPermissionGuard({
   showAuthPrompt = true
 }: GuestPermissionGuardProps) {
   const { user } = useAuth()
-  const { hasPermission, loading } = useSimpleRBAC()
+  const { hasPermission, loading } = useAdmin()
 
   // Show loading state
   if (loading && showLoading) {
