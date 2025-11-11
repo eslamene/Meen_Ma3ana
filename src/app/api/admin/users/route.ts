@@ -21,6 +21,28 @@ export async function GET(request: NextRequest) {
 
     const { user: adminUser, supabase } = authResult
 
+    // Parse query parameters
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100) // Max 100 per page
+    const search = searchParams.get('search') || ''
+    const roleFilter = searchParams.get('role') || ''
+    const sortBy = searchParams.get('sortBy') || 'created_at'
+    const sortOrder = searchParams.get('sortOrder') || 'desc'
+
+    // Validate pagination
+    if (page < 1) {
+      return NextResponse.json({ 
+        error: 'Page must be greater than 0' 
+      }, { status: 400 })
+    }
+
+    if (limit < 1 || limit > 100) {
+      return NextResponse.json({ 
+        error: 'Limit must be between 1 and 100' 
+      }, { status: 400 })
+    }
+
     // Log the admin access
     const { ipAddress, userAgent } = extractRequestInfo(request)
     await AuditService.logAdminAction(
@@ -28,12 +50,12 @@ export async function GET(request: NextRequest) {
       'admin_users_access',
       'user',
       undefined,
-      { endpoint: '/api/admin/users' },
+      { endpoint: '/api/admin/users', page, limit, search, roleFilter },
       ipAddress,
       userAgent
     )
 
-    logger.info('Admin user authenticated', { userId: adminUser.id })
+    logger.info('Admin user authenticated', { userId: adminUser.id, page, limit, search, roleFilter })
 
     // Create service role client for admin operations (listUsers requires service role key)
     const serviceRoleClient = createClient(
@@ -47,32 +69,33 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    // Fetch users using service role client with pagination
+    // Fetch all users (Supabase Auth doesn't support server-side filtering/search)
+    // We'll filter in memory after fetching
     const allUsers = []
-    let page = 1
+    let authPage = 1
     const perPage = 1000
     
     while (true) {
       const { data: authUsersPage, error: usersError } = await serviceRoleClient.auth.admin.listUsers({
-        page,
+        page: authPage,
         perPage
       })
       
-    if (usersError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users:', usersError)
-      const errorDetails: any = {
-        code: usersError.code,
-        message: usersError.message
+      if (usersError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users:', usersError)
+        const errorDetails: any = {
+          code: usersError.code,
+          message: usersError.message
+        }
+        if ((usersError as any).details) {
+          errorDetails.details = (usersError as any).details
+        }
+        if ((usersError as any).hint) {
+          errorDetails.hint = (usersError as any).hint
+        }
+        logger.error('Users fetch error details:', errorDetails)
+        throw usersError
       }
-      if ((usersError as any).details) {
-        errorDetails.details = (usersError as any).details
-      }
-      if ((usersError as any).hint) {
-        errorDetails.hint = (usersError as any).hint
-      }
-      logger.error('Users fetch error details:', errorDetails)
-      throw usersError
-    }
 
       if (!authUsersPage?.users || authUsersPage.users.length === 0) {
         break
@@ -85,13 +108,12 @@ export async function GET(request: NextRequest) {
         break
       }
       
-      page++
+      authPage++
     }
     
     logger.info('Users fetched:', allUsers.length)
 
-    // Fetch user roles from admin_user_roles table using regular client (respects RLS)
-    // Note: RLS policy allows admins to view all user roles via is_current_user_admin() function
+    // Fetch user roles from admin_user_roles table
     const { data: userRoles, error: rolesError } = await supabase
       .from('admin_user_roles')
       .select(`
@@ -146,7 +168,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Sanitize user data and attach roles
-    const sanitizedUsers = allUsers.map(user => ({
+    let sanitizedUsers = allUsers.map(user => ({
       id: user.id,
       email: user.email,
       display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
@@ -157,9 +179,85 @@ export async function GET(request: NextRequest) {
       roles: rolesByUserId.get(user.id) || []
     }))
 
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase()
+      sanitizedUsers = sanitizedUsers.filter(user => 
+        (user.email?.toLowerCase().includes(searchLower) ?? false) ||
+        user.display_name?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Apply role filter
+    if (roleFilter && roleFilter !== 'all') {
+      if (roleFilter === 'no-roles') {
+        sanitizedUsers = sanitizedUsers.filter(user => user.roles.length === 0)
+      } else {
+        sanitizedUsers = sanitizedUsers.filter(user => 
+          user.roles.some(r => r.name === roleFilter)
+        )
+      }
+    }
+
+    // Apply sorting
+    sanitizedUsers.sort((a, b) => {
+      let aValue: any
+      let bValue: any
+
+      switch (sortBy) {
+        case 'email':
+          aValue = (a.email || '').toLowerCase()
+          bValue = (b.email || '').toLowerCase()
+          break
+        case 'display_name':
+          aValue = (a.display_name || '').toLowerCase()
+          bValue = (b.display_name || '').toLowerCase()
+          break
+        case 'created_at':
+          aValue = new Date(a.created_at || 0).getTime()
+          bValue = new Date(b.created_at || 0).getTime()
+          break
+        case 'last_sign_in_at':
+          aValue = new Date(a.last_sign_in_at || 0).getTime()
+          bValue = new Date(b.last_sign_in_at || 0).getTime()
+          break
+        default:
+          aValue = new Date(a.created_at || 0).getTime()
+          bValue = new Date(b.created_at || 0).getTime()
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0
+      }
+    })
+
+    // Calculate pagination
+    const total = sanitizedUsers.length
+    const totalPages = Math.ceil(total / limit)
+    const offset = (page - 1) * limit
+    const paginatedUsers = sanitizedUsers.slice(offset, offset + limit)
+
+    logger.info('Users filtered and paginated', { 
+      total, 
+      page, 
+      limit, 
+      totalPages, 
+      returned: paginatedUsers.length 
+    })
+
     return NextResponse.json({
       success: true,
-      users: sanitizedUsers
+      users: paginatedUsers,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
     })
 
   } catch (error) {

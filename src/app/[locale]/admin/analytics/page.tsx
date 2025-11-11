@@ -90,7 +90,9 @@ export default function AdminAnalyticsPage() {
       const response = await fetch(`/api/admin/analytics?${params}`)
       
       if (!response.ok) {
-        throw new Error('Failed to fetch analytics data')
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.details || errorData.error || 'Failed to fetch analytics data'
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()

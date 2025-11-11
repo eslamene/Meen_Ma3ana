@@ -56,16 +56,27 @@ export function RoleFormModal({
       setSaving(true)
       const submitHandler = onSave || onSubmit
       if (submitHandler) {
-        await submitHandler({
-        name: name.trim(),
-        display_name: displayName.trim(),
-          description: description.trim(),
-          ...(onSave && { is_system: false })
-      })
+        if (isEditMode) {
+          // For edit mode, only send display_name and description (name cannot be changed)
+          await submitHandler({
+            display_name: displayName.trim(),
+            description: description.trim()
+          } as any)
+        } else {
+          // For create mode, send all fields
+          await submitHandler({
+            name: name.trim(),
+            display_name: displayName.trim(),
+            description: description.trim(),
+            ...(onSave && { is_system: false })
+          })
+        }
       }
       onClose()
     } catch (error) {
       console.error('Error saving role:', error)
+      // Don't close modal on error - let the parent handle error display
+      throw error
     } finally {
       setSaving(false)
     }

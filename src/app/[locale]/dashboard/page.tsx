@@ -159,7 +159,7 @@ export default function DashboardPage() {
       console.log('Primary role (highest level):', roles.sort((a, b) => (b.level || 0) - (a.level || 0))[0]?.name)
     } else if (!rolesLoading && roles.length === 0) {
       console.warn('No roles found for user. User ID:', user?.id)
-      console.warn('This might indicate the user needs roles assigned in /admin/manage')
+      console.warn('This might indicate the user needs roles assigned in /admin/system-management/users')
     }
   }, [roles, rolesLoading, user?.id])
   

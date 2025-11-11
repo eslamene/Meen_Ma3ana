@@ -29,25 +29,196 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { permission_id } = body
+    const { permission_id, sort_order, label, label_ar, href, icon, description, is_active, parent_id } = body
 
+    defaultLogger.info('Updating menu item:', {
+      menuItemId: params.id,
+      bodyFields: Object.keys(body),
+      bodyValues: body
+    })
+
+    const updateData: Record<string, any> = {
+      updated_at: new Date().toISOString()
+    }
+
+    if (permission_id !== undefined) updateData.permission_id = permission_id || null
+    if (sort_order !== undefined) updateData.sort_order = sort_order
+    if (label !== undefined) updateData.label = label
+    if (label_ar !== undefined) updateData.label_ar = label_ar || null
+    if (href !== undefined) updateData.href = href
+    if (icon !== undefined) updateData.icon = icon || null
+    if (description !== undefined) updateData.description = description || null
+    if (is_active !== undefined) updateData.is_active = is_active
+    if (parent_id !== undefined) updateData.parent_id = parent_id || null
+
+    defaultLogger.info('Update data prepared:', {
+      menuItemId: params.id,
+      updateData,
+      updateDataKeys: Object.keys(updateData)
+    })
+
+    // Validate that we have at least one field to update
+    if (Object.keys(updateData).length === 1) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      )
+    }
+
+    // First check if the menu item exists
+    const { data: existingItem, error: checkError } = await supabase
+      .from('admin_menu_items')
+      .select('id')
+      .eq('id', params.id)
+      .maybeSingle()
+
+    if (checkError) {
+      defaultLogger.error('Error checking menu item existence:', checkError, {
+        menuItemId: params.id
+      })
+      
+      return NextResponse.json(
+        { 
+          error: 'Error checking menu item',
+          details: checkError.message
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!existingItem) {
+      defaultLogger.error('Menu item not found:', {
+        menuItemId: params.id
+      })
+      
+      return NextResponse.json(
+        { 
+          error: 'Menu item not found',
+          details: 'The menu item does not exist'
+        },
+        { status: 404 }
+      )
+    }
+
+    // Update the menu item
     const { data, error } = await supabase
       .from('admin_menu_items')
-      .update({
-        permission_id: permission_id || null,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', params.id)
       .select()
-      .single()
+      .maybeSingle()
 
-    if (error) throw error
+    if (error) {
+      defaultLogger.error('Supabase error updating menu item:', error, {
+        menuItemId: params.id,
+        updateData,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        errorHint: error.hint
+      })
+      
+      return NextResponse.json(
+        { 
+          error: 'Failed to update menu item',
+          details: error.message,
+          code: error.code
+        },
+        { status: 500 }
+      )
+    }
+
+    // If data is null, try to fetch the item separately to verify update
+    // This can happen if RLS policies prevent selecting after update
+    // (e.g., if is_active was set to false, RLS might block the SELECT)
+    if (!data) {
+      defaultLogger.warn('Update returned no data, fetching item separately:', {
+        menuItemId: params.id,
+        updateData,
+        isActiveBeingSetToFalse: updateData.is_active === false
+      })
+      
+      // Try fetching with RLS bypass for super_admin (using service role would be better, but this works)
+      // First try normal fetch
+      let fetchedData = null
+      let fetchError = null
+      
+      const { data: normalData, error: normalError } = await supabase
+        .from('admin_menu_items')
+        .select('*')
+        .eq('id', params.id)
+        .maybeSingle()
+      
+      if (normalData) {
+        fetchedData = normalData
+      } else if (normalError) {
+        fetchError = normalError
+      }
+      
+      // If normal fetch failed and we're setting is_active to false, 
+      // the update likely succeeded but RLS is blocking the SELECT
+      if (!fetchedData && updateData.is_active === false && !fetchError) {
+        defaultLogger.info('Item likely updated to inactive, RLS blocking SELECT. Update likely succeeded.')
+        
+        // Return success with the update data we sent (since we can't fetch it back)
+        return NextResponse.json({ 
+          menuItem: {
+            id: params.id,
+            ...updateData,
+            // We don't have all fields, but the update succeeded
+          },
+          message: 'Update succeeded but item is now inactive and cannot be fetched due to RLS'
+        })
+      }
+      
+      if (fetchError) {
+        defaultLogger.error('Error fetching updated menu item:', fetchError, {
+          menuItemId: params.id
+        })
+        
+        return NextResponse.json(
+          { 
+            error: 'Menu item update may have succeeded but could not verify',
+            details: fetchError.message
+          },
+          { status: 500 }
+        )
+      }
+      
+      if (!fetchedData) {
+        defaultLogger.error('Menu item not found after update:', {
+          menuItemId: params.id,
+          updateData
+        })
+        
+        return NextResponse.json(
+          { 
+            error: 'Menu item update failed',
+            details: 'Update completed but item could not be found'
+          },
+          { status: 500 }
+        )
+      }
+      
+      // Return the fetched data
+      return NextResponse.json({ menuItem: fetchedData })
+    }
 
     return NextResponse.json({ menuItem: data })
   } catch (error) {
-    defaultLogger.error('Error updating menu item:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    defaultLogger.error('Error updating menu item:', error, {
+      errorMessage,
+      errorStack
+    })
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: errorMessage
+      },
       { status: 500 }
     )
   }

@@ -26,6 +26,7 @@ import {
   Settings
 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
+import type { AdminMenuItem } from '@/lib/admin/types'
 
 interface SimpleSidebarProps {
   isOpen: boolean
@@ -45,14 +46,8 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
   const supabase = createClient()
   const { user, loading, menuItems } = useAdmin()
   
-  // Convert menuItems to modules format for compatibility
-  const modules = menuItems.map(item => ({
-    id: item.id,
-    name: item.label.toLowerCase().replace(/\s+/g, '_'),
-    display_name: item.label,
-    icon: item.icon || 'FileText',
-    items: item.children || []
-  }))
+  // Menu items are already in tree structure from useAdmin hook
+  // They are filtered by permissions and sorted by sort_order
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
@@ -116,7 +111,7 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
   }
 
   // Show loading only on initial load, not on every re-render
-  if (loading && modules.length === 0) {
+  if (loading && menuItems.length === 0) {
     return (
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
@@ -165,7 +160,25 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto">
           <nav className="p-4 space-y-2">
-            {/* Home */}
+            {/* All Menu Items from Database */}
+            {!loading && menuItems.length > 0 ? (
+              menuItems.map((item) => (
+                <MenuItemComponent
+                  key={item.id}
+                  item={item}
+                  locale={locale}
+                  pathname={pathname}
+                  expandedModules={expandedModules}
+                  toggleModule={toggleModule}
+                  isActive={isActive}
+                  getIcon={getIcon}
+                  notificationCount={notificationCount}
+                  level={0}
+                />
+              ))
+            ) : (
+              // Fallback while loading or if no menu items
+              <>
             <Link
               href={`/${locale}`}
               className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -177,8 +190,6 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
               <Home className="mr-3 h-4 w-4" />
               {t('home')}
             </Link>
-
-            {/* Dashboard */}
             <Link
               href={`/${locale}/dashboard`}
               className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -190,78 +201,8 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
               <BarChart3 className="mr-3 h-4 w-4" />
               {t('dashboard')}
             </Link>
-
-            {/* Notifications */}
-            <Link
-              href={`/${locale}/notifications`}
-              className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive('/notifications') 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <div className="flex items-center">
-                <Bell className="mr-3 h-4 w-4" />
-                {t('notifications')}
-              </div>
-              {notificationCount > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {notificationCount}
-                </Badge>
-              )}
-            </Link>
-
-            {/* Modules */}
-            {modules.map((module) => {
-              const IconComponent = getIcon(module.icon)
-              const isExpanded = expandedModules.has(module.id)
-              const hasItems = module.items.length > 0
-
-              if (!hasItems) return null
-
-              return (
-                <div key={module.id} className="space-y-1">
-                  {/* Module Header */}
-                  <button
-                    onClick={() => toggleModule(module.id)}
-                    className="flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center">
-                      <IconComponent className="mr-3 h-4 w-4" />
-                      {module.display_name}
-                    </div>
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                  </button>
-
-                  {/* Module Items */}
-                  {isExpanded && (
-                    <div className="ml-6 space-y-1">
-                      {module.items.map((item, index) => {
-                        const ItemIcon = item.icon ? getIcon(item.icon) : null
-                        return (
-                          <Link
-                            key={index}
-                            href={`/${locale}${item.href}`}
-                            className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
-                              isActive(item.href)
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'text-gray-600 hover:bg-gray-50'
-                            }`}
-                          >
-                            {ItemIcon && <ItemIcon className="mr-3 h-4 w-4" />}
-                            {item.label}
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+              </>
+            )}
           </nav>
         </div>
 
@@ -301,5 +242,100 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
         </div>
       </div>
     </>
+  )
+}
+
+// Menu Item Component - Recursive rendering
+function MenuItemComponent({
+  item,
+  locale,
+  pathname,
+  expandedModules,
+  toggleModule,
+  isActive,
+  getIcon,
+  notificationCount = 0,
+  level = 0
+}: {
+  item: AdminMenuItem
+  locale: string
+  pathname: string
+  expandedModules: Set<string>
+  toggleModule: (id: string) => void
+  isActive: (href: string) => boolean
+  getIcon: (iconName: string) => React.ComponentType<any>
+  notificationCount?: number
+  level?: number
+}) {
+  const IconComponent = getIcon(item.icon || 'FileText')
+  const hasChildren = item.children && item.children.length > 0
+  const isExpanded = expandedModules.has(item.id)
+  const itemPath = `/${locale}${item.href}`
+  const itemIsActive = isActive(item.href)
+  const isNotifications = item.href === '/notifications'
+
+  if (hasChildren) {
+    return (
+      <div className="space-y-1">
+        <button
+          onClick={() => toggleModule(item.id)}
+          className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            itemIsActive
+              ? 'bg-blue-100 text-blue-700'
+              : 'text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <div className="flex items-center">
+            <IconComponent className="mr-3 h-4 w-4" />
+            {item.label}
+          </div>
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </button>
+
+        {isExpanded && (
+          <div className="ml-6 space-y-1">
+            {item.children!.map((child) => (
+              <MenuItemComponent
+                key={child.id}
+                item={child}
+                locale={locale}
+                pathname={pathname}
+                expandedModules={expandedModules}
+                toggleModule={toggleModule}
+                isActive={isActive}
+                getIcon={getIcon}
+                notificationCount={notificationCount}
+                level={level + 1}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      href={itemPath}
+      className={`flex items-center ${isNotifications ? 'justify-between' : ''} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+        itemIsActive
+          ? 'bg-blue-100 text-blue-700'
+          : 'text-gray-700 hover:bg-gray-100'
+      }`}
+    >
+      <div className="flex items-center">
+        <IconComponent className="mr-3 h-4 w-4" />
+        {item.label}
+      </div>
+      {isNotifications && notificationCount > 0 && (
+        <Badge variant="destructive" className="ml-2">
+          {notificationCount}
+        </Badge>
+      )}
+    </Link>
   )
 }

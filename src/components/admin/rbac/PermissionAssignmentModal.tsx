@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -47,6 +47,7 @@ export function PermissionAssignmentModal({
   const [searchTerm, setSearchTerm] = useState('')
   const [saving, setSaving] = useState(false)
   const [allPermissions, setAllPermissions] = useState<Permission[]>(permissions)
+  const fetchingRef = useRef(false)
 
   // Use role prop if available, otherwise use roleId/roleName
   const effectiveRole = role || (roleId && roleName ? { id: roleId, display_name: roleName } : undefined)
@@ -99,56 +100,78 @@ export function PermissionAssignmentModal({
 
   // Load current permissions when modal opens
   useEffect(() => {
-    if (open && effectiveRole?.id) {
+    if (!open) {
+      fetchingRef.current = false
+      return
+    }
+
+    // Prevent multiple simultaneous fetches
+    if (fetchingRef.current) return
+    fetchingRef.current = true
+
+    if (effectiveRole?.id) {
       // Fetch current permissions for this role
-      fetch(`/api/admin/rbac/roles/${effectiveRole.id}/permissions`, {
+      fetch(`/api/admin/roles/${effectiveRole.id}/permissions`, {
         credentials: 'include'
       })
         .then(res => {
           if (res.ok) {
             return res.json()
           }
-          throw new Error('Failed to fetch permissions')
+          throw new Error(`Failed to fetch permissions: ${res.status} ${res.statusText}`)
         })
         .then(data => {
-          setSelectedPermissions(data.permissions?.map((p: Permission) => p.id) || currentPermissions)
+          // Handle the response format from /api/admin/roles/[id]/permissions
+          // It returns { role: {...}, permissions: [...] }
+          const permissions = data.permissions || []
+          setSelectedPermissions(permissions.map((p: Permission) => p.id) || currentPermissions)
+          fetchingRef.current = false
         })
         .catch(error => {
           console.error('Error fetching permissions:', error)
           setSelectedPermissions(currentPermissions)
+          fetchingRef.current = false
         })
 
       // Fetch all available permissions if not provided
       if (allPermissions.length === 0) {
-        fetch('/api/admin/rbac/permissions', {
+        fetch('/api/admin/permissions', {
           credentials: 'include'
         })
           .then(res => {
             if (res.ok) {
               return res.json()
             }
-            throw new Error('Failed to fetch all permissions')
+            throw new Error(`Failed to fetch all permissions: ${res.status} ${res.statusText}`)
           })
           .then(data => {
-            // Flatten permissions from modules
-            const flatPermissions: Permission[] = []
+            // Handle both flat array and grouped by module formats
+            let flatPermissions: Permission[] = []
             if (data.permissionsByModule) {
+              // Grouped by module format
               Object.values(data.permissionsByModule).forEach((modulePerms: any) => {
                 if (Array.isArray(modulePerms)) {
                   flatPermissions.push(...modulePerms)
-          }
+                }
               })
+            } else if (Array.isArray(data.permissions)) {
+              // Flat array format from /api/admin/permissions
+              flatPermissions = data.permissions
             }
             setAllPermissions(flatPermissions)
-        })
+          })
           .catch(error => {
             console.error('Error fetching all permissions:', error)
-        })
+            // Don't set empty array, keep existing permissions if any
+          })
       }
-    } else if (open && currentPermissions.length > 0) {
+    } else if (currentPermissions.length > 0) {
       setSelectedPermissions(currentPermissions)
+      fetchingRef.current = false
+    } else {
+      fetchingRef.current = false
     }
-  }, [open, effectiveRole?.id, currentPermissions.length])
+  }, [open, effectiveRole?.id])
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
