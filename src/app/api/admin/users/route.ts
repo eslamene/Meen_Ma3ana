@@ -47,8 +47,17 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    // Fetch users using service role client
-    const { data: authUsers, error: usersError } = await serviceRoleClient.auth.admin.listUsers()
+    // Fetch users using service role client with pagination
+    const allUsers = []
+    let page = 1
+    const perPage = 1000
+    
+    while (true) {
+      const { data: authUsersPage, error: usersError } = await serviceRoleClient.auth.admin.listUsers({
+        page,
+        perPage
+      })
+      
     if (usersError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users:', usersError)
       const errorDetails: any = {
@@ -65,7 +74,21 @@ export async function GET(request: NextRequest) {
       throw usersError
     }
 
-    logger.info('Users fetched:', authUsers.users.length)
+      if (!authUsersPage?.users || authUsersPage.users.length === 0) {
+        break
+      }
+      
+      allUsers.push(...authUsersPage.users)
+      
+      // If we got fewer than perPage, we've reached the end
+      if (authUsersPage.users.length < perPage) {
+        break
+      }
+      
+      page++
+    }
+    
+    logger.info('Users fetched:', allUsers.length)
 
     // Fetch user roles from admin_user_roles table using regular client (respects RLS)
     // Note: RLS policy allows admins to view all user roles via is_current_user_admin() function
@@ -123,7 +146,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Sanitize user data and attach roles
-    const sanitizedUsers = authUsers.users.map(user => ({
+    const sanitizedUsers = allUsers.map(user => ({
       id: user.id,
       email: user.email,
       display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',

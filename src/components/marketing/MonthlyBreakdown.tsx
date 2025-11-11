@@ -32,10 +32,14 @@ function formatNumber(num: number): string {
   return num.toLocaleString()
 }
 
-// Constants for scroll calculations
-const CARD_WIDTH = 320 + 24 // card width + gap
-const SPACER_WIDTH = 128 // Start spacer width (w-32)
-const TOTAL_START_OFFSET = 96 + 344 + 128 // paddingLeft (96px) + card offset (344px) + spacer (128px) = 568px
+// Constants for scroll calculations - responsive
+const CARD_WIDTH_MOBILE = 280 + 16 // card width (280px) + gap (16px) on mobile
+const CARD_WIDTH_TABLET = 300 + 16 // card width (300px) + gap (16px) on tablet
+const CARD_WIDTH_DESKTOP = 320 + 24 // card width (320px) + gap (24px) on desktop
+const SPACER_WIDTH_MOBILE = 32 // Start spacer width on mobile (w-8)
+const SPACER_WIDTH_DESKTOP = 128 // Start spacer width on desktop (w-32)
+const TOTAL_START_OFFSET_MOBILE = 16 + 280 + 32 // paddingLeft (16px) + card offset (280px) + spacer (32px) on mobile
+const TOTAL_START_OFFSET_DESKTOP = 96 + 344 + 128 // paddingLeft (96px) + card offset (344px) + spacer (128px) on desktop
 
 export default function MonthlyBreakdown() {
   const t = useTranslations('landing.monthlyBreakdown')
@@ -93,9 +97,12 @@ export default function MonthlyBreakdown() {
   // Reset scroll position when data loads
   useEffect(() => {
     if (monthlyData.length > 0 && scrollContainerRef.current) {
-      // Scroll to show first card with offset (past spacer)
+      // Use responsive spacer width based on screen size
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+      const spacerWidth = isMobile ? SPACER_WIDTH_MOBILE : SPACER_WIDTH_DESKTOP
+      
       scrollContainerRef.current.scrollTo({
-        left: SPACER_WIDTH,
+        left: spacerWidth,
         behavior: 'auto'
       })
       setCurrentIndex(0)
@@ -104,7 +111,7 @@ export default function MonthlyBreakdown() {
       const container = scrollContainerRef.current
       const preventElasticScroll = (e: WheelEvent) => {
         // Only prevent if scrolling horizontally, allow vertical scrolling
-        if (e.deltaX !== 0 && container.scrollLeft <= SPACER_WIDTH && e.deltaX < 0) {
+        if (e.deltaX !== 0 && container.scrollLeft <= spacerWidth && e.deltaX < 0) {
           e.preventDefault()
         }
         // Allow vertical scrolling (deltaY) to pass through
@@ -126,8 +133,13 @@ export default function MonthlyBreakdown() {
     const updateScrollIndicators = () => {
       const { scrollLeft, scrollWidth, clientWidth } = container
       
+      // Use responsive values based on screen size
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+      const minScroll = isMobile ? SPACER_WIDTH_MOBILE : SPACER_WIDTH_DESKTOP
+      const cardWidth = isMobile ? CARD_WIDTH_MOBILE : window.innerWidth < 1024 ? CARD_WIDTH_TABLET : CARD_WIDTH_DESKTOP
+      const totalOffset = isMobile ? TOTAL_START_OFFSET_MOBILE : TOTAL_START_OFFSET_DESKTOP
+      
       // Clamp scroll position to prevent elastic effect
-      const minScroll = SPACER_WIDTH
       const maxScroll = scrollWidth - clientWidth
       
       if (scrollLeft < minScroll) {
@@ -142,8 +154,8 @@ export default function MonthlyBreakdown() {
       setCanScrollRight(scrollLeft < maxScroll - 10)
       
       // Update current index based on scroll position
-      const adjustedScrollLeft = Math.max(0, scrollLeft - TOTAL_START_OFFSET)
-      const index = Math.round(adjustedScrollLeft / CARD_WIDTH)
+      const adjustedScrollLeft = Math.max(0, scrollLeft - totalOffset)
+      const index = Math.round(adjustedScrollLeft / cardWidth)
       setCurrentIndex(Math.min(Math.max(0, index), monthlyData.length - 1))
     }
 
@@ -163,9 +175,14 @@ export default function MonthlyBreakdown() {
     )
     
     if (index !== -1 && scrollContainerRef.current) {
+      // Use responsive values
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+      const cardWidth = isMobile ? CARD_WIDTH_MOBILE : window.innerWidth < 1024 ? CARD_WIDTH_TABLET : CARD_WIDTH_DESKTOP
+      const totalOffset = isMobile ? TOTAL_START_OFFSET_MOBILE : TOTAL_START_OFFSET_DESKTOP
+      
       // Scroll to card position accounting for total start offset
       scrollContainerRef.current.scrollTo({
-        left: TOTAL_START_OFFSET + (index * CARD_WIDTH),
+        left: totalOffset + (index * cardWidth),
         behavior: 'smooth'
       })
       setCurrentIndex(index)
@@ -175,8 +192,12 @@ export default function MonthlyBreakdown() {
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return
     
+    // Use responsive card width
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+    const cardWidth = isMobile ? CARD_WIDTH_MOBILE : window.innerWidth < 1024 ? CARD_WIDTH_TABLET : CARD_WIDTH_DESKTOP
+    
     scrollContainerRef.current.scrollBy({
-      left: direction === 'left' ? -CARD_WIDTH : CARD_WIDTH,
+      left: direction === 'left' ? -cardWidth : cardWidth,
       behavior: 'smooth'
     })
   }
@@ -258,11 +279,12 @@ export default function MonthlyBreakdown() {
   }
 
   return (
-    <section className="bg-gradient-to-b from-gray-50 to-white py-16">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="bg-gradient-to-b from-gray-50 to-white py-16 overflow-x-hidden">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-full">
         {/* Header with Month Picker */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-10 gap-4">
-          <div className="flex-1">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-10 gap-4 relative">
+          {/* Centered Header */}
+          <div className="flex-1 flex flex-col items-center text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
               {t('title')}
             </h2>
@@ -271,9 +293,9 @@ export default function MonthlyBreakdown() {
             </p>
           </div>
           
-          {/* Month/Year Picker */}
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-gray-500" />
+          {/* Month/Year Picker - Positioned at end */}
+          <div className="flex items-center justify-center md:justify-end gap-2 flex-shrink-0 md:absolute md:right-0">
+            <Calendar className="h-5 w-5 text-gray-500 flex-shrink-0" />
             <Select value={selectedMonthYear} onValueChange={setSelectedMonthYear}>
               <SelectTrigger className="w-[200px] md:w-[240px] bg-white border-gray-300 hover:border-[#6B8E7E] transition-colors">
                 <SelectValue placeholder={isRTL ? 'اختر الشهر والسنة' : 'Select Month & Year'} />
@@ -290,51 +312,51 @@ export default function MonthlyBreakdown() {
         </div>
 
         {/* Carousel Container */}
-        <div className="relative">
-          {/* Left Arrow */}
+        <div className="relative w-full overflow-hidden">
+          {/* Left Arrow - Hidden on mobile */}
           {canScrollLeft && (
             <button
               onClick={() => scroll('left')}
-              className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group"
+              className="hidden md:block absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-2 md:p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group"
               aria-label={isRTL ? 'الشهر السابق' : 'Previous month'}
             >
-              <ChevronLeft className="h-5 w-5 text-gray-700 group-hover:text-white transition-colors" />
+              <ChevronLeft className="h-4 w-4 md:h-5 md:w-5 text-gray-700 group-hover:text-white transition-colors" />
             </button>
           )}
 
-          {/* Right Arrow */}
+          {/* Right Arrow - Hidden on mobile */}
           {canScrollRight && (
             <button
               onClick={() => scroll('right')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group"
+              className="hidden md:block absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-2 md:p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group"
               aria-label={isRTL ? 'الشهر التالي' : 'Next month'}
             >
-              <ChevronRight className="h-5 w-5 text-gray-700 group-hover:text-white transition-colors" />
+              <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-700 group-hover:text-white transition-colors" />
             </button>
           )}
 
           {/* Scrollable Container */}
           <div 
             ref={scrollContainerRef}
-            className="monthly-carousel flex gap-6 overflow-x-auto pb-6 scroll-smooth snap-x snap-mandatory"
+            className="monthly-carousel flex gap-4 md:gap-6 overflow-x-auto pb-6 scroll-smooth snap-x snap-mandatory"
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
-              paddingLeft: '440px', // 96px base + 344px for one card offset
-              paddingRight: '96px',
+              paddingLeft: 'clamp(16px, 4vw, 440px)', // Responsive padding: 16px on mobile, scales up to 440px
+              paddingRight: 'clamp(16px, 4vw, 96px)', // Responsive padding: 16px on mobile, scales up to 96px
               overscrollBehaviorX: 'none',
               overscrollBehaviorY: 'auto', // Allow vertical page scrolling
             }}
           >
-            {/* Extra spacer at the start to prevent overlap with left arrow */}
-            <div className="flex-shrink-0 w-32" aria-hidden={true} style={{ pointerEvents: 'none' }} />
-            {/* Additional spacer to offset first card by one card width */}
-            <div className="flex-shrink-0 w-[344px]" aria-hidden={true} style={{ pointerEvents: 'none' }} />
+            {/* Extra spacer at the start to prevent overlap with left arrow - responsive */}
+            <div className="flex-shrink-0 w-8 md:w-32" aria-hidden={true} style={{ pointerEvents: 'none' }} />
+            {/* Additional spacer to offset first card by one card width - responsive */}
+            <div className="flex-shrink-0 w-[280px] sm:w-[320px] md:w-[344px]" aria-hidden={true} style={{ pointerEvents: 'none' }} />
             {monthlyData.map((month) => (
               <div
                 key={`${month.year}-${month.month}`}
-                className="flex-shrink-0 w-[320px] md:w-[360px] bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 snap-start border border-gray-100 hover:border-[#6B8E7E]/20 group"
+                className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] lg:w-[360px] bg-white rounded-xl p-4 md:p-6 shadow-md hover:shadow-xl transition-all duration-300 snap-start border border-gray-100 hover:border-[#6B8E7E]/20 group"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between mb-5 pb-4 border-b border-gray-100">
@@ -350,25 +372,25 @@ export default function MonthlyBreakdown() {
                 </div>
                 
                 {/* Card Content */}
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   {/* Total Amount */}
-                  <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-[#E74C3C]" />
-                      <span className="text-sm font-medium text-gray-700">{t('totalAmount')}</span>
+                  <div className="p-3 bg-red-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-[#E74C3C] flex-shrink-0" />
+                      <span className="text-xs md:text-sm font-medium text-gray-700">{t('totalAmount')}</span>
                     </div>
-                    <span className="text-xl font-bold text-[#E74C3C]">
+                    <span className="text-lg md:text-xl font-bold text-[#E74C3C] block">
                       {formatNumber(month.totalAmount)} EGP
                     </span>
                   </div>
                   
                   {/* Contributors */}
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-blue-600" />
-                      <span className="text-sm font-medium text-gray-700">{t('contributors')}</span>
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Users className="h-4 w-4 md:h-5 md:w-5 text-blue-600 flex-shrink-0" />
+                      <span className="text-xs md:text-sm font-medium text-gray-700">{t('contributors')}</span>
                     </div>
-                    <span className="text-xl font-semibold text-gray-900">
+                    <span className="text-lg md:text-xl font-semibold text-gray-900 block">
                       {month.contributors}
                     </span>
                   </div>
@@ -395,7 +417,7 @@ export default function MonthlyBreakdown() {
             {nextMonthPlaceholder && (
               <div
                 key={`placeholder-${nextMonthPlaceholder.year}-${nextMonthPlaceholder.month}`}
-                className="flex-shrink-0 w-[320px] md:w-[360px] bg-white rounded-xl p-6 shadow-sm transition-all duration-300 snap-start border border-gray-200 opacity-50 grayscale"
+                className="flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] lg:w-[360px] bg-white rounded-xl p-4 md:p-6 shadow-sm transition-all duration-300 snap-start border border-gray-200 opacity-50 grayscale"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between mb-5 pb-4 border-b border-gray-200">
@@ -411,25 +433,25 @@ export default function MonthlyBreakdown() {
                 </div>
                 
                 {/* Card Content */}
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   {/* Total Amount */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-400">{t('totalAmount')}</span>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-gray-400 flex-shrink-0" />
+                      <span className="text-xs md:text-sm font-medium text-gray-400">{t('totalAmount')}</span>
                     </div>
-                    <span className="text-xl font-bold text-gray-400">
+                    <span className="text-lg md:text-xl font-bold text-gray-400 block">
                       --
                     </span>
                   </div>
                   
                   {/* Contributors */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-400">{t('contributors')}</span>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Users className="h-4 w-4 md:h-5 md:w-5 text-gray-400 flex-shrink-0" />
+                      <span className="text-xs md:text-sm font-medium text-gray-400">{t('contributors')}</span>
                     </div>
-                    <span className="text-xl font-semibold text-gray-400">
+                    <span className="text-lg md:text-xl font-semibold text-gray-400 block">
                       --
                     </span>
                   </div>
@@ -450,8 +472,8 @@ export default function MonthlyBreakdown() {
               </div>
             )}
             
-            {/* Extra spacer at the end to prevent overlap with right arrow */}
-            <div className="flex-shrink-0 w-32" aria-hidden={true} style={{ pointerEvents: 'none' }} />
+            {/* Extra spacer at the end to prevent overlap with right arrow - responsive */}
+            <div className="flex-shrink-0 w-8 md:w-32" aria-hidden={true} style={{ pointerEvents: 'none' }} />
           </div>
 
           {/* Scroll Indicators (Dots) */}
@@ -461,9 +483,14 @@ export default function MonthlyBreakdown() {
                 key={index}
                 onClick={() => {
                   if (scrollContainerRef.current) {
+                    // Use responsive values
+                    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+                    const cardWidth = isMobile ? CARD_WIDTH_MOBILE : window.innerWidth < 1024 ? CARD_WIDTH_TABLET : CARD_WIDTH_DESKTOP
+                    const totalOffset = isMobile ? TOTAL_START_OFFSET_MOBILE : TOTAL_START_OFFSET_DESKTOP
+                    
                     // Scroll to card position accounting for total start offset
                     scrollContainerRef.current.scrollTo({
-                      left: TOTAL_START_OFFSET + (index * CARD_WIDTH),
+                      left: totalOffset + (index * cardWidth),
                       behavior: 'smooth'
                     })
                     setCurrentIndex(index)

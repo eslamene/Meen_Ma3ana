@@ -2,7 +2,27 @@
 
 This directory contains scripts and documentation for managing cases and contributions data in the database.
 
-## 📁 **Current Workflow**
+## 📋 **Import with User Accounts (Recommended)**
+
+For importing contributions with proper user accounts:
+
+```bash
+# See comprehensive guide
+cat docs/cases/IMPORT_STEPS.md
+
+# Run the import script
+node scripts/import-contributions-with-users.js
+```
+
+**What it does:**
+- Clears all existing cases, contributions, and notifications
+- Creates user accounts for each unique ContributorID
+- Creates cases and contributions with proper relationships
+- All emails are ASCII-only (format: `contributor<ID>@contributor.meenma3ana.local`)
+
+See [`IMPORT_STEPS.md`](./IMPORT_STEPS.md) for detailed step-by-step instructions.
+
+## 📋 **Legacy Workflow (SQL-based)**
 
 ### **1. Consolidate and Recategorize Categories**
 

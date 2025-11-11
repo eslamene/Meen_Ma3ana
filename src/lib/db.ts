@@ -46,4 +46,4 @@ export { client }
 export { schema }
 
 // Export individual tables for easier imports
-export const { users, cases, projects, projectCycles, contributions, sponsorships, communications, localization, landingStats, systemConfig } = schema 
+export const { users, cases, projects, projectCycles, contributions, sponsorships, communications, localization, landingStats, systemConfig, systemContent } = schema 
