@@ -47,17 +47,17 @@ node scripts/00-run-full-import.js
 
 If totals don't match:
 ```bash
-node scripts/check-contribution-totals.js
-node scripts/check-duplicate-contributions.js
+node scripts/11-check-contribution-totals.js
+node scripts/12-check-duplicate-contributions.js
 ```
 
 If users missing donor role:
 ```bash
-node scripts/assign-donor-role-to-all.js
+node scripts/40-assign-donor-role-to-all.js
 ```
 
 ## Documentation
 
-- Full guide: `docs/cases/IMPORT_README.md`
+- Full guide: `docs/cases/IMPORT_GUIDE.md`
 - Migration plan: `docs/cases/IMPORT_MIGRATION_PLAN.md`
-- Scripts overview: `docs/cases/SCRIPTS_ORGANIZATION.md`
+- Scripts overview: See `docs/cases/IMPORT_GUIDE.md`

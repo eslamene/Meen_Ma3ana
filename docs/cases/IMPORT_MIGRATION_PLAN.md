@@ -137,12 +137,12 @@ node scripts/03-verify-import.js
 2. **Verify Donor Roles**
    ```bash
    # If users don't have donor role:
-   node scripts/assign-donor-role-to-all.js
+   node scripts/40-assign-donor-role-to-all.js
    ```
 
 3. **Check for Duplicates**
    ```bash
-   node scripts/check-duplicate-contributions.js
+   node scripts/12-check-duplicate-contributions.js
    ```
 
 4. **Verify Notifications**
@@ -156,7 +156,7 @@ If something goes wrong:
 1. **Stop the import** (Ctrl+C)
 2. **Check what was imported**:
    ```bash
-   node scripts/check-contribution-totals.js
+   node scripts/11-check-contribution-totals.js
    ```
 3. **Clear and restart**:
    ```bash
@@ -185,9 +185,9 @@ If something goes wrong:
 ### Issue 5: "Total doesn't match"
 **Cause**: Duplicate contributions or CSV parsing issue
 **Solution**: 
-1. Run `check-contribution-totals.js` to identify discrepancy
-2. Run `check-duplicate-contributions.js` to find duplicates
-3. Run `remove-duplicate-contributions.js` if needed
+1. Run `scripts/11-check-contribution-totals.js` to identify discrepancy
+2. Run `scripts/12-check-duplicate-contributions.js` to find duplicates
+3. Run `scripts/20-remove-duplicate-contributions.js` if needed
 
 ## Success Criteria
 
@@ -222,7 +222,7 @@ If something goes wrong:
 ## Maintenance
 
 ### Regular Checks
-- Run `check-contribution-totals.js` monthly to verify data integrity
+- Run `scripts/11-check-contribution-totals.js` monthly to verify data integrity
 - Check for duplicates quarterly
 - Review notification counts
 
