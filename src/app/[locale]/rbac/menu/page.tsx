@@ -1188,6 +1188,8 @@ function MenuItemComponent({
                   level={level + 1}
                   expandedItems={expandedItems}
                   onToggleExpand={onToggleExpand}
+                  hoveredDropZone={hoveredDropZone}
+                  setHoveredDropZone={setHoveredDropZone}
                 />
                 {/* Drop zone after child */}
                 <div
