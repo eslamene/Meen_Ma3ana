@@ -13,7 +13,7 @@ export default function AdminUserRolesRedirectPage() {
   
   useEffect(() => {
     // Redirect to system management roles page
-    router.replace(`/${params.locale}/admin/system-management/roles`)
+    router.replace(`/${params.locale}/rbac/roles`)
   }, [router, params.locale])
 
   // Show loading state while redirecting

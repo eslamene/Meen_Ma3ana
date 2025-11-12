@@ -218,10 +218,10 @@ export function useAdmin(): UseAdminReturn {
       return permissions.some(p => p.name === permissionName)
     }
     
-    // For unauthenticated users, only allow public dashboard view
-    // Cases and other content require authentication
-    const visitorPermissions = ['dashboard:view']
-    return visitorPermissions.includes(permissionName)
+    // For unauthenticated users (public role), allow public dashboard and cases view
+    // Cases should be publicly viewable so unauthenticated users can browse and contribute
+    const publicPermissions = ['dashboard:view', 'cases:view']
+    return publicPermissions.includes(permissionName)
   }, [permissions, user])
 
   const hasRole = useCallback((roleName: string): boolean => {
@@ -240,11 +240,11 @@ export function useAdmin(): UseAdminReturn {
       )
     }
     
-    // For unauthenticated users, only allow public dashboard view
-    // Cases and other content require authentication
-    const visitorPermissions = ['dashboard:view']
+    // For unauthenticated users (public role), allow public dashboard and cases view
+    // Cases should be publicly viewable so unauthenticated users can browse and contribute
+    const publicPermissions = ['dashboard:view', 'cases:view']
     return permissionNames.some(permissionName => 
-      visitorPermissions.includes(permissionName)
+      publicPermissions.includes(permissionName)
     )
   }, [permissions, user])
 

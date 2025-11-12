@@ -312,43 +312,34 @@ export default function MonthlyBreakdown() {
         </div>
 
         {/* Carousel Container */}
-        <div className="relative w-full overflow-hidden">
-          {/* Left Arrow - Hidden on mobile */}
-          {canScrollLeft && (
-            <button
-              onClick={() => scroll('left')}
-              className="hidden md:block absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-2 md:p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group"
-              aria-label={isRTL ? 'الشهر السابق' : 'Previous month'}
-            >
-              <ChevronLeft className="h-4 w-4 md:h-5 md:w-5 text-gray-700 group-hover:text-white transition-colors" />
-            </button>
-          )}
+        <div className="relative w-full">
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* Left Arrow - Hidden on mobile */}
+            {canScrollLeft && (
+              <button
+                onClick={() => scroll('left')}
+                className="hidden md:flex flex-shrink-0 items-center justify-center w-10 h-10 bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group z-10"
+                aria-label={isRTL ? 'الشهر السابق' : 'Previous month'}
+              >
+                <ChevronLeft className="h-5 w-5 text-gray-700 group-hover:text-white transition-colors" />
+              </button>
+            )}
 
-          {/* Right Arrow - Hidden on mobile */}
-          {canScrollRight && (
-            <button
-              onClick={() => scroll('right')}
-              className="hidden md:block absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-2 md:p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group"
-              aria-label={isRTL ? 'الشهر التالي' : 'Next month'}
-            >
-              <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-700 group-hover:text-white transition-colors" />
-            </button>
-          )}
-
-          {/* Scrollable Container */}
-          <div 
-            ref={scrollContainerRef}
-            className="monthly-carousel flex gap-4 md:gap-6 overflow-x-auto pb-6 scroll-smooth snap-x snap-mandatory"
-            style={{
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch',
-              paddingLeft: 'clamp(16px, 4vw, 440px)', // Responsive padding: 16px on mobile, scales up to 440px
-              paddingRight: 'clamp(16px, 4vw, 96px)', // Responsive padding: 16px on mobile, scales up to 96px
-              overscrollBehaviorX: 'none',
-              overscrollBehaviorY: 'auto', // Allow vertical page scrolling
-            }}
-          >
+            {/* Scrollable Container */}
+            <div className="flex-1 relative overflow-hidden">
+              <div 
+                ref={scrollContainerRef}
+                className="monthly-carousel flex gap-4 md:gap-6 overflow-x-auto pb-6 scroll-smooth snap-x snap-mandatory"
+                style={{
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                  WebkitOverflowScrolling: 'touch',
+                  paddingLeft: 'clamp(16px, 4vw, 96px)',
+                  paddingRight: 'clamp(16px, 4vw, 96px)',
+                  overscrollBehaviorX: 'none',
+                  overscrollBehaviorY: 'auto', // Allow vertical page scrolling
+                }}
+              >
             {/* Extra spacer at the start to prevent overlap with left arrow - responsive */}
             <div className="flex-shrink-0 w-8 md:w-32" aria-hidden={true} style={{ pointerEvents: 'none' }} />
             {/* Additional spacer to offset first card by one card width - responsive */}
@@ -474,6 +465,19 @@ export default function MonthlyBreakdown() {
             
             {/* Extra spacer at the end to prevent overlap with right arrow - responsive */}
             <div className="flex-shrink-0 w-8 md:w-32" aria-hidden={true} style={{ pointerEvents: 'none' }} />
+              </div>
+            </div>
+
+            {/* Right Arrow - Hidden on mobile */}
+            {canScrollRight && (
+              <button
+                onClick={() => scroll('right')}
+                className="hidden md:flex flex-shrink-0 items-center justify-center w-10 h-10 bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group z-10"
+                aria-label={isRTL ? 'الشهر التالي' : 'Next month'}
+              >
+                <ChevronRight className="h-5 w-5 text-gray-700 group-hover:text-white transition-colors" />
+              </button>
+            )}
           </div>
 
           {/* Scroll Indicators (Dots) */}

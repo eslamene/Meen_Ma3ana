@@ -25,12 +25,12 @@ interface GuestPermissionGuardProps {
 }
 
 /**
- * Permission Guard for Unauthenticated Users
- * Handles both visitor permissions and auth prompts
+ * Permission Guard for Unauthenticated Users (Public Role)
+ * Handles both public permissions and auth prompts
  */
 export function GuestPermissionGuard({
   children,
-  visitorPermissions = [],
+  visitorPermissions = [], // Legacy prop name - represents public permissions
   requireAll = false,
   fallback = null,
   showLoading = true,

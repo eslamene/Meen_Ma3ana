@@ -11,8 +11,8 @@ export default function AdminUsersRedirectPage() {
   const router = useRouter()
   
   useEffect(() => {
-    // Redirect to the default locale version
-    router.replace('/en/admin/users')
+    // Redirect to the RBAC user management page
+    router.replace('/en/rbac/users')
   }, [router])
 
   // Show loading state while redirecting

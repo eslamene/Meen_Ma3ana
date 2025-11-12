@@ -3,13 +3,13 @@
 import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
-export default function SystemManagementPermissionsRedirect() {
+export default function SystemManagementRedirect() {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
 
   useEffect(() => {
-    router.replace(`/${locale}/rbac/permissions`)
+    router.replace(`/${locale}/rbac/users`)
   }, [router, locale])
 
   return (
@@ -21,3 +21,4 @@ export default function SystemManagementPermissionsRedirect() {
     </div>
   )
 }
+

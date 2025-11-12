@@ -79,30 +79,6 @@ export default function AdminRolesPage() {
     fetchData()
   }, [fetchData])
 
-  const handleCreateRole = async (roleData: { name: string; display_name: string; description: string }) => {
-    try {
-      const response = await safeFetch('/api/admin/roles', {
-        method: 'POST',
-        body: JSON.stringify(roleData)
-      })
-
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Role created successfully'
-        })
-        setCreateRoleModal(false)
-        fetchData()
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create role',
-        type: 'error'
-      })
-    }
-  }
-
   const handleEditRole = async (roleData: { display_name: string; description: string }) => {
     if (!selectedRole) return
 
@@ -115,16 +91,25 @@ export default function AdminRolesPage() {
       if (response.ok) {
         toast({
           title: 'Success',
-          description: 'Role updated successfully'
+          description: 'Role updated successfully',
+          type: 'default'
         })
         setEditRoleModal(false)
         setSelectedRole(undefined)
         fetchData()
+      } else {
+        const errorMessage = response.error || response.data?.error || 'Failed to update role'
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          type: 'error'
+        })
       }
     } catch (error) {
+      console.error('Update role error:', error)
       toast({
         title: 'Error',
-        description: 'Failed to update role',
+        description: error instanceof Error ? error.message : 'Failed to update role',
         type: 'error'
       })
     }
@@ -140,16 +125,58 @@ export default function AdminRolesPage() {
       if (response.ok) {
         toast({
           title: 'Success',
-          description: 'Permissions assigned successfully'
+          description: 'Permissions assigned successfully',
+          type: 'default'
         })
         setAssignPermissionsModal(false)
         setSelectedRole(undefined)
         fetchData()
+      } else {
+        const errorMessage = response.error || response.data?.error || 'Failed to assign permissions'
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          type: 'error'
+        })
       }
     } catch (error) {
+      console.error('Assign permissions error:', error)
       toast({
         title: 'Error',
-        description: 'Failed to assign permissions',
+        description: error instanceof Error ? error.message : 'Failed to assign permissions',
+        type: 'error'
+      })
+    }
+  }
+
+  const handleCreateRole = async (roleData: { name: string; display_name: string; description: string }) => {
+    try {
+      const response = await safeFetch('/api/admin/roles', {
+        method: 'POST',
+        body: JSON.stringify(roleData)
+      })
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Role created successfully',
+          type: 'default'
+        })
+        setCreateRoleModal(false)
+        fetchData()
+      } else {
+        const errorMessage = response.error || response.data?.error || 'Failed to create role'
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          type: 'error'
+        })
+      }
+    } catch (error) {
+      console.error('Create role error:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create role',
         type: 'error'
       })
     }
@@ -218,7 +245,14 @@ export default function AdminRolesPage() {
               setEditRoleModal(false)
               setSelectedRole(undefined)
             }}
-            onSubmit={handleEditRole}
+            onSubmit={async (data) => {
+              try {
+                await handleEditRole(data)
+              } catch (error) {
+                // Error already handled in handleEditRole
+                console.error('Error in edit role handler:', error)
+              }
+            }}
             role={selectedRole}
           />
         )}

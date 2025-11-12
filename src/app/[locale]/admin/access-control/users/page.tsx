@@ -11,6 +11,6 @@ export default async function AccessControlUsersRedirectPage({
 }) {
   // Redirect to system management users page
   const { locale } = await params
-  redirect(`/${locale}/admin/system-management/users`)
+  redirect(`/${locale}/rbac/users`)
 }
 
