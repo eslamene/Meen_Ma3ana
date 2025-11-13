@@ -170,7 +170,8 @@ export default function ProjectDetailPage() {
   const completedCycles = project.cycles.filter(cycle => cycle.status === 'completed')
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <Container variant={containerVariant} className="py-8">
       <div className="mb-8">
         <div className="flex justify-between items-start mb-4">
           <div>
@@ -429,6 +430,7 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
       </Container>
     </div>
   )

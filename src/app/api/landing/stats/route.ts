@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cases, contributions } from '@/drizzle/schema'
-import { eq, and, sql, sum, countDistinct, gte, lte } from 'drizzle-orm'
+import { eq, and, sql, countDistinct } from 'drizzle-orm'
 
 // Helper function to categorize case by description
 function categorizeCase(description: string): string {
