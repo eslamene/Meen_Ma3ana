@@ -42,11 +42,15 @@ export async function GET() {
   try {
     // Calculate stats directly from cases and contributions tables
     // Get total raised from ALL approved contributions (no date filter)
+    // Use SQL directly to ensure proper decimal handling
     const totalRaisedResult = await db
-      .select({ total: sum(contributions.amount) })
+      .select({ 
+        total: sql<number>`COALESCE(SUM(${contributions.amount}::numeric), 0)`
+      })
       .from(contributions)
       .where(eq(contributions.status, 'approved'))
     
+    // Convert to number - drizzle sum with decimal returns string, SQL returns number
     const totalRaised = Number(totalRaisedResult[0]?.total || 0)
     
     // Get active cases count (published cases)

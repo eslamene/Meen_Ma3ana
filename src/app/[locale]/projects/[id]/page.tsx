@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +50,7 @@ export default function ProjectDetailPage() {
   const router = useRouter()
   const locale = params.locale as string
   const projectId = params.id as string
+  const { containerVariant } = useLayout()
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -426,7 +429,7 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </Container>
     </div>
   )
 } 

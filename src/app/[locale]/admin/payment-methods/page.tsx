@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { 
   CreditCard, 
   Plus, 
@@ -56,6 +58,7 @@ export default function AdminPaymentMethodsPage() {
   const locale = params.locale as string
   const t = useTranslations('admin')
   const { toast } = useEnhancedToast()
+  const { containerVariant } = useLayout()
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
   const [loading, setLoading] = useState(true)
@@ -420,7 +423,7 @@ export default function AdminPaymentMethodsPage() {
       </div>
     }>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Container variant={containerVariant}>
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
@@ -875,7 +878,7 @@ export default function AdminPaymentMethodsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
+        </Container>
       </div>
     </PermissionGuard>
   )

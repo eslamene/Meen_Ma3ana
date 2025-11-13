@@ -112,7 +112,8 @@ export default function CaseDetailPage() {
   const [loading, setLoading] = useState(true)
   
   // Use centralized hook for approved contributions
-  const { contributions: approvedContributions, totalAmount: approvedTotal } = useApprovedContributions(caseId)
+  const { contributions: approvedContributions, totalAmount: approvedTotal, isLoading: contributionsLoading, error: contributionsError } = useApprovedContributions(caseId)
+  const [apiProgress, setApiProgress] = useState<{ approvedTotal: number; progressPercentage: number; contributorCount: number } | null>(null)
   const { hasPermission } = useAdmin()
   const [error, setError] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -257,6 +258,23 @@ export default function CaseDetailPage() {
   // Removed fetchContributions - contributions are now managed by useApprovedContributions hook
   // This prevents duplicate fetching and infinite loops
 
+  // Fetch progress from API as fallback for public users
+  const fetchProgressFromAPI = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/cases/${caseId}/progress`)
+      if (response.ok) {
+        const data = await response.json()
+        setApiProgress({
+          approvedTotal: data.approvedTotal || 0,
+          progressPercentage: data.progressPercentage || 0,
+          contributorCount: data.contributorCount || 0
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching progress from API:', error)
+    }
+  }, [caseId])
+
   const fetchTotalContributions = useCallback(async () => {
     try {
       const client = createClient()
@@ -390,6 +408,7 @@ export default function CaseDetailPage() {
     fetchCaseDetails()
     fetchUpdates()
     fetchTotalContributions()
+    fetchProgressFromAPI() // Fetch progress from API as fallback
     setupRealtimeSubscriptions()
 
     return () => {
@@ -398,7 +417,14 @@ export default function CaseDetailPage() {
       realtimeCaseUpdates.unsubscribeFromCaseUpdates(caseId)
       realtimeCaseUpdates.unsubscribeFromCaseContributions(caseId)
     }
-  }, [caseId, fetchCaseDetails, fetchUpdates, fetchTotalContributions, setupRealtimeSubscriptions])
+  }, [caseId, fetchCaseDetails, fetchUpdates, fetchTotalContributions, fetchProgressFromAPI, setupRealtimeSubscriptions])
+
+  // Use API progress as fallback if hook fails or returns 0
+  useEffect(() => {
+    if (contributionsError && apiProgress) {
+      console.log('Using API progress as fallback due to hook error')
+    }
+  }, [contributionsError, apiProgress])
 
   // Check permissions after caseData is loaded
   useEffect(() => {
@@ -469,8 +495,18 @@ export default function CaseDetailPage() {
     setUpdates(prev => [newUpdate, ...prev])
   }
 
-  // Helper functions now use centralized hook data
-  const getApprovedContributionsTotal = () => approvedTotal
+  // Helper functions now use centralized hook data, with API fallback
+  const getApprovedContributionsTotal = () => {
+    // Use API progress if hook failed (for public users who can't access contributions directly)
+    if (contributionsError && apiProgress) {
+      return apiProgress.approvedTotal
+    }
+    // If hook is still loading and we have API data, use it temporarily
+    if (contributionsLoading && apiProgress) {
+      return apiProgress.approvedTotal
+    }
+    return approvedTotal
+  }
   const getApprovedContributions = () => approvedContributions
 
   const getStatusColor = (status: string) => {

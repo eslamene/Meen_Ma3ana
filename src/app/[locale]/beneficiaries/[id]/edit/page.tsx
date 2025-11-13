@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,6 +18,7 @@ export default function EditBeneficiaryPage() {
   const t = useTranslations('beneficiaries')
   const params = useParams()
   const router = useRouter()
+  const { containerVariant } = useLayout()
   
   const beneficiaryId = params.id as string
   const locale = params.locale as string
@@ -137,18 +140,21 @@ export default function EditBeneficiaryPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </Container>
       </div>
     )
   }
 
   if (!beneficiary) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card className="text-center py-12">
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-8">
+          <Card className="text-center py-12">
           <CardContent>
             <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -163,13 +169,14 @@ export default function EditBeneficiaryPage() {
             </Button>
           </CardContent>
         </Card>
+        </Container>
       </div>
     )
   }
 
   return (
-    <div className="w-full min-h-screen bg-gray-50">
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+    <div className="min-h-screen bg-gray-50">
+      <Container variant={containerVariant} className="py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 lg:mb-8">
           <div className="flex items-center gap-4">
@@ -218,7 +225,7 @@ export default function EditBeneficiaryPage() {
             } : undefined}
           />
         </div>
-      </div>
+      </Container>
     </div>
   )
 }

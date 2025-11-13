@@ -6,12 +6,15 @@ import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import Logo from '@/components/ui/Logo'
+import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useAdmin } from '@/lib/admin/hooks'
 import GuestPermissionGuard from '@/components/auth/GuestPermissionGuard'
+import { Heart } from 'lucide-react'
 
 export default function NavigationBar() {
   const t = useTranslations('navigation')
@@ -117,79 +120,88 @@ export default function NavigationBar() {
         <div className="flex justify-between items-center h-16">
           {/* Logo and Brand */}
           <div className="flex items-center">
-            <Link href={`/${locale}`} className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white font-bold text-lg">M</span>
-              </div>
-              <span className="text-2xl font-bold text-gray-900 tracking-tight">Meen Ma3ana</span>
-            </Link>
+            <Logo size="lg" />
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            <Link 
-              href={`/${locale}`}
-              className={`${getNavLinkClass('/')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
-            >
-              {t('home')}
-            </Link>
-            
-            <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
-              <Link 
-                href={`/${locale}/cases`}
-                className={`${getNavLinkClass('/cases')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
-              >
-                {t('cases')}
-              </Link>
-            </GuestPermissionGuard>
-            
-            <Link 
-              href={`/${locale}/projects`}
-              className={`${getNavLinkClass('/projects')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
-            >
-              {t('projects')}
-            </Link>
-
-            {/* Modular Navigation */}
-            {!modulesLoading && modules.map((module) => (
-              <div key={module.id} className="relative group">
-                <Button variant="ghost" className="text-gray-700 hover:text-gray-900">
-                  {module.display_name}
-                </Button>
-                {module.items && module.items.length > 0 && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    <div className="py-1">
-                      {module.items.map((item, index) => (
-                        <Link
-                          key={index}
-                          href={`/${locale}${item.href}`}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {user && (
+            {!user ? (
+              // Public user navigation - focused on discovery and engagement
+              <>
+                <Link 
+                  href={`/${locale}/landing`}
+                  className={`${getNavLinkClass('/landing')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
+                >
+                  {t('home')}
+                </Link>
+                
+                <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
+                  <Link 
+                    href={`/${locale}/cases`}
+                    className={`${getNavLinkClass('/cases')} px-4 py-2 text-sm font-medium rounded-lg mx-1 flex items-center gap-1.5`}
+                  >
+                    <Heart className="h-4 w-4" />
+                    {t('cases')}
+                  </Link>
+                </GuestPermissionGuard>
+              </>
+            ) : (
+              // Authenticated user navigation
               <>
                 <Link 
                   href={`/${locale}/dashboard`}
-                  className={`${getNavLinkClass('/dashboard')} px-3 py-2 text-sm font-medium`}
+                  className={`${getNavLinkClass('/dashboard')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
                 >
                   {t('dashboard')}
                 </Link>
+                
+                <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
+                  <Link 
+                    href={`/${locale}/cases`}
+                    className={`${getNavLinkClass('/cases')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
+                  >
+                    {t('cases')}
+                  </Link>
+                </GuestPermissionGuard>
+                
+                <Link 
+                  href={`/${locale}/projects`}
+                  className={`${getNavLinkClass('/projects')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
+                >
+                  {t('projects')}
+                </Link>
 
-
+                {/* Modular Navigation - Only for authenticated users */}
+                {!modulesLoading && modules.map((module) => (
+                  <div key={module.id} className="relative group">
+                    <Button variant="ghost" className="text-gray-700 hover:text-gray-900">
+                      {module.display_name}
+                    </Button>
+                    {module.items && module.items.length > 0 && (
+                      <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <div className="py-1">
+                          {module.items.map((item, index) => (
+                            <Link
+                              key={index}
+                              href={`/${locale}${item.href}`}
+                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              {item.label}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </>
             )}
           </div>
 
-          {/* Right side - Language Switcher, Auth and Notifications */}
+          {/* Right side - Layout Toggle, Language Switcher, Auth and Notifications */}
           <div className="hidden md:flex items-center space-x-4">
+            {/* Layout Toggle - Available for all users */}
+            <LayoutToggle />
             {/* Language Switcher */}
             <LanguageSwitcher />
             {user ? (
@@ -254,14 +266,21 @@ export default function NavigationBar() {
                 </div>
               </>
             ) : (
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
                 <Link href={`/${locale}/auth/login`}>
-                  <Button variant="ghost" size="sm">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="text-gray-700 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200 font-medium"
+                  >
                     {t('login')}
                   </Button>
                 </Link>
                 <Link href={`/${locale}/auth/register`}>
-                  <Button size="sm">
+                  <Button 
+                    size="sm"
+                    className="bg-gradient-to-r from-[#6B8E7E] to-[#5a7a6b] hover:from-[#5a7a6b] hover:to-[#4a6a5b] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                  >
                     {t('register')}
                   </Button>
                 </Link>
@@ -292,25 +311,47 @@ export default function NavigationBar() {
         {isMobileMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t">
-              <Link 
-                href={`/${locale}`}
-                className={`${getNavLinkClass('/')} block px-3 py-2 text-base font-medium`}
-                onClick={closeMobileMenu}
-              >
-                {t('home')}
-              </Link>
-              
-              <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
-                <Link 
-                  href={`/${locale}/cases`}
-                  className={`${getNavLinkClass('/cases')} block px-3 py-2 text-base font-medium`}
-                  onClick={closeMobileMenu}
-                >
-                  {t('cases')}
-                </Link>
-              </GuestPermissionGuard>
+              {!user ? (
+                // Public user mobile navigation
+                <>
+                  <Link 
+                    href={`/${locale}/landing`}
+                    className={`${getNavLinkClass('/landing')} block px-3 py-2 text-base font-medium`}
+                    onClick={closeMobileMenu}
+                  >
+                    {t('home')}
+                  </Link>
+                  
+                  <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
+                    <Link 
+                      href={`/${locale}/cases`}
+                      className={`${getNavLinkClass('/cases')} block px-3 py-2 text-base font-medium flex items-center gap-2`}
+                      onClick={closeMobileMenu}
+                    >
+                      <Heart className="h-4 w-4" />
+                      {t('cases')}
+                    </Link>
+                  </GuestPermissionGuard>
 
-              {user && (
+                  <div className="border-t pt-4 mt-4 space-y-2">
+                    <Link 
+                      href={`/${locale}/auth/login`}
+                      className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-[#6B8E7E] rounded-lg hover:bg-[#6B8E7E]/10 transition-colors"
+                      onClick={closeMobileMenu}
+                    >
+                      {t('login')}
+                    </Link>
+                    <Link 
+                      href={`/${locale}/auth/register`}
+                      className="block px-3 py-2 text-base font-medium text-white bg-gradient-to-r from-[#6B8E7E] to-[#5a7a6b] rounded-lg text-center hover:from-[#5a7a6b] hover:to-[#4a6a5b] transition-all duration-200"
+                      onClick={closeMobileMenu}
+                    >
+                      {t('register')}
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                // Authenticated user mobile navigation
                 <>
                   <Link 
                     href={`/${locale}/dashboard`}
@@ -318,6 +359,24 @@ export default function NavigationBar() {
                     onClick={closeMobileMenu}
                   >
                     {t('dashboard')}
+                  </Link>
+
+                  <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
+                    <Link 
+                      href={`/${locale}/cases`}
+                      className={`${getNavLinkClass('/cases')} block px-3 py-2 text-base font-medium`}
+                      onClick={closeMobileMenu}
+                    >
+                      {t('cases')}
+                    </Link>
+                  </GuestPermissionGuard>
+
+                  <Link 
+                    href={`/${locale}/projects`}
+                    className={`${getNavLinkClass('/projects')} block px-3 py-2 text-base font-medium`}
+                    onClick={closeMobileMenu}
+                  >
+                    {t('projects')}
                   </Link>
 
                   {/* Modular Navigation - Mobile */}
@@ -358,7 +417,6 @@ export default function NavigationBar() {
                     </div>
                   </Link>
 
-
                   <div className="border-t pt-4 mt-4">
                     <div className="px-3 py-2 text-sm text-gray-500">
                       {user.email}
@@ -381,25 +439,6 @@ export default function NavigationBar() {
                     </button>
                   </div>
                 </>
-              )}
-
-              {!user && (
-                <div className="border-t pt-4 mt-4 space-y-2">
-                  <Link 
-                    href={`/${locale}/auth/login`}
-                    className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600"
-                    onClick={closeMobileMenu}
-                  >
-                    {t('login')}
-                  </Link>
-                  <Link 
-                    href={`/${locale}/auth/register`}
-                    className="block px-3 py-2 text-base font-medium text-blue-600 hover:text-blue-700"
-                    onClick={closeMobileMenu}
-                  >
-                    {t('register')}
-                  </Link>
-                </div>
               )}
 
               {/* Language Switcher for Mobile */}

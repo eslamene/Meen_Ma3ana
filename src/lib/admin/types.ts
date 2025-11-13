@@ -84,7 +84,8 @@ export type PermissionWithRoles = AdminPermission & {
 
 // Role names enum
 export const ROLE_NAMES = {
-  VISITOR: 'visitor',
+  PUBLIC: 'public', // Public role for unauthenticated users (formerly 'visitor')
+  VISITOR: 'visitor', // Deprecated: use PUBLIC instead
   DONOR: 'donor',
   MODERATOR: 'moderator',
   ADMIN: 'admin',

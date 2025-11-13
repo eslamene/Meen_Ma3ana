@@ -1,15 +1,27 @@
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 
 /**
- * Redirect page for old admin/users route
- * Redirects to the unified admin management page
+ * Redirect page for /admin/users
+ * Redirects to /rbac/users which has more comprehensive user management features
  */
-export default async function AdminUsersRedirectPage({
-  params
-}: {
-  params: Promise<{ locale: string }>
-}) {
-  // Redirect to unified admin management page
-  const { locale } = await params
-  redirect(`/${locale}/admin/manage`)
+export default function AdminUsersRedirect() {
+  const params = useParams()
+  const router = useRouter()
+  const locale = params.locale as string
+
+  useEffect(() => {
+    router.replace(`/${locale}/rbac/users`)
+  }, [router, locale])
+
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Redirecting to RBAC User Management...</p>
+      </div>
+    </div>
+  )
 }

@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import NavigationBar from '@/components/navigation/NavigationBar'
 import SimpleSidebar from '@/components/navigation/SimpleSidebar'
+import { Button } from '@/components/ui/button'
+import { Menu } from 'lucide-react'
 
 interface ConditionalLayoutProps {
   children: React.ReactNode
@@ -13,8 +15,49 @@ interface ConditionalLayoutProps {
 export default function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false) // Start closed on mobile
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
 
   const [supabase] = useState(() => createClient())
+  
+  // Load sidebar state from localStorage and set initial mobile state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sidebar-collapsed')
+      if (stored === 'true') {
+        setSidebarCollapsed(true)
+      }
+      
+      // Check if desktop
+      const checkDesktop = () => {
+        const desktop = window.innerWidth >= 1024
+        setIsDesktop(desktop)
+        if (desktop) {
+          setSidebarOpen(true)
+        }
+      }
+      
+      checkDesktop()
+      
+      // Handle window resize
+      const handleResize = () => {
+        checkDesktop()
+      }
+      
+      window.addEventListener('resize', handleResize)
+      return () => window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+  
+  // Save sidebar collapsed state
+  const toggleSidebarCollapse = () => {
+    const newState = !sidebarCollapsed
+    setSidebarCollapsed(newState)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar-collapsed', String(newState))
+    }
+  }
 
   useEffect(() => {
     // Get initial user
@@ -62,12 +105,37 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
 
   // Show sidebar navigation for authenticated users
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* New Sidebar - handles its own mobile menu */}
-      <SimpleSidebar isOpen={true} onToggle={() => {}} />
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile menu button */}
+      {!sidebarOpen && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSidebarOpen(true)}
+          className="lg:hidden fixed top-4 left-4 z-50 bg-white shadow-md"
+          aria-label="Open menu"
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
+      )}
       
-      {/* Main Content */}
-      <div className="flex-1">
+      {/* Sidebar - Always fixed, never scrolls with page */}
+      <SimpleSidebar 
+        isOpen={sidebarOpen} 
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        collapsed={sidebarCollapsed}
+        onCollapseToggle={toggleSidebarCollapse}
+      />
+      
+      {/* Main Content - Accounts for fixed sidebar width on desktop, full width on mobile */}
+      <div 
+        className="min-h-screen transition-all duration-300"
+        style={{
+          marginLeft: sidebarOpen && isDesktop 
+            ? (sidebarCollapsed ? '80px' : '256px') 
+            : '0',
+        }}
+      >
         <main className="min-h-screen">
           {children}
         </main>

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { Plus, Search, Filter, User, Phone, MapPin, Calendar, Eye, Edit, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +22,7 @@ export default function BeneficiariesPage() {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
+  const { containerVariant } = useLayout()
   
   // State
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([])
@@ -128,16 +131,19 @@ export default function BeneficiariesPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </Container>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <Container variant={containerVariant} className="py-8">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -378,6 +384,7 @@ export default function BeneficiariesPage() {
           </div>
         </DialogContent>
       </Dialog>
+      </Container>
     </div>
   )
 }

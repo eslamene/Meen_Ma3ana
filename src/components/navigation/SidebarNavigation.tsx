@@ -6,6 +6,8 @@ import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import Logo from '@/components/ui/Logo'
+import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
@@ -15,7 +17,6 @@ import {
   X, 
   Home, 
   User as UserIcon, 
-  Bell, 
   LogOut, 
   ChevronDown,
   ChevronRight,
@@ -23,6 +24,7 @@ import {
   BarChart3
 } from 'lucide-react'
 import { getIconWithFallback } from '@/lib/icons/registry'
+import type { AdminMenuItem } from '@/lib/admin/types'
 
 // Note: useAdmin handles permissions internally
 
@@ -45,24 +47,31 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
   const [canScrollDown, setCanScrollDown] = useState(false)
   const [canScrollUp, setCanScrollUp] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  
+  // Store user in ref to prevent footer from disappearing during re-renders
+  const userRef = useRef<User | null>(null)
+  const hasLoadedUserRef = useRef<boolean>(false)
+  
+  useEffect(() => {
+    if (user) {
+      userRef.current = user
+      hasLoadedUserRef.current = true
+    }
+  }, [user])
+  
+  // Use ref value for footer rendering to ensure stability
+  const stableUser = user || (hasLoadedUserRef.current ? userRef.current : null)
 
   const supabase = createClient()
   
   // Use the new admin hook
   const { 
     menuItems, 
-    loading: modulesLoading,
-    user: rbacUser
+    loading: modulesLoading
   } = useAdmin()
   
-  // Convert menuItems to modules format for compatibility
-  const modules = menuItems.map(item => ({
-    id: item.id,
-    name: item.label.toLowerCase().replace(/\s+/g, '_'),
-    display_name: item.label,
-    icon: item.icon || 'FileText',
-    items: item.children || []
-  }))
+  // Menu items are already in tree structure from useAdmin hook
+  // They are filtered by permissions and sorted by sort_order
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
@@ -107,28 +116,36 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     return () => subscription.unsubscribe()
   }, [fetchUserAndNotifications, fetchUnreadNotifications, supabase.auth])
 
-  // Auto-expand module based on current path
+  // Auto-expand menu items based on current path
   useEffect(() => {
     try {
-      if (!modulesLoading && modules.length > 0 && pathname && locale) {
-        const currentModule = modules.find(module => {
-          if (!module?.items || module.items.length === 0) return false
-          
-          return module.items.some(item => {
-            if (!item?.href) return false
-            return pathname === `/${locale}${item.href}` || 
-                   (item.href !== '/' && pathname.startsWith(`/${locale}${item.href}`))
-          })
-        })
-        
-        if (currentModule && !expandedModules.has(currentModule.id)) {
-          setExpandedModules(prev => new Set([...prev, currentModule.id]))
+      if (!modulesLoading && menuItems.length > 0 && pathname && locale) {
+        const findActiveItem = (items: typeof menuItems): string | null => {
+          for (const item of items) {
+            const itemPath = `/${locale}${item.href}`
+            if (pathname === itemPath || (item.href !== '/' && pathname.startsWith(itemPath))) {
+              return item.id
+            }
+            if (item.children && item.children.length > 0) {
+              const childId = findActiveItem(item.children)
+              if (childId) {
+                // Expand parent if child is active
+                if (!expandedModules.has(item.id)) {
+                  setExpandedModules(prev => new Set([...prev, item.id]))
         }
+                return childId
+              }
+            }
+          }
+          return null
+        }
+        
+        findActiveItem(menuItems)
       }
     } catch (error) {
       console.error('Error in SidebarNavigation useEffect:', error)
     }
-  }, [pathname, locale, modules, modulesLoading, expandedModules])
+  }, [pathname, locale, menuItems, modulesLoading, expandedModules])
 
   // Note: useAdmin handles admin system update events automatically
 
@@ -184,11 +201,11 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
     return () => container.removeEventListener('scroll', handleScroll)
   }, [checkScrollPosition])
 
-  // Recheck scroll position when modules change
+  // Recheck scroll position when menu items count or expanded modules change
   useEffect(() => {
     const timer = setTimeout(checkScrollPosition, 100)
     return () => clearTimeout(timer)
-  }, [modules, expandedModules, checkScrollPosition])
+  }, [menuItems.length, expandedModules, checkScrollPosition])
 
   if (loading) {
     return (
@@ -219,12 +236,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
         
         {/* Header - Fixed */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 flex-shrink-0">
-          <Link href={`/${locale}`} className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">Meen Ma3ana</span>
-          </Link>
+          <Logo size="md" href={`/${locale}/dashboard`} />
           
           <Button
             variant="ghost"
@@ -253,8 +265,23 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
             }}
           >
             <nav className="px-2 space-y-1">
-            
-            {/* Main Navigation Items */}
+            {/* All Menu Items from Database */}
+            {!modulesLoading && menuItems.length > 0 ? (
+              menuItems.map((item) => (
+                <MenuItemComponent
+                  key={item.id}
+                  item={item}
+                  locale={locale}
+                  pathname={pathname}
+                  expandedModules={expandedModules}
+                  toggleModule={toggleModule}
+                  getNavLinkClass={getNavLinkClass}
+                  unreadNotifications={unreadNotifications}
+                />
+              ))
+            ) : (
+              // Fallback while loading or if no menu items
+              <>
             <Link
               href={`/${locale}`}
               className={`${getNavLinkClass('/')} flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors`}
@@ -262,7 +289,6 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
               <Home className="mr-3 h-4 w-4" />
               {t('home')}
             </Link>
-
             <Link
               href={`/${locale}/dashboard`}
               className={`${getNavLinkClass('/dashboard')} flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors`}
@@ -270,79 +296,8 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
               <BarChart3 className="mr-3 h-4 w-4" />
               {t('dashboard')}
             </Link>
-
-            {/* Modular Navigation */}
-            {!modulesLoading && modules.map((module) => {
-              const IconComponent = getIconWithFallback(module.icon)
-              if (!module.name) return null // Ensure module name is present for navigation item retrieval
-
-              // With useAdmin, module.items are already filtered based on permissions
-              const filteredItems = module.items || []
-              const isExpanded = expandedModules.has(module.id)
-
-              if (filteredItems.length === 0) return null
-
-              return (
-                <div key={module.id} className="space-y-1">
-                  {/* Module Header */}
-                  <button
-                    onClick={() => toggleModule(module.id)}
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
-                  >
-                    <div className="flex items-center">
-                      <IconComponent className="mr-3 h-4 w-4" />
-                      <span>{module.display_name}</span>
-                    </div>
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                  </button>
-
-                  {/* Module Items */}
-                  <div className={`ml-6 space-y-1 overflow-hidden transition-all duration-300 ${
-                    isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                  }`}>
-                    {filteredItems.map((item, index) => (
-                      <Link
-                        key={index}
-                        href={`/${locale}${item.href}`}
-                        className={`${getNavLinkClass(item.href)} block px-3 py-2 text-sm rounded-md transition-all duration-200 transform hover:translate-x-1`}
-                        title={item.description}
-                      >
-                        <div className="flex items-center">
-                          <div className={`w-2 h-2 rounded-full mr-3 transition-colors duration-200 ${
-                            pathname === `/${locale}${item.href}` || 
-                            (item.href !== '/' && pathname.startsWith(`/${locale}${item.href}`))
-                              ? 'bg-blue-600' 
-                              : 'bg-gray-300'
-                          }`} />
-                          {item.label}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Notifications */}
-            <Link
-              href={`/${locale}/notifications`}
-              className={`${getNavLinkClass('/notifications')} flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors`}
-            >
-              <div className="flex items-center">
-                <Bell className="mr-3 h-4 w-4" />
-                {t('notifications')}
-              </div>
-              {unreadNotifications > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {unreadNotifications}
-                </Badge>
-              )}
-            </Link>
-
+              </>
+            )}
             </nav>
           </div>
           
@@ -352,15 +307,20 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
           )}
         </div>
 
-        {/* Footer - Fixed */}
+        {/* Footer - Always visible */}
         <div className="border-t border-gray-200 p-4 flex-shrink-0">
-          {/* Language Switcher */}
+          {/* Layout Toggle - Always visible */}
+          <div className="mb-4 flex justify-center">
+            <LayoutToggle />
+          </div>
+          
+          {/* Language Switcher - Always visible */}
           <div className="mb-4">
             <LanguageSwitcher />
           </div>
 
-          {/* User Info */}
-          {user && (
+          {/* User Info - Show if we have a user, otherwise show placeholder */}
+          {stableUser ? (
             <div className="space-y-2">
               <div className="flex items-center space-x-3 px-3 py-2 bg-gray-50 rounded-md">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
@@ -368,10 +328,10 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {user.user_metadata?.full_name || user.email}
+                    {stableUser.user_metadata?.full_name || stableUser.email}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
-                    {user.email}
+                    {stableUser.email}
                   </p>
                 </div>
               </div>
@@ -386,9 +346,126 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
                 {t('signOut')}
               </Button>
             </div>
+          ) : (
+            // Placeholder while loading user
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3 px-3 py-2 bg-gray-50 rounded-md">
+                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center animate-pulse">
+                  <UserIcon className="w-4 h-4 text-gray-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+                  <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3"></div>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleSignOut}
+                variant="ghost"
+                size="sm"
+                disabled
+                className="w-full justify-start text-gray-400"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                {t('signOut')}
+              </Button>
+            </div>
           )}
         </div>
       </div>
     </>
+  )
+}
+
+// Menu Item Component - Recursive rendering
+function MenuItemComponent({
+  item,
+  locale,
+  pathname,
+  expandedModules,
+  toggleModule,
+  getNavLinkClass,
+  unreadNotifications = 0,
+  level = 0
+}: {
+  item: AdminMenuItem
+  locale: string
+  pathname: string
+  expandedModules: Set<string>
+  toggleModule: (id: string) => void
+  getNavLinkClass: (path: string) => string
+  unreadNotifications?: number
+  level?: number
+}) {
+  const IconComponent = getIconWithFallback(item.icon || 'FileText')
+  const hasChildren = item.children && item.children.length > 0
+  const isExpanded = expandedModules.has(item.id)
+  const itemPath = `/${locale}${item.href}`
+  const isActive = pathname === itemPath || (item.href !== '/' && pathname.startsWith(itemPath))
+  // Check if this is the notifications item to show badge
+  const isNotifications = item.href === '/notifications'
+
+  if (hasChildren) {
+    return (
+      <div className="space-y-1">
+        <button
+          onClick={() => toggleModule(item.id)}
+          className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+            isActive
+              ? 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-r-4 border-blue-600 shadow-sm'
+              : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <div className="flex items-center">
+            <IconComponent className="mr-3 h-4 w-4" />
+            <span>{item.label}</span>
+          </div>
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </button>
+
+        {isExpanded && (
+          <div className="ml-6 space-y-1">
+            {item.children!.map((child) => (
+              <MenuItemComponent
+                key={child.id}
+                item={child}
+                locale={locale}
+                pathname={pathname}
+                expandedModules={expandedModules}
+                toggleModule={toggleModule}
+                getNavLinkClass={getNavLinkClass}
+                unreadNotifications={unreadNotifications}
+                level={level + 1}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      href={itemPath}
+      className={`${getNavLinkClass(item.href)} flex items-center ${isNotifications ? 'justify-between' : ''} px-3 py-2 text-sm rounded-md transition-all duration-200 transform hover:translate-x-1`}
+      title={item.description}
+    >
+      <div className="flex items-center">
+        <div className={`w-2 h-2 rounded-full mr-3 transition-colors duration-200 ${
+          isActive ? 'bg-blue-600' : 'bg-gray-300'
+        }`} />
+        {item.icon && <IconComponent className="mr-2 h-4 w-4" />}
+        <span>{item.label}</span>
+      </div>
+      {isNotifications && unreadNotifications > 0 && (
+        <Badge variant="destructive" className="ml-2">
+          {unreadNotifications}
+        </Badge>
+      )}
+    </Link>
   )
 }

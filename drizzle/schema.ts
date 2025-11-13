@@ -296,6 +296,22 @@ export const systemConfig = pgTable('system_config', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
+export const systemContent = pgTable('system_content', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  contentKey: text('content_key').notNull().unique(),
+  titleEn: text('title_en').notNull(),
+  titleAr: text('title_ar').notNull(),
+  contentEn: text('content_en').notNull(),
+  contentAr: text('content_ar').notNull(),
+  description: text('description'),
+  descriptionAr: text('description_ar'),
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
 export const contributionApprovalStatus = pgTable('contribution_approval_status', {
   id: uuid('id').primaryKey().defaultRandom(),
   contribution_id: uuid('contribution_id').notNull().references(() => contributions.id, { onDelete: 'cascade' }),
@@ -483,4 +499,5 @@ export const schema = {
   localization,
   landingStats,
   systemConfig,
+  systemContent,
 }

@@ -7,6 +7,8 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useAdmin } from '@/lib/admin/hooks'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import ContributionHistory from '@/components/profile/ContributionHistory'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -151,6 +153,7 @@ export default function DashboardPage() {
   const params = useParams()
   const { user, signOut } = useAuth()
   const { roles, loading: rolesLoading, refresh: refreshAdminData } = useAdmin()
+  const { containerVariant } = useLayout()
   
   // Debug: Log roles to help diagnose issues
   useEffect(() => {
@@ -159,7 +162,7 @@ export default function DashboardPage() {
       console.log('Primary role (highest level):', roles.sort((a, b) => (b.level || 0) - (a.level || 0))[0]?.name)
     } else if (!rolesLoading && roles.length === 0) {
       console.warn('No roles found for user. User ID:', user?.id)
-      console.warn('This might indicate the user needs roles assigned in /admin/manage')
+      console.warn('This might indicate the user needs roles assigned in /rbac/users')
     }
   }, [roles, rolesLoading, user?.id])
   
@@ -312,7 +315,7 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <Container variant={containerVariant} className="py-8">
           {/* Header */}
           <div className="mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -594,7 +597,7 @@ export default function DashboardPage() {
               </Card>
             </PermissionGuard>
           </div>
-        </div>
+        </Container>
       </div>
     </ProtectedRoute>
   )

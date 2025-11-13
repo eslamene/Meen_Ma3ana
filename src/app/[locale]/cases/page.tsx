@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { 
   Search, 
   Grid, 
@@ -61,6 +63,7 @@ export default function CasesPage() {
   const router = useRouter()
   const locale = params.locale as string
   const { hasPermission } = useAdmin()
+  const { containerVariant } = useLayout()
   // Check if user can create cases
   const canCreateCase = hasPermission('cases:create')
 
@@ -285,8 +288,8 @@ export default function CasesPage() {
         </Card>
       </div>
     }>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+        <Container variant={containerVariant} className="py-8">
         {/* Enhanced Header */}
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
@@ -565,8 +568,8 @@ export default function CasesPage() {
             )}
           </div>
         </div>
+        </Container>
       </div>
-    </div>
     </PermissionGuard>
   )
 } 

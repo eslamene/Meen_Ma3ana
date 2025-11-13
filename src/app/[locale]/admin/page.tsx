@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { useAdmin } from '@/lib/admin/hooks'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -153,6 +155,7 @@ export default function AdminPage() {
   const router = useRouter()
   const params = useParams()
   const { roles } = useAdmin()
+  const { containerVariant } = useLayout()
   // Get primary role (first role or highest level)
   const primaryRole = roles.length > 0 ? roles[0] : null
   const userRoleDisplayName = primaryRole?.display_name || 'User'
@@ -340,7 +343,7 @@ export default function AdminPage() {
     <ProtectedRoute>
       <PermissionGuard permission="admin:dashboard">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-          <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+          <Container variant={containerVariant} className="py-8">
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
@@ -556,8 +559,8 @@ export default function AdminPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </div>
+        </Container>
+      </div>
       </PermissionGuard>
     </ProtectedRoute>
   )

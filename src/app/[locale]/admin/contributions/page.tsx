@@ -12,6 +12,8 @@ import { ArrowLeft, Heart, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import ContributionsList from '@/components/contributions/ContributionsList'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 
 interface Contribution {
   id: string
@@ -65,6 +67,7 @@ export default function AdminContributionsPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { containerVariant } = useLayout()
   
   // Get status from URL query parameter
   const urlStatus = searchParams.get('status') || 'all'
@@ -221,7 +224,7 @@ export default function AdminContributionsPage() {
     <ProtectedRoute>
       <PermissionGuard permission="contributions:manage">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Container variant={containerVariant}>
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center gap-4 mb-4">
@@ -343,7 +346,7 @@ export default function AdminContributionsPage() {
               onPageChange={handlePageChange}
               onRefresh={handleRefresh}
             />
-          </div>
+          </Container>
         </div>
       </PermissionGuard>
     </ProtectedRoute>
