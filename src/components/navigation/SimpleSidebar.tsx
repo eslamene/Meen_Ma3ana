@@ -1,14 +1,17 @@
 'use client'
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import Logo from '@/components/ui/Logo'
+import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
 import { useAdmin } from '@/lib/admin/hooks'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { User } from '@supabase/supabase-js'
 import { 
   X, 
   Home, 
@@ -17,6 +20,7 @@ import {
   LogOut, 
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Heart,
   BarChart3,
   Users,
@@ -31,9 +35,16 @@ import type { AdminMenuItem } from '@/lib/admin/types'
 interface SimpleSidebarProps {
   isOpen: boolean
   onToggle: () => void
+  collapsed?: boolean
+  onCollapseToggle?: () => void
 }
 
-export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) {
+export default function SimpleSidebar({ 
+  isOpen, 
+  onToggle, 
+  collapsed = false,
+  onCollapseToggle 
+}: SimpleSidebarProps) {
   const t = useTranslations('navigation')
   const params = useParams()
   const router = useRouter()
@@ -45,6 +56,21 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
 
   const supabase = createClient()
   const { user, loading, menuItems } = useAdmin()
+  
+  // Store user in ref to prevent footer from disappearing during re-renders
+  const userRef = useRef<User | null>(null)
+  const hasLoadedUserRef = useRef<boolean>(false)
+  
+  useEffect(() => {
+    if (user) {
+      userRef.current = user
+      hasLoadedUserRef.current = true
+    }
+  }, [user])
+  
+  // Use ref value for footer rendering to ensure stability
+  // Always use ref if we've previously loaded a user, otherwise use current user
+  const stableUser = user || (hasLoadedUserRef.current ? userRef.current : null)
   
   // Menu items are already in tree structure from useAdmin hook
   // They are filtered by permissions and sorted by sort_order
@@ -111,15 +137,122 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
   }
 
   // Show loading only on initial load, not on every re-render
+  // But still show the footer even during loading
   if (loading && menuItems.length === 0) {
     return (
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0`}>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <>
+        {/* Overlay for mobile */}
+        {isOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={onToggle}
+          />
+        )}
+
+        {/* Sidebar - Always fixed, never scrolls with page */}
+        <div className={`fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-all duration-300 flex flex-col h-screen ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0 ${
+          collapsed ? 'w-20' : 'w-64'
+        }`}>
+          {/* Header */}
+          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 flex-shrink-0">
+            {!collapsed && (
+              <Logo size="md" href={`/${locale}/dashboard`} />
+            )}
+            {collapsed && (
+              <Logo size="sm" href={`/${locale}/dashboard`} showText={false} />
+            )}
+            
+            <div className="flex items-center gap-2">
+              {onCollapseToggle && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onCollapseToggle}
+                  className="hidden lg:flex"
+                  aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                  <ChevronLeft className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+                </Button>
+              )}
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggle}
+                className="lg:hidden"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Loading Content - Scrollable area */}
+          <div className="flex-1 overflow-y-auto min-h-0 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+
+          {/* Footer - Fixed at bottom, always visible */}
+          <div className={`border-t-2 border-gray-200/60 bg-gradient-to-b from-white via-gray-50/30 to-white ${collapsed ? 'p-3' : 'p-5'} space-y-4 flex-shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]`}>
+            {!collapsed && (
+              <div className="flex justify-center w-full">
+                <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl p-2 border border-gray-200/60 shadow-sm">
+                  <LayoutToggle />
+                </div>
+              </div>
+            )}
+            <div className="flex justify-center w-full">
+              <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl p-2 border border-gray-200/60 shadow-sm">
+                <LanguageSwitcher />
+              </div>
+            </div>
+            <div className={`bg-gradient-to-br from-white to-gray-50/50 rounded-xl p-3 border border-gray-200/60 shadow-sm ${collapsed ? 'flex justify-center' : ''}`}>
+              <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'} w-full`}>
+                {stableUser ? (
+                  <>
+                    <div className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#6B8E7E]/80 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ring-2 ring-white">
+                      <UserIcon className="w-5 h-5 text-white" />
+                    </div>
+                    {!collapsed && (
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {stableUser.email?.split('@')[0] || 'User'}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {stableUser.email || 'Loading...'}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse ring-2 ring-white">
+                      <UserIcon className="w-5 h-5 text-gray-600" />
+                    </div>
+                    {!collapsed && (
+                      <div className="flex-1 min-w-0">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse mb-1.5"></div>
+                        <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3"></div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleSignOut}
+              disabled={!stableUser}
+              className={`w-full ${collapsed ? 'px-2 h-10' : 'h-11'} bg-white/80 backdrop-blur-sm border-red-200/60 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-50/50 hover:border-red-300 hover:text-[#E74C3C] transition-all duration-200 shadow-sm font-medium`}
+              title={collapsed ? t('signOut') : undefined}
+            >
+              <LogOut className={`${collapsed ? '' : 'mr-2'} h-4 w-4`} />
+              {!collapsed && <span>{t('signOut')}</span>}
+            </Button>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -133,33 +266,51 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
         />
       )}
 
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 flex flex-col ${
+      {/* Sidebar - Always fixed, never scrolls with page */}
+      <div className={`fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-white via-gray-50/50 to-white shadow-xl border-r border-gray-200/80 transform transition-all duration-300 flex flex-col h-screen ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0`}>
+      } lg:translate-x-0 ${
+        collapsed ? 'w-20' : 'w-64'
+      }`}>
         
-        {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 flex-shrink-0">
-          <Link href={`/${locale}`} className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">Meen Ma3ana</span>
-          </Link>
+        {/* Header - Fixed at top */}
+        <div className="flex items-center justify-between h-20 px-4 border-b border-gray-200/60 bg-gradient-to-r from-[#6B8E7E]/5 via-white to-[#E74C3C]/5 flex-shrink-0 backdrop-blur-sm">
+          {!collapsed && (
+            <Logo size="md" href={`/${locale}/dashboard`} />
+          )}
+          {collapsed && (
+            <Logo size="sm" href={`/${locale}/dashboard`} showText={false} />
+          )}
           
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggle}
-            className="lg:hidden"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Collapse Toggle - Desktop only */}
+            {onCollapseToggle && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onCollapseToggle}
+                className="hidden lg:flex hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors"
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                <ChevronLeft className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+              </Button>
+            )}
+            
+            {/* Close Button - Mobile only */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggle}
+              className="lg:hidden hover:bg-red-50 hover:text-[#E74C3C] transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto">
-          <nav className="p-4 space-y-2">
+        {/* Navigation - Scrollable area, takes remaining space */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+          <nav className={`${collapsed ? 'p-2' : 'p-4'} space-y-1.5`}>
             {/* All Menu Items from Database */}
             {!loading && menuItems.length > 0 ? (
               menuItems.map((item) => (
@@ -174,6 +325,7 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
                   getIcon={getIcon}
                   notificationCount={notificationCount}
                   level={0}
+                  collapsed={collapsed}
                 />
               ))
             ) : (
@@ -181,63 +333,97 @@ export default function SimpleSidebar({ isOpen, onToggle }: SimpleSidebarProps) 
               <>
             <Link
               href={`/${locale}`}
-              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center ${collapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 isActive('') 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-gradient-to-r from-[#6B8E7E] to-[#6B8E7E]/90 text-white shadow-md shadow-[#6B8E7E]/20' 
+                  : 'text-gray-700 hover:bg-gradient-to-r hover:from-[#6B8E7E]/10 hover:to-[#6B8E7E]/5 hover:text-[#6B8E7E] hover:shadow-sm'
               }`}
+              title={collapsed ? t('home') : undefined}
             >
-              <Home className="mr-3 h-4 w-4" />
-              {t('home')}
+              <Home className={`${collapsed ? '' : 'mr-3'} h-4 w-4`} />
+              {!collapsed && <span>{t('home')}</span>}
             </Link>
             <Link
               href={`/${locale}/dashboard`}
-              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center ${collapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 isActive('/dashboard') 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-gradient-to-r from-[#6B8E7E] to-[#6B8E7E]/90 text-white shadow-md shadow-[#6B8E7E]/20' 
+                  : 'text-gray-700 hover:bg-gradient-to-r hover:from-[#6B8E7E]/10 hover:to-[#6B8E7E]/5 hover:text-[#6B8E7E] hover:shadow-sm'
               }`}
+              title={collapsed ? t('dashboard') : undefined}
             >
-              <BarChart3 className="mr-3 h-4 w-4" />
-              {t('dashboard')}
+              <BarChart3 className={`${collapsed ? '' : 'mr-3'} h-4 w-4`} />
+              {!collapsed && <span>{t('dashboard')}</span>}
             </Link>
               </>
             )}
           </nav>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 p-4 space-y-4">
-          {/* Language Switcher */}
-          <div className="flex justify-center">
-            <LanguageSwitcher />
-          </div>
-
-          {/* User Info */}
-          {user && (
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <UserIcon className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {user.email}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {user.email}
-                </p>
+        {/* Footer - Fixed at bottom, always visible */}
+        <div className={`border-t-2 border-gray-200/60 bg-gradient-to-b from-white via-gray-50/30 to-white ${collapsed ? 'p-3' : 'p-5'} space-y-4 flex-shrink-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]`}>
+          {/* Layout Toggle - Always visible when not collapsed */}
+          {!collapsed && (
+            <div className="flex justify-center w-full">
+              <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl p-2 border border-gray-200/60 shadow-sm">
+                <LayoutToggle />
               </div>
             </div>
           )}
+          
+          {/* Language Switcher - Always visible */}
+          <div className="flex justify-center w-full">
+            <div className="w-full bg-white/80 backdrop-blur-sm rounded-xl p-2 border border-gray-200/60 shadow-sm">
+              <LanguageSwitcher />
+            </div>
+          </div>
 
-          {/* Sign Out */}
+          {/* User Info Card - Enhanced styling */}
+          <div className={`bg-gradient-to-br from-white to-gray-50/50 rounded-xl p-3 border border-gray-200/60 shadow-sm ${collapsed ? 'flex justify-center' : ''}`}>
+            <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'} w-full`}>
+              {stableUser ? (
+                <>
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#6B8E7E]/80 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ring-2 ring-white">
+                    <UserIcon className="w-5 h-5 text-white" />
+                  </div>
+                  {!collapsed && (
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {stableUser.email?.split('@')[0] || 'User'}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {stableUser.email || 'Loading...'}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Placeholder while loading user */}
+                  <div className="w-10 h-10 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse ring-2 ring-white">
+                    <UserIcon className="w-5 h-5 text-gray-600" />
+                  </div>
+                  {!collapsed && (
+                    <div className="flex-1 min-w-0">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse mb-1.5"></div>
+                      <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3"></div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Sign Out - Enhanced button styling */}
           <Button
             variant="outline"
             onClick={handleSignOut}
-            className="w-full"
+            disabled={!stableUser}
+            className={`w-full ${collapsed ? 'px-2 h-10' : 'h-11'} bg-white/80 backdrop-blur-sm border-red-200/60 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-50/50 hover:border-red-300 hover:text-[#E74C3C] transition-all duration-200 shadow-sm font-medium`}
+            title={collapsed ? t('signOut') : undefined}
           >
-            <LogOut className="mr-2 h-4 w-4" />
-            {t('signOut')}
+            <LogOut className={`${collapsed ? '' : 'mr-2'} h-4 w-4`} />
+            {!collapsed && <span>{t('signOut')}</span>}
           </Button>
         </div>
       </div>
@@ -255,7 +441,8 @@ function MenuItemComponent({
   isActive,
   getIcon,
   notificationCount = 0,
-  level = 0
+  level = 0,
+  collapsed = false
 }: {
   item: AdminMenuItem
   locale: string
@@ -266,6 +453,7 @@ function MenuItemComponent({
   getIcon: (iconName: string) => React.ComponentType<any>
   notificationCount?: number
   level?: number
+  collapsed?: boolean
 }) {
   const IconComponent = getIcon(item.icon || 'FileText')
   const hasChildren = item.children && item.children.length > 0
@@ -275,14 +463,19 @@ function MenuItemComponent({
   const isNotifications = item.href === '/notifications'
 
   if (hasChildren) {
+    // When collapsed, don't show expandable items with children
+    if (collapsed) {
+      return null
+    }
+    
     return (
       <div className="space-y-1">
         <button
           onClick={() => toggleModule(item.id)}
-          className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
             itemIsActive
-              ? 'bg-blue-100 text-blue-700'
-              : 'text-gray-700 hover:bg-gray-100'
+              ? 'bg-gradient-to-r from-[#6B8E7E] to-[#6B8E7E]/90 text-white shadow-md shadow-[#6B8E7E]/20'
+              : 'text-gray-700 hover:bg-gradient-to-r hover:from-[#6B8E7E]/10 hover:to-[#6B8E7E]/5 hover:text-[#6B8E7E] hover:shadow-sm'
           }`}
         >
           <div className="flex items-center">
@@ -310,6 +503,7 @@ function MenuItemComponent({
                 getIcon={getIcon}
                 notificationCount={notificationCount}
                 level={level + 1}
+                collapsed={collapsed}
               />
             ))}
           </div>
@@ -321,19 +515,25 @@ function MenuItemComponent({
   return (
     <Link
       href={itemPath}
-      className={`flex items-center ${isNotifications ? 'justify-between' : ''} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+      className={`relative flex items-center ${collapsed ? 'justify-center px-2' : isNotifications ? 'justify-between px-3' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
         itemIsActive
-          ? 'bg-blue-100 text-blue-700'
-          : 'text-gray-700 hover:bg-gray-100'
+          ? 'bg-gradient-to-r from-[#6B8E7E] to-[#6B8E7E]/90 text-white shadow-md shadow-[#6B8E7E]/20'
+          : 'text-gray-700 hover:bg-gradient-to-r hover:from-[#6B8E7E]/10 hover:to-[#6B8E7E]/5 hover:text-[#6B8E7E] hover:shadow-sm'
       }`}
+      title={collapsed ? item.label : undefined}
     >
-      <div className="flex items-center">
-        <IconComponent className="mr-3 h-4 w-4" />
-        {item.label}
+      <div className={`flex items-center ${collapsed ? '' : 'flex-1'}`}>
+        <IconComponent className={`${collapsed ? '' : 'mr-3'} h-4 w-4`} />
+        {!collapsed && <span>{item.label}</span>}
       </div>
-      {isNotifications && notificationCount > 0 && (
-        <Badge variant="destructive" className="ml-2">
+      {!collapsed && isNotifications && notificationCount > 0 && (
+        <Badge variant="destructive" className="ml-2 bg-[#E74C3C] text-white shadow-sm">
           {notificationCount}
+        </Badge>
+      )}
+      {collapsed && isNotifications && notificationCount > 0 && (
+        <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full bg-[#E74C3C] text-white shadow-md">
+          {notificationCount > 9 ? '9+' : notificationCount}
         </Badge>
       )}
     </Link>

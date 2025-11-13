@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { safeFetch } from '@/lib/utils/safe-fetch'
 import { RoleFormModal } from '@/components/admin/rbac/RoleFormModal'
 import { PermissionAssignmentModal } from '@/components/admin/rbac/PermissionAssignmentModal'
@@ -33,6 +35,7 @@ interface Permission {
 }
 
 export default function AdminRolesPage() {
+  const { containerVariant } = useLayout()
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(true)
@@ -184,7 +187,8 @@ export default function AdminRolesPage() {
 
   return (
     <PermissionGuard permission="admin:roles">
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-6">
         <div>
           <h1 className="text-3xl font-bold">Role Management</h1>
           <p className="text-muted-foreground">
@@ -270,6 +274,7 @@ export default function AdminRolesPage() {
             onSave={(permissionIds) => handleAssignPermissions(selectedRole.id, permissionIds)}
           />
         )}
+        </Container>
       </div>
     </PermissionGuard>
   )

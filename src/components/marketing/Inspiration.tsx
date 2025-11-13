@@ -15,7 +15,9 @@ export default function Inspiration() {
   }>
 
   return (
-    <section className="bg-gradient-to-br from-gray-900 to-[#6B8E7E] py-20 text-white">
+    <section className="bg-gradient-to-br from-gray-900 to-[#6B8E7E] py-20 text-white relative">
+      {/* Decorative top border */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto space-y-6">
           {quotes.map((quote, index) => (

@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { ArrowLeft, Save, User, Phone, MapPin, IdCard, AlertCircle, Search, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +20,7 @@ import type { CreateBeneficiaryData, City, IdType } from '@/types/beneficiary'
 export default function CreateBeneficiaryPage() {
   const t = useTranslations('beneficiaries')
   const router = useRouter()
+  const { containerVariant } = useLayout()
   
   // State
   const [formData, setFormData] = useState<CreateBeneficiaryData>({
@@ -205,16 +208,19 @@ export default function CreateBeneficiaryPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </Container>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <Container variant={containerVariant} className="py-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Button
@@ -593,6 +599,7 @@ export default function CreateBeneficiaryPage() {
           </Button>
         </div>
       </form>
+      </Container>
     </div>
   )
 }

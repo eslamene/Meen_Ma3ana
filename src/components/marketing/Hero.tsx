@@ -106,6 +106,12 @@ export default function Hero() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center" style={{ animation: 'fadeInUp 0.8s ease-out 0.6s forwards', opacity: 0 }}>
             <a
+              href="#contact"
+              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-[#6B8E7E] to-[#5a7a6b] hover:from-[#5a7a6b] hover:to-[#4a6a5b] rounded-lg transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
+            >
+              {t('ctaPrimary')}
+            </a>
+            <a
               href="#features"
               className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-gray-700 bg-transparent rounded-lg border-2 border-gray-300 hover:border-[#6B8E7E] hover:text-[#6B8E7C] transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
             >

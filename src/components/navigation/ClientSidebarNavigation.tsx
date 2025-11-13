@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import Logo from '@/components/ui/Logo'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useMenuState } from '@/lib/hooks/useMenuState'
@@ -80,10 +81,7 @@ export default function ClientSidebarNavigation({
     } lg:translate-x-0 lg:static lg:inset-0`}>
       {/* Header */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-        <div className="flex items-center space-x-2">
-          <Heart className="h-8 w-8 text-red-500" />
-          <span className="text-xl font-bold text-gray-900">Meen Ma3ana</span>
-        </div>
+        <Logo size="md" href={`/${locale}/dashboard`} />
         <Button
           variant="ghost"
           size="sm"

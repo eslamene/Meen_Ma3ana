@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { safeFetch } from '@/lib/utils/safe-fetch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -49,6 +51,7 @@ interface Permission {
 }
 
 export default function AdminMenuPage() {
+  const { containerVariant } = useLayout()
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [originalMenuItems, setOriginalMenuItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,6 +62,8 @@ export default function AdminMenuPage() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [editForm, setEditForm] = useState<Partial<MenuItem>>({})
   const [isSaving, setIsSaving] = useState(false)
+  const [deletingItem, setDeletingItem] = useState<MenuItem | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set()) // Track expanded items
   const [hoveredDropZone, setHoveredDropZone] = useState<{ itemId: string; position: 'before' | 'after' } | null>(null) // Track hovered drop zone
   const { toast } = useToast()
@@ -72,9 +77,11 @@ export default function AdminMenuPage() {
 
       if (menuRes.ok) {
         const items = menuRes.data?.menuItems || []
+        console.log('Fetched menu items:', items.length, 'items')
         setMenuItems(items)
         setOriginalMenuItems(JSON.parse(JSON.stringify(items))) // Deep copy for comparison
       } else {
+        console.error('Failed to fetch menu items:', menuRes)
         toast({
           title: 'Error',
           description: 'Failed to fetch menu items',
@@ -602,9 +609,90 @@ export default function AdminMenuPage() {
     }
   }
 
+  // Handle delete
+  const handleDelete = (item: MenuItem) => {
+    setDeletingItem(item)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return
+
+    try {
+      setIsDeleting(true)
+
+      // Check if item has children
+      const hasChildren = menuItems.some(item => item.parent_id === deletingItem.id)
+      if (hasChildren) {
+        toast({
+          title: 'Cannot Delete',
+          description: 'This menu item has children. Please delete or move child items first.',
+          type: 'error'
+        })
+        setDeletingItem(null)
+        setIsDeleting(false)
+        return
+      }
+
+      const res = await safeFetch(`/api/admin/menu/${deletingItem.id}`, {
+        method: 'DELETE'
+      })
+
+      console.log('Delete response:', { ok: res.ok, status: res.status, data: res.data, error: res.error })
+
+      if (res.ok && res.status === 200) {
+        toast({
+          title: 'Success',
+          description: 'Menu item deleted successfully',
+          type: 'default'
+        })
+        setDeletingItem(null)
+        // Force refresh menu items
+        await fetchMenuItems()
+        await refreshAdmin()
+      } else {
+        let errorMessage = 'Failed to delete menu item'
+        
+        if (res.error) {
+          errorMessage = res.error
+        } else if (res.data) {
+          if (typeof res.data === 'string') {
+            errorMessage = res.data
+          } else if (res.data.error) {
+            errorMessage = res.data.error
+            if (res.data.details) {
+              errorMessage += `: ${res.data.details}`
+            }
+          } else if (res.data.details) {
+            errorMessage = res.data.details
+          } else if (res.data.message) {
+            errorMessage = res.data.message
+          }
+        }
+        
+        console.error('Delete failed:', { status: res.status, error: errorMessage, response: res })
+        
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          type: 'error'
+        })
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete menu item',
+        type: 'error'
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <PermissionGuard permission="admin:menu">
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-6">
         <div>
           <h1 className="text-3xl font-bold">Menu Management</h1>
           <p className="text-muted-foreground">
@@ -755,6 +843,7 @@ export default function AdminMenuPage() {
                           onDragEnd={handleDragEnd}
                           onDrop={handleDrop}
                           onEdit={handleEdit}
+                          onDelete={handleDelete}
                           draggedItem={draggedItem}
                           dragOverItem={dragOverItem}
                           level={0}
@@ -833,18 +922,19 @@ export default function AdminMenuPage() {
                             setDropPlaceholderIndex(null)
                           }}
                         />
-                        <MenuItemComponent
-                          item={item}
-                          allItems={menuItems}
-                          onDragStart={handleDragStart}
-                          onDragOver={handleDragOver}
-                          onDragLeave={handleDragLeave}
-                          onDragEnd={handleDragEnd}
-                          onDrop={handleDrop}
-                          onEdit={handleEdit}
-                          draggedItem={draggedItem}
-                          dragOverItem={dragOverItem}
-                          level={0}
+                      <MenuItemComponent
+                        item={item}
+                        allItems={menuItems}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDragEnd={handleDragEnd}
+                        onDrop={handleDrop}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        draggedItem={draggedItem}
+                        dragOverItem={dragOverItem}
+                        level={0}
                           expandedItems={expandedItems}
                           onToggleExpand={toggleExpand}
                           hoveredDropZone={hoveredDropZone}
@@ -987,6 +1077,62 @@ export default function AdminMenuPage() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        {deletingItem && (
+          <Dialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Menu Item</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete &quot;{deletingItem.label}&quot;? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              {deletingItem.children && deletingItem.children.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-800">
+                        This menu item has {deletingItem.children.length} child item(s).
+                      </p>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Please delete or move child items first before deleting this item.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setDeletingItem(null)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting || (deletingItem.children && deletingItem.children.length > 0)}
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+        </Container>
       </div>
     </PermissionGuard>
   )
@@ -1002,6 +1148,7 @@ function MenuItemComponent({
   onDragEnd,
   onDrop,
   onEdit,
+  onDelete,
   draggedItem,
   dragOverItem,
   level = 0,
@@ -1018,6 +1165,7 @@ function MenuItemComponent({
   onDragEnd: () => void
   onDrop: (e: React.DragEvent, item: MenuItem) => void
   onEdit: (item: MenuItem) => void
+  onDelete: (item: MenuItem) => void
   draggedItem: MenuItem | null
   dragOverItem: MenuItem | null
   level?: number
@@ -1112,19 +1260,34 @@ function MenuItemComponent({
               </Badge>
               </div>
             </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="h-8 px-2 sm:px-3 flex-shrink-0"
-            onClick={(e) => {
-              e.stopPropagation()
-              onEdit(item)
-            }}
-            type="button"
-          >
-            <Edit2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Edit</span>
-          </Button>
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="h-8 px-2 sm:px-3 flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(item)
+              }}
+              type="button"
+            >
+              <Edit2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Edit</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="h-8 px-2 sm:px-3 flex-shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(item)
+              }}
+              type="button"
+            >
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Delete</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1174,23 +1337,24 @@ function MenuItemComponent({
                     setHoveredDropZone(null)
                   }}
                 />
-                <MenuItemComponent
-                  item={child}
-                  allItems={allItems}
-                  onDragStart={onDragStart}
-                  onDragOver={onDragOver}
-                  onDragLeave={onDragLeave}
-                  onDragEnd={onDragEnd}
-                  onDrop={onDrop}
-                  onEdit={onEdit}
-                  draggedItem={draggedItem}
-                  dragOverItem={dragOverItem}
-                  level={level + 1}
+            <MenuItemComponent
+              item={child}
+              allItems={allItems}
+              onDragStart={onDragStart}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDragEnd={onDragEnd}
+              onDrop={onDrop}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              draggedItem={draggedItem}
+              dragOverItem={dragOverItem}
+              level={level + 1}
                   expandedItems={expandedItems}
                   onToggleExpand={onToggleExpand}
                   hoveredDropZone={hoveredDropZone}
                   setHoveredDropZone={setHoveredDropZone}
-                />
+            />
                 {/* Drop zone after child */}
                 <div
                   className={`

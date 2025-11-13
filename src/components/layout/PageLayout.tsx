@@ -1,38 +1,59 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useContext } from 'react'
 import { usePathname } from 'next/navigation'
 import ConditionalLayout from '@/components/layout/ConditionalLayout'
 import Breadcrumbs from '@/components/navigation/Breadcrumbs'
+import Container, { ContainerVariant } from '@/components/layout/Container'
+import { LayoutContext } from '@/components/layout/LayoutProvider'
 
 interface PageLayoutProps {
   children: ReactNode
   showBreadcrumbs?: boolean
   className?: string
+  /**
+   * Container variant for this page (overrides global preference)
+   */
+  containerVariant?: ContainerVariant
+  /**
+   * Whether to use global layout preference
+   * @default true
+   */
+  useGlobalLayout?: boolean
 }
 
 export default function PageLayout({ 
   children, 
   showBreadcrumbs = true, 
-  className = "" 
+  className = "",
+  containerVariant,
+  useGlobalLayout = true,
 }: PageLayoutProps) {
   const pathname = usePathname()
+  const layoutContext = useContext(LayoutContext)
+  
+  // Use page-specific variant if provided, otherwise use global or default to boxed
+  const variant = containerVariant || (useGlobalLayout && layoutContext 
+    ? layoutContext.containerVariant 
+    : 'boxed')
   
   // Don't show breadcrumbs on home page or if explicitly disabled
   const shouldShowBreadcrumbs = showBreadcrumbs && !pathname?.endsWith('/en') && !pathname?.endsWith('/ar')
 
   return (
     <ConditionalLayout>
-      <div className={`${className}`}>
+      <div className={className}>
         {shouldShowBreadcrumbs && (
           <div className="bg-white border-b border-gray-200">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <Container variant={variant} className="py-4">
               <Breadcrumbs />
-            </div>
+            </Container>
           </div>
         )}
         
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Allow children to control their own container if needed */}
+        {/* If children need full-width backgrounds, they should wrap content in Container themselves */}
+        <div>
           {children}
         </div>
       </div>

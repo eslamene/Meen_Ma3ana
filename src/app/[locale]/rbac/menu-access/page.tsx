@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { safeFetch } from '@/lib/utils/safe-fetch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +50,7 @@ interface MenuItem {
 }
 
 export default function MenuAccessPage() {
+  const { containerVariant } = useLayout()
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
@@ -182,7 +185,8 @@ export default function MenuAccessPage() {
 
   return (
     <PermissionGuard permission="admin:menu">
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-6">
         <div>
           <h1 className="text-3xl font-bold">Menu Access Management</h1>
           <p className="text-muted-foreground">
@@ -227,6 +231,7 @@ export default function MenuAccessPage() {
             </div>
           </CardContent>
         </Card>
+        </Container>
       </div>
     </PermissionGuard>
   )

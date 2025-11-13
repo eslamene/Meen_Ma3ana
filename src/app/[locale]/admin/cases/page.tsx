@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { 
   Target, 
   Plus, 
@@ -53,6 +55,7 @@ interface Case {
 export default function AdminCasesPage() {
   const router = useRouter()
   const params = useParams()
+  const { containerVariant } = useLayout()
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -421,7 +424,7 @@ export default function AdminCasesPage() {
     <ProtectedRoute>
       <PermissionGuard permission="cases:manage">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-          <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+          <Container variant={containerVariant} className="py-8">
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center gap-4 mb-4">
@@ -774,7 +777,7 @@ export default function AdminCasesPage() {
                 )}
               </>
             )}
-          </div>
+          </Container>
         </div>
 
         {/* Delete Confirmation Dialog */}

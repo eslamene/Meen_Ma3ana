@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +29,7 @@ export default function CreateProjectPage() {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
+  const { containerVariant } = useLayout()
 
   const [formData, setFormData] = useState<ProjectFormData>({
     name: '',
@@ -150,7 +153,8 @@ export default function CreateProjectPage() {
   ]
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <Container variant={containerVariant} className="py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Create New Project</h1>
         <p className="text-gray-600">
@@ -312,6 +316,7 @@ export default function CreateProjectPage() {
           </form>
         </CardContent>
       </Card>
+      </Container>
     </div>
   )
 } 

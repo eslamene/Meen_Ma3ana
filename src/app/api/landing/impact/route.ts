@@ -212,7 +212,8 @@ export async function GET() {
     `
 
     // Transform the view data to match the expected format
-    const monthlyBreakdown = monthlyBreakdownData.map((row) => {
+    // Ensure monthlyBreakdownData is an array before mapping
+    const monthlyBreakdown = (Array.isArray(monthlyBreakdownData) ? monthlyBreakdownData : []).map((row) => {
       const monthNum = Number(row.month)
       const yearNum = Number(row.year)
       const monthInfo = monthNames[monthNum] || { en: `Month ${monthNum}`, ar: `شهر ${monthNum}` }
@@ -254,8 +255,10 @@ export async function GET() {
     `
 
     // Transform the view data to match the expected format
+    // Ensure categorySummaryData is an array before iterating
     const categorySummary: Record<string, any> = {}
-    for (const row of categorySummaryData) {
+    const safeCategoryData = Array.isArray(categorySummaryData) ? categorySummaryData : []
+    for (const row of safeCategoryData) {
       // Use category_id as key, or generate a slug from name_en
       const categoryKey = (row.name_en as string)?.toLowerCase().replace(/\s+/g, '').replace(/&/g, '') || `category_${row.category_id}`
       

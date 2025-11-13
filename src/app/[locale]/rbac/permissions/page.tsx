@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { safeFetch } from '@/lib/utils/safe-fetch'
 import { PermissionFormModal } from '@/components/admin/rbac/PermissionFormModal'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -21,6 +23,7 @@ interface Permission {
 }
 
 export default function AdminPermissionsPage() {
+  const { containerVariant } = useLayout()
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(true)
   const [createPermissionModal, setCreatePermissionModal] = useState(false)
@@ -121,7 +124,8 @@ export default function AdminPermissionsPage() {
 
   return (
     <PermissionGuard permission="admin:permissions">
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-6">
         <div>
           <h1 className="text-3xl font-bold">Permission Management</h1>
           <p className="text-muted-foreground">
@@ -214,6 +218,7 @@ export default function AdminPermissionsPage() {
             permission={selectedPermission}
           />
         )}
+        </Container>
       </div>
     </PermissionGuard>
   )

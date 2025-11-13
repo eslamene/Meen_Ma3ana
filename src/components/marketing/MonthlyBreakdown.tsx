@@ -59,7 +59,9 @@ export default function MonthlyBreakdown() {
         const response = await fetch('/api/landing/impact')
         if (response.ok) {
           const data = await response.json()
-          const dataWithYear = (data.monthlyBreakdown || []).map((item: any) => ({
+          // Ensure monthlyBreakdown is an array before mapping
+          const monthlyBreakdown = Array.isArray(data.monthlyBreakdown) ? data.monthlyBreakdown : []
+          const dataWithYear = monthlyBreakdown.map((item: any) => ({
             ...item,
             year: Number(item.year) || new Date().getFullYear(), // Ensure year is present and numeric
             month: Number(item.month) || 1 // Ensure month is numeric
@@ -314,32 +316,32 @@ export default function MonthlyBreakdown() {
         {/* Carousel Container */}
         <div className="relative w-full">
           <div className="flex items-center gap-2 md:gap-4">
-            {/* Left Arrow - Hidden on mobile */}
-            {canScrollLeft && (
-              <button
-                onClick={() => scroll('left')}
+          {/* Left Arrow - Hidden on mobile */}
+          {canScrollLeft && (
+            <button
+              onClick={() => scroll('left')}
                 className="hidden md:flex flex-shrink-0 items-center justify-center w-10 h-10 bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-[#6B8E7E] hover:text-white group z-10"
-                aria-label={isRTL ? 'الشهر السابق' : 'Previous month'}
-              >
+              aria-label={isRTL ? 'الشهر السابق' : 'Previous month'}
+            >
                 <ChevronLeft className="h-5 w-5 text-gray-700 group-hover:text-white transition-colors" />
-              </button>
-            )}
+            </button>
+          )}
 
-            {/* Scrollable Container */}
+          {/* Scrollable Container */}
             <div className="flex-1 relative overflow-hidden">
-              <div 
-                ref={scrollContainerRef}
-                className="monthly-carousel flex gap-4 md:gap-6 overflow-x-auto pb-6 scroll-smooth snap-x snap-mandatory"
-                style={{
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none',
-                  WebkitOverflowScrolling: 'touch',
+          <div 
+            ref={scrollContainerRef}
+            className="monthly-carousel flex gap-4 md:gap-6 overflow-x-auto pb-6 scroll-smooth snap-x snap-mandatory"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch',
                   paddingLeft: 'clamp(16px, 4vw, 96px)',
                   paddingRight: 'clamp(16px, 4vw, 96px)',
-                  overscrollBehaviorX: 'none',
-                  overscrollBehaviorY: 'auto', // Allow vertical page scrolling
-                }}
-              >
+              overscrollBehaviorX: 'none',
+              overscrollBehaviorY: 'auto', // Allow vertical page scrolling
+            }}
+          >
             {/* Extra spacer at the start to prevent overlap with left arrow - responsive */}
             <div className="flex-shrink-0 w-8 md:w-32" aria-hidden={true} style={{ pointerEvents: 'none' }} />
             {/* Additional spacer to offset first card by one card width - responsive */}

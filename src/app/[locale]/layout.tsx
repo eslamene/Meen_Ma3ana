@@ -4,6 +4,7 @@ import { getMessages } from 'next-intl/server'
 import { locales } from '@/i18n/request'
 import { AuthProvider } from '@/components/auth/AuthProvider'
 import LocaleProvider from '@/components/LocaleProvider'
+import { LayoutProvider } from '@/components/layout/LayoutProvider'
 import PageLayout from '@/components/layout/PageLayout'
 import { ToastProvider } from '@/components/ui/toast'
 
@@ -30,11 +31,13 @@ export default async function LocaleLayout({
     <NextIntlClientProvider messages={messages}>
       <LocaleProvider>
         <AuthProvider>
-          <ToastProvider>
-            <PageLayout>
-              {children}
-            </PageLayout>
-          </ToastProvider>
+          <LayoutProvider defaultVariant="boxed" persist={true}>
+            <ToastProvider>
+              <PageLayout>
+                {children}
+              </PageLayout>
+            </ToastProvider>
+          </LayoutProvider>
         </AuthProvider>
       </LocaleProvider>
     </NextIntlClientProvider>

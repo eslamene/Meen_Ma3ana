@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { safeFetch } from '@/lib/utils/safe-fetch'
 import { useAdmin } from '@/lib/admin/hooks'
 import { UserProfileEditModal } from '@/components/admin/UserProfileEditModal'
@@ -55,6 +57,7 @@ interface PaginationInfo {
 }
 
 export default function AdminUsersPage() {
+  const { containerVariant } = useLayout()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -181,7 +184,8 @@ export default function AdminUsersPage() {
 
   return (
     <PermissionGuard permission="admin:users">
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-6">
         <div>
           <h1 className="text-3xl font-bold">User Management</h1>
           <p className="text-muted-foreground">
@@ -409,6 +413,7 @@ export default function AdminUsersPage() {
             })
           }}
         />
+        </Container>
       </div>
     </PermissionGuard>
   )

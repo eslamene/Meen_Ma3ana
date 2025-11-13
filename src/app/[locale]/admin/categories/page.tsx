@@ -16,6 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
 import { HexColorPicker } from 'react-colorful'
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { 
   Tag, 
   Plus, 
@@ -51,6 +53,7 @@ export default function AdminCategoriesPage() {
   const locale = params.locale as string
   const t = useTranslations('admin')
   const { toast } = useEnhancedToast()
+  const { containerVariant } = useLayout()
 
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -342,7 +345,7 @@ export default function AdminCategoriesPage() {
       </div>
     }>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Container variant={containerVariant}>
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
@@ -838,7 +841,7 @@ export default function AdminCategoriesPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
+        </Container>
       </div>
     </PermissionGuard>
   )

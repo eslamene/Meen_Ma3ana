@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -80,6 +82,7 @@ export default function AdminSponsorshipsPage() {
   const [selectedSponsorship, setSelectedSponsorship] = useState<SponsorshipRequest | null>(null)
   const [reviewComment, setReviewComment] = useState('')
   const [processing, setProcessing] = useState(false)
+  const { containerVariant } = useLayout()
 
   const supabase = createClient()
 
@@ -277,19 +280,22 @@ export default function AdminSponsorshipsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-8">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
             <p>Loading sponsorship requests...</p>
           </div>
         </div>
+        </Container>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <Container variant={containerVariant} className="py-8">
       <div className="mb-6">
         <div className="mb-4">
           <h1 className="text-3xl font-bold">Sponsorship Management</h1>
@@ -335,6 +341,7 @@ export default function AdminSponsorshipsPage() {
           </TabsContent>
         </Tabs>
       </div>
+      </Container>
 
       {/* Review Dialog */}
       <Dialog open={!!selectedSponsorship} onOpenChange={() => setSelectedSponsorship(null)}>

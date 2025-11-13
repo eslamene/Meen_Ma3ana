@@ -36,6 +36,10 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
       setError(null)
 
       const supabase = createClient()
+      
+      // Check if user is authenticated first
+      const { data: { user } } = await supabase.auth.getUser()
+      
       const { data, error: fetchError } = await supabase
         .from('contributions')
         .select(`
@@ -52,6 +56,35 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
         .order('created_at', { ascending: false })
 
       if (fetchError) {
+        // For public users, RLS errors are expected - try API fallback
+        // Check for various RLS/permission error indicators
+        const isRLSError = !user && (
+          fetchError.code === 'PGRST116' || 
+          fetchError.code === '42501' ||
+          fetchError.message?.toLowerCase().includes('permission') || 
+          fetchError.message?.toLowerCase().includes('policy') ||
+          fetchError.message?.toLowerCase().includes('row-level security') ||
+          fetchError.message?.toLowerCase().includes('new row violates')
+        )
+        
+        if (isRLSError) {
+          // Try to fetch from API endpoint as fallback
+          try {
+            const response = await fetch(`/api/cases/${caseId}/progress`)
+            if (response.ok) {
+              const apiData = await response.json()
+              // Set total amount from API, but contributions list will be empty for public users
+              setTotalAmount(apiData.approvedTotal || 0)
+              setContributions([]) // Public users don't see individual contributions
+              setIsLoading(false)
+              setError(null) // Clear error since API fallback succeeded
+              return // Successfully fetched from API, exit early
+            }
+          } catch (apiError) {
+            // API also failed, fall through to error handling
+            console.warn('API fallback also failed:', apiError)
+          }
+        }
         throw fetchError
       }
 
@@ -96,11 +129,26 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
       setTotalAmount(total)
 
     } catch (err: unknown) {
-      // Log both to console and structured logger for better visibility in devtools
-      // Some non-Error objects (e.g., PostgrestError) don't render well in Next DevTools
-      // so we also emit a plain console.error.
-      console.error('Error fetching approved contributions', err)
-      defaultLogger.error('Error fetching approved contributions', err)
+      // Check if this is an RLS/permission error for public users
+      const isRLSError = err && typeof err === 'object' && 'code' in err && (
+        err.code === 'PGRST116' || 
+        err.code === '42501' ||
+        (typeof err === 'object' && err !== null && 'message' in err && 
+         typeof (err as { message: unknown }).message === 'string' &&
+         ((err as { message: string }).message.toLowerCase().includes('permission') || 
+          (err as { message: string }).message.toLowerCase().includes('policy') ||
+          (err as { message: string }).message.toLowerCase().includes('row-level security')))
+      )
+      
+      // Only log non-RLS errors to avoid console noise for expected public user restrictions
+      if (!isRLSError) {
+        console.error('Error fetching approved contributions', err)
+        defaultLogger.error('Error fetching approved contributions', err)
+      } else {
+        // Silently handle RLS errors - they're expected for public users
+        // The API fallback should have already been attempted above
+      }
+      
       const message = err instanceof Error
         ? err.message
         : (typeof err === 'object' && err !== null && 'message' in err)

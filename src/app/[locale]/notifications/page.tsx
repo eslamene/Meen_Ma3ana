@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +31,7 @@ export default function NotificationsPage() {
   const router = useRouter()
   const locale = params.locale as string
   const { toast } = useToast()
+  const { containerVariant } = useLayout()
   
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
@@ -314,7 +317,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <Container variant={containerVariant} className="py-8">
       <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">{t('subtitle')}</p>
@@ -599,7 +602,7 @@ export default function NotificationsPage() {
             </DialogContent>
           </Dialog>
         )}
-      </div>
+      </Container>
     </div>
   )
 } 

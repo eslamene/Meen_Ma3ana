@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +41,7 @@ export default function ProjectsPage() {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
+  const { containerVariant } = useLayout()
 
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -158,32 +161,35 @@ export default function ProjectsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Projects</h1>
-          <p className="text-gray-600">Manage recurring projects and funding cycles</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Projects</h1>
+            <p className="text-gray-600">Manage recurring projects and funding cycles</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </Container>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <Container variant={containerVariant} className="py-8">
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <div>
@@ -319,6 +325,7 @@ export default function ProjectsPage() {
           ))}
         </div>
       )}
+      </Container>
     </div>
   )
 } 

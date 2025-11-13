@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter } from 'next/navigation'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { ArrowLeft, Edit, Trash2, Upload, Download, Eye, User, Phone, MapPin, Calendar, IdCard, Mail, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,6 +18,7 @@ export default function BeneficiaryDetailPage() {
   const t = useTranslations('beneficiaries')
   const params = useParams()
   const router = useRouter()
+  const { containerVariant } = useLayout()
   
   const beneficiaryId = params.id as string
   const locale = params.locale as string
@@ -118,38 +121,43 @@ export default function BeneficiaryDetailPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </Container>
       </div>
     )
   }
 
   if (!beneficiary) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card className="text-center py-12">
-          <CardContent>
-            <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {t('beneficiaryNotFound') || 'Beneficiary not found'}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {t('beneficiaryNotFoundDescription') || 'The beneficiary you are looking for does not exist.'}
-            </p>
-            <Button onClick={() => router.push(`/${locale}/beneficiaries`)}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {t('backToBeneficiaries') || 'Back to Beneficiaries'}
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gray-50">
+        <Container variant={containerVariant} className="py-8">
+          <Card className="text-center py-12">
+            <CardContent>
+              <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {t('beneficiaryNotFound') || 'Beneficiary not found'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {t('beneficiaryNotFoundDescription') || 'The beneficiary you are looking for does not exist.'}
+              </p>
+              <Button onClick={() => router.push(`/${locale}/beneficiaries`)}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                {t('backToBeneficiaries') || 'Back to Beneficiaries'}
+              </Button>
+            </CardContent>
+          </Card>
+        </Container>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <Container variant={containerVariant} className="py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
@@ -481,6 +489,7 @@ export default function BeneficiaryDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+      </Container>
     </div>
   )
 }

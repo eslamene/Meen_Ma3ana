@@ -4,6 +4,8 @@ import { useTranslations } from 'next-intl'
 import { useState, useEffect, useCallback } from 'react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -205,10 +207,12 @@ export default function AdminAnalyticsPage() {
     fetchData(true) // Use refresh indicator for manual refresh
   }
 
+  const { containerVariant } = useLayout()
+
   // Skeleton loading component
   const AnalyticsSkeleton = () => (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <Container variant={containerVariant} className="py-6">
         <div className="px-4 py-6 sm:px-0">
           {/* Header Skeleton */}
           <div className="mb-8">
@@ -288,7 +292,7 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </Container>
     </div>
   )
 
@@ -306,7 +310,7 @@ export default function AdminAnalyticsPage() {
     <ProtectedRoute>
       <PermissionGuard permission="admin:analytics">
         <div className="min-h-screen bg-gray-50">
-          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <Container variant={containerVariant} className="py-6">
             <div className="px-4 py-6 sm:px-0">
               {/* Header */}
               <div className="mb-8">
@@ -748,8 +752,8 @@ export default function AdminAnalyticsPage() {
                 </TabsContent>
               </Tabs>
             </div>
-          </div>
-        </div>
+        </Container>
+      </div>
       </PermissionGuard>
     </ProtectedRoute>
   )

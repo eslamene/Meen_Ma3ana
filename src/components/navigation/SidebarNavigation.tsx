@@ -6,6 +6,8 @@ import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import Logo from '@/components/ui/Logo'
+import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
@@ -45,6 +47,20 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
   const [canScrollDown, setCanScrollDown] = useState(false)
   const [canScrollUp, setCanScrollUp] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  
+  // Store user in ref to prevent footer from disappearing during re-renders
+  const userRef = useRef<User | null>(null)
+  const hasLoadedUserRef = useRef<boolean>(false)
+  
+  useEffect(() => {
+    if (user) {
+      userRef.current = user
+      hasLoadedUserRef.current = true
+    }
+  }, [user])
+  
+  // Use ref value for footer rendering to ensure stability
+  const stableUser = user || (hasLoadedUserRef.current ? userRef.current : null)
 
   const supabase = createClient()
   
@@ -220,12 +236,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
         
         {/* Header - Fixed */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 flex-shrink-0">
-          <Link href={`/${locale}`} className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">Meen Ma3ana</span>
-          </Link>
+          <Logo size="md" href={`/${locale}/dashboard`} />
           
           <Button
             variant="ghost"
@@ -296,15 +307,20 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
           )}
         </div>
 
-        {/* Footer - Fixed */}
+        {/* Footer - Always visible */}
         <div className="border-t border-gray-200 p-4 flex-shrink-0">
-          {/* Language Switcher */}
+          {/* Layout Toggle - Always visible */}
+          <div className="mb-4 flex justify-center">
+            <LayoutToggle />
+          </div>
+          
+          {/* Language Switcher - Always visible */}
           <div className="mb-4">
             <LanguageSwitcher />
           </div>
 
-          {/* User Info */}
-          {user && (
+          {/* User Info - Show if we have a user, otherwise show placeholder */}
+          {stableUser ? (
             <div className="space-y-2">
               <div className="flex items-center space-x-3 px-3 py-2 bg-gray-50 rounded-md">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
@@ -312,10 +328,10 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {user.user_metadata?.full_name || user.email}
+                    {stableUser.user_metadata?.full_name || stableUser.email}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
-                    {user.email}
+                    {stableUser.email}
                   </p>
                 </div>
               </div>
@@ -325,6 +341,30 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
                 variant="ghost"
                 size="sm"
                 className="w-full justify-start text-gray-700 hover:text-red-700 hover:bg-red-50"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                {t('signOut')}
+              </Button>
+            </div>
+          ) : (
+            // Placeholder while loading user
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3 px-3 py-2 bg-gray-50 rounded-md">
+                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center animate-pulse">
+                  <UserIcon className="w-4 h-4 text-gray-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+                  <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3"></div>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleSignOut}
+                variant="ghost"
+                size="sm"
+                disabled
+                className="w-full justify-start text-gray-400"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 {t('signOut')}
