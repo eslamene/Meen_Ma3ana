@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { getIconWithFallback } from '@/lib/icons/registry'
 import { PermissionFormModal } from '@/components/admin/rbac/PermissionFormModal'
 
@@ -119,7 +119,6 @@ export default function PermissionsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editingPermission, setEditingPermission] = useState<Permission | undefined>()
   const [viewingRoles, setViewingRoles] = useState<Permission | undefined>()
-  const { toast } = useToast()
 
   const fetchData = useCallback(async () => {
     try {
@@ -160,10 +159,8 @@ export default function PermissionsPage() {
       }
     } catch (error) {
       console.error('Fetch data error:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch data',
-        type: 'error'
+      toast.error('Error', {
+        description: 'Failed to fetch data'
       })
     } finally {
       setLoading(false)
@@ -214,18 +211,14 @@ export default function PermissionsPage() {
         throw new Error('Failed to delete permission')
       }
 
-      toast({
-        title: 'Success',
-        description: 'Permission deleted successfully',
-        type: 'success'
+      toast.success('Success', {
+        description: 'Permission deleted successfully'
       })
 
       await fetchData()
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete permission',
-        type: 'error'
+      toast.error('Error', {
+        description: 'Failed to delete permission'
       })
     }
   }

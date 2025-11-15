@@ -95,11 +95,8 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
 
-  const supabase = createClient()
-
   useEffect(() => {
     fetchUserProfile()
-    fetchProfileStats()
   }, [])
 
   // Refresh data when component becomes visible (e.g., when returning from edit page)
@@ -107,7 +104,6 @@ export default function ProfilePage() {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         fetchUserProfile()
-        fetchProfileStats()
       }
     }
 
@@ -118,14 +114,14 @@ export default function ProfilePage() {
   // Refresh data when pathname changes (e.g., when returning from edit page)
   useEffect(() => {
     fetchUserProfile()
-    fetchProfileStats()
   }, [pathname])
 
   const fetchUserProfile = async () => {
     try {
       setLoading(true)
       
-      // Get current user
+      // Get current user for auth check
+      const supabase = createClient()
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       
       if (authError || !authUser) {
@@ -133,99 +129,39 @@ export default function ProfilePage() {
         return
       }
 
-      // Fetch user profile from database
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
-
-      if (profileError) {
-        throw profileError
+      // Fetch user profile and stats from API
+      const response = await fetch('/api/profile/stats')
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push(`/${params.locale}/auth/login`)
+          return
+        }
+        throw new Error(`Failed to fetch profile: ${response.statusText}`)
       }
 
-
-      setUser(profile)
+      const data = await response.json()
+      
+      if (data.user) {
+        setUser(data.user)
+      }
+      
+      if (data.stats) {
+        setStats({
+          totalContributions: data.stats.totalContributions || 0,
+          totalAmount: data.stats.totalAmount || 0,
+          activeCases: data.stats.activeCases || 0,
+          completedCases: data.stats.completedCases || 0,
+          averageContribution: data.stats.averageContribution || 0,
+          lastContribution: data.stats.lastContribution || null,
+          latestContribution: data.stats.latestContribution || null
+        })
+      }
     } catch (err) {
       console.error('Error fetching user profile:', err)
       setError('Failed to load profile')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchProfileStats = async () => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) return
-
-      // Fetch contribution statistics - include all contributions regardless of status
-      const { data: contributions } = await supabase
-        .from('contributions')
-        .select('id, amount, created_at, case_id, status, cases!inner(title, status)')
-        .eq('donor_id', authUser.id)
-        .in('status', ['pending', 'approved', 'rejected'])
-        .order('created_at', { ascending: false })
-
-      if (contributions && contributions.length > 0) {
-        
-        // Calculate stats for all contributions
-        const totalAmount = contributions.reduce((sum, c) => sum + parseFloat(c.amount), 0)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const approvedContributions = contributions.filter(c => c.status === 'approved')
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const pendingContributions = contributions.filter(c => c.status === 'pending')
-        
-        // Get unique cases and their statuses
-        const uniqueCases = new Map()
-        contributions.forEach(c => {
-          if (!uniqueCases.has(c.case_id)) {
-            uniqueCases.set(c.case_id, c.cases)
-          }
-        })
-        
-        const activeCases = Array.from(uniqueCases.values()).filter(c => c.status === 'published').length
-        const completedCases = Array.from(uniqueCases.values()).filter(c => c.status === 'closed').length
-        const lastContribution = contributions[0]?.created_at || null
-
-        // Normalize the latest contribution - handle cases as array or object
-        const latestContributionData = contributions[0]
-        const normalizedLatestContribution: LatestContribution | null = latestContributionData ? {
-          id: latestContributionData.id,
-          amount: latestContributionData.amount,
-          created_at: latestContributionData.created_at,
-          case_id: latestContributionData.case_id,
-          status: latestContributionData.status,
-          cases: Array.isArray(latestContributionData.cases) 
-            ? latestContributionData.cases[0] || null
-            : latestContributionData.cases || null
-        } : null
-
-        const stats = {
-          totalContributions: contributions.length,
-          totalAmount,
-          activeCases,
-          completedCases,
-          averageContribution: totalAmount / contributions.length,
-          lastContribution,
-          latestContribution: normalizedLatestContribution
-        }
-
-        setStats(stats)
-      } else {
-
-        setStats({
-          totalContributions: 0,
-          totalAmount: 0,
-          activeCases: 0,
-          completedCases: 0,
-          averageContribution: 0,
-          lastContribution: null,
-          latestContribution: null
-        })
-      }
-    } catch (error) {
-      console.error('Error fetching profile stats:', error)
     }
   }
 

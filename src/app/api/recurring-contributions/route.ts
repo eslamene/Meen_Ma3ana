@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
+/**
+ * GET /api/recurring-contributions
+ * Fetch recurring contributions for the authenticated user
+ * Returns contributions with joined case and project data
+ */
 export async function GET(request: NextRequest) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
@@ -11,47 +15,87 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const offset = parseInt(searchParams.get('offset') || '0')
-
-    // Build query
-    let query = supabase
+    // Fetch recurring contributions with joined case and project data
+    const { data: contributions, error } = await supabase
       .from('recurring_contributions')
-      .select('*')
+      .select(`
+        *,
+        cases(title),
+        projects(name)
+      `)
       .eq('donor_id', user.id)
       .order('created_at', { ascending: false })
 
-    if (status && status !== 'all') {
-      query = query.eq('status', status)
-    }
-
-    query = query.range(offset, offset + limit - 1)
-
-    const { data, error } = await query
-
     if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching recurring contributions:', error)
-      return NextResponse.json({ error: 'Failed to fetch recurring contributions' }, { status: 500 })
+      logger.error('Error fetching recurring contributions:', error)
+      return NextResponse.json({ 
+        error: 'Failed to fetch recurring contributions' 
+      }, { status: 500 })
     }
+
+    // Transform the data to include case/project metadata in a flat structure
+    const transformedContributions = (contributions || []).map((contrib: any) => {
+      const caseData = Array.isArray(contrib.cases) ? contrib.cases[0] : contrib.cases
+      const projectData = Array.isArray(contrib.projects) ? contrib.projects[0] : contrib.projects
+
+      return {
+        id: contrib.id,
+        amount: contrib.amount,
+        frequency: contrib.frequency,
+        status: contrib.status,
+        start_date: contrib.start_date,
+        end_date: contrib.end_date,
+        next_contribution_date: contrib.next_contribution_date,
+        total_contributions: contrib.total_contributions || 0,
+        successful_contributions: contrib.successful_contributions || 0,
+        failed_contributions: contrib.failed_contributions || 0,
+        payment_method: contrib.payment_method,
+        auto_process: contrib.auto_process,
+        notes: contrib.notes,
+        case_id: contrib.case_id,
+        project_id: contrib.project_id,
+        created_at: contrib.created_at,
+        // Include resolved metadata
+        case_title: caseData?.title || null,
+        project_name: projectData?.name || null
+      }
+    })
+
+    // Calculate aggregates server-side
+    const total = transformedContributions.length
+    const active = transformedContributions.filter((c: any) => c.status === 'active').length
+    const paused = transformedContributions.filter((c: any) => c.status === 'paused').length
+    const cancelled = transformedContributions.filter((c: any) => c.status === 'cancelled').length
+    const completed = transformedContributions.filter((c: any) => c.status === 'completed').length
 
     return NextResponse.json({
-      recurringContributions: data || [],
-      total: data?.length || 0
+      contributions: transformedContributions,
+      aggregates: {
+        total,
+        active,
+        paused,
+        cancelled,
+        completed
+      }
     })
   } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in recurring contributions API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Unexpected error in GET /api/recurring-contributions:', error)
+    return NextResponse.json({ 
+      error: 'Internal server error' 
+    }, { status: 500 })
   }
 }
 
+/**
+ * POST /api/recurring-contributions
+ * Create a new recurring contribution
+ */
 export async function POST(request: NextRequest) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
@@ -59,8 +103,8 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -78,39 +122,46 @@ export async function POST(request: NextRequest) {
       notes
     } = body
 
-    // Validate required fields
-    if (!amount || !frequency || !startDate || !paymentMethod) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+    // Validation
+    if (!amount || amount <= 0) {
+      return NextResponse.json({ 
+        error: 'Amount must be greater than 0' 
+      }, { status: 400 })
+    }
+
+    if (!frequency || !['weekly', 'monthly', 'quarterly', 'yearly'].includes(frequency)) {
+      return NextResponse.json({ 
+        error: 'Invalid frequency. Must be one of: weekly, monthly, quarterly, yearly' 
+      }, { status: 400 })
+    }
+
+    if (!startDate) {
+      return NextResponse.json({ 
+        error: 'Start date is required' 
+      }, { status: 400 })
     }
 
     // Calculate next contribution date based on frequency
-    const startDateObj = new Date(startDate)
-    const nextContributionDate = new Date(startDateObj)
+    const start = new Date(startDate)
+    const nextContributionDate = new Date(start)
     
     switch (frequency) {
       case 'weekly':
-        nextContributionDate.setDate(startDateObj.getDate() + 7)
+        nextContributionDate.setDate(start.getDate() + 7)
         break
       case 'monthly':
-        nextContributionDate.setMonth(startDateObj.getMonth() + 1)
+        nextContributionDate.setMonth(start.getMonth() + 1)
         break
       case 'quarterly':
-        nextContributionDate.setMonth(startDateObj.getMonth() + 3)
+        nextContributionDate.setMonth(start.getMonth() + 3)
         break
       case 'yearly':
-        nextContributionDate.setFullYear(startDateObj.getFullYear() + 1)
+        nextContributionDate.setFullYear(start.getFullYear() + 1)
         break
-      default:
-        return NextResponse.json(
-          { error: 'Invalid frequency' },
-          { status: 400 }
-        )
     }
 
-    const { data, error } = await supabase
+    // Insert recurring contribution
+    const { data: contribution, error: insertError } = await supabase
       .from('recurring_contributions')
       .insert({
         donor_id: user.id,
@@ -121,21 +172,27 @@ export async function POST(request: NextRequest) {
         start_date: startDate,
         end_date: endDate || null,
         next_contribution_date: nextContributionDate.toISOString(),
-        payment_method: paymentMethod,
-        auto_process: autoProcess !== false, // default to true
+        payment_method: paymentMethod || 'bank_transfer',
+        auto_process: autoProcess !== undefined ? autoProcess : true,
         notes: notes || null,
+        status: 'active'
       })
       .select()
       .single()
 
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating recurring contribution:', error)
-      return NextResponse.json({ error: 'Failed to create recurring contribution' }, { status: 500 })
+    if (insertError) {
+      logger.error('Error creating recurring contribution:', insertError)
+      return NextResponse.json({ 
+        error: 'Failed to create recurring contribution',
+        details: insertError.message
+      }, { status: 500 })
     }
 
-    return NextResponse.json({ recurringContribution: data })
+    return NextResponse.json(contribution, { status: 201 })
   } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in recurring contributions API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Unexpected error in POST /api/recurring-contributions:', error)
+    return NextResponse.json({ 
+      error: 'Internal server error' 
+    }, { status: 500 })
   }
-} 
+}

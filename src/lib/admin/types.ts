@@ -120,6 +120,9 @@ export const PERMISSION_NAMES = {
   ADMIN_SETTINGS: 'admin:settings',
   ADMIN_ANALYTICS: 'admin:analytics',
   
+  // Storage
+  MANAGE_FILES: 'manage:files',
+  
   // Profile
   PROFILE_VIEW: 'profile:view',
   PROFILE_UPDATE: 'profile:update',

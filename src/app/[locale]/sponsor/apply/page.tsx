@@ -53,14 +53,21 @@ export default function SponsorApplicationPage() {
         return
       }
 
-      // Check if user is already a sponsor
-      const { data: existingSponsor } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+      // Check if user is already a sponsor via API
+      const response = await fetch('/api/sponsor/role-check')
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push('/auth/login')
+          return
+        }
+        // For other errors, allow the user to proceed (they may not be a sponsor yet)
+        return
+      }
 
-      if (existingSponsor?.role === 'sponsor') {
+      const data = await response.json()
+      
+      if (data.isSponsor) {
         router.push('/sponsor/dashboard')
         return
       }
@@ -145,23 +152,27 @@ export default function SponsorApplicationPage() {
         throw new Error('User not authenticated')
       }
 
-      // Create sponsor application
-      const { error: applicationError } = await supabase
-        .from('sponsor_applications')
-        .insert({
-          userId: user.id,
+      // Submit application via API
+      const response = await fetch('/api/sponsor/applications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           companyName: formData.companyName.trim(),
           contactPerson: formData.contactPerson.trim(),
           email: formData.email.trim(),
           phone: formData.phone.trim(),
           website: formData.website.trim(),
           companyDescription: formData.companyDescription.trim(),
-          sponsorshipTier: formData.sponsorshipTier,
-          status: 'pending',
-          submittedAt: new Date().toISOString(),
+          sponsorshipTier: formData.sponsorshipTier
         })
+      })
 
-      if (applicationError) throw applicationError
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to submit application')
+      }
 
       _setSuccess(t('applicationSubmittedSuccessfully')) // eslint-disable-line @typescript-eslint/no-unused-vars
       

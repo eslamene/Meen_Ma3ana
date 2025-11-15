@@ -6,11 +6,11 @@ const supabase = createClient()
 
 const buckets = [
   {
-    name: 'case-images',
+    name: 'case-files',
     public: true,
-    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    fileSizeLimit: 5242880, // 5MB
-    description: 'Images for case documents and evidence'
+    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'audio/mp3', 'audio/wav'],
+    fileSizeLimit: 52428800, // 50MB
+    description: 'All case files including images, documents, videos, and audio'
   },
   {
     name: 'contributions',
@@ -39,6 +39,13 @@ const buckets = [
     allowedMimeTypes: ['image/jpeg', 'image/png', 'application/pdf'],
     fileSizeLimit: 5242880, // 5MB
     description: 'Recurring contribution documents'
+  },
+  {
+    name: 'beneficiaries',
+    public: false,
+    allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'],
+    fileSizeLimit: 5242880, // 5MB
+    description: 'Beneficiary documents and files'
   }
 ]
 

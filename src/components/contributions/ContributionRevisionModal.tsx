@@ -20,7 +20,7 @@ import {
   X,
   Upload,
 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 
 interface PaymentMethod {
   id: string
@@ -79,7 +79,6 @@ export default function ContributionRevisionModal({
   onClose,
   onRevisionSubmit,
 }: ContributionRevisionModalProps) {
-    const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
   
@@ -186,20 +185,16 @@ export default function ContributionRevisionModal({
 
   const handleSubmit = async () => {
     if (!amount || !paymentMethod || !explanation.trim()) {
-      toast({
-        title: 'Missing Information',
+      toast.error('Error', {
         description: 'Please fill in all required fields including amount, payment method, and explanation.',
-        type: 'error'
       })
       return
     }
 
     const amountNum = parseFloat(amount)
     if (isNaN(amountNum) || amountNum <= 0) {
-      toast({
-        title: 'Invalid Amount',
+      toast.error('Error', {
         description: 'Please enter a valid amount greater than 0.',
-        type: 'error'
       })
       return
     }
@@ -218,18 +213,14 @@ export default function ContributionRevisionModal({
         proofFile: proofFile || undefined
       })
       
-      toast({
-        title: 'Revision Submitted',
+      toast.success('Success', {
         description: 'Your contribution revision has been submitted for review.',
-        type: 'success'
       })
       
       onClose()
     } catch (_error) {
-      toast({
-        title: 'Submission Failed',
+      toast.error('Error', {
         description: 'Failed to submit revision. Please try again.',
-        type: 'error'
       })
     } finally {
       setIsSubmitting(false)
@@ -262,17 +253,10 @@ export default function ContributionRevisionModal({
       }
 
       const _data = await response.json()
-      toast({
-        title: 'Proof Uploaded',
-        description: 'Payment proof uploaded successfully.',
-        type: 'success'
-      })
-    } catch (_error) {
-      toast({
-        title: 'Upload Failed',
-        description: 'Failed to upload payment proof. Please try again.',
-        type: 'error'
-      })
+      toast.success('Success', { description: 'Payment proof uploaded successfully.' })
+    } catch (error) {
+      console.error('Error uploading payment proof:', error)
+      toast.error('Error', { description: 'Failed to upload payment proof. Please try again.' })
     } finally {
       setUploading(false)
     }

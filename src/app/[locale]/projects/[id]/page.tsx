@@ -219,7 +219,7 @@ export default function ProjectDetailPage() {
                     <div>
                       <div className="flex justify-between text-sm mb-2">
                         <span>Overall Progress</span>
-                        <span>{formatAmount(project.currentAmount)} / {formatAmount(project.targetAmount)}</span>
+                        <span>{`${formatAmount(project.currentAmount)} / ${formatAmount(project.targetAmount)}`}</span>
                       </div>
                       <Progress 
                         value={calculateProgress(project.currentAmount, project.targetAmount)} 
@@ -260,7 +260,7 @@ export default function ProjectDetailPage() {
                       <div>
                         <div className="flex justify-between text-sm mb-2">
                           <span>Cycle Progress</span>
-                          <span>{formatAmount(currentCycle.currentAmount)} / {formatAmount(currentCycle.targetAmount)}</span>
+                          <span>{`${formatAmount(currentCycle.currentAmount)} / ${formatAmount(currentCycle.targetAmount)}`}</span>
                         </div>
                         <Progress 
                           value={calculateProgress(currentCycle.currentAmount, currentCycle.targetAmount)} 

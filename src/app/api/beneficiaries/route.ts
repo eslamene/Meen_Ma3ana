@@ -17,12 +17,62 @@ export async function GET(request: NextRequest) {
     const cityId = searchParams.get('cityId') || ''
     const riskLevel = searchParams.get('riskLevel') || ''
 
-    const beneficiaries = await BeneficiaryService.getAll({
-      page,
-      limit,
-      search,
-      cityId,
-      riskLevel
+    // Create service role client to bypass RLS for beneficiary fetching
+    // This allows authorized users (via API route) to fetch beneficiaries
+    const serviceRoleClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+
+    // Fetch directly using service role client to bypass RLS
+    let query = serviceRoleClient
+      .from('beneficiaries')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    // Apply search filter
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,mobile_number.ilike.%${search}%,national_id.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+
+    // Apply city filter
+    if (cityId) {
+      query = query.eq('city_id', cityId)
+    }
+
+    // Apply risk level filter
+    if (riskLevel) {
+      query = query.eq('risk_level', riskLevel)
+    }
+
+    // Apply pagination
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    query = query.range(from, to)
+
+    const { data, error } = await query
+
+    if (error) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiaries:', error)
+      return NextResponse.json(
+        { success: false, error: error.message || 'Failed to fetch beneficiaries' },
+        { status: 500 }
+      )
+    }
+
+    // Transform beneficiaries to include calculated age
+    const beneficiaries = (data || []).map((beneficiary: any) => {
+      if (beneficiary.year_of_birth) {
+        const currentYear = new Date().getFullYear()
+        beneficiary.age = currentYear - beneficiary.year_of_birth
+      }
+      return beneficiary
     })
 
     return NextResponse.json({

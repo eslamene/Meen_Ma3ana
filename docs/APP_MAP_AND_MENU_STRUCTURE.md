@@ -32,9 +32,7 @@ Meen Ma3ana Application
 │   └── /[locale]/cases/[id]/donate (Donate to case)
 │
 ├── 📝 Case Management Routes
-│   ├── /[locale]/cases/create (Create case)
-│   │   ├── /details
-│   │   └── /images
+│   ├── /[locale]/cases/create (Create case - unified form)
 │   └── /[locale]/cases/[id]/edit (Edit case)
 │
 ├── 🤝 Sponsor Routes

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Menu } from 'lucide-react'
 
 // Types
@@ -56,7 +56,6 @@ export default function MenuAccessPage() {
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(true)
   const [menuRoleFilter, setMenuRoleFilter] = useState<string>('all')
-  const { toast } = useToast()
 
   // Fetch all data
   const fetchData = useCallback(async () => {
@@ -81,11 +80,7 @@ export default function MenuAccessPage() {
       }
     } catch (error) {
       console.error('Fetch error:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch data',
-        type: 'error'
-      })
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to fetch data' })
     } finally {
       setLoading(false)
     }
@@ -106,26 +101,14 @@ export default function MenuAccessPage() {
       })
 
       if (res.ok) {
-        toast({ 
-          title: 'Success', 
-          description: 'Menu item updated successfully',
-          type: 'default'
-        })
+        toast.success('Success', { description: 'Menu item updated successfully' })   
         fetchData()
       } else {
         const error = await res.json()
-        toast({ 
-          title: 'Error', 
-          description: error.error || 'Failed to update menu item',
-          type: 'error'
-        })
+        toast.error('Error', { description: error.error || 'Failed to update menu item' })
       }
     } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to update menu item',
-        type: 'error'
-      })
+      toast.error('Error', { description: 'Failed to update menu item' })
     }
   }
 

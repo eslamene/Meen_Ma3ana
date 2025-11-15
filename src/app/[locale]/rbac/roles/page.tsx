@@ -10,7 +10,7 @@ import { PermissionAssignmentModal } from '@/components/admin/rbac/PermissionAss
 import { RolesDataTable } from '@/components/admin/rbac/RolesDataTable'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 
 interface Role {
@@ -43,7 +43,6 @@ export default function AdminRolesPage() {
   const [editRoleModal, setEditRoleModal] = useState(false)
   const [assignPermissionsModal, setAssignPermissionsModal] = useState(false)
   const [selectedRole, setSelectedRole] = useState<Role | undefined>(undefined)
-  const { toast } = useToast()
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -68,11 +67,7 @@ export default function AdminRolesPage() {
       }
     } catch (error) {
       console.error('Fetch error:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch data',
-        type: 'error'
-      })
+      toast.error('Error', { description: 'Failed to fetch data' })
     } finally {
       setLoading(false)
     }
@@ -92,29 +87,17 @@ export default function AdminRolesPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Role updated successfully',
-          type: 'default'
-        })
+        toast.success('Success', { description: 'Role updated successfully' })
         setEditRoleModal(false)
         setSelectedRole(undefined)
         fetchData()
       } else {
         const errorMessage = response.error || response.data?.error || 'Failed to update role'
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          type: 'error'
-        })
+        toast.error('Error', { description: errorMessage })
       }
     } catch (error) {
       console.error('Update role error:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update role',
-        type: 'error'
-      })
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update role' })
     }
   }
 
@@ -126,29 +109,17 @@ export default function AdminRolesPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Permissions assigned successfully',
-          type: 'default'
-        })
+        toast.success('Success', { description: 'Permissions assigned successfully' })
         setAssignPermissionsModal(false)
         setSelectedRole(undefined)
         fetchData()
       } else {
         const errorMessage = response.error || response.data?.error || 'Failed to assign permissions'
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          type: 'error'
-        })
+        toast.error('Error', { description: errorMessage })
       }
     } catch (error) {
       console.error('Assign permissions error:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to assign permissions',
-        type: 'error'
-      })
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to assign permissions' })
     }
   }
 
@@ -160,28 +131,16 @@ export default function AdminRolesPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Role created successfully',
-          type: 'default'
-        })
+        toast.success('Success', { description: 'Role created successfully' })
         setCreateRoleModal(false)
         fetchData()
       } else {
         const errorMessage = response.error || response.data?.error || 'Failed to create role'
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          type: 'error'
-        })
+        toast.error('Error', { description: errorMessage })
       }
     } catch (error) {
       console.error('Create role error:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create role',
-        type: 'error'
-      })
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to create role' })
     }
   }
 

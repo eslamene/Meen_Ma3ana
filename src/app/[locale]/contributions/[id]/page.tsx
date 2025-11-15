@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { ArrowLeft, DollarSign, User, MessageSquare, CheckCircle, XCircle, Clock, AlertCircle, Copy, ExternalLink, Eye, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import ContributionRevisionModal from '@/components/contributions/ContributionRevisionModal'
 
 interface Contribution {
@@ -62,7 +62,6 @@ export default function ContributionDetailsPage() {
   const router = useRouter()
   const locale = params.locale as string
   const contributionId = params.id as string
-  const { toast } = useToast()
   const t = useTranslations('contributions.details')
   
   const [contribution, setContribution] = useState<Contribution | null>(null)
@@ -145,8 +144,7 @@ export default function ContributionDetailsPage() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      toast({
-        title: t('copied'),
+      toast.success('Copied', {
         description: t('transactionIdCopied')
       })
     } catch (error) {
@@ -210,10 +208,8 @@ export default function ContributionDetailsPage() {
         throw new Error(errorData.error || 'Failed to submit revision')
       }
 
-      toast({
-        title: 'Revision Submitted',
-        description: 'Your contribution revision has been submitted for review.',
-        type: 'success'
+      toast.success('Revision Submitted', {
+        description: 'Your contribution revision has been submitted for review.'
       })
 
       // Refresh the contribution data
@@ -221,10 +217,8 @@ export default function ContributionDetailsPage() {
       setShowRevisionModal(false)
     } catch (error) {
       console.error('Error submitting revision:', error)
-      toast({
-        title: 'Submission Failed',
-        description: 'Failed to submit revision. Please try again.',
-        type: 'error'
+      toast.error('Submission Failed', {
+        description: 'Failed to submit revision. Please try again.'
       })
     }
   }

@@ -29,29 +29,6 @@ interface Sponsorship {
   }
 }
 
-interface SponsorshipQueryResult {
-  id: string
-  case_id: string
-  amount: string | number
-  status: string
-  start_date: string
-  end_date: string
-  created_at: string
-  case?: {
-    title: string | null
-    description: string | null
-    target_amount: string | number | null
-    current_amount: string | number | null
-    status: string | null
-  } | null | Array<{
-    title: string | null
-    description: string | null
-    target_amount: string | number | null
-    current_amount: string | number | null
-    status: string | null
-  }>
-}
-
 export default function SponsorDashboardPage() {
   const t = useTranslations('sponsorships')
   const router = useRouter()
@@ -62,65 +39,28 @@ export default function SponsorDashboardPage() {
 
   const supabase = createClient()
 
-  const fetchSponsorships = useCallback(async (userId: string) => {
+  const fetchSponsorships = useCallback(async () => {
     try {
       setLoading(true)
       
-      const { data, error } = await supabase
-        .from('sponsorships')
-        .select(`
-          id,
-          case_id,
-          amount,
-          status,
-          start_date,
-          end_date,
-          created_at,
-          case:cases(
-            title,
-            description,
-            target_amount,
-            current_amount,
-            status
-          )
-        `)
-        .eq('sponsor_id', userId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
+      const response = await fetch('/api/sponsor/dashboard')
       
-      // Transform the data to match the interface
-      const transformedData = (data || []).map((item: SponsorshipQueryResult) => {
-        // Normalize case - handle both array and single object cases
-        const caseData = Array.isArray(item.case)
-          ? item.case[0]
-          : item.case
-
-        return {
-          id: item.id,
-          case_id: item.case_id,
-          amount: parseFloat(String(item.amount)),
-          status: item.status,
-          start_date: item.start_date,
-          end_date: item.end_date,
-          created_at: item.created_at,
-          case: {
-            title: caseData?.title || '',
-            description: caseData?.description || '',
-            target_amount: parseFloat(String(caseData?.target_amount || '0')),
-            current_amount: parseFloat(String(caseData?.current_amount || '0')),
-            status: caseData?.status || ''
-          }
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push('/auth/login')
+          return
         }
-      })
-      
-      setSponsorships(transformedData)
+        throw new Error(`Failed to fetch sponsorships: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      setSponsorships(data.sponsorships || [])
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to fetch sponsorships')
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [router])
 
   const checkAuthentication = useCallback(async () => {
     try {
@@ -132,7 +72,7 @@ export default function SponsorDashboardPage() {
       }
 
       setUser(user)
-      fetchSponsorships(user.id)
+      fetchSponsorships()
     } catch (err) {
       console.error('Error checking authentication:', err)
       router.push('/auth/login')

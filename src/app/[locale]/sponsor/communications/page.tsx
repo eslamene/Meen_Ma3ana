@@ -114,114 +114,25 @@ export default function SponsorCommunicationsPage() {
     try {
       setLoading(true)
       
-      // Fetch user's messages
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('communications')
-        .select(`
-          id,
-          sender_id,
-          recipient_id,
-          subject,
-          message,
-          is_read,
-          created_at,
-          sender:users!communications_sender_id_fkey(
-            first_name,
-            last_name,
-            email,
-            role
-          ),
-          recipient:users!communications_recipient_id_fkey(
-            first_name,
-            last_name,
-            email,
-            role
-          )
-        `)
-        .or(`sender_id.eq.${user?.id},recipient_id.eq.${user?.id}`)
-        .order('created_at', { ascending: false })
-
-      if (messagesError) throw messagesError
-
-      // Fetch user's sponsorships
-      const { data: sponsorshipsData, error: sponsorshipsError } = await supabase
-        .from('sponsorships')
-        .select(`
-          id,
-          case_id,
-          amount,
-          status,
-          case:cases(
-            title,
-            description
-          )
-        `)
-        .eq('sponsor_id', user?.id)
-        .eq('status', 'approved')
-
-      if (sponsorshipsError) throw sponsorshipsError
-
-      // Transform the data to match the interfaces
-      const transformedMessages = (messagesData || []).map((item: MessageQueryResult) => {
-        // Normalize sender - handle both array and single object cases
-        const senderData = Array.isArray(item.sender) 
-          ? item.sender[0] 
-          : item.sender
-        
-        // Normalize recipient - handle both array and single object cases
-        const recipientData = Array.isArray(item.recipient)
-          ? item.recipient[0]
-          : item.recipient
-
-        return {
-          id: item.id,
-          sender_id: item.sender_id,
-          recipient_id: item.recipient_id,
-          subject: item.subject,
-          message: item.message,
-          is_read: item.is_read,
-          created_at: item.created_at,
-          sender: {
-            first_name: senderData?.first_name || '',
-            last_name: senderData?.last_name || '',
-            email: senderData?.email || '',
-            role: senderData?.role || ''
-          },
-          recipient: {
-            first_name: recipientData?.first_name || '',
-            last_name: recipientData?.last_name || '',
-            email: recipientData?.email || '',
-            role: recipientData?.role || ''
-          }
+      const response = await fetch('/api/sponsor/communications')
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push('/auth/login')
+          return
         }
-      })
+        throw new Error(`Failed to fetch data: ${response.statusText}`)
+      }
 
-      const transformedSponsorships = (sponsorshipsData || []).map((item: SponsorshipQueryResult) => {
-        // Normalize case - handle both array and single object cases
-        const caseData = Array.isArray(item.case)
-          ? item.case[0]
-          : item.case
-
-        return {
-          id: item.id,
-          case_id: item.case_id,
-          amount: parseFloat(String(item.amount)),
-          status: item.status,
-          case: {
-            title: caseData?.title || '',
-            description: caseData?.description || ''
-          }
-        }
-      })
-
-      setMessages(transformedMessages)
-      setSponsorships(transformedSponsorships)
+      const data = await response.json()
+      setMessages(data.messages || [])
+      setSponsorships(data.sponsorships || [])
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data')
     } finally {
       setLoading(false)
     }
-  }, [supabase, user?.id])
+  }, [router])
 
   const checkAuthentication = useCallback(async () => {
     try {
@@ -253,30 +164,22 @@ export default function SponsorCommunicationsPage() {
     try {
       setSending(true)
       
-      const { error } = await supabase
-        .from('communications')
-        .insert({
-          sender_id: user?.id,
+      const response = await fetch('/api/sponsor/communications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           recipient_id: newMessage.recipient_id,
           subject: newMessage.subject,
           message: newMessage.message
         })
+      })
 
-      if (error) throw error
-
-      // Create notification for recipient
-      await supabase
-        .from('notifications')
-        .insert({
-          type: 'new_message',
-          recipient_id: newMessage.recipient_id,
-          title: 'New Message',
-          message: `You have received a new message: ${newMessage.subject}`,
-          data: {
-            messageId: 'new',
-            subject: newMessage.subject
-          }
-        })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to send message')
+      }
 
       setNewMessage({ recipient_id: '', subject: '', message: '' })
       setShowNewMessage(false)
@@ -290,11 +193,9 @@ export default function SponsorCommunicationsPage() {
 
   const markAsRead = async (messageId: string) => {
     try {
-      await supabase
-        .from('communications')
-        .update({ is_read: true })
-        .eq('id', messageId)
-        .eq('recipient_id', user?.id)
+      await fetch(`/api/sponsor/communications/${messageId}/read`, {
+        method: 'POST'
+      })
 
       await fetchData()
     } catch (err) {

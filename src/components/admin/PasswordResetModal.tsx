@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Loader2, Key, AlertTriangle, CheckCircle } from 'lucide-react'
 
 interface PasswordResetModalProps {
@@ -16,7 +16,6 @@ interface PasswordResetModalProps {
 }
 
 export function PasswordResetModal({ open, userId, userEmail, onClose, onSuccess }: PasswordResetModalProps) {
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
 
@@ -39,24 +38,12 @@ export function PasswordResetModal({ open, userId, userEmail, onClose, onSuccess
         throw new Error(error.error || 'Failed to send password reset email')
       }
 
-      setSuccess(true)
-      toast({
-        title: 'Success',
-        description: 'Password reset email sent successfully'
-      })
-
-      setTimeout(() => {
-        onSuccess()
-        onClose()
-        setSuccess(false)
-      }, 2000)
+      toast.success('Success', { description: 'Password reset email sent successfully' })
+      onSuccess()
+      onClose()
     } catch (error) {
       console.error('Error resetting password:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to send password reset email',
-        type: 'error'
-      })
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to send password reset email' })
     } finally {
       setLoading(false)
     }

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Loader2, User, Mail, Phone, MapPin, Globe } from 'lucide-react'
 
 interface UserProfile {
@@ -31,7 +31,6 @@ interface UserProfileEditModalProps {
 }
 
 export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserProfileEditModalProps) {
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [user, setUser] = useState<UserProfile | null>(null)
@@ -86,10 +85,8 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       })
     } catch (error) {
       console.error('Error fetching user:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load user profile',
-        type: 'error'
+      toast.error('Error', {
+        description: error instanceof Error ? error.message : 'Failed to load user profile',
       })
     } finally {
       setFetching(false)
@@ -124,8 +121,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         throw new Error(error.error || 'Failed to update user')
       }
 
-      toast({
-        title: 'Success',
+      toast.success('Success', {
         description: 'User profile updated successfully'
       })
 
@@ -133,10 +129,8 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       onClose()
     } catch (error) {
       console.error('Error updating user:', error)
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to update user profile',
-        type: 'error'
       })
     } finally {
       setLoading(false)

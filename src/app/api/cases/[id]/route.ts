@@ -30,36 +30,45 @@ export async function PATCH(
       updated_at: new Date().toISOString(),
     }
 
-    // Handle image URLs - store in case_images table
+    // Handle image URLs - store in case_files table (legacy support)
+    // Note: New code should save directly to case_files during upload
     if (body.images && Array.isArray(body.images)) {
-      // First, delete existing images for this case
+      // First, delete existing photo files for this case (only photos category)
       await supabase
-        .from('case_images')
+        .from('case_files')
         .delete()
         .eq('case_id', id)
+        .eq('category', 'photos')
 
-      // Insert new images
+      // Insert new images as case_files records
       const imageRecords = body.images.map((imageUrl: string, index: number) => {
-        const fileName = imageUrl.split('/').pop() || 'image.jpg'
-        const imagePath = imageUrl.replace(process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/', '')
+        const fileName = imageUrl.split('/').pop()?.split('?')[0] || 'image.jpg'
+        // Extract file path from URL if it contains storage path
+        const storagePathMatch = imageUrl.match(/case-files\/(.+)/)
+        const filePath = storagePathMatch ? `case-files/${storagePathMatch[1]}` : null
         
         return {
           case_id: id,
-          image_url: imageUrl,
-          image_path: imagePath,
-          file_name: fileName,
+          filename: fileName,
+          original_filename: fileName,
+          file_url: imageUrl,
+          file_path: filePath,
+          file_type: 'image/jpeg', // Default, could be improved by detecting from URL or file
+          file_size: 0, // Unknown from URL alone
+          category: 'photos',
           is_primary: index === 0, // First image is primary
-          display_order: index
-          // created_at and updated_at will be set automatically by the database
+          display_order: index,
+          is_public: false,
+          uploaded_by: user.id
         }
       })
 
       const { error: imagesError } = await supabase
-        .from('case_images')
+        .from('case_files')
         .insert(imageRecords)
 
       if (imagesError) {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting case images:', imagesError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting case files:', imagesError)
         return NextResponse.json(
           { error: 'Failed to save images', details: imagesError.message },
           { status: 500 }

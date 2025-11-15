@@ -1,106 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { RouteContext } from '@/types/next-api'
-
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 
-export async function PUT(request: NextRequest, context: RouteContext<{ id: string }>) {
+/**
+ * PATCH /api/recurring-contributions/[id]
+ * Update a recurring contribution (e.g., status changes for pause/resume/cancel)
+ */
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext<{ id: string }>
+) {
   const correlationId = getCorrelationId(request)
   const logger = new Logger(correlationId)
+
   try {
     const { id } = await context.params
     const supabase = await createClient()
     
-    // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
-    const { status, nextContributionDate, notes } = body
+    const { status, action } = body
 
-    // Validate that the recurring contribution belongs to the user
-    const { data: existingContribution, error: fetchError } = await supabase
+    // Verify the contribution belongs to the user
+    const { data: existingContrib, error: fetchError } = await supabase
       .from('recurring_contributions')
-      .select('*')
+      .select('donor_id, status')
       .eq('id', id)
-      .eq('donor_id', user.id)
       .single()
 
-    if (fetchError || !existingContribution) {
-      return NextResponse.json({ error: 'Recurring contribution not found' }, { status: 404 })
+    if (fetchError || !existingContrib) {
+      return NextResponse.json({ 
+        error: 'Recurring contribution not found' 
+      }, { status: 404 })
     }
 
-    // Prepare update data
-    const updateData: Record<string, unknown> = {}
-    if (status) updateData.status = status
-    if (nextContributionDate) updateData.next_contribution_date = nextContributionDate
-    if (notes !== undefined) updateData.notes = notes
-    updateData.updated_at = new Date().toISOString()
+    if (existingContrib.donor_id !== user.id) {
+      return NextResponse.json({ 
+        error: 'Forbidden' 
+      }, { status: 403 })
+    }
 
-    const { data, error } = await supabase
+    // Determine new status based on action or direct status
+    let newStatus = status
+    if (action === 'pause') {
+      newStatus = 'paused'
+    } else if (action === 'resume') {
+      newStatus = 'active'
+    } else if (action === 'cancel') {
+      newStatus = 'cancelled'
+    }
+
+    if (!newStatus) {
+      return NextResponse.json({ 
+        error: 'Status or action is required' 
+      }, { status: 400 })
+    }
+
+    // Validate status values
+    const validStatuses = ['active', 'paused', 'cancelled', 'completed']
+    if (!validStatuses.includes(newStatus)) {
+      return NextResponse.json({ 
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+      }, { status: 400 })
+    }
+
+    // Update the contribution
+    const { data: updatedContrib, error: updateError } = await supabase
       .from('recurring_contributions')
-      .update(updateData)
+      .update({ 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', id)
       .select()
       .single()
 
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating recurring contribution:', error)
-      return NextResponse.json({ error: 'Failed to update recurring contribution' }, { status: 500 })
+    if (updateError) {
+      logger.error('Error updating recurring contribution:', updateError)
+      return NextResponse.json({ 
+        error: 'Failed to update recurring contribution',
+        details: updateError.message
+      }, { status: 500 })
     }
 
-    return NextResponse.json({ recurringContribution: data })
+    return NextResponse.json(updatedContrib)
   } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in recurring contribution API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Unexpected error in PATCH /api/recurring-contributions/[id]:', error)
+    return NextResponse.json({ 
+      error: 'Internal server error' 
+    }, { status: 500 })
   }
 }
-
-export async function DELETE(request: NextRequest, context: RouteContext<{ id: string }>) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Validate that the recurring contribution belongs to the user
-    const { data: existingContribution, error: fetchError } = await supabase
-      .from('recurring_contributions')
-      .select('*')
-      .eq('id', id)
-      .eq('donor_id', user.id)
-      .single()
-
-    if (fetchError || !existingContribution) {
-      return NextResponse.json({ error: 'Recurring contribution not found' }, { status: 404 })
-    }
-
-    // Instead of deleting, mark as cancelled
-    const { error } = await supabase
-      .from('recurring_contributions')
-      .update({ 
-        status: 'cancelled',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error cancelling recurring contribution:', error)
-      return NextResponse.json({ error: 'Failed to cancel recurring contribution' }, { status: 500 })
-    }
-
-    return NextResponse.json({ message: 'Recurring contribution cancelled successfully' })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in recurring contribution API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-} 

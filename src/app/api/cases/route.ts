@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || ''
     const status = searchParams.get('status') || ''
     const category = searchParams.get('category') || ''
+    const detectedCategory = searchParams.get('detectedCategory') || ''
     const minAmount = searchParams.get('minAmount') || ''
     const maxAmount = searchParams.get('maxAmount') || ''
     const sortBy = searchParams.get('sortBy') || 'created_at'
@@ -26,10 +27,28 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient()
 
-    // Get category ID if filtering by category
+    // Get category ID if filtering by assigned category (category_id)
     let categoryId = null
     if (category && category !== 'all') {
-      // Map filter values to actual category names in database
+      // Category is now a direct UUID (category_id) from caseCategories
+      // Validate it's a valid UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (uuidRegex.test(category)) {
+        categoryId = category
+        if (process.env.NODE_ENV === 'development') {
+          logger.debug('Filtering by assigned category ID', { categoryId })
+        }
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          logger.debug('Invalid category ID format', { category })
+        }
+      }
+    }
+
+    // Get detected category ID if filtering by auto-detected category (detection rules)
+    let detectedCategoryId = null
+    if (detectedCategory && detectedCategory !== 'all') {
+      // Map detection rule filter values to actual category names in database
       const categoryNameMap: Record<string, string> = {
         'medical': 'Medical Support',
         'education': 'Educational Assistance',
@@ -44,12 +63,12 @@ export async function GET(request: NextRequest) {
       }
       
       // Get the actual category name from the map, or use the provided value as-is
-      const categoryName = categoryNameMap[category.toLowerCase()] || category
+      const categoryName = categoryNameMap[detectedCategory.toLowerCase()] || detectedCategory
       
       // Only log category filtering in development
       if (process.env.NODE_ENV === 'development') {
-        logger.debug('Filtering by category', { 
-          originalCategory: category, 
+        logger.debug('Filtering by detected category', { 
+          originalCategory: detectedCategory, 
           mappedCategoryName: categoryName 
         })
       }
@@ -85,19 +104,19 @@ export async function GET(request: NextRequest) {
       }
       
       if (categoryError) {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching category:', categoryError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching detected category:', categoryError)
       }
       
       if (categoryData) {
-        categoryId = categoryData.id
+        detectedCategoryId = categoryData.id
         // Only log category ID resolution in development
         if (process.env.NODE_ENV === 'development') {
-          logger.debug('Category ID resolved', { categoryId, categoryName })
+          logger.debug('Detected category ID resolved', { detectedCategoryId, categoryName })
         }
       } else {
         // Only log missing category in development
         if (process.env.NODE_ENV === 'development') {
-          logger.debug('No category found', { categoryName, originalCategory: category })
+          logger.debug('No detected category found', { categoryName, originalCategory: detectedCategory })
         }
       }
     }
@@ -126,7 +145,7 @@ export async function GET(request: NextRequest) {
         sponsored_by,
         supporting_documents,
         category_id,
-        case_categories(name)
+        case_categories(name, icon, color)
       `, { count: 'exact' })
 
     // Apply status filter - default to published cases if no status specified
@@ -146,9 +165,24 @@ export async function GET(request: NextRequest) {
       query = query.eq('type', type)
     }
     
-    // Apply category filter using category_id
-    if (categoryId) {
+    // Apply category filters
+    // If both assigned and detected category filters are set, use OR logic
+    if (categoryId && detectedCategoryId) {
+      // If both filters point to the same category, just use one
+      if (categoryId === detectedCategoryId) {
+        query = query.eq('category_id', categoryId)
+      } else {
+        // If different categories, use OR logic (cases matching either category)
+        query = query.or(`category_id.eq.${categoryId},category_id.eq.${detectedCategoryId}`)
+      }
+    } else if (categoryId) {
+      // Apply assigned category filter using category_id
       query = query.eq('category_id', categoryId)
+    } else if (detectedCategoryId) {
+      // Apply detected category filter using category_id (for cases detected by rules)
+      // Note: This filters cases that have been auto-detected to match the category
+      // In the future, this could be enhanced to search case descriptions for keywords
+      query = query.eq('category_id', detectedCategoryId)
     }
     
     // Apply amount filters
@@ -186,8 +220,17 @@ export async function GET(request: NextRequest) {
       statsQuery = statsQuery.eq('type', type)
     }
 
-    if (categoryId) {
+    // Apply category filters to stats query (same logic as main query)
+    if (categoryId && detectedCategoryId) {
+      if (categoryId === detectedCategoryId) {
+        statsQuery = statsQuery.eq('category_id', categoryId)
+      } else {
+        statsQuery = statsQuery.or(`category_id.eq.${categoryId},category_id.eq.${detectedCategoryId}`)
+      }
+    } else if (categoryId) {
       statsQuery = statsQuery.eq('category_id', categoryId)
+    } else if (detectedCategoryId) {
+      statsQuery = statsQuery.eq('category_id', detectedCategoryId)
     }
 
     if (minAmount) {
@@ -260,7 +303,7 @@ export async function GET(request: NextRequest) {
       assigned_to?: string
       sponsored_by?: string
       supporting_documents?: string
-      case_categories?: { name: string } | { name: string }[] | null
+      case_categories?: { name: string; icon?: string; color?: string } | { name: string; icon?: string; color?: string }[] | null
     }) => {
       // Use current_amount from cases table (should be updated when contributions are approved)
       // Fallback to 0 if null or invalid
@@ -303,6 +346,9 @@ export async function GET(request: NextRequest) {
         category: (Array.isArray(caseItem.case_categories) 
           ? caseItem.case_categories[0]?.name 
           : caseItem.case_categories?.name) || 'other', // Use category name from join
+        categoryData: Array.isArray(caseItem.case_categories) 
+          ? caseItem.case_categories[0] 
+          : caseItem.case_categories || null, // Full category object with name, icon, color
         type: caseItem.type,
         location: caseItem.location,
         beneficiaryName: caseItem.beneficiary_name,

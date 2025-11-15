@@ -6,8 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { createClient } from '@/lib/supabase/client'
-import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { toast } from 'sonner'
 
 interface Contribution {
   id: string
@@ -45,8 +44,6 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
   const [bulkAction, setBulkAction] = useState<'approve' | 'reject' | ''>('')
   const [rejectionReason, setRejectionReason] = useState('')
 
-  const supabase = createClient()
-
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedContributions(contributions.map(c => c.id))
@@ -65,92 +62,47 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
 
   const handleBulkAction = async () => {
     if (selectedContributions.length === 0) {
-      alert('Please select at least one contribution')
+      toast.error('Please select at least one contribution')
       return
     }
 
     if (bulkAction === 'reject' && !rejectionReason.trim()) {
-      alert('Please provide a reason for rejection')
+      toast.error('Please provide a reason for rejection')
       return
     }
 
     try {
       setProcessing(true)
 
-      if (bulkAction === 'approve') {
-        // Approve all selected contributions
-        for (const contributionId of selectedContributions) {
-          const contribution = contributions.find(c => c.id === contributionId)
-          
-          // Update contribution status
-          const { error } = await supabase
-            .from('contributions')
-            .update({ 
-              status: 'approved',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', contributionId)
+      const response = await fetch('/api/admin/contributions/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ids: selectedContributions,
+          action: bulkAction,
+          reason: bulkAction === 'reject' ? rejectionReason : undefined
+        }),
+      })
 
-          if (error) {
-            console.error('Error approving contribution:', error)
-            continue
-          }
+      const data = await response.json()
 
-          // Update case current amount
-          if (contribution) {
-            const { error: caseError } = await supabase
-              .from('cases')
-              .update({ 
-                current_amount: contribution.amount,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', contribution.case_id)
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process bulk action')
+      }
 
-            if (caseError) {
-              console.error('Error updating case amount:', caseError)
-            }
-          }
+      // Show success message with results
+      if (data.success > 0) {
+        toast.success(
+          `Successfully ${bulkAction === 'approve' ? 'approved' : 'rejected'} ${data.success} contribution(s)`
+        )
+      }
 
-          // Send notification
-          if (contribution) {
-            const notificationService = createContributionNotificationService(supabase)
-            await notificationService.sendApprovalNotification(
-              contributionId,
-              contribution.donor_id,
-              contribution.amount,
-              contribution.case?.title || 'Unknown Case'
-            )
-          }
-        }
-      } else if (bulkAction === 'reject') {
-        // Reject all selected contributions
-        for (const contributionId of selectedContributions) {
-          const { error } = await supabase
-            .from('contributions')
-            .update({ 
-              status: 'rejected',
-              notes: rejectionReason,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', contributionId)
-
-          if (error) {
-            console.error('Error rejecting contribution:', error)
-            continue
-          }
-
-          // Send notification
-          const contribution = contributions.find(c => c.id === contributionId)
-          if (contribution) {
-            const notificationService = createContributionNotificationService(supabase)
-            await notificationService.sendRejectionNotification(
-              contributionId,
-              contribution.donor_id,
-              contribution.amount,
-              contribution.case?.title || 'Unknown Case',
-              rejectionReason
-            )
-          }
+      if (data.failed > 0) {
+        toast.error(`Failed to process ${data.failed} contribution(s)`)
+        if (data.errors && data.errors.length > 0) {
+          console.error('Batch processing errors:', data.errors)
         }
       }
 
@@ -163,6 +115,9 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
       onRefresh()
     } catch (error) {
       console.error('Error processing bulk action:', error)
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to process bulk action'
+      )
     } finally {
       setProcessing(false)
     }

@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { getIcon } from '@/lib/icons/registry'
 import { ChevronDown, Edit, Trash, Plus, GripVertical, Search, Eye, EyeOff, ArrowRight } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ModuleFormModal } from '@/components/admin/rbac/ModuleFormModal'
 import { PermissionsByModule } from '@/hooks/useRBACData'
@@ -60,7 +60,6 @@ function ManagePermissionsContent({
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
   const [targetModuleId, setTargetModuleId] = useState<string>('')
   const [isMoving, setIsMoving] = useState(false)
-  const { toast } = useToast()
 
   const modulePermissions = permissionsByModule[module.name] || []
   const availableModules = modules.filter(m => m.id !== module.id)
@@ -83,16 +82,14 @@ function ManagePermissionsContent({
 
   const handleMovePermissions = async () => {
     if (selectedPermissions.length === 0) {
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: 'Please select at least one permission to move',
       })
       return
     }
 
     if (!targetModuleId) {
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: 'Please select a target module',
       })
       return
@@ -118,21 +115,18 @@ function ManagePermissionsContent({
         (result.status === 'fulfilled' && !result.value.ok))
       
       if (failed.length > 0) {
-        toast({
-          title: 'Warning',
+        toast.warning('Warning', {
           description: `Failed to move ${failed.length} permission(s). Some may have been moved successfully.`,
         })
       } else {
-        toast({
-          title: 'Success',
+        toast.success('Success', {
           description: `Successfully moved ${selectedPermissions.length} permission(s) to ${modules.find(m => m.id === targetModuleId)?.display_name}`,
         })
         onSuccess()
       }
     } catch (error) {
       console.error('Failed to move permissions:', error)
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: 'Failed to move permissions',
       })
     } finally {
@@ -245,7 +239,6 @@ export default function ModulesPage() {
   const [managePermissionsModalOpen, setManagePermissionsModalOpen] = useState(false)
   const [selectedModule, setSelectedModule] = useState<Module | null>(null)
   const [draggedModule, setDraggedModule] = useState<Module | null>(null)
-  const { toast } = useToast()
 
   // Fetch data
   useEffect(() => {
@@ -318,16 +311,14 @@ export default function ModulesPage() {
   // Handle delete
   const handleDelete = async (module: Module) => {
     if (module.is_system) {
-      toast({
-        title: 'Error',
+      toast.error('Error',  {
         description: 'Cannot delete system modules',
       })
       return
     }
 
     if (module.permissions_count > 0) {
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: 'Cannot delete modules with permissions. Move permissions first.',
       })
       return
@@ -341,15 +332,13 @@ export default function ModulesPage() {
       })
 
       if (res.ok) {
-        toast({
-          title: 'Success',
+        toast.success('Success', {
           description: 'Module deleted successfully'
         })
         fetchData()
       } else {
         const error = await res.json()
-        toast({
-          title: 'Error',
+        toast.error('Error', {
           description: error.error || 'Failed to delete module',
         })
       }
@@ -383,10 +372,8 @@ export default function ModulesPage() {
         })
       ))
     } catch {
-      toast({
-        title: 'Error',
+      toast.error('Error', {
         description: 'Failed to update sort order',
-        type: 'error'
       })
       fetchData() // Revert on error
     }

@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useToast } from '@/hooks/use-toast'
-import { SimpleFileUpload } from '@/components/cases/SimpleFileUpload'
+import { toast } from 'sonner'
+import { GenericFileUploader, GenericFilePreviewModal, type FileCategoryConfig, type GenericFile } from '@/components/files'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { 
   FileText, 
   Image as ImageIcon, 
@@ -33,6 +34,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { usePrefetchStorageRules } from '@/hooks/use-prefetch-storage-rules'
 
 // Sanitize filename for storage (remove special characters, Arabic, emojis, etc.)
 function sanitizeFilename(filename: string): string {
@@ -110,21 +112,21 @@ export const FILE_CATEGORIES = {
 
 export type FileCategory = keyof typeof FILE_CATEGORIES
 
-export interface CaseFile {
-  id: string
-  name: string
-  originalName: string
-  url: string
+export interface CaseFile extends GenericFile {
+  name: string // Alias for originalName (for backward compatibility)
   path?: string // Storage path (may differ from display name)
-  size: number
-  type: string
-  category: FileCategory
-  description?: string
-  uploadedAt: string
   uploadedBy: string
   uploaderName?: string
-  isPublic: boolean
   thumbnail?: string
+}
+
+// Helper function to format file size (used by child components)
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 interface CaseFileManagerProps {
@@ -145,7 +147,6 @@ export default function CaseFileManager({
   showUpload = true
 }: CaseFileManagerProps) {
   const t = useTranslations('cases.files')
-  const { toast } = useToast()
   const [files, setFiles] = useState<CaseFile[]>(initialFiles)
   const [filteredFiles, setFilteredFiles] = useState<CaseFile[]>(initialFiles)
   const [selectedCategory, setSelectedCategory] = useState<FileCategory | 'all'>('all')
@@ -156,8 +157,12 @@ export default function CaseFileManager({
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; fileId: string | null }>({ open: false, fileId: null })
   
   const supabase = createClient()
+
+  // Prefetch storage rules using centralized hook
+  const { prefetch } = usePrefetchStorageRules('case-files')
 
   // Filter files based on category and search
   useEffect(() => {
@@ -175,7 +180,7 @@ export default function CaseFileManager({
         file.name.toLowerCase().includes(query) ||
         file.originalName.toLowerCase().includes(query) ||
         file.description?.toLowerCase().includes(query) ||
-        FILE_CATEGORIES[file.category].label.toLowerCase().includes(query)
+        (FILE_CATEGORIES as unknown as Record<string, FileCategoryConfig>)[file.category]?.label.toLowerCase().includes(query)
       )
     }
 
@@ -188,19 +193,11 @@ export default function CaseFileManager({
   }, [onFilesChange])
 
   const getFileIcon = (file: CaseFile) => {
-    const category = FILE_CATEGORIES[file.category]
-    return category.icon
+    const category = (FILE_CATEGORIES as unknown as Record<string, FileCategoryConfig>)[file.category]
+    return category?.icon
   }
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
-  const handleFileUpload = async (filesWithCategories: Array<{ file: File; category: FileCategory }>) => {
+  const handleFileUpload = async (filesWithCategories: Array<{ file: File; category: string }>) => {
     if (!filesWithCategories.length) return
 
     setUploading(true)
@@ -255,29 +252,114 @@ export default function CaseFileManager({
       if (newFiles.length > 0) {
         const filesToInsert = newFiles.map(f => ({
           case_id: caseId,
-          filename: f.originalName,
-          original_filename: f.originalName,
+          filename: f.originalName || f.name || 'unnamed-file',
+          original_filename: f.originalName || f.name || 'unnamed-file',
           file_url: f.url,
           file_path: f.path,
-          file_type: f.type,
-          file_size: f.size,
-          category: f.category,
-          description: f.description,
+          file_type: f.type || 'application/octet-stream',
+          file_size: f.size || 0,
+          category: f.category || 'other',
+          description: f.description || null,
           is_public: f.isPublic || false,
           display_order: files.length + newFiles.indexOf(f)
         }))
 
-        const { error: insertError } = await supabase
+        // Log what we're trying to insert (for debugging)
+        console.log('Attempting to insert files:', {
+          count: filesToInsert.length,
+          caseId,
+          sample: filesToInsert[0] ? {
+            case_id: filesToInsert[0].case_id,
+            filename: filesToInsert[0].filename,
+            file_url: filesToInsert[0].file_url ? 'present' : 'missing',
+            file_type: filesToInsert[0].file_type
+          } : null
+        })
+
+        // Verify case still exists before inserting (prevents 409 on deleted draft cases)
+        const { data: caseCheck, error: caseCheckError } = await supabase
+          .from('cases')
+          .select('id')
+          .eq('id', caseId)
+          .single()
+
+        if (caseCheckError || !caseCheck) {
+          console.error('Case not found before file insert:', {
+            caseId,
+            error: caseCheckError
+          })
+          toast.error('Case Not Found', {
+            description: 'The case was deleted or does not exist. Files were uploaded to storage but could not be saved to the database.'
+          })
+          // Clean up uploaded files from storage since we can't save them
+          for (const file of newFiles) {
+            if (file.path) {
+              await supabase.storage
+                .from('case-files')
+                .remove([file.path])
+                .catch(err => console.warn('Failed to cleanup storage file:', err))
+            }
+          }
+          return
+        }
+
+        const { data: insertData, error: insertError } = await supabase
           .from('case_files')
           .insert(filesToInsert)
+          .select()
 
         if (insertError) {
-          console.error('Error inserting files into database:', insertError)
-          toast({
-            type: 'error',
-            title: 'Error',
-            description: 'Files uploaded but failed to save to database'
-          })
+          // Better error serialization
+          const errorInfo = {
+            code: insertError.code || 'UNKNOWN',
+            message: insertError.message || 'No error message',
+            details: insertError.details || null,
+            hint: insertError.hint || null,
+            // Try to stringify the full error
+            errorString: JSON.stringify(insertError, Object.getOwnPropertyNames(insertError)),
+            // Log the data we tried to insert
+            attemptedInsert: {
+              count: filesToInsert.length,
+              firstFile: filesToInsert[0] ? {
+                case_id: filesToInsert[0].case_id,
+                filename: filesToInsert[0].filename,
+                has_url: !!filesToInsert[0].file_url,
+                file_type: filesToInsert[0].file_type
+              } : null
+            }
+          }
+          
+          console.error('Error inserting files into database:', errorInfo)
+          console.error('Full error object:', insertError)
+          
+          // More user-friendly error message based on error type
+          let userMessage = 'Files uploaded but failed to save to database.'
+          
+          // Handle HTTP 409 Conflict (from PostgREST)
+          if (insertError.code === 'PGRST409' || insertError.message?.includes('409') || insertError.message?.includes('conflict')) {
+            userMessage = 'Failed to save files: Conflict detected. The case may have been deleted or the files already exist. Please refresh and try again.'
+            // Clean up uploaded files from storage
+            for (const file of newFiles) {
+              if (file.path) {
+                await supabase.storage
+                  .from('case-files')
+                  .remove([file.path])
+                  .catch(err => console.warn('Failed to cleanup storage file:', err))
+              }
+            }
+          } else if (insertError.code === '23503') {
+            userMessage = 'Failed to save files: Case not found. Please refresh the page and try again.'
+          } else if (insertError.code === '23505') {
+            userMessage = 'Failed to save files: Duplicate file detected. This file may already exist for this case.'
+          } else if (insertError.code === '42501') {
+            userMessage = 'Failed to save files: Permission denied. You may not have permission to add files to this case.'
+          } else if (insertError.message) {
+            userMessage = `Failed to save files: ${insertError.message}`
+          }
+          
+          toast.error('Database Error', { description: userMessage })
+        } else {
+          console.log('Successfully inserted files:', insertData?.length || 0)
         }
       }
 
@@ -290,15 +372,22 @@ export default function CaseFileManager({
 
       console.log(`Successfully uploaded ${newFiles.length} file(s)`)
       
-      toast({
-        title: 'Success',
+      toast.success('Files Uploaded', {
         description: `Successfully uploaded ${newFiles.length} file(s)`
       })
 
       setShowUploadDialog(false)
     } catch (error) {
-      console.error('Upload error:', error)
-      console.error('An error occurred while uploading files')
+      // Log detailed error information
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Upload error:', {
+        error,
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      })
+      toast.error('Upload Failed', {
+        description: `An error occurred while uploading files: ${errorMessage}`
+      })
     } finally {
       setUploading(false)
       setUploadProgress(0)
@@ -335,18 +424,25 @@ export default function CaseFileManager({
     }
   }
 
-  const handleDeleteFile = async (fileId: string) => {
-    if (!confirm('Are you sure you want to delete this file?')) return
+  const handleDeleteClick = (fileId: string) => {
+    setDeleteDialog({ open: true, fileId })
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialog.fileId) return
 
     try {
-      const fileToDelete = files.find(f => f.id === fileId)
-      if (!fileToDelete) return
+      const fileToDelete = files.find(f => f.id === deleteDialog.fileId)
+      if (!fileToDelete) {
+        setDeleteDialog({ open: false, fileId: null })
+        return
+      }
 
       // Delete from database first (unified case_files table)
       const { error: dbError } = await supabase
         .from('case_files')
         .delete()
-        .eq('id', fileId)
+        .eq('id', deleteDialog.fileId)
         .eq('case_id', caseId)
 
       if (dbError) {
@@ -360,11 +456,10 @@ export default function CaseFileManager({
         }
         console.error('Database delete error:', JSON.stringify(errorDetails, null, 2))
         console.error('Full error object:', dbError)
-        toast({
-          type: 'error',
-          title: 'Error',
+        toast.error('Delete Failed', {
           description: `Failed to delete file: ${errorDetails.message}`
         })
+        setDeleteDialog({ open: false, fileId: null })
         return
       }
 
@@ -388,16 +483,15 @@ export default function CaseFileManager({
       }
 
       // Update local state
-      const updatedFiles = files.filter(f => f.id !== fileId)
+      const updatedFiles = files.filter(f => f.id !== deleteDialog.fileId)
       setFiles(updatedFiles)
       
       // Notify parent component
       notifyParent(updatedFiles)
 
-      toast({
-        title: 'Success',
-        description: 'File deleted successfully'
-      })
+      setDeleteDialog({ open: false, fileId: null })
+
+      toast.success('File Deleted', { description: 'File deleted successfully' })
     } catch (error) {
       // Properly serialize error for logging
       const errorDetails = {
@@ -407,11 +501,8 @@ export default function CaseFileManager({
       }
       console.error('Error deleting file:', JSON.stringify(errorDetails, null, 2))
       console.error('Full error object:', error)
-      toast({
-        type: 'error',
-        title: 'Error',
-        description: `Failed to delete file: ${errorDetails.message}`
-      })
+      toast.error('Delete Failed', { description: `Failed to delete file: ${errorDetails.message}` })
+      setDeleteDialog({ open: false, fileId: null })
     }
   }
 
@@ -473,16 +564,23 @@ export default function CaseFileManager({
           {/* Upload Button */}
           {canEdit && showUpload && (
             <>
-              <Button onClick={() => setShowUploadDialog(true)}>
+              <Button 
+                onClick={() => setShowUploadDialog(true)}
+                onMouseEnter={prefetch}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 {t('uploadFiles')}
               </Button>
-              <SimpleFileUpload
+              <GenericFileUploader
                 open={showUploadDialog}
                 onOpenChange={setShowUploadDialog}
                 onUpload={handleFileUpload}
                 uploading={uploading}
                 progress={uploadProgress}
+                categories={FILE_CATEGORIES as unknown as Record<string, FileCategoryConfig>}
+                defaultCategory="other"
+                translationNamespace="cases.files"
+                bucketName="case-files"
               />
             </>
           )}
@@ -593,7 +691,7 @@ export default function CaseFileManager({
               viewMode={viewMode}
               canEdit={canEdit}
               onPreview={handlePreviewFile}
-              onDelete={handleDeleteFile}
+              onDelete={handleDeleteClick}
             />
           )}
         </div>
@@ -601,23 +699,24 @@ export default function CaseFileManager({
 
       {/* File Preview Modal */}
       {selectedFile && (
-        <FilePreviewModal
+        <GenericFilePreviewModal
           file={selectedFile}
           open={showPreview}
           onOpenChange={setShowPreview}
           canEdit={canEdit}
-          onFileUpdate={async (updatedFile) => {
+          onFileUpdate={async (updatedFile: GenericFile) => {
             try {
-              console.log('Updating file:', updatedFile)
+              const caseFile = updatedFile as CaseFile
+              console.log('Updating file:', caseFile)
               console.log('Case ID:', caseId)
-              console.log('File ID:', updatedFile.id)
+              console.log('File ID:', caseFile.id)
               
-              const url = `/api/cases/${caseId}/files/${updatedFile.id}`
+              const url = `/api/cases/${caseId}/files/${caseFile.id}`
               const payload = {
-                originalName: updatedFile.originalName,
-                description: updatedFile.description,
-                category: updatedFile.category,
-                isPublic: updatedFile.isPublic
+                originalName: caseFile.originalName,
+                description: caseFile.description,
+                category: caseFile.category,
+                isPublic: caseFile.isPublic
               }
               
               console.log('Request URL:', url)
@@ -658,31 +757,40 @@ export default function CaseFileManager({
 
               // Update local state with the updated file
               const updatedFiles = files.map(f => 
-                f.id === updatedFile.id 
-                  ? { ...updatedFile, name: updatedFile.originalName } 
+                f.id === caseFile.id 
+                  ? { ...caseFile, name: caseFile.originalName } as CaseFile
                   : f
               )
               setFiles(updatedFiles)
               notifyParent(updatedFiles)
               
-              toast({
-                title: "Success",
-                description: "File updated successfully"
-              })
+              toast.success("File Updated", { description: "File updated successfully" })
             } catch (error) {
               console.error('Error updating file:', error)
               console.error('Error message:', (error as Error)?.message)
               console.error('Error details:', error)
-              toast({
-                type: "error",
-                title: "Error",
-                description: "Failed to update file"
-              })
+              toast.error("Update Failed", { description: "Failed to update file" })
             }
           }}
-          onDelete={handleDeleteFile}
+          onDelete={async (fileId: string) => {
+            handleDeleteClick(fileId)
+          }}
+          categories={FILE_CATEGORIES as unknown as Record<string, FileCategoryConfig>}
+          translationNamespace="cases.files"
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog({ open, fileId: deleteDialog.fileId })}
+        onConfirm={handleDeleteConfirm}
+        title={t('delete') || 'Delete File'}
+        description={t('confirmDelete') || 'Are you sure you want to delete this file? This action cannot be undone.'}
+        confirmText={t('delete') || 'Delete'}
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </div>
   )
 }
@@ -738,8 +846,8 @@ interface FileItemProps {
 }
 
 function FileGridItem({ file, canEdit, onPreview, onDelete }: FileItemProps) {
-  const category = FILE_CATEGORIES[file.category]
-  const IconComponent = category.icon
+  const category = (FILE_CATEGORIES as unknown as Record<string, FileCategoryConfig>)[file.category]
+  const IconComponent = category?.icon
 
   return (
     <Card className="group hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer overflow-hidden">
@@ -811,8 +919,8 @@ function FileGridItem({ file, canEdit, onPreview, onDelete }: FileItemProps) {
 
 // File List Item Component
 function FileListItem({ file, canEdit, onPreview, onDelete }: FileItemProps) {
-  const category = FILE_CATEGORIES[file.category]
-  const IconComponent = category.icon
+  const category = (FILE_CATEGORIES as unknown as Record<string, FileCategoryConfig>)[file.category]
+  const IconComponent = category?.icon
 
   return (
     <Card className="group hover:shadow-sm transition-shadow">
@@ -862,311 +970,3 @@ function FileListItem({ file, canEdit, onPreview, onDelete }: FileItemProps) {
   )
 }
 
-// File Preview Modal Component
-interface FilePreviewModalProps {
-  file: CaseFile
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  canEdit: boolean
-  onFileUpdate: (file: CaseFile) => void
-  onDelete: (fileId: string) => void
-}
-
-function FilePreviewModal({ file, open, onOpenChange, canEdit, onFileUpdate, onDelete }: FilePreviewModalProps) {
-  const t = useTranslations('cases.files')
-  const [editMode, setEditMode] = useState(false)
-  const [editData, setEditData] = useState({
-    originalName: file.originalName,
-    description: file.description || '',
-    category: file.category,
-    isPublic: file.isPublic
-  })
-
-  // Reset edit data when file changes
-  useEffect(() => {
-    setEditData({
-      originalName: file.originalName,
-      description: file.description || '',
-      category: file.category,
-      isPublic: file.isPublic
-    })
-    setEditMode(false) // Also exit edit mode
-  }, [file.id, file.originalName, file.description, file.category, file.isPublic]) // Reset when file data changes
-
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this file?')) {
-      onDelete(file.id)
-      onOpenChange(false)
-    }
-  }
-
-  const category = FILE_CATEGORIES[file.category]
-  const IconComponent = category.icon
-
-  const handleSave = () => {
-    const updatedFile = {
-      ...file,
-      originalName: editData.originalName,
-      description: editData.description,
-      category: editData.category,
-      isPublic: editData.isPublic
-    }
-    onFileUpdate(updatedFile)
-    setEditMode(false)
-  }
-
-  const isImage = file.type.startsWith('image/')
-  const isVideo = file.type.startsWith('video/')
-  const isAudio = file.type.startsWith('audio/')
-  const isPDF = file.type === 'application/pdf'
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white/80 backdrop-blur-2xl border border-white/20 shadow-2xl">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${category.color}`}>
-                <IconComponent className="h-5 w-5" />
-              </div>
-              <div>
-                <DialogTitle className="text-left text-gray-900 font-semibold">{file.originalName}</DialogTitle>
-                <DialogDescription className="text-left text-gray-600">
-                  {category.label} • {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleDateString()}
-                </DialogDescription>
-              </div>
-            </div>
-            {canEdit && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditMode(!editMode)}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                {editMode ? 'Cancel' : 'Edit'}
-              </Button>
-            )}
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* File Preview */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            {isImage && (
-              <img 
-                src={file.url} 
-                alt={file.originalName}
-                className="max-w-full h-auto max-h-96 mx-auto rounded-lg"
-              />
-            )}
-            {isVideo && (
-              <video 
-                controls 
-                className="max-w-full h-auto max-h-96 mx-auto rounded-lg"
-              >
-                <source src={file.url} type={file.type} />
-                Your browser does not support the video tag.
-              </video>
-            )}
-            {isAudio && (
-              <div className="flex items-center justify-center py-12">
-                <audio controls className="w-full max-w-md">
-                  <source src={file.url} type={file.type} />
-                  Your browser does not support the audio tag.
-                </audio>
-              </div>
-            )}
-            {isPDF && (
-              <div className="space-y-3">
-                <div className="flex justify-end">
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={file.url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      {t('openInNewTab') || 'Open in New Tab'}
-                    </a>
-                  </Button>
-                </div>
-                <div className="relative w-full" style={{ height: '600px' }}>
-                  <iframe
-                    src={`${file.url}#toolbar=1&navpanes=1&scrollbar=1`}
-                    className="w-full h-full rounded-lg border-2 border-gray-200"
-                    title={file.originalName}
-                  />
-                </div>
-              </div>
-            )}
-            {!isImage && !isVideo && !isAudio && !isPDF && (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <IconComponent className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-4">Preview not available</p>
-                  <Button asChild>
-                    <a href={file.url} download>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download File
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* File Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium">File Name</Label>
-                <p className="text-sm text-gray-600">{file.originalName}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">File Size</Label>
-                <p className="text-sm text-gray-600">{formatFileSize(file.size)}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">File Type</Label>
-                <p className="text-sm text-gray-600">{file.type}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Uploaded</Label>
-                <p className="text-sm text-gray-600">
-                  {new Date(file.uploadedAt).toLocaleString()}
-                  {file.uploaderName && ` by ${file.uploaderName}`}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {editMode ? (
-                <>
-                  <div>
-                    <Label htmlFor="filename" className="text-sm font-semibold text-gray-900">File Name</Label>
-                    <input
-                      type="text"
-                      id="filename"
-                      value={editData.originalName}
-                      onChange={(e) => setEditData(prev => ({ ...prev, originalName: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-                      placeholder="Enter file name..."
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="category" className="text-sm font-semibold text-gray-900">Category</Label>
-                    <Select 
-                      value={editData.category} 
-                      onValueChange={(value) => setEditData(prev => ({ ...prev, category: value as FileCategory }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(FILE_CATEGORIES).map(([key, cat]) => (
-                          <SelectItem key={key} value={key}>
-                            {cat.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="description" className="text-sm font-semibold text-gray-900">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={editData.description}
-                      onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Add a description for this file..."
-                      rows={3}
-                      className="bg-white"
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="isPublic"
-                      checked={editData.isPublic}
-                      onChange={(e) => setEditData(prev => ({ ...prev, isPublic: e.target.checked }))}
-                      className="w-4 h-4"
-                    />
-                    <Label htmlFor="isPublic" className="text-sm font-medium text-gray-900">Make this file publicly visible</Label>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleSave} className="bg-primary hover:bg-primary/90">Save Changes</Button>
-                    <Button variant="outline" onClick={() => setEditMode(false)}>Cancel</Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <Label className="text-sm font-semibold text-gray-900">File Name</Label>
-                    <p className="text-sm text-gray-700 mt-1 font-medium">
-                      {file.originalName}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-semibold text-gray-900">Category</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge className={category.color}>
-                        <IconComponent className="h-3 w-3 mr-1" />
-                        {category.label}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-semibold text-gray-900">Description</Label>
-                    <p className="text-sm text-gray-700 mt-1 font-medium">
-                      {file.description || 'No description provided'}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-semibold text-gray-900">Visibility</Label>
-                    <p className="text-sm text-gray-700 mt-1 font-medium">
-                      {file.isPublic ? 'Public' : 'Private'}
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-between items-center pt-4 border-t">
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <a href={file.url} download>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a href={file.url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open in New Tab
-                </a>
-              </Button>
-              {canEdit && (
-                <Button 
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-md hover:shadow-lg transition-all"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-              )}
-            </div>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// Helper function to format file size
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}

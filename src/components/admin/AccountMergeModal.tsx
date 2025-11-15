@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Loader2, Users, AlertTriangle, ArrowRight, Trash2 } from 'lucide-react'
 import { safeFetch } from '@/lib/utils/safe-fetch'
 
@@ -27,7 +27,6 @@ interface AccountMergeModalProps {
 }
 
 export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: AccountMergeModalProps) {
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [sourceUser, setSourceUser] = useState<User | null>(null)
@@ -65,15 +64,11 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
       if (response.ok) {
         setSourceUser(response.data.user)
       } else {
-        throw new Error('Failed to fetch source user')
+        throw new Error(response.error || 'Failed to fetch source user')
       }
     } catch (error) {
       console.error('Error fetching source user:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load source user',
-        type: 'error'
-      })
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to load source user' })
     } finally {
       setFetching(false)
     }
@@ -130,20 +125,12 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
 
   const handleMerge = async () => {
     if (!sourceUserId || !targetUserId) {
-      toast({
-        title: 'Error',
-        description: 'Please select a target user',
-        type: 'error'
-      })
+      toast.error('Error', { description: 'Please select a target user' })
       return
     }
 
     if (sourceUserId === targetUserId) {
-      toast({
-        title: 'Error',
-        description: 'Cannot merge user with itself',
-        type: 'error'
-      })
+      toast.error('Error', { description: 'Cannot merge user with itself' })
       return
     }
 
@@ -169,20 +156,13 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
 
       const data = await response.json()
 
-      toast({
-        title: 'Success',
-        description: data.message || 'Accounts merged successfully'
-      })
+      toast.success('Success', { description: data.message || 'Accounts merged successfully' })
 
       onSuccess()
       onClose()
     } catch (error) {
       console.error('Error merging accounts:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to merge accounts',
-        type: 'error'
-      })
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to merge accounts' })
     } finally {
       setLoading(false)
     }

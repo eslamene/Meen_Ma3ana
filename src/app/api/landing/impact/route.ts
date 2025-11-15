@@ -2,103 +2,7 @@ import { NextResponse } from 'next/server'
 import { db, client } from '@/lib/db'
 import { cases, contributions, caseCategories } from '@/drizzle/schema'
 import { eq, and, sql, sum, countDistinct, gte, lte } from 'drizzle-orm'
-
-// Helper function to categorize case by description
-function categorizeCase(description: string): string {
-  if (!description) return 'other'
-  
-  const desc = description.toLowerCase()
-  
-  // Medical Support
-  if (desc.includes('مريض') || desc.includes('دوا') || desc.includes('أدويه') || 
-      desc.includes('علاج') || desc.includes('عمليه') || desc.includes('كانسر') ||
-      desc.includes('مستشفي') || desc.includes('أشعه') || desc.includes('سنان') ||
-      desc.includes('ضروس') || desc.includes('قلب') || desc.includes('حروق') ||
-      desc.includes('روماتيزم') || desc.includes('تخاطب') || desc.includes('جلسات') ||
-      desc.includes('سكر')) {
-    return 'medical'
-  }
-  
-  // Educational Assistance
-  if (desc.includes('مدرسه') || desc.includes('مدارس') || desc.includes('دروس') ||
-      desc.includes('تعليم') || desc.includes('مصاريف مدرس') || desc.includes('لاب توب') ||
-      desc.includes('هندسه') || desc.includes('ثانويه') || desc.includes('طلبه') ||
-      desc.includes('أزهر') || desc.includes('شباب الأزهر')) {
-    return 'education'
-  }
-  
-  // Housing & Rent
-  if (desc.includes('ايجار') || desc.includes('إيجار') || desc.includes('بيت') ||
-      desc.includes('شقه') || desc.includes('سقف') || desc.includes('ارضيه') ||
-      desc.includes('مرتبه') || desc.includes('كهربا') || desc.includes('كهرباء') ||
-      desc.includes('سباكه') || desc.includes('حمام')) {
-    return 'housing'
-  }
-  
-  // Home Appliances
-  if (desc.includes('تلاجه') || desc.includes('غساله') || desc.includes('بوتاجاز') ||
-      desc.includes('مروحه') || desc.includes('فريزر') || desc.includes('كولدير') ||
-      desc.includes('دولاب') || desc.includes('شاشه') || desc.includes('سرير') ||
-      desc.includes('جهاز') || desc.includes('أنبوبه') || desc.includes('ماكينه') ||
-      desc.includes('خياطه') || desc.includes('اوفر') || desc.includes('موبايل')) {
-    return 'appliances'
-  }
-  
-  // Emergency Relief
-  if (desc.includes('دين') || desc.includes('دين حالا') || desc.includes('غارمه') ||
-      desc.includes('مطلقه') || desc.includes('أرمله') || desc.includes('أيتام') ||
-      desc.includes('يتيم') || desc.includes('بتيم') || desc.includes('المتوفي') ||
-      desc.includes('اكفان')) {
-    return 'emergency'
-  }
-  
-  // Livelihood & Business Support
-  if (desc.includes('مشروع') || desc.includes('عربيه') || desc.includes('مقدم') ||
-      desc.includes('موتوسيكل') || desc.includes('طيور') || desc.includes('زراعه')) {
-    return 'livelihood'
-  }
-  
-  // Social & Community Support
-  if (desc.includes('جواز') || desc.includes('حلويات') || desc.includes('مولد') ||
-      desc.includes('مسجد') || desc.includes('منبر') || desc.includes('سجاجيد') ||
-      desc.includes('بنا') || desc.includes('تجديد') || desc.includes('افتتاح')) {
-    return 'community'
-  }
-  
-  // Basic Needs & Clothing
-  if (desc.includes('بطاطين') || desc.includes('جواكت') || desc.includes('لعب') ||
-      desc.includes('ميكب') || desc.includes('فساتين') || desc.includes('لبس') ||
-      desc.includes('شتوي') || desc.includes('نيجيري')) {
-    return 'basicneeds'
-  }
-  
-  return 'other'
-}
-
-// Category name mappings
-const categoryNames: Record<string, { en: string; ar: string }> = {
-  medical: { en: 'Medical Support', ar: 'الدعم الطبي' },
-  education: { en: 'Educational Assistance', ar: 'المساعدة التعليمية' },
-  housing: { en: 'Housing & Rent', ar: 'السكن والإيجار' },
-  appliances: { en: 'Home Appliances', ar: 'الأجهزة المنزلية' },
-  emergency: { en: 'Emergency Relief', ar: 'الإغاثة الطارئة' },
-  livelihood: { en: 'Livelihood & Business', ar: 'الدعم المعيشي والتجاري' },
-  community: { en: 'Community & Social', ar: 'الدعم المجتمعي والاجتماعي' },
-  basicneeds: { en: 'Basic Needs & Clothing', ar: 'الاحتياجات الأساسية والملابس' },
-  other: { en: 'Other Support', ar: 'دعم آخر' },
-}
-
-const categoryDescriptions: Record<string, string> = {
-  medical: 'Emergency medical expenses, treatments, medications, and ongoing care',
-  education: 'School fees, supplies, tutoring, and educational support',
-  housing: 'Rent assistance, housing repairs, and utility bills',
-  appliances: 'Refrigerators, washing machines, stoves, and essential home appliances',
-  emergency: 'Emergency support for widows, orphans, and families in crisis',
-  livelihood: 'Business support, income generation projects, and livelihood assistance',
-  community: 'Community infrastructure, social events, and community support',
-  basicneeds: 'Clothing, blankets, toys, and basic necessities',
-  other: 'Other forms of support and assistance',
-}
+import { categorizeCase } from '@/lib/utils/category-detection'
 
 // Month name mappings
 const monthNames: Record<number, { en: string; ar: string }> = {
@@ -322,18 +226,39 @@ export async function GET() {
           .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
       : null
 
-    // Use the category-based results, fallback to old method if needed
-    const topMedicalCase = topMedicalCaseByCategory || allCases
-      .filter(c => categorizeCase(c.descriptionAr || '') === 'medical')
-      .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+    // Use the category-based results, fallback to database rules if needed
+    let topMedicalCase = topMedicalCaseByCategory
+    let topEducationCase = topEducationCaseByCategory
+    let topHousingCase = topHousingCaseByCategory
 
-    const topEducationCase = topEducationCaseByCategory || allCases
-      .filter(c => categorizeCase(c.descriptionAr || '') === 'education')
-      .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+    // If category-based matching didn't find cases, use database rules
+    if (!topMedicalCase || !topEducationCase || !topHousingCase) {
+      // Categorize all cases using database rules
+      const categorizedCases = await Promise.all(
+        allCases.map(async (c) => ({
+          ...c,
+          detectedCategoryId: await categorizeCase(c.descriptionAr || ''),
+        }))
+      )
 
-    const topHousingCase = topHousingCaseByCategory || allCases
-      .filter(c => categorizeCase(c.descriptionAr || '') === 'housing')
-      .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      if (!topMedicalCase && medicalCategory) {
+        topMedicalCase = categorizedCases
+          .filter(c => c.detectedCategoryId === medicalCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      }
+
+      if (!topEducationCase && educationCategory) {
+        topEducationCase = categorizedCases
+          .filter(c => c.detectedCategoryId === educationCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      }
+
+      if (!topHousingCase && housingCategory) {
+        topHousingCase = categorizedCases
+          .filter(c => c.detectedCategoryId === housingCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      }
+    }
 
     // Get contributor counts for featured stories
     const getContributorCount = async (caseId: string) => {

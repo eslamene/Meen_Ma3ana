@@ -173,118 +173,39 @@ export default function AdminPage() {
   })
   const [loading, setLoading] = useState(true)
 
-  const supabase = createClient()
-
   const fetchSystemStats = useCallback(async () => {
     try {
       setLoading(true)
       
-      // Fetch all system-wide statistics
-      const [
-        { data: users },
-        { data: contributions },
-        { data: cases },
-        { data: projects }
-      ] = await Promise.all([
-        supabase.from('users').select('id, created_at, role'),
-        supabase.from('contributions').select(`
-          id, 
-          amount, 
-          status, 
-          created_at,
-          approval_status:contribution_approval_status!contribution_id(status)
-        `),
-        supabase.from('cases').select('id, status, created_at'),
-        supabase.from('projects').select('id, created_at')
-      ])
-
-      // Calculate statistics based on approval status
-      const totalUsers = users?.length || 0
-      const totalContributions = contributions?.length || 0
+      const response = await fetch('/api/admin/dashboard')
       
-      // Contribution type for admin dashboard
-      interface ContributionWithApproval {
-        id: string
-        amount: number
-        status: string
-        created_at: string
-        approval_status?: {
-          status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
-        } | Array<{
-          status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
-        }>
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.error('Unauthorized or forbidden access to admin dashboard')
+          return
+        }
+        throw new Error(`Failed to fetch system stats: ${response.statusText}`)
       }
 
-      // Calculate total amount from approved contributions only
-      const totalAmount = contributions?.reduce((sum, c: ContributionWithApproval) => {
-        const approvalStatus = Array.isArray(c.approval_status) 
-          ? c.approval_status[0]?.status 
-          : c.approval_status?.status || 'pending'
-        return approvalStatus === 'approved' ? sum + (c.amount || 0) : sum
-      }, 0) || 0
-      
-      const activeCases = cases?.filter(c => c.status === 'active').length || 0
-      const completedCases = cases?.filter(c => c.status === 'completed').length || 0
-      
-      // Calculate contribution counts based on approval status
-      const pendingContributions = contributions?.filter((c: ContributionWithApproval) => {
-        const approvalStatus = Array.isArray(c.approval_status) 
-          ? c.approval_status[0]?.status 
-          : c.approval_status?.status || 'pending'
-        return approvalStatus === 'pending'
-      }).length || 0
-      
-      const approvedContributions = contributions?.filter((c: ContributionWithApproval) => {
-        const approvalStatus = Array.isArray(c.approval_status) 
-          ? c.approval_status[0]?.status 
-          : c.approval_status?.status || 'pending'
-        return approvalStatus === 'approved'
-      }).length || 0
-      
-      const rejectedContributions = contributions?.filter((c: ContributionWithApproval) => {
-        const approvalStatus = Array.isArray(c.approval_status) 
-          ? c.approval_status[0]?.status 
-          : c.approval_status?.status || 'pending'
-        return approvalStatus === 'rejected'
-      }).length || 0
-      
-      const totalProjects = projects?.length || 0
-
-      // Get recent activity (last 10 approved contributions)
-      const recentActivity = contributions
-        ?.filter((c: ContributionWithApproval) => {
-          const approvalStatus = Array.isArray(c.approval_status) 
-            ? c.approval_status[0]?.status 
-            : c.approval_status?.status || 'pending'
-          return approvalStatus === 'approved'
-        })
-        .slice(0, 10)
-        .map((c: ContributionWithApproval) => ({
-          id: c.id,
-          type: 'contribution',
-          status: c.status,
-          amount: c.amount,
-          date: c.created_at
-        })) || []
-
+      const data = await response.json()
       setStats({
-        totalUsers,
-        totalContributions,
-        totalAmount,
-        activeCases,
-        completedCases,
-        pendingContributions,
-        approvedContributions,
-        rejectedContributions,
-        totalProjects,
-        recentActivity
+        totalUsers: data.totalUsers || 0,
+        totalContributions: data.totalContributions || 0,
+        totalAmount: data.totalAmount || 0,
+        activeCases: data.activeCases || 0,
+        completedCases: data.completedCases || 0,
+        pendingContributions: data.pendingContributions || 0,
+        approvedContributions: data.approvedContributions || 0,
+        rejectedContributions: data.rejectedContributions || 0,
+        totalProjects: data.totalProjects || 0,
+        recentActivity: data.recentActivity || []
       })
     } catch (error) {
       console.error('Error fetching system stats:', error)
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     fetchSystemStats()

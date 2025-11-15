@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Plus, Calendar, User, MessageSquare, AlertTriangle, Target, FileText, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 import { CaseUpdate } from '@/lib/case-updates'
 import { createClient } from '@/lib/supabase/client'
+import { useAdmin } from '@/lib/admin/hooks'
 
 type UpdateType = 'progress' | 'milestone' | 'general' | 'emergency'
 
@@ -99,36 +100,11 @@ export default function UpdatesTimeline({
     isPublic: true,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [currentUser, setCurrentUser] = useState<{
-    id: string
-    role: string
-    first_name?: string
-    last_name?: string
-  } | null>(null)
   const [filterType, setFilterType] = useState<UpdateType | 'all'>('all')
   const [showPrivate, setShowPrivate] = useState(false)
 
   const supabase = createClient()
-
-  useEffect(() => {
-    checkCurrentUser()
-  }, [])
-
-  const checkCurrentUser = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        setCurrentUser(userProfile)
-      }
-    } catch (error) {
-      console.error('Error checking current user:', error)
-    }
-  }
+  const { user: currentUser, hasRole } = useAdmin()
 
   const filteredUpdates = updates.filter(update => {
     if (filterType !== 'all' && update.updateType !== filterType) return false
@@ -232,7 +208,7 @@ export default function UpdatesTimeline({
 
   const canModifyUpdate = (update: CaseUpdate) => {
     if (!currentUser) return false
-    if (currentUser.role === 'admin') return true
+    if (hasRole('admin') || hasRole('super_admin')) return true
     return update.createdBy === currentUser.id
   }
 

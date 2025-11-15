@@ -76,6 +76,19 @@ export const caseCategories = pgTable('case_categories', {
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 })
 
+// Category detection rules table
+export const categoryDetectionRules = pgTable('category_detection_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  category_id: uuid('category_id').references(() => caseCategories.id, { onDelete: 'cascade' }).notNull(),
+  keyword: text('keyword').notNull(), // The keyword to search for
+  is_active: boolean('is_active').notNull().default(true),
+  priority: integer('priority').notNull().default(0), // Higher priority rules are checked first
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+  created_by: uuid('created_by').references(() => users.id),
+  updated_by: uuid('updated_by').references(() => users.id),
+})
+
 // Updated cases table with enhanced fields
 export const cases = pgTable('cases', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -487,6 +500,7 @@ export const recurringContributionsRelations = relations(recurringContributions,
 export const schema = {
   users,
   caseCategories,
+  categoryDetectionRules,
   cases,
   caseImages,
   caseStatusHistory,

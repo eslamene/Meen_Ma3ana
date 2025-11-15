@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/client'
 import type { BeneficiaryDocument, CreateBeneficiaryDocumentData } from '@/types/beneficiary'
 
 import { defaultLogger } from '@/lib/logger'
@@ -8,77 +7,101 @@ export class BeneficiaryDocumentService {
    * Get documents by beneficiary ID
    */
   static async getByBeneficiaryId(beneficiaryId: string): Promise<BeneficiaryDocument[]> {
-    const supabase = createClient()
+    try {
+      const response = await fetch(`/api/beneficiaries/${beneficiaryId}/documents`)
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized')
+        }
+        throw new Error(`Failed to fetch documents: ${response.statusText}`)
+      }
 
-    const { data, error } = await supabase
-      .from('beneficiary_documents')
-      .select('*')
-      .eq('beneficiary_id', beneficiaryId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
+      const data = await response.json()
+      return data.documents || []
+    } catch (error) {
       defaultLogger.error('Error fetching beneficiary documents:', error)
-      throw new Error(error.message)
+      throw error instanceof Error ? error : new Error('Failed to fetch documents')
     }
-
-    return data || []
   }
 
   /**
    * Create a new document
    */
   static async create(data: CreateBeneficiaryDocumentData): Promise<BeneficiaryDocument> {
-    const supabase = createClient()
+    try {
+      const response = await fetch('/api/beneficiaries/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
 
-    const { data: document, error } = await supabase
-      .from('beneficiary_documents')
-      .insert([data])
-      .select()
-      .single()
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized')
+        }
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to create document: ${response.statusText}`)
+      }
 
-    if (error) {
+      const result = await response.json()
+      return result.document
+    } catch (error) {
       defaultLogger.error('Error creating beneficiary document:', error)
-      throw new Error(error.message)
+      throw error instanceof Error ? error : new Error('Failed to create document')
     }
-
-    return document
   }
 
   /**
    * Update document
    */
   static async update(id: string, data: Partial<CreateBeneficiaryDocumentData>): Promise<BeneficiaryDocument> {
-    const supabase = createClient()
+    try {
+      const response = await fetch(`/api/beneficiaries/documents/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
 
-    const { data: document, error } = await supabase
-      .from('beneficiary_documents')
-      .update(data)
-      .eq('id', id)
-      .select()
-      .single()
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized')
+        }
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to update document: ${response.statusText}`)
+      }
 
-    if (error) {
+      const result = await response.json()
+      return result.document
+    } catch (error) {
       defaultLogger.error('Error updating beneficiary document:', error)
-      throw new Error(error.message)
+      throw error instanceof Error ? error : new Error('Failed to update document')
     }
-
-    return document
   }
 
   /**
    * Delete document
    */
   static async delete(id: string): Promise<void> {
-    const supabase = createClient()
+    try {
+      const response = await fetch(`/api/beneficiaries/documents/${id}`, {
+        method: 'DELETE',
+      })
 
-    const { error } = await supabase
-      .from('beneficiary_documents')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized')
+        }
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to delete document: ${response.statusText}`)
+      }
+    } catch (error) {
       defaultLogger.error('Error deleting beneficiary document:', error)
-      throw new Error(error.message)
+      throw error instanceof Error ? error : new Error('Failed to delete document')
     }
   }
 
@@ -86,22 +109,24 @@ export class BeneficiaryDocumentService {
    * Get document by ID
    */
   static async getById(id: string): Promise<BeneficiaryDocument | null> {
-    const supabase = createClient()
-
-    const { data, error } = await supabase
-      .from('beneficiary_documents')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null // Document not found
+    try {
+      const response = await fetch(`/api/beneficiaries/documents/${id}`)
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null // Document not found
+        }
+        if (response.status === 401) {
+          throw new Error('Unauthorized')
+        }
+        throw new Error(`Failed to fetch document: ${response.statusText}`)
       }
-      defaultLogger.error('Error fetching beneficiary document:', error)
-      throw new Error(error.message)
-    }
 
-    return data
+      const data = await response.json()
+      return data.document || null
+    } catch (error) {
+      defaultLogger.error('Error fetching beneficiary document:', error)
+      throw error instanceof Error ? error : new Error('Failed to fetch document')
+    }
   }
 }

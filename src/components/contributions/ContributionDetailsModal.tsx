@@ -25,7 +25,7 @@ import {
   RefreshCw,
   Info
 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 
 interface Contribution {
   id: string
@@ -80,7 +80,6 @@ export default function ContributionDetailsModal({
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
-  const { toast } = useToast()
   const [isExpanded, setIsExpanded] = useState(false)
 
   if (!contribution) return null
@@ -121,18 +120,10 @@ export default function ContributionDetailsModal({
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      toast({
-        title: 'Copied!',
-        description: 'Transaction ID copied to clipboard',
-        type: 'success'
-      })
-    } catch (err) {
+      toast.success('Copied!', { description: 'Transaction ID copied to clipboard' })
+    } catch (err: any) {
       console.error('Failed to copy: ', err)
-      toast({
-        title: 'Error',
-        description: 'Failed to copy to clipboard',
-        type: 'error'
-      })
+      toast.error('Error', { description: 'Failed to copy to clipboard' })
     }
   }
 

@@ -5,9 +5,9 @@
  * This script finds pages with hardcoded max-w containers and updates them
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = import('fs');
+const path = import('path');
+const { execSync } = import('child_process');
 
 const pagesDir = path.join(__dirname, '../src/app/[locale]');
 

@@ -9,7 +9,7 @@ import { PermissionFormModal } from '@/components/admin/rbac/PermissionFormModal
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Plus, Edit2, Shield } from 'lucide-react'
 
 interface Permission {
@@ -29,7 +29,6 @@ export default function AdminPermissionsPage() {
   const [createPermissionModal, setCreatePermissionModal] = useState(false)
   const [editPermissionModal, setEditPermissionModal] = useState(false)
   const [selectedPermission, setSelectedPermission] = useState<Permission | undefined>(undefined)
-  const { toast } = useToast()
 
   // Fetch permissions
   const fetchPermissions = useCallback(async () => {
@@ -40,18 +39,14 @@ export default function AdminPermissionsPage() {
       if (permissionsRes.ok) {
         setPermissions(permissionsRes.data?.permissions || [])
       } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch permissions',
-          type: 'error'
+        toast.error('Error', {
+          description: 'Failed to fetch permissions'
         })
       }
     } catch (error) {
       console.error('Fetch error:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch permissions',
-        type: 'error'
+      toast.error('Error', {
+        description: 'Failed to fetch permissions'
       })
     } finally {
       setLoading(false)
@@ -76,18 +71,14 @@ export default function AdminPermissionsPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Permission created successfully'
-        })
+        toast.success('Success', { description: 'Permission created successfully' })  
         setCreatePermissionModal(false)
         fetchPermissions()
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create permission',
-        type: 'error'
+      console.error('Create permission error:', error)
+      toast.error('Error', {
+        description: 'Failed to create permission'
       })
     }
   }
@@ -105,8 +96,7 @@ export default function AdminPermissionsPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: 'Success',
+        toast.success('Success', {
           description: 'Permission updated successfully'
         })
         setEditPermissionModal(false)
@@ -114,10 +104,8 @@ export default function AdminPermissionsPage() {
         fetchPermissions()
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update permission',
-        type: 'error'
+      toast.error('Error', {
+        description: 'Failed to update permission'
       })
     }
   }

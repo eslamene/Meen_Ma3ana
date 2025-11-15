@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, TrendingUp, Target } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import ContributionForm from '@/components/contributions/ContributionForm'
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
 
@@ -43,8 +42,6 @@ export default function DonatePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const supabase = createClient()
-  
   // Use centralized hook for approved contributions
   const { totalAmount: approvedTotal } = useApprovedContributions(caseId)
 
@@ -54,24 +51,37 @@ export default function DonatePage() {
         setLoading(true)
         setError(null)
 
-        const { data, error } = await supabase
-          .from('cases')
-          .select('*')
-          .eq('id', caseId)
-          .single()
+        const response = await fetch(`/api/cases/${caseId}`)
+        const result = await response.json()
 
-        if (error) {
-          console.error('Error fetching case:', error)
-          setError('Case not found')
+        if (!response.ok) {
+          setError(result.error || 'Case not found')
           return
         }
+
+        const data = result.case
 
         if (data.status !== 'published') {
           setError('This case is not available for donations')
           return
         }
 
-        setCaseData(data)
+        // Map API response to Case interface
+        setCaseData({
+          id: data.id,
+          title: data.title_en || data.title_ar || '',
+          description: data.description_en || data.description_ar || '',
+          target_amount: parseFloat(data.target_amount || '0'),
+          current_amount: parseFloat(data.current_amount || '0'),
+          status: data.status,
+          category: Array.isArray(data.case_categories) 
+            ? data.case_categories[0]?.name 
+            : data.case_categories?.name || '',
+          priority: data.priority || 'medium',
+          beneficiary_name: data.beneficiary_name || '',
+          location: data.location || '',
+          created_at: data.created_at
+        })
       } catch (error) {
         console.error('Error fetching case details:', error)
         setError('Failed to load case details')
@@ -81,7 +91,7 @@ export default function DonatePage() {
     }
 
     fetchCaseDetails()
-  }, [caseId, supabase])
+  }, [caseId])
 
   const handleBack = () => {
     router.push(`/${locale}/cases/${caseId}`)

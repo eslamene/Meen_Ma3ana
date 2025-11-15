@@ -201,10 +201,13 @@ export class Logger {
       }
       
       if (error instanceof Error) {
-        logData.error = {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
+        const errorData: Record<string, unknown> = {}
+        if (error.name) errorData.name = error.name
+        if (error.message) errorData.message = error.message
+        if (error.stack) errorData.stack = error.stack
+        // Only add error object if it has at least one property
+        if (Object.keys(errorData).length > 0) {
+          logData.error = errorData
         }
       } else if (error) {
         // Handle error-like objects (e.g., Supabase errors)
@@ -233,21 +236,33 @@ export class Logger {
         const redactedError = redactPII(error)
         
         // Merge essential fields with redacted error, prioritizing essential fields
-        if (Object.keys(essentialFields).length > 0 || (redactedError !== null && redactedError !== undefined)) {
+        // Only create error object if we have essential fields or redactedError has meaningful data
+        const hasRedactedData = redactedError !== null && 
+                               redactedError !== undefined && 
+                               typeof redactedError === 'object' &&
+                               Object.keys(redactedError as Record<string, unknown>).length > 0
+        
+        if (Object.keys(essentialFields).length > 0 || hasRedactedData) {
           logData.error = {
             ...essentialFields,
-            ...(typeof redactedError === 'object' && redactedError !== null ? redactedError : {}),
+            ...(hasRedactedData ? (redactedError as Record<string, unknown>) : {}),
           }
         }
       }
       
-      // Ensure we always log something meaningful
-      if (Object.keys(logData).length === 0 || (logData.error && Object.keys(logData.error as Record<string, unknown>).length === 0)) {
+      // Remove empty error object if it exists
+      if (logData.error && Object.keys(logData.error as Record<string, unknown>).length === 0) {
+        delete logData.error
+      }
+      
+      // Ensure we always have at least a message
+      if (!logData.message || logData.message === '') {
         logData.message = message || 'Unknown error'
-        // Remove empty error object
-        if (logData.error && Object.keys(logData.error as Record<string, unknown>).length === 0) {
-          delete logData.error
-        }
+      }
+      
+      // Ensure logData is not empty before logging
+      if (Object.keys(logData).length === 0) {
+        logData.message = message || 'Unknown error'
       }
       
       logger.error(logData)

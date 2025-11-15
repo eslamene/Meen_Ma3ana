@@ -179,48 +179,33 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [refreshingRole, setRefreshingRole] = useState(false)
 
-  const supabase = createClient()
-
   const fetchDashboardStats = useCallback(async () => {
     try {
       setLoading(true)
+      const supabase = createClient()
       const { data: { user: authUser } } = await supabase.auth.getUser()
       
       if (!authUser) return
 
-      // Fetch user's contributions
-      const { data: contributions } = await supabase
-        .from('contributions')
-        .select('amount, status')
-        .eq('donor_id', authUser.id)
-
-      // Fetch cases (for admin users)
-      const { data: cases } = await supabase
-        .from('cases')
-        .select('status')
-        .eq('created_by', authUser.id)
-
-      if (contributions) {
-        interface Contribution {
-          amount: number | string
-          status?: string
+      // Fetch dashboard statistics from API
+      const response = await fetch('/api/dashboard/stats')
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          // User not authenticated, redirect to login
+          return
         }
-        interface Case {
-          status?: string
-        }
-        const totalContributions = contributions.length
-        const totalAmount = (contributions as Contribution[]).reduce((sum, c) => {
-          const amount = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0)
-          return sum + amount
-        }, 0)
-        const activeCases = (cases as Case[] | null)?.filter((c: Case) => c.status === 'active').length || 0
-        const completedCases = (cases as Case[] | null)?.filter((c: Case) => c.status === 'completed').length || 0
+        throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`)
+      }
 
+      const data = await response.json()
+      
+      if (data.stats) {
         setStats({
-          totalContributions,
-          totalAmount,
-          activeCases,
-          completedCases
+          totalContributions: data.stats.totalContributions || 0,
+          totalAmount: data.stats.totalAmount || 0,
+          activeCases: data.stats.activeCases || 0,
+          completedCases: data.stats.completedCases || 0
         })
       }
     } catch (error) {
@@ -228,7 +213,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     fetchDashboardStats()

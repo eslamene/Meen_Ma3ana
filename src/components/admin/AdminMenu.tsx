@@ -8,7 +8,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAdmin } from '@/lib/admin/hooks'
-import { getIconComponent } from '@/config/navigation'
+import DynamicIcon from '@/components/ui/dynamic-icon'
 import { cn } from '@/lib/utils'
 import type { AdminMenuItem } from '@/lib/admin/types'
 
@@ -50,7 +50,6 @@ interface MenuItemProps {
 
 function MenuItem({ item, pathname, level }: MenuItemProps) {
   const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
-  const Icon = item.icon ? getIconComponent(item.icon) : null
   const hasChildren = item.children && item.children.length > 0
 
   if (hasChildren) {
@@ -64,7 +63,7 @@ function MenuItem({ item, pathname, level }: MenuItemProps) {
               : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
           )}
         >
-          {Icon && <Icon className="h-4 w-4" />}
+          {item.icon && <DynamicIcon name={item.icon} className="h-4 w-4" />}
           <span>{item.label}</span>
         </div>
         <div className="ml-4 space-y-1">
@@ -91,7 +90,7 @@ function MenuItem({ item, pathname, level }: MenuItemProps) {
           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
       )}
     >
-      {Icon && <Icon className="h-4 w-4" />}
+      {item.icon && <DynamicIcon name={item.icon} className="h-4 w-4" />}
       <span>{item.label}</span>
     </Link>
   )

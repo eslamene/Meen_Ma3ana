@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Heart, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import ContributionsList from '@/components/contributions/ContributionsList'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
@@ -66,7 +66,6 @@ export default function AdminContributionsPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
-  const { toast } = useToast()
   const { containerVariant } = useLayout()
   
   // Get status from URL query parameter
@@ -170,7 +169,7 @@ export default function AdminContributionsPage() {
       } else {
         newSearchParams.set('status', value)
       }
-      const newUrl = `/${params.locale}/admin/contributions${newSearchParams.toString() ? '?' + newSearchParams.toString() : ''}`
+      const newUrl = `/${params.locale}/case-management/contributions${newSearchParams.toString() ? '?' + newSearchParams.toString() : ''}`
       router.push(newUrl, { scroll: false })
     }
   }
@@ -202,21 +201,13 @@ export default function AdminContributionsPage() {
         throw new Error(errorData.error || 'Failed to update status')
       }
 
-      toast({
-        title: 'Success',
-        description: `Contribution ${status} successfully`,
-        type: 'success'
-      })
+      toast.success('Success', { description: `Contribution ${status} successfully` })      
 
       // Refresh the contributions list
       await fetchContributions()
     } catch (error) {
       console.error('Error updating contribution status:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update status',
-        type: 'error'
-      })
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update status' })
     }
   }
 
@@ -230,7 +221,7 @@ export default function AdminContributionsPage() {
               <div className="flex items-center gap-4 mb-4">
                 <Button
                   variant="ghost"
-                  onClick={() => router.push(`/${params.locale}/admin`)}
+                  onClick={() => router.push(`/${params.locale}/case-management`)}
                   className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeft className="h-4 w-4" />

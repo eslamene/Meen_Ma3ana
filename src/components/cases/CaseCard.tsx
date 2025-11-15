@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useTranslations, useLocale } from 'next-intl'
 import { useParams } from 'next/navigation'
+import DynamicIcon from '@/components/ui/dynamic-icon'
 
 interface Case {
   id: string
@@ -37,6 +38,7 @@ interface Case {
   currentAmount: number
   status: string
   category: string
+  categoryData?: { name: string; icon?: string; color?: string } | null
   type: 'one-time' | 'recurring'
   location: string
   createdAt: string
@@ -132,25 +134,90 @@ export default function CaseCard({
     }
   }
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'medical': return <AlertTriangle className="h-4 w-4 text-red-500" />
-      case 'education': return <GraduationCap className="h-4 w-4 text-blue-500" />
-      case 'housing': return <Home className="h-4 w-4 text-green-500" />
-      case 'food': return <Utensils className="h-4 w-4 text-orange-500" />
-      case 'emergency': return <AlertTriangle className="h-4 w-4 text-red-600" />
-      default: return <Gift className="h-4 w-4 text-purple-500" />
+  // Helper function to convert hex color to light gradient background
+  const getCategoryGradient = (color?: string | null) => {
+    if (!color) {
+      return {
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 250, 251, 0.9) 100%)',
+        borderColor: 'rgba(229, 231, 235, 0.5)',
+        iconColor: '#6B7280',
+        badgeBg: 'rgba(243, 244, 246, 0.5)',
+        badgeBorder: 'rgba(156, 163, 175, 0.3)',
+        accentColor: 'rgba(156, 163, 175, 0.1)'
+      }
+    }
+    
+    // Convert hex to RGB
+    const hex = color.replace('#', '')
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+    
+    // Create lighter, more visible versions for gradient (light ingredient effect)
+    // Use the original color with low opacity for a subtle tint
+    const lightR = Math.min(255, Math.floor(r * 0.15 + 240))
+    const lightG = Math.min(255, Math.floor(g * 0.15 + 240))
+    const lightB = Math.min(255, Math.floor(b * 0.15 + 240))
+    
+    // Even lighter for the gradient end
+    const lighterR = Math.min(255, Math.floor(r * 0.08 + 248))
+    const lighterG = Math.min(255, Math.floor(g * 0.08 + 248))
+    const lighterB = Math.min(255, Math.floor(b * 0.08 + 248))
+    
+    // For accent border/edge
+    const accentR = Math.min(255, Math.floor(r * 0.3 + 220))
+    const accentG = Math.min(255, Math.floor(g * 0.3 + 220))
+    const accentB = Math.min(255, Math.floor(b * 0.3 + 220))
+    
+    return {
+      background: `linear-gradient(135deg, rgba(${lightR}, ${lightG}, ${lightB}, 0.4) 0%, rgba(${lighterR}, ${lighterG}, ${lighterB}, 0.2) 50%, rgba(255, 255, 255, 0.95) 100%)`,
+      borderColor: `rgba(${r}, ${g}, ${b}, 0.25)`,
+      iconColor: color,
+      badgeBg: `rgba(${r}, ${g}, ${b}, 0.15)`,
+      badgeBorder: `rgba(${r}, ${g}, ${b}, 0.35)`,
+      accentColor: `rgba(${accentR}, ${accentG}, ${accentB}, 0.3)`
     }
   }
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'medical': return 'bg-red-50 border-red-200'
-      case 'education': return 'bg-blue-50 border-blue-200'
-      case 'housing': return 'bg-green-50 border-green-200'
-      case 'food': return 'bg-orange-50 border-orange-200'
-      case 'emergency': return 'bg-red-50 border-red-200'
-      default: return 'bg-purple-50 border-purple-200'
+  // Get category icon from database or fallback
+  const getCategoryIcon = () => {
+    // Always prefer icon from database (caseCategories table)
+    if (caseItem.categoryData?.icon) {
+      return <DynamicIcon name={caseItem.categoryData.icon} className="h-4 w-4" fallback="gift" />
+    }
+    // Fallback to default icon only if no icon in database
+    return <Gift className="h-4 w-4 text-purple-500" />
+  }
+
+  // Get category color classes for badges
+  const getCategoryBadgeStyle = () => {
+    if (caseItem.categoryData?.color) {
+      const gradient = getCategoryGradient(caseItem.categoryData.color)
+      return {
+        backgroundColor: gradient.badgeBg,
+        borderColor: gradient.badgeBorder,
+        color: gradient.iconColor
+      }
+    }
+    return {
+      backgroundColor: 'rgba(243, 244, 246, 0.5)',
+      borderColor: 'rgba(156, 163, 175, 0.3)',
+      color: '#6B7280'
+    }
+  }
+
+  // Get category icon container style
+  const getCategoryIconStyle = () => {
+    if (caseItem.categoryData?.color) {
+      const gradient = getCategoryGradient(caseItem.categoryData.color)
+      return {
+        backgroundColor: gradient.badgeBg,
+        color: gradient.iconColor
+      }
+    }
+    return {
+      backgroundColor: 'rgba(243, 244, 246, 0.5)',
+      color: '#6B7280'
     }
   }
 
@@ -209,14 +276,48 @@ export default function CaseCard({
   const isNearTarget = progressPercentage >= 75
   const isFullyFunded = progressPercentage >= 100
 
+  // Get card background style based on category color with light gradient effect
+  const getCardStyle = () => {
+    if (caseItem.categoryData?.color) {
+      const gradient = getCategoryGradient(caseItem.categoryData.color)
+      return {
+        background: gradient.background,
+        borderColor: gradient.borderColor,
+        borderLeftWidth: '3px',
+        borderLeftColor: gradient.iconColor
+      }
+    }
+    return {
+      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 250, 251, 0.9) 100%)',
+      borderColor: 'rgba(229, 231, 235, 0.5)',
+      borderLeftWidth: '3px',
+      borderLeftColor: 'rgba(156, 163, 175, 0.3)'
+    }
+  }
+
   // Grid View Component
-  const GridView = () => (
+  const GridView = () => {
+    const cardStyle = getCardStyle()
+    const badgeStyle = getCategoryBadgeStyle()
+    const iconStyle = getCategoryIconStyle()
+    
+    return (
     <Card 
-      className="group hover:shadow-xl transition-all duration-300 cursor-pointer h-full flex flex-col bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:scale-[1.02] overflow-hidden" 
+      className="group hover:shadow-xl transition-all duration-300 cursor-pointer h-full flex flex-col backdrop-blur-sm border shadow-lg hover:scale-[1.02] overflow-hidden relative" 
+      style={cardStyle}
       onClick={handleCardClick}
     >
+      {/* Subtle top accent bar based on category color */}
+      {caseItem.categoryData?.color && (
+        <div 
+          className="absolute top-0 left-0 right-0 h-1"
+          style={{ 
+            background: `linear-gradient(90deg, ${caseItem.categoryData.color}40 0%, ${caseItem.categoryData.color}20 100%)`
+          }}
+        />
+      )}
       {/* Header with Status and Category */}
-      <CardHeader className="pb-3 relative">
+      <CardHeader className="pb-3 relative pt-4">
         <div className="flex justify-between items-start mb-3">
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className={`${getStatusColor(caseItem.status)} font-medium text-xs`}>
@@ -227,9 +328,22 @@ export default function CaseCard({
                 {t(caseItem.priority)}
               </Badge>
             )}
+            {caseItem.categoryData?.name && (
+              <Badge 
+                variant="outline" 
+                className="font-medium text-xs flex items-center gap-1"
+                style={badgeStyle}
+              >
+                {getCategoryIcon()}
+                <span>{caseItem.categoryData.name}</span>
+              </Badge>
+            )}
           </div>
-          <div className={`p-2 rounded-lg ${getCategoryColor(caseItem.category)} flex-shrink-0`}>
-            {getCategoryIcon(caseItem.category)}
+          <div 
+            className="p-2 rounded-lg flex-shrink-0"
+            style={iconStyle}
+          >
+            {getCategoryIcon()}
           </div>
         </div>
         
@@ -379,32 +493,61 @@ export default function CaseCard({
         </div>
       </CardContent>
     </Card>
-  )
+    )
+  }
 
   // List View Component
-  const ListView = () => (
+  const ListView = () => {
+    const cardStyle = getCardStyle()
+    const badgeStyle = getCategoryBadgeStyle()
+    const iconStyle = getCategoryIconStyle()
+    
+    return (
     <Card 
-      className="group hover:shadow-lg transition-all duration-300 cursor-pointer bg-white/90 backdrop-blur-sm border-0 shadow-md hover:scale-[1.01] overflow-hidden" 
+      className="group hover:shadow-lg transition-all duration-300 cursor-pointer backdrop-blur-sm border shadow-md hover:scale-[1.01] overflow-hidden relative" 
+      style={cardStyle}
       onClick={handleCardClick}
     >
-      <CardContent className="p-4">
+      {/* Subtle top accent bar based on category color */}
+      {caseItem.categoryData?.color && (
+        <div 
+          className="absolute top-0 left-0 right-0 h-1"
+          style={{ 
+            background: `linear-gradient(90deg, ${caseItem.categoryData.color}40 0%, ${caseItem.categoryData.color}20 100%)`
+          }}
+        />
+      )}
+      <CardContent className="p-4 pt-5">
         <div className="flex items-center gap-4">
           {/* Category Icon */}
-          <div className={`p-3 rounded-lg ${getCategoryColor(caseItem.category)} flex-shrink-0`}>
-            {getCategoryIcon(caseItem.category)}
+          <div 
+            className="p-3 rounded-lg flex-shrink-0"
+            style={iconStyle}
+          >
+            {getCategoryIcon()}
           </div>
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Badge variant="outline" className={`${getStatusColor(caseItem.status)} font-medium text-xs`}>
                     {t(caseItem.status)}
                   </Badge>
                   {caseItem.priority && (
                     <Badge variant="outline" className={`${getPriorityColor(caseItem.priority)} font-medium text-xs`}>
                       {t(caseItem.priority)}
+                    </Badge>
+                  )}
+                  {caseItem.categoryData?.name && (
+                    <Badge 
+                      variant="outline" 
+                      className="font-medium text-xs flex items-center gap-1"
+                      style={badgeStyle}
+                    >
+                      {getCategoryIcon()}
+                      <span>{caseItem.categoryData.name}</span>
                     </Badge>
                   )}
                 </div>
@@ -542,7 +685,8 @@ export default function CaseCard({
         </div>
       </CardContent>
     </Card>
-  )
+    )
+  }
 
   return viewMode === 'list' ? <ListView /> : <GridView />
 } 

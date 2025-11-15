@@ -74,14 +74,18 @@ export async function PUT(
       .maybeSingle()
 
     if (checkError) {
-      defaultLogger.error('Error checking menu item existence:', checkError, {
-        menuItemId: params.id
+      defaultLogger.error('Error checking menu item existence:', {
+        menuItemId: params.id,
+        error: checkError,
+        errorCode: checkError.code,
+        errorMessage: checkError.message,
+        errorDetails: checkError.details
       })
       
       return NextResponse.json(
         { 
           error: 'Error checking menu item',
-          details: checkError.message
+          details: checkError.message || 'Database query failed'
         },
         { status: 500 }
       )

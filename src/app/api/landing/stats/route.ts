@@ -1,42 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { cases, contributions } from '@/drizzle/schema'
+import { cases, contributions, caseCategories } from '@/drizzle/schema'
 import { eq, and, sql, countDistinct } from 'drizzle-orm'
-
-// Helper function to categorize case by description
-function categorizeCase(description: string): string {
-  if (!description) return 'other'
-  
-  const desc = description.toLowerCase()
-  
-  // Medical Support
-  if (desc.includes('مريض') || desc.includes('دوا') || desc.includes('أدويه') || 
-      desc.includes('علاج') || desc.includes('عمليه') || desc.includes('كانسر') ||
-      desc.includes('مستشفي') || desc.includes('أشعه') || desc.includes('سنان') ||
-      desc.includes('ضروس') || desc.includes('قلب') || desc.includes('حروق') ||
-      desc.includes('روماتيزم') || desc.includes('تخاطب') || desc.includes('جلسات') ||
-      desc.includes('سكر')) {
-    return 'medical'
-  }
-  
-  // Educational Assistance
-  if (desc.includes('مدرسه') || desc.includes('مدارس') || desc.includes('دروس') ||
-      desc.includes('تعليم') || desc.includes('مصاريف مدرس') || desc.includes('لاب توب') ||
-      desc.includes('هندسه') || desc.includes('ثانويه') || desc.includes('طلبه') ||
-      desc.includes('أزهر') || desc.includes('شباب الأزهر')) {
-    return 'education'
-  }
-  
-  // Housing & Rent
-  if (desc.includes('ايجار') || desc.includes('إيجار') || desc.includes('بيت') ||
-      desc.includes('شقه') || desc.includes('سقف') || desc.includes('ارضيه') ||
-      desc.includes('مرتبه') || desc.includes('كهربا') || desc.includes('كهرباء') ||
-      desc.includes('سباكه') || desc.includes('حمام')) {
-    return 'housing'
-  }
-  
-  return 'other'
-}
+import { categorizeCase } from '@/lib/utils/category-detection'
 
 export async function GET() {
   try {
@@ -85,20 +51,55 @@ export async function GET() {
       .from(cases)
       .where(eq(cases.status, 'published'))
     
+    // Get categories to match by ID - use specific IDs from database
+    const allCategories = await db.select().from(caseCategories).where(eq(caseCategories.is_active, true))
+    
+    // Find medical, education, and housing categories by ID or name pattern
+    const medicalCategory = allCategories.find(c => 
+      c.id === '034662d0-00ef-41fc-bfbf-90db9c7499dd' ||
+      (c.name || '').toLowerCase().includes('medical') || 
+      (c.name || '').toLowerCase().includes('طبي')
+    )
+    const educationCategory = allCategories.find(c => 
+      c.id === '449ca259-a73d-4edf-b000-9bbd91c89973' ||
+      (c.name || '').toLowerCase().includes('education') || 
+      (c.name || '').toLowerCase().includes('تعليم')
+    )
+    const housingCategory = allCategories.find(c => 
+      c.id === '39db1de3-6f6c-474a-a656-0d12affbd4f5' ||
+      (c.name || '').toLowerCase().includes('housing') || 
+      (c.name || '').toLowerCase().includes('سكن') ||
+      (c.name || '').toLowerCase().includes('ايجار')
+    )
+    
+    // Categorize all cases using database rules (async)
+    const categorizedCases = await Promise.all(
+      allCases.map(async (c) => ({
+        ...c,
+        detectedCategoryId: await categorizeCase(c.descriptionAr || ''),
+      }))
+    )
+    
     // Find top medical case
-    const topMedicalCase = allCases
-      .filter(c => categorizeCase(c.descriptionAr || '') === 'medical')
-      .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+    const topMedicalCase = medicalCategory
+      ? categorizedCases
+          .filter(c => c.detectedCategoryId === medicalCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      : null
     
     // Find top education case
-    const topEducationCase = allCases
-      .filter(c => categorizeCase(c.descriptionAr || '') === 'education')
-      .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+    const topEducationCase = educationCategory
+      ? categorizedCases
+          .filter(c => c.detectedCategoryId === educationCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      : null
     
     // Find top housing case
-    const topHousingCase = allCases
-      .filter(c => categorizeCase(c.descriptionAr || '') === 'housing')
-      .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+    const topHousingCase = housingCategory
+      ? categorizedCases
+          .filter(c => c.detectedCategoryId === housingCategory.id)
+          .sort((a, b) => Number(b.currentAmount || 0) - Number(a.currentAmount || 0))[0]
+      : null
     
     // Get contributor counts for featured stories
     const getContributorCount = async (caseId: string) => {

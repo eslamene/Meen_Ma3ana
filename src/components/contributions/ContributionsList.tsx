@@ -23,7 +23,7 @@ import {
   ExternalLink,
   ArrowLeft
 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import ContributionRejectionModal from '@/components/contributions/ContributionRejectionModal'
 import ContributionDetailsModal from '@/components/contributions/ContributionDetailsModal'
 import PaymentProofModal from '@/components/contributions/PaymentProofModal'
@@ -161,7 +161,6 @@ const ContributionItem = ({
 }: ContributionItemProps) => {
   const params = useParams()
   const router = useRouter()
-  const { toast } = useToast()
   const [showRejectionModal, setShowRejectionModal] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [openMenuForId, setOpenMenuForId] = useState<string | null>(null)
@@ -170,17 +169,13 @@ const ContributionItem = ({
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      toast({
-        title: 'Copied!',
-        description: 'Transaction ID copied to clipboard',
-        type: 'success'
+      toast.success('Copied!', {
+        description: 'Transaction ID copied to clipboard'
       })
     } catch (err) {
       console.error('Failed to copy: ', err)
-      toast({
-        title: 'Error',
-        description: 'Failed to copy to clipboard',
-        type: 'error'
+      toast.error('Error',  {
+        description: 'Failed to copy to clipboard'
       })
     }
   }

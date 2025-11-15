@@ -157,23 +157,32 @@ export default function ImageUpload({
     try {
       const uploadedImages: UploadedImage[] = []
       
-      for (const image of images) {
+      // Get current user for uploaded_by field
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i]
+        
         if (image.uploaded) {
           uploadedImages.push(image)
           continue
         }
         
         try {
-          // Upload to Supabase Storage
-          // Sanitize file extension
-          const fileExt = (image.file.name.split('.').pop() || 'jpg')
-            .replace(/[^\w]/g, '') // Remove any special characters from extension
+          // Upload to Supabase Storage - use case-files bucket
+          // Sanitize filename
+          const sanitizedName = image.file.name
+            .replace(/[^\w\s.-]/g, '') // Remove special characters
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/--+/g, '-') // Replace multiple hyphens with single
             .toLowerCase()
-          const fileName = `case-images/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+          
+          const fileId = `${Date.now()}-${Math.random().toString(36).substring(2)}`
+          const storagePath = `photos/${fileId}-${sanitizedName}`
           
           const { data, error } = await supabase.storage
-            .from('case-images')
-            .upload(fileName, image.file, {
+            .from('case-files')
+            .upload(storagePath, image.file, {
               cacheControl: '3600',
               upsert: false
             })
@@ -182,8 +191,8 @@ export default function ImageUpload({
           
           // Get public URL
           const { data: urlData } = supabase.storage
-            .from('case-images')
-            .getPublicUrl(fileName)
+            .from('case-files')
+            .getPublicUrl(storagePath)
           
           uploadedImages.push({
             ...image,

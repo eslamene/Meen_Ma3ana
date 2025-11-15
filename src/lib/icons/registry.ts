@@ -39,6 +39,91 @@ import {
   UserPlus,
   Package,
   Circle,
+  FileCheck,
+  FolderKanban,
+  PlusCircle,
+  Calendar,
+  Repeat,
+  MessageSquare,
+  LineChart,
+  ShieldCheck,
+  ShieldPlus,
+  UserCog,
+  GitBranch,
+  Tag,
+  Search,
+  Edit,
+  Trash2,
+  ArrowLeft,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+  Palette,
+  Building2,
+  ShoppingBag,
+  Truck,
+  Store,
+  Gift,
+  Star,
+  Award,
+  Target,
+  TrendingDown,
+  Activity,
+  Zap,
+  Flame,
+  Droplet,
+  Sun,
+  Moon,
+  Cloud,
+  Umbrella,
+  Coffee,
+  Utensils,
+  Car,
+  Plane,
+  Train,
+  Bike,
+  Gamepad2,
+  Music,
+  Film,
+  Book,
+  GraduationCap,
+  Briefcase,
+  Stethoscope,
+  Pill,
+  Hospital,
+  Building,
+  Factory,
+  Phone,
+  MapPin,
+  Unlock,
+  Key,
+  UserCircle,
+  UserSquare,
+  Users2,
+  UserX,
+  CheckCircle,
+  XCircle,
+  HelpCircle,
+  AlertCircle,
+  Check,
+  Minus,
+  MoreHorizontal,
+  MoreVertical,
+  ChevronUp,
+  ChevronLeft,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
+  Save,
+  RefreshCw,
+  RotateCw,
+  RotateCcw,
+  Copy,
+  Clipboard,
+  Scissors,
+  Ambulance,
+  Shirt,
+  Refrigerator,
   type LucideIcon
 } from 'lucide-react'
 
@@ -55,44 +140,161 @@ export interface IconProps {
  * Type-safe icon registry mapping icon names to components
  */
 export const ICON_REGISTRY: Record<string, LucideIcon> = {
-  // Navigation icons
-  Settings,
-  Heart,
-  DollarSign,
-  Users,
-  Bell,
-  BarChart3,
-  FileText,
-  CreditCard,
-  User,
+  // Core Navigation icons
   Home,
+  Users,
+  Heart,
+  FileText,
+  DollarSign,
+  Settings,
+  Shield,
+  BarChart3,
+  Bell,
+  User,
   Menu,
   X,
   LogOut,
+  
+  // File & Document icons
+  FileCheck,
+  FolderOpen,
+  Folder,
+  FolderKanban,
+  Clipboard,
+  Scissors,
+  Copy,
+  
+  // User & People icons
+  UserPlus,
+  UserCheck,
+  UserCircle,
+  UserSquare,
+  Users2,
+  UserX,
+  UserCog,
+  
+  // Action & UI icons
+  Plus,
+  PlusCircle,
+  Edit,
+  Trash2,
+  Search,
+  Save,
+  Download,
+  Upload,
+  RefreshCw,
+  RotateCw,
+  RotateCcw,
+  Check,
+  CheckCircle,
+  XCircle,
+  Minus,
+  MoreHorizontal,
+  MoreVertical,
+  
+  // Navigation & Direction icons
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
   ChevronDown,
+  ChevronUp,
+  ChevronLeft,
   ChevronRight,
   
-  // Feature-specific icons
-  Shield,
-  TrendingUp,
-  FolderOpen,
-  Plus,
-  Wallet,
-  Clock,
-  UserCheck,
-  Download,
-  Folder,
-  Upload,
-  Lock,
-  
-  // Additional icons for menu system
-  Globe,
+  // Status & Alert icons
+  AlertTriangle,
+  AlertCircle,
   Info,
-  Mail,
-  UserPlus,
-  Package,
-  Circle,
+  HelpCircle,
+  Eye,
+  EyeOff,
   
+  // Communication icons
+  Mail,
+  Phone,
+  MessageSquare,
+  
+  // Location & Geography icons
+  MapPin,
+  Globe,
+  
+  // Security & Access icons
+  Lock,
+  Unlock,
+  Key,
+  ShieldCheck,
+  ShieldPlus,
+  
+  // Business & Commerce icons
+  Building2,
+  Building,
+  Factory,
+  ShoppingBag,
+  CreditCard,
+  Store,
+  Package,
+  Truck,
+  Wallet,
+  Gift,
+  
+  // Education & Learning icons
+  Book,
+  GraduationCap,
+  Briefcase,
+  
+  // Medical & Health icons
+  Stethoscope,
+  Pill,
+  Hospital,
+  Ambulance,
+  
+  // Transportation icons
+  Car,
+  Plane,
+  Train,
+  Bike,
+  
+  // Entertainment & Media icons
+  Gamepad2,
+  Music,
+  Film,
+  
+  // Nature & Weather icons
+  Sun,
+  Moon,
+  Cloud,
+  Umbrella,
+  Droplet,
+  Flame,
+  
+  // Food & Drink icons
+  Coffee,
+  Utensils,
+  
+  // Analytics & Data icons
+  LineChart,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Target,
+  Award,
+  Star,
+  
+  // Utility icons
+  Calendar,
+  Repeat,
+  Clock,
+  Zap,
+  Tag,
+  Palette,
+  Circle,
+  GitBranch,
+  
+
+  // Clothing & Fashion icons
+  Shirt,
+  Refrigerator,
   // Aliases for backward compatibility
   'BarChart': BarChart3,
   'Files': FileText,
@@ -114,6 +316,21 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
 export function getIcon(iconName: string): LucideIcon | undefined {
   return ICON_REGISTRY[iconName]
 }
+
+/**
+ * Get an icon component by name (alias for getIconWithFallback with FileText fallback)
+ * This matches the API from config/navigation.ts for compatibility
+ * @param iconName - The name of the icon
+ * @returns The icon component or FileText as fallback
+ */
+export function getIconComponent(iconName: string): LucideIcon {
+  return getIconWithFallback(iconName, FileText)
+}
+
+/**
+ * Export ICON_MAP as alias for ICON_REGISTRY for backward compatibility
+ */
+export const ICON_MAP = ICON_REGISTRY
 
 /**
  * Get an icon component with fallback

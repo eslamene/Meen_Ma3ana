@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { 
   Users, 
   Search, 
@@ -73,7 +73,7 @@ export default function AdminUsersPage() {
   const [editProfileModal, setEditProfileModal] = useState<{ open: boolean; userId: string | null }>({ open: false, userId: null })
   const [passwordResetModal, setPasswordResetModal] = useState<{ open: boolean; userId: string | null; userEmail: string | null }>({ open: false, userId: null, userEmail: null })
   const [mergeAccountModal, setMergeAccountModal] = useState<{ open: boolean; userId: string | null }>({ open: false, userId: null })
-  const { toast } = useToast()
+  const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([])
   const { user: currentUser } = useAdmin()
 
   // Fetch users with pagination, search, and filtering
@@ -95,19 +95,11 @@ export default function AdminUsersPage() {
           setPagination(usersRes.data.pagination)
         }
       } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch users',
-          type: 'error'
-        })
+        toast.error('Error', { description: usersRes.error || 'Failed to fetch users' })
       }
     } catch (error) {
       console.error('Fetch error:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch users',
-        type: 'error'
-      })
+      toast.error('Error', { description: 'Failed to fetch users' })
     } finally {
       setLoading(false)
     }
@@ -127,18 +119,16 @@ export default function AdminUsersPage() {
     try {
       const rolesRes = await safeFetch('/api/admin/roles')
       if (rolesRes.ok) {
-        return rolesRes.data?.roles || []
+        setAvailableRoles(rolesRes.data?.roles || [])
       }
     } catch (error) {
       console.error('Error fetching roles:', error)
+      toast.error('Error', { description: 'Failed to fetch roles' })
     }
-    return []
-  }, [])
-
-  const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([])
+  }, [toast])
 
   useEffect(() => {
-    fetchRoles().then(setAvailableRoles)
+    fetchRoles()
   }, [fetchRoles])
 
   const handlePageChange = (newPage: number) => {
@@ -226,7 +216,7 @@ export default function AdminUsersPage() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="no-roles">No Roles</SelectItem>
-                  {availableRoles.map(role => (
+                    {availableRoles.map(role => (
                     <SelectItem key={role.id} value={role.name}>
                       {role.display_name}
                     </SelectItem>
@@ -376,11 +366,7 @@ export default function AdminUsersPage() {
           onClose={() => setEditProfileModal({ open: false, userId: null })}
           onSuccess={() => {
             fetchUsers()
-            toast({
-              title: 'Success',
-              description: 'User profile updated successfully',
-              type: 'default'
-            })
+            toast.success('Success', { description: 'User profile updated successfully' })
           }}
         />
 
@@ -391,11 +377,7 @@ export default function AdminUsersPage() {
           userEmail={passwordResetModal.userEmail}
           onClose={() => setPasswordResetModal({ open: false, userId: null, userEmail: null })}
           onSuccess={() => {
-            toast({
-              title: 'Success',
-              description: 'Password reset email sent successfully',
-              type: 'default'
-            })
+            toast.success('Success', { description: 'Password reset email sent successfully' })
           }}
         />
 
@@ -406,11 +388,7 @@ export default function AdminUsersPage() {
           onClose={() => setMergeAccountModal({ open: false, userId: null })}
           onSuccess={() => {
             fetchUsers()
-            toast({
-              title: 'Success',
-              description: 'Accounts merged successfully',
-              type: 'default'
-            })
+            toast.success('Success', { description: 'Accounts merged successfully' })
           }}
         />
         </Container>

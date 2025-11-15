@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
+import { toast } from 'sonner'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import { 
@@ -57,7 +57,6 @@ export default function AdminPaymentMethodsPage() {
   const params = useParams()
   const locale = params.locale as string
   const t = useTranslations('admin')
-  const { toast } = useEnhancedToast()
   const { containerVariant } = useLayout()
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
@@ -95,11 +94,7 @@ export default function AdminPaymentMethodsPage() {
       setPaymentMethods(data.paymentMethods || [])
     } catch (error) {
       console.error('Error fetching payment methods:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load payment methods',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: 'Failed to load payment methods' })
     } finally {
       setLoading(false)
     }
@@ -160,20 +155,12 @@ export default function AdminPaymentMethodsPage() {
         throw new Error(error.error || 'Failed to update payment method')
       }
 
-      toast({
-        title: 'Success',
-        description: `Payment method ${!method.is_active ? 'activated' : 'deactivated'} successfully`,
-        variant: 'default'
-      })
+      toast.success('Success', { description: `Payment method ${!method.is_active ? 'activated' : 'deactivated'} successfully` })
 
       fetchPaymentMethods()
     } catch (error: any) {
       console.error('Error toggling payment method:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update payment method',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: error.message || 'Failed to update payment method' })
     } finally {
       setSaving(false)
     }
@@ -207,20 +194,12 @@ export default function AdminPaymentMethodsPage() {
         })
       ])
 
-      toast({
-        title: 'Success',
-        description: 'Order updated successfully',
-        variant: 'default'
-      })
+      toast.success('Success', { description: 'Order updated successfully' })
 
       fetchPaymentMethods()
     } catch (error: any) {
       console.error('Error updating order:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to update order',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: 'Failed to update order' })
     } finally {
       setSaving(false)
     }
@@ -231,20 +210,12 @@ export default function AdminPaymentMethodsPage() {
       setSaving(true)
 
       if (!formData.code) {
-        toast({
-          title: 'Validation Error',
-          description: 'Code is required',
-          variant: 'destructive'
-        })
+        toast.error('Validation Error', { description: 'Code is required' })
         return
       }
 
       if (!formData.name_en && !formData.name_ar) {
-        toast({
-          title: 'Validation Error',
-          description: 'Please provide at least name_en or name_ar',
-          variant: 'destructive'
-        })
+        toast.error('Validation Error', { description: 'Please provide at least name_en or name_ar' })
         return
       }
 
@@ -259,21 +230,13 @@ export default function AdminPaymentMethodsPage() {
         throw new Error(error.error || 'Failed to create payment method')
       }
 
-      toast({
-        title: 'Success',
-        description: 'Payment method created successfully',
-        variant: 'default'
-      })
+      toast.success('Success', { description: 'Payment method created successfully' })
 
       setIsCreateDialogOpen(false)
       fetchPaymentMethods()
     } catch (error: any) {
       console.error('Error creating payment method:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to create payment method',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: error.message || 'Failed to create payment method' })
     } finally {
       setSaving(false)
     }
@@ -286,20 +249,12 @@ export default function AdminPaymentMethodsPage() {
       setSaving(true)
 
       if (!formData.code) {
-        toast({
-          title: 'Validation Error',
-          description: 'Code is required',
-          variant: 'destructive'
-        })
+        toast.error('Validation Error', { description: 'Code is required' })
         return
       }
 
       if (!formData.name_en && !formData.name_ar) {
-        toast({
-          title: 'Validation Error',
-          description: 'Please provide at least name_en or name_ar',
-          variant: 'destructive'
-        })
+        toast.error('Validation Error', { description: 'Please provide at least name_en or name_ar' })
         return
       }
 
@@ -314,22 +269,14 @@ export default function AdminPaymentMethodsPage() {
         throw new Error(error.error || 'Failed to update payment method')
       }
 
-      toast({
-        title: 'Success',
-        description: 'Payment method updated successfully',
-        variant: 'default'
-      })
+      toast.success('Success', { description: 'Payment method updated successfully' })
 
       setIsEditDialogOpen(false)
       setEditingMethod(null)
       fetchPaymentMethods()
     } catch (error: any) {
       console.error('Error updating payment method:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update payment method',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: error.message || 'Failed to update payment method' })
     } finally {
       setSaving(false)
     }
@@ -349,22 +296,14 @@ export default function AdminPaymentMethodsPage() {
         throw new Error(error.error || 'Failed to delete payment method')
       }
 
-      toast({
-        title: 'Success',
-        description: 'Payment method deleted successfully',
-        variant: 'default'
-      })
+      toast.success('Success', { description: 'Payment method deleted successfully' })
 
       setIsDeleteDialogOpen(false)
       setDeletingMethodId(null)
       fetchPaymentMethods()
     } catch (error: any) {
       console.error('Error deleting payment method:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to delete payment method',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: error.message || 'Failed to delete payment method' })
     } finally {
       setSaving(false)
     }

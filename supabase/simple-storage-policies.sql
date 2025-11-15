@@ -58,6 +58,14 @@ CREATE POLICY "case_files_auth_write" ON storage.objects FOR INSERT WITH CHECK (
 CREATE POLICY "case_files_owner_update" ON storage.objects FOR UPDATE USING (bucket_id = 'case-files' AND auth.uid() = owner);
 CREATE POLICY "case_files_owner_delete" ON storage.objects FOR DELETE USING (bucket_id = 'case-files' AND auth.uid() = owner);
 
+-- =====================================================
+-- POLICIES FOR: beneficiaries
+-- =====================================================
+CREATE POLICY "beneficiaries_auth_read" ON storage.objects FOR SELECT USING (bucket_id = 'beneficiaries' AND auth.role() = 'authenticated');
+CREATE POLICY "beneficiaries_auth_write" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'beneficiaries' AND auth.role() = 'authenticated');
+CREATE POLICY "beneficiaries_owner_update" ON storage.objects FOR UPDATE USING (bucket_id = 'beneficiaries' AND auth.uid() = owner);
+CREATE POLICY "beneficiaries_owner_delete" ON storage.objects FOR DELETE USING (bucket_id = 'beneficiaries' AND auth.uid() = owner);
+
 COMMIT;
 
 -- =====================================================
@@ -72,7 +80,7 @@ WHERE tablename = 'objects'
   AND schemaname = 'storage'
 ORDER BY policyname;
 
--- Expected: 24 policies total (4 policies × 6 buckets)
+-- Expected: 28 policies total (4 policies × 7 buckets)
 SELECT COUNT(*) as total_policies 
 FROM pg_policies 
 WHERE tablename = 'objects' 

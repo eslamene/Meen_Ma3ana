@@ -6,7 +6,6 @@ import { AuthProvider } from '@/components/auth/AuthProvider'
 import LocaleProvider from '@/components/LocaleProvider'
 import { LayoutProvider } from '@/components/layout/LayoutProvider'
 import PageLayout from '@/components/layout/PageLayout'
-import { ToastProvider } from '@/components/ui/toast'
 
 export const metadata: Metadata = {
   title: 'Meen Ma3ana - Charity Platform',
@@ -32,11 +31,9 @@ export default async function LocaleLayout({
       <LocaleProvider>
         <AuthProvider>
           <LayoutProvider defaultVariant="boxed" persist={true}>
-            <ToastProvider>
-              <PageLayout>
-                {children}
-              </PageLayout>
-            </ToastProvider>
+            <PageLayout>
+              {children}
+            </PageLayout>
           </LayoutProvider>
         </AuthProvider>
       </LocaleProvider>

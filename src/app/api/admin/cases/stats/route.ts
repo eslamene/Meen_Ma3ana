@@ -1,0 +1,201 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
+
+export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+  try {
+    const supabase = await createClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Check if user is admin
+    const { data: adminRoles } = await supabase
+      .from('admin_user_roles')
+      .select('admin_roles!inner(name)')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .in('admin_roles.name', ['admin', 'super_admin'])
+      .limit(1)
+
+    const isAdmin = (adminRoles?.length || 0) > 0
+
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
+    }
+
+    // Parse query parameters for filtering
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status')
+    const search = searchParams.get('search')
+
+    // Fetch all cases with beneficiary information
+    let query = supabase
+      .from('cases')
+      .select(`
+        *,
+        beneficiaries (
+          id,
+          name,
+          name_ar,
+          age,
+          gender,
+          mobile_number,
+          email,
+          city,
+          governorate,
+          risk_level,
+          is_verified,
+          total_cases,
+          active_cases
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    // Apply status filter if provided
+    if (status && status !== 'all') {
+      query = query.eq('status', status)
+    }
+
+    // Apply search filter if provided
+    if (search) {
+      query = query.or(`title_en.ilike.%${search}%,title_ar.ilike.%${search}%,description_en.ilike.%${search}%,description_ar.ilike.%${search}%`)
+    }
+
+    const { data: cases, error: casesError } = await query
+
+    if (casesError) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching cases:', casesError)
+      return NextResponse.json(
+        { error: 'Failed to fetch cases' },
+        { status: 500 }
+      )
+    }
+
+    if (!cases || cases.length === 0) {
+      return NextResponse.json({
+        cases: [],
+        stats: {
+          total: 0,
+          published: 0,
+          completed: 0,
+          closed: 0,
+          under_review: 0
+        }
+      })
+    }
+
+    // Fetch all contributions for all cases in a single query
+    const caseIds = cases.map(c => c.id)
+    const { data: contributions, error: contribError } = await supabase
+      .from('contributions')
+      .select(`
+        id,
+        case_id,
+        amount,
+        contribution_approval_status!contribution_id(
+          status,
+          created_at,
+          updated_at
+        )
+      `)
+      .in('case_id', caseIds)
+
+    if (contribError) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching contributions:', contribError)
+      return NextResponse.json(
+        { error: 'Failed to fetch contributions' },
+        { status: 500 }
+      )
+    }
+
+    // Group contributions by case_id and compute stats
+    const contributionStats = new Map<string, { approved_amount: number; total_contributions: number }>()
+    
+    // Initialize stats for all cases
+    cases.forEach(c => {
+      contributionStats.set(c.id, { approved_amount: 0, total_contributions: 0 })
+    })
+
+    // Process contributions and aggregate by case
+    ;(contributions || []).forEach((contribution) => {
+      const caseId = contribution.case_id
+      const amount = parseFloat(contribution.amount || '0')
+      
+      if (!contributionStats.has(caseId)) {
+        contributionStats.set(caseId, { approved_amount: 0, total_contributions: 0 })
+      }
+      
+      const stats = contributionStats.get(caseId)!
+      stats.total_contributions += amount
+
+      // Get latest approval status by ordering by created_at or updated_at descending
+      const approvalStatuses = contribution.contribution_approval_status || []
+      let latestStatus = 'none'
+      
+      if (Array.isArray(approvalStatuses) && approvalStatuses.length > 0) {
+        // Sort by created_at descending, then updated_at descending to get the latest
+        const sorted = [...approvalStatuses].sort((a: any, b: any) => {
+          const aTime = new Date(a.updated_at || a.created_at || 0).getTime()
+          const bTime = new Date(b.updated_at || b.created_at || 0).getTime()
+          return bTime - aTime
+        })
+        latestStatus = sorted[0]?.status || 'none'
+      } else if (approvalStatuses && !Array.isArray(approvalStatuses)) {
+        latestStatus = (approvalStatuses as any).status || 'none'
+      }
+      
+      if (latestStatus === 'approved') {
+        stats.approved_amount += amount
+      }
+    })
+
+    // Merge stats back into cases array
+    const casesWithStats = (cases || []).map(case_ => {
+      const stats = contributionStats.get(case_.id) || { approved_amount: 0, total_contributions: 0 }
+      return {
+        ...case_,
+        approved_amount: stats.approved_amount,
+        total_contributions: stats.total_contributions
+      }
+    })
+
+    // Calculate overall statistics
+    const total = casesWithStats.length
+    const published = casesWithStats.filter(c => c.status === 'published').length
+    const completed = casesWithStats.filter(c => c.status === 'completed').length
+    const closed = casesWithStats.filter(c => c.status === 'closed').length
+    const under_review = casesWithStats.filter(c => c.status === 'under_review').length
+
+    return NextResponse.json({
+      cases: casesWithStats,
+      stats: {
+        total,
+        published,
+        completed,
+        closed,
+        under_review
+      }
+    })
+  } catch (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in admin cases stats API:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { 
   Activity,
   AlertTriangle,
@@ -37,7 +38,9 @@ import {
   CheckCircle,
   XCircle,
   Bell,
-  Edit
+  Edit,
+  ExternalLink,
+  Info
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import UpdatesTimeline from '@/components/cases/UpdatesTimeline'
@@ -47,6 +50,8 @@ import { CaseUpdate } from '@/lib/case-updates'
 
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
 import { useAdmin } from '@/lib/admin/hooks'
+import { toast } from 'sonner'
+import type { Beneficiary } from '@/types/beneficiary'
 
 interface Case {
   id: string
@@ -121,6 +126,9 @@ export default function CaseDetailPage() {
   const [realTimeProgress, setRealTimeProgress] = useState<CaseProgressUpdate | null>(null)
   const [canCreateUpdates, setCanCreateUpdates] = useState(false)
   const [totalContributions, setTotalContributions] = useState(0)
+  const [beneficiaryData, setBeneficiaryData] = useState<Beneficiary | null>(null)
+  const [beneficiaryLoading, setBeneficiaryLoading] = useState(false)
+  const [beneficiaryPopoverOpen, setBeneficiaryPopoverOpen] = useState(false)
 
   // Helper functions to get locale-aware title and description
   // Simple logic: show the language that matches the locale
@@ -164,40 +172,22 @@ export default function CaseDetailPage() {
       setLoading(true)
       setError(null)
 
-      const client = createClient()
-      const { data, error } = await client
-        .from('cases')
-        .select(`
-          id,
-          title_en,
-          title_ar,
-          description_en,
-          description_ar,
-          target_amount,
-          current_amount,
-          status,
-          type,
-          priority,
-          location,
-          beneficiary_name,
-          beneficiary_contact,
-          created_at,
-          updated_at,
-          created_by,
-          assigned_to,
-          sponsored_by,
-          supporting_documents,
-          category_id,
-          case_categories(name)
-        `)
-        .eq('id', caseId)
-        .single()
-
-      if (error) {
-        console.error('Error fetching case:', error)
-        setError('Case not found')
+      // Fetch case details from API
+      const caseResponse = await fetch(`/api/cases/${caseId}`)
+      
+      if (!caseResponse.ok) {
+        const errorData = await caseResponse.json().catch(() => ({}))
+        const errorMessage = caseResponse.status === 404
+          ? 'Case not found or you do not have permission to view it'
+          : errorData.error || 'Failed to load case details'
+        
+        setError(errorMessage)
+        toast.error('Error Loading Case', { description: errorMessage })
         return
       }
+
+      const caseDataResponse = await caseResponse.json()
+      const data = caseDataResponse.case
 
       // Map database fields to include category name and use locale-aware fields
       const mappedData = {
@@ -217,15 +207,14 @@ export default function CaseDetailPage() {
       
       setCaseData(mappedData as Case)
       
-      // Fetch all files from unified case_files table
-      const { data: filesData, error: filesError } = await client
-        .from('case_files')
-        .select('*')
-        .eq('case_id', caseId)
-        .order('display_order', { ascending: true })
-
-      if (filesData && !filesError) {
-        const files: CaseFile[] = filesData.map((file) => ({
+      // Fetch all files from API
+      const filesResponse = await fetch(`/api/cases/${caseId}/files`)
+      
+      if (filesResponse.ok) {
+        const filesDataResponse = await filesResponse.json()
+        const filesData = filesDataResponse.files || []
+        
+        const files: CaseFile[] = filesData.map((file: any) => ({
           id: file.id,
           name: file.filename || file.original_filename || 'unnamed',
           originalName: file.filename || file.original_filename || 'unnamed',
@@ -248,8 +237,15 @@ export default function CaseDetailPage() {
         setCaseFiles([])
       }
     } catch (error) {
-      console.error('Error fetching case details:', error)
+      // Log detailed error information
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error fetching case details:', {
+        error,
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      })
       setError('Failed to load case details')
+      toast.error('Error Loading Case', { description: 'Failed to load case details. Please try refreshing the page.' })
     } finally {
       setLoading(false)
     }
@@ -269,9 +265,17 @@ export default function CaseDetailPage() {
           progressPercentage: data.progressPercentage || 0,
           contributorCount: data.contributorCount || 0
         })
+      } else if (response.status === 404) {
+        // Case not found - silently ignore (expected for draft cases or deleted cases)
+        return
       }
+      // Other errors are silently ignored to avoid console noise
     } catch (error) {
-      console.error('Error fetching progress from API:', error)
+      // Network errors are silently ignored to avoid console noise
+      // Only log unexpected errors in development
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Progress API fetch failed (expected for missing cases):', error)
+      }
     }
   }, [caseId])
 
@@ -298,6 +302,63 @@ export default function CaseDetailPage() {
       console.error('Error calculating total contributions:', error)
     }
   }, [caseId])
+
+  const fetchBeneficiaryData = useCallback(async () => {
+    if (!caseData?.beneficiary_name && !caseData?.beneficiary_contact) {
+      return
+    }
+
+    try {
+      setBeneficiaryLoading(true)
+      
+      // Try to find beneficiary by contact first, then by name
+      let beneficiary: Beneficiary | null = null
+      
+      if (caseData.beneficiary_contact) {
+        // Check both mobile_number and additional_mobile_number using API
+        const findResponse = await fetch(`/api/beneficiaries/find?mobileNumber=${encodeURIComponent(caseData.beneficiary_contact)}`)
+        const findResult = await findResponse.json()
+        
+        if (findResult.success && findResult.data) {
+          beneficiary = findResult.data
+        } else {
+          // Try additional_mobile_number by searching
+          const searchResponse = await fetch(`/api/beneficiaries/find?query=${encodeURIComponent(caseData.beneficiary_contact)}&limit=1`)
+          const searchResult = await searchResponse.json()
+          if (searchResult.success && searchResult.data && searchResult.data.length > 0) {
+            const found = searchResult.data[0]
+            // Verify it matches the contact number
+            if (found.additional_mobile_number === caseData.beneficiary_contact) {
+              beneficiary = found
+            }
+          }
+        }
+      }
+      
+      // If not found by contact, try searching by name
+      if (!beneficiary && caseData.beneficiary_name) {
+        const searchResponse = await fetch(`/api/beneficiaries/find?query=${encodeURIComponent(caseData.beneficiary_name)}&limit=1`)
+        const searchResult = await searchResponse.json()
+        if (searchResult.success && searchResult.data && searchResult.data.length > 0) {
+          beneficiary = searchResult.data[0]
+        }
+      }
+      
+      setBeneficiaryData(beneficiary)
+    } catch (error) {
+      console.error('Error fetching beneficiary data:', error)
+      setBeneficiaryData(null)
+    } finally {
+      setBeneficiaryLoading(false)
+    }
+  }, [caseData?.beneficiary_name, caseData?.beneficiary_contact])
+
+  // Fetch beneficiary data when popover opens
+  useEffect(() => {
+    if (beneficiaryPopoverOpen && !beneficiaryData && !beneficiaryLoading) {
+      fetchBeneficiaryData()
+    }
+  }, [beneficiaryPopoverOpen, beneficiaryData, beneficiaryLoading, fetchBeneficiaryData])
 
   const fetchUpdates = useCallback(async () => {
     try {
@@ -1071,9 +1132,118 @@ export default function CaseDetailPage() {
                               <User className="h-4 w-4 text-gray-400" />
                               <span className="text-sm text-gray-600 font-medium">Beneficiary</span>
                             </div>
+                            {caseData.beneficiary_name ? (
+                              <Popover open={beneficiaryPopoverOpen} onOpenChange={setBeneficiaryPopoverOpen}>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-auto p-0 text-sm font-semibold text-gray-900 hover:text-blue-600 hover:bg-transparent"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span>{caseData.beneficiary_name}</span>
+                                      <Info className="h-3.5 w-3.5 text-gray-400" />
+                                    </div>
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80" align="end">
+                                  {beneficiaryLoading ? (
+                                    <div className="flex items-center justify-center py-4">
+                                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                    </div>
+                                  ) : beneficiaryData ? (
+                                    <div className="space-y-4">
+                                      <div className="flex items-start justify-between">
+                                        <div>
+                                          <h4 className="font-semibold text-gray-900 text-base">{beneficiaryData.name}</h4>
+                                          {beneficiaryData.name_ar && (
+                                            <p className="text-sm text-gray-600 mt-0.5">{beneficiaryData.name_ar}</p>
+                                          )}
+                                        </div>
+                                        {beneficiaryData.is_verified && (
+                                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                            <CheckCircle className="h-3 w-3 mr-1" />
+                                            Verified
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="space-y-2 pt-2 border-t border-gray-100">
+                                        {beneficiaryData.age && (
+                                          <div className="flex items-center gap-2 text-sm">
+                                            <Calendar className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600">Age:</span>
+                                            <span className="text-gray-900 font-medium">{beneficiaryData.age} years</span>
+                                          </div>
+                                        )}
+                                        {beneficiaryData.mobile_number && (
+                                          <div className="flex items-center gap-2 text-sm">
+                                            <Phone className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600">Mobile:</span>
+                                            <span className="text-gray-900 font-medium">{beneficiaryData.mobile_number}</span>
+                                          </div>
+                                        )}
+                                        {beneficiaryData.city && (
+                                          <div className="flex items-center gap-2 text-sm">
+                                            <MapPin className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600">Location:</span>
+                                            <span className="text-gray-900 font-medium">{beneficiaryData.city}</span>
+                                          </div>
+                                        )}
+                                        {beneficiaryData.risk_level && (
+                                          <div className="flex items-center gap-2 text-sm">
+                                            <AlertTriangle className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600">Risk Level:</span>
+                                            <Badge 
+                                              variant="outline" 
+                                              className={
+                                                beneficiaryData.risk_level === 'low' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                beneficiaryData.risk_level === 'medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                                beneficiaryData.risk_level === 'high' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                                'bg-red-50 text-red-700 border-red-200'
+                                              }
+                                            >
+                                              {beneficiaryData.risk_level}
+                                            </Badge>
+                                          </div>
+                                        )}
+                                        {beneficiaryData.total_cases > 0 && (
+                                          <div className="flex items-center gap-2 text-sm">
+                                            <FileText className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600">Total Cases:</span>
+                                            <span className="text-gray-900 font-medium">{beneficiaryData.total_cases}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="pt-2 border-t border-gray-100">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="w-full"
+                                          onClick={() => {
+                                            setBeneficiaryPopoverOpen(false)
+                                            router.push(`/${locale}/beneficiaries/${beneficiaryData.id}`)
+                                          }}
+                                        >
+                                          <ExternalLink className="h-4 w-4 mr-2" />
+                                          View Full Details
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-4">
+                                      <p className="text-sm text-gray-600">Beneficiary information not found in database</p>
+                                      <p className="text-xs text-gray-500 mt-1">Only basic information is available</p>
+                                    </div>
+                                  )}
+                                </PopoverContent>
+                              </Popover>
+                            ) : (
                             <span className="text-sm text-gray-900 font-semibold">
-                              {caseData.beneficiary_name || t('beneficiaryNotSpecified')}
+                                {t('beneficiaryNotSpecified')}
                             </span>
+                            )}
                           </div>
                           
                           {/* Contact - Conditional */}

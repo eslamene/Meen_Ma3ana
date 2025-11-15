@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
+import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -79,51 +80,39 @@ export default function RecurringContributionForm({
     setError(null)
 
     try {
-      // Calculate next contribution date based on frequency
-      const startDate = new Date(formData.startDate)
-      const nextContributionDate = new Date(startDate)
-      
-      switch (formData.frequency) {
-        case 'weekly':
-          nextContributionDate.setDate(startDate.getDate() + 7)
-          break
-        case 'monthly':
-          nextContributionDate.setMonth(startDate.getMonth() + 1)
-          break
-        case 'quarterly':
-          nextContributionDate.setMonth(startDate.getMonth() + 3)
-          break
-        case 'yearly':
-          nextContributionDate.setFullYear(startDate.getFullYear() + 1)
-          break
-      }
-
-      const { error: insertError } = await supabase
-        .from('recurring_contributions')
-        .insert({
-          donor_id: user.id,
-          case_id: caseId || null,
-          project_id: projectId || null,
+      const response = await fetch('/api/recurring-contributions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          caseId: caseId || null,
+          projectId: projectId || null,
           amount: parseFloat(formData.amount),
           frequency: formData.frequency,
-          start_date: formData.startDate,
-          end_date: formData.endDate || null,
-          next_contribution_date: nextContributionDate.toISOString(),
-          payment_method: formData.paymentMethod,
-          auto_process: formData.autoProcess,
+          startDate: formData.startDate,
+          endDate: formData.endDate || null,
+          paymentMethod: formData.paymentMethod,
+          autoProcess: formData.autoProcess,
           notes: formData.notes || null,
-        })
+        }),
+      })
 
-      if (insertError) {
-        throw insertError
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to set up recurring contribution')
       }
 
       setSuccess(true)
+      toast.success(t('recurringSetupSuccess') || 'Recurring contribution set up successfully')
       if (onSuccess) {
         onSuccess()
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to set up recurring contribution')
+      const errorMessage = err.message || 'Failed to set up recurring contribution'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }

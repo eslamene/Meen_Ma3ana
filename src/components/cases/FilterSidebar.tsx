@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,15 +21,18 @@ import {
   TrendingUp,
   Clock,
   Eye,
-  Users
+  Users,
+  Sparkles
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import DynamicIcon from '@/components/ui/dynamic-icon'
 
 interface CaseFilters {
   search: string
   type: string
   status: string
   category: string
+  detectedCategory: string
   minAmount: string
   maxAmount: string
   sortBy: string
@@ -45,6 +49,16 @@ interface FilterSidebarProps {
   activeFiltersCount: number
 }
 
+interface Category {
+  id: string
+  name: string
+  name_en?: string | null
+  name_ar?: string | null
+  icon?: string | null
+  color?: string | null
+  is_active: boolean
+}
+
 export default function FilterSidebar({
   filters,
   onFilterChange,
@@ -55,8 +69,32 @@ export default function FilterSidebar({
   activeFiltersCount
 }: FilterSidebarProps) {
   const t = useTranslations('cases')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
 
   const hasActiveFilters = activeFiltersCount > 0
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      setCategoriesLoading(true)
+      const response = await fetch('/api/categories?includeInactive=false')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories')
+      }
+
+      const data = await response.json()
+      setCategories(data.categories || [])
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    } finally {
+      setCategoriesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCategories()
+  }, [fetchCategories])
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -168,13 +206,41 @@ export default function FilterSidebar({
               </Select>
             </div>
 
-            {/* Enhanced Category Filter */}
+            {/* Enhanced Category Filter - Assigned Categories */}
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <Gift className="h-4 w-4 text-purple-600" />
                 {t('category')}
               </label>
-              <Select value={filters.category} onValueChange={(value) => onFilterChange('category', value)}>
+              <Select 
+                value={filters.category} 
+                onValueChange={(value) => onFilterChange('category', value)}
+                disabled={categoriesLoading}
+              >
+                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                  <SelectValue placeholder={categoriesLoading ? t('loading') || 'Loading...' : t('allCategories')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('allCategories')}</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <div className="flex items-center gap-2">
+                        {category.icon && <DynamicIcon name={category.icon} className="h-4 w-4" />}
+                        <span>{category.name_en || category.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Auto-Detected Category Filter - Detection Rules */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-600" />
+                {t('autoDetectedCategory')}
+              </label>
+              <Select value={filters.detectedCategory} onValueChange={(value) => onFilterChange('detectedCategory', value)}>
                 <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
                   <SelectValue placeholder={t('allCategories')} />
                 </SelectTrigger>
@@ -309,7 +375,7 @@ export default function FilterSidebar({
                   size="sm"
                   className="w-full justify-start h-11 border-2 border-red-200 hover:border-red-300 hover:bg-red-50 transition-all duration-200"
                   onClick={() => {
-                    onFilterChange('category', 'emergency')
+                    onFilterChange('detectedCategory', 'emergency')
                     onFilterChange('status', 'published')
                     onFilterChange('sortBy', 'createdAt')
                     onFilterChange('sortOrder', 'desc')
@@ -337,7 +403,7 @@ export default function FilterSidebar({
                   size="sm"
                   className="w-full justify-start h-11 border-2 border-blue-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
                   onClick={() => {
-                    onFilterChange('category', 'education')
+                    onFilterChange('detectedCategory', 'education')
                     onFilterChange('status', 'published')
                     onFilterChange('sortBy', 'createdAt')
                     onFilterChange('sortOrder', 'desc')

@@ -26,6 +26,9 @@ import {
   Edit
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { EditPageHeader, EditPageFooter } from '@/components/crud'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 
 interface UserProfile {
   id: string
@@ -53,6 +56,8 @@ export default function EditProfilePage() {
   const t = useTranslations('profile')
   const router = useRouter()
   const params = useParams()
+  const { containerVariant } = useLayout()
+  const locale = params.locale as string
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -83,17 +88,44 @@ export default function EditProfilePage() {
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
-
-      if (profileError) {
-        throw profileError
+      // Fetch profile via API
+      const response = await fetch('/api/profile')
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push(`/${params.locale}/auth/login`)
+          return
+        }
+        throw new Error('Failed to fetch profile')
       }
 
-      setUser(profile)
+      const data = await response.json()
+      const profile = data.user
+
+      // Map API response to UserProfile interface
+      // We need to fetch full profile from stats API for display purposes
+      const statsResponse = await fetch('/api/profile/stats')
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setUser(statsData.user)
+      } else {
+        // Fallback: create minimal user object from profile API
+        setUser({
+          id: profile.id,
+          email: authUser.email || '',
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone: profile.phone,
+          address: profile.address,
+          profile_image: profile.profile_image,
+          role: 'donor', // Default, will be updated if stats API works
+          language: profile.language || 'en',
+          created_at: new Date().toISOString(),
+          is_active: true,
+          email_verified: authUser.email_confirmed_at !== null,
+        })
+      }
+
       setFormData({
         firstName: profile.first_name || '',
         lastName: profile.last_name || '',
@@ -143,28 +175,37 @@ export default function EditProfilePage() {
       setError(null)
       setSuccess(null)
 
-      const { error } = await supabase
-        .from('users')
-        .update({
-          first_name: formData.firstName.trim(),
-          last_name: formData.lastName.trim(),
+      // Update profile via API
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
           phone: formData.phone.trim() || null,
           address: formData.address.trim() || null,
-          updated_at: new Date().toISOString(),
         })
-        .eq('id', user.id)
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update profile')
+      }
+
+      const data = await response.json()
+      const updatedProfile = data.user
 
       setSuccess(t('profileUpdatedSuccessfully'))
       
       // Update local user state
       setUser(prev => prev ? {
         ...prev,
-        first_name: formData.firstName.trim(),
-        last_name: formData.lastName.trim(),
-        phone: formData.phone.trim() || null,
-        address: formData.address.trim() || null,
+        first_name: updatedProfile.first_name,
+        last_name: updatedProfile.last_name,
+        phone: updatedProfile.phone,
+        address: updatedProfile.address,
       } : null)
 
       // Redirect back to profile after a short delay
@@ -173,7 +214,7 @@ export default function EditProfilePage() {
       }, 1500)
     } catch (err) {
       console.error('Error updating profile:', err)
-      setError(t('profileUpdateError'))
+      setError(err instanceof Error ? err.message : t('profileUpdateError'))
     } finally {
       setSaving(false)
     }
@@ -240,32 +281,17 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Enhanced Header */}
-                  <div className="mb-8">
-            <Button
-              variant="ghost"
-              onClick={handleCancel}
-              className="mb-6 h-12 px-4 hover:bg-gray-100 transition-colors text-base font-medium"
-            >
-              <ArrowLeft className="h-5 w-5 mr-3" />
-              {t('back')}
-            </Button>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg">
-                <Edit className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                  {t('editProfile')}
-                </h1>
-                <p className="text-gray-600 text-lg mt-1">
-                  Update your personal information and preferences
-                </p>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
+        {/* Header */}
+        <EditPageHeader
+          backUrl={`/${locale}/profile`}
+          icon={Edit}
+          title={t('editProfile') || 'Edit Profile'}
+          description="Update your personal information and preferences"
+          itemName={user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email : undefined}
+          backLabel={t('back') || 'Back'}
+        />
 
         {/* Success/Error Messages */}
         {success && (
@@ -508,42 +534,28 @@ export default function EditProfilePage() {
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader className="pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg">
-                    <Edit className="h-5 w-5 text-white" />
-                  </div>
-                  <CardTitle className="text-xl font-bold text-gray-900">Actions</CardTitle>
-                </div>
-                <CardDescription className="text-gray-600 font-medium mt-2">
-                  Save your changes or cancel
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-6">
-                <Button 
-                  onClick={handleSave} 
-                  disabled={saving}
-                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? t('saving') : t('saveChanges')}
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={handleCancel}
-                  className="w-full h-11 border-2 border-gray-200 hover:border-red-500 hover:bg-red-50 transition-all duration-200"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  {t('cancel')}
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         </div>
-      </div>
+
+        {/* Footer */}
+        <EditPageFooter
+          primaryAction={{
+            label: saving ? (t('saving') || 'Saving...') : (t('saveChanges') || 'Save Changes'),
+            onClick: handleSave,
+            disabled: saving,
+            loading: saving,
+            icon: <Save className="h-4 w-4 mr-2" />
+          }}
+          secondaryActions={[
+            {
+              label: t('cancel') || 'Cancel',
+              onClick: handleCancel,
+              variant: 'outline',
+              icon: <X className="h-4 w-4 mr-2" />
+            }
+          ]}
+        />
+      </Container>
     </div>
   )
 } 

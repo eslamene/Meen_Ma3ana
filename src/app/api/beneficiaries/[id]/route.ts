@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { BeneficiaryService } from '@/lib/services/beneficiaryService'
 import { createClient } from '@supabase/supabase-js'
 import { RouteContext } from '@/types/next-api'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
+import { BUCKET_NAMES } from '@/lib/utils/storageBuckets'
 
 export async function GET(
   request: NextRequest,
@@ -14,13 +14,53 @@ export async function GET(
   const logger = new Logger(correlationId)
   try {
     const { id } = await context.params
-    const beneficiary = await BeneficiaryService.getById(id)
+    
+    // Create service role client to bypass RLS for beneficiary fetching
+    const serviceRoleClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+    
+    // Fetch beneficiary directly using service role client
+    const { data, error } = await serviceRoleClient
+      .from('beneficiaries')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-    if (!beneficiary) {
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows returned
+        return NextResponse.json(
+          { success: false, error: 'Beneficiary not found' },
+          { status: 404 }
+        )
+      }
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary:', error)
+      return NextResponse.json(
+        { success: false, error: error.message || 'Failed to fetch beneficiary' },
+        { status: 500 }
+      )
+    }
+
+    if (!data) {
       return NextResponse.json(
         { success: false, error: 'Beneficiary not found' },
         { status: 404 }
       )
+    }
+
+    // Transform beneficiary to include calculated age
+    const beneficiary = data
+    if (beneficiary.year_of_birth) {
+      const currentYear = new Date().getFullYear()
+      beneficiary.age = currentYear - beneficiary.year_of_birth
     }
 
     return NextResponse.json({
@@ -217,11 +257,329 @@ export async function DELETE(
   const logger = new Logger(correlationId)
   try {
     const { id } = await context.params
-    await BeneficiaryService.delete(id)
+    
+    // Create service role client to bypass RLS for beneficiary deletion
+    // This allows authorized users (via API route) to delete beneficiaries
+    const serviceRoleClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+    
+    // Fetch all beneficiary documents before transaction (needed for storage deletion)
+    const { data: documents, error: documentsError } = await serviceRoleClient
+      .from('beneficiary_documents')
+      .select('*')
+      .eq('beneficiary_id', id)
+    
+    if (documentsError) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary documents:', documentsError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch beneficiary documents for deletion' },
+        { status: 500 }
+      )
+    }
+    
+    const documentsCount = documents?.length || 0
+    logger.info(`Found ${documentsCount} document(s) to delete for beneficiary ${id}`)
+    
+    // First, fetch beneficiary details to check cases by name/contact as well
+    // Cases may be linked via beneficiary_id OR via beneficiary_name/beneficiary_contact
+    const { data: beneficiary, error: beneficiaryError } = await serviceRoleClient
+      .from('beneficiaries')
+      .select('id, name, mobile_number, national_id')
+      .eq('id', id)
+      .single()
+    
+    if (beneficiaryError || !beneficiary) {
+      return NextResponse.json(
+        { success: false, error: 'Beneficiary not found' },
+        { status: 404 }
+      )
+    }
+    
+    // Safety check: Check for cases linked to this beneficiary
+    // Cases can be linked via beneficiary_id OR via beneficiary_name/beneficiary_contact
+    // We need to check all possible links
+    let casesByBeneficiaryId: any[] = []
+    
+    // Check cases linked via beneficiary_id
+    const { data: casesById, error: casesByIdError, count: countById } = await serviceRoleClient
+      .from('cases')
+      .select('id', { count: 'exact' })
+      .eq('beneficiary_id', id)
+    
+    if (casesByIdError) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking cases by beneficiary_id:', casesByIdError)
+    } else {
+      casesByBeneficiaryId = casesById || []
+    }
+    
+    // Check cases linked via beneficiary_name or beneficiary_contact
+    // Use OR query to check both name and contact
+    let casesByNameContact: any[] = []
+    let countByNameContact = 0
+    
+    // Build OR conditions for Supabase
+    const orConditions: string[] = []
+    if (beneficiary.name) {
+      orConditions.push(`beneficiary_name.eq.${beneficiary.name}`)
+    }
+    if (beneficiary.mobile_number) {
+      orConditions.push(`beneficiary_contact.eq.${beneficiary.mobile_number}`)
+    }
+    
+    if (orConditions.length > 0) {
+      const { data: casesByName, error: casesByNameError, count: countByName } = await serviceRoleClient
+        .from('cases')
+        .select('id', { count: 'exact' })
+        .or(orConditions.join(','))
+      
+      if (casesByNameError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking cases by name/contact:', casesByNameError)
+      } else {
+        casesByNameContact = casesByName || []
+        countByNameContact = countByName ?? 0
+      }
+    }
+    
+    // Combine results and remove duplicates
+    const allCaseIds = new Set([
+      ...casesByBeneficiaryId.map(c => c.id),
+      ...casesByNameContact.map(c => c.id)
+    ])
+    
+    const totalCasesCount = allCaseIds.size
+    const countByIdValue = countById ?? casesByBeneficiaryId.length
+    const totalCount = Math.max(countByIdValue, countByNameContact, totalCasesCount)
+    
+    // Log for debugging
+    logger.info(`Case check for beneficiary ${id} (${beneficiary.name}): by_id=${countByIdValue}, by_name/contact=${countByNameContact}, total=${totalCount}`)
+    
+    if (totalCount > 0) {
+      logger.warn(`Blocking deletion of beneficiary ${id} - assigned to ${totalCount} case(s)`)
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Cannot delete beneficiary. This beneficiary is assigned to ${totalCount} case(s). Please remove the beneficiary from all cases before deleting.`,
+          assignedCasesCount: totalCount
+        },
+        { status: 400 }
+      )
+    }
+    
+    logger.info(`No cases found for beneficiary ${id}, proceeding with deletion`)
+    
+    // Perform database operations within a transaction using RPC function
+    // This ensures atomicity: verify existence, check cases, delete documents, delete beneficiary
+    const { data: deletedData, error: rpcError } = await serviceRoleClient.rpc(
+      'delete_beneficiary_with_documents',
+      { p_beneficiary_id: id }
+    )
+    
+    if (rpcError) {
+      // Handle transaction errors from RPC function
+      // If function doesn't exist (42883), fall back to manual deletion
+      if (rpcError.code === '42883' || rpcError.message?.includes('function') || rpcError.message?.includes('does not exist')) {
+        logger.warn('RPC function not found, falling back to manual deletion. Please run migration 066_create_delete_beneficiary_transaction.sql')
+        // Fall through to manual deletion below
+      } else if (rpcError.code === 'P0001' || rpcError.message?.includes('Beneficiary not found')) {
+        return NextResponse.json(
+          { success: false, error: 'Beneficiary not found' },
+          { status: 404 }
+        )
+      } else if (rpcError.code === 'P0002' || rpcError.message?.includes('Cannot delete beneficiary')) {
+        const caseCountMatch = rpcError.message?.match(/(\d+)/)
+        const caseCount = caseCountMatch ? parseInt(caseCountMatch[1], 10) : 0
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: rpcError.message || 'Cannot delete beneficiary with existing cases',
+            assignedCasesCount: caseCount
+          },
+          { status: 400 }
+        )
+      } else {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Transaction error during beneficiary deletion:', rpcError)
+        return NextResponse.json(
+          { success: false, error: rpcError.message || 'Failed to delete beneficiary' },
+          { status: 500 }
+        )
+      }
+    }
+    
+    // If RPC succeeded, use its result
+    if (deletedData && !rpcError) {
+      // RPC function returns an array, get the first (and only) result
+      const deletedBeneficiary = Array.isArray(deletedData) ? deletedData[0] : deletedData
+      
+      if (!deletedBeneficiary) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'No rows deleted - beneficiary may not exist or deletion was blocked')
+        return NextResponse.json(
+          { success: false, error: 'Beneficiary could not be deleted. It may not exist or may be referenced by other records.' },
+          { status: 404 }
+        )
+      }
+      
+      logger.info(`Deleted ${documentsCount} document record(s) from database`)
+      
+      // Continue with storage deletion (code continues below)
+      // Storage deletion happens after successful transaction
+      // Delete files from storage bucket
+      if (documents && documents.length > 0) {
+        const bucketName = BUCKET_NAMES.BENEFICIARIES
+        // Escape special regex characters in bucket name
+        const escapedBucketName = bucketName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        // Create regex pattern that matches the bucket name followed by a path
+        const pathRegex = new RegExp(`${escapedBucketName}\\/(.+?)(?:\\?|$)`)
+        
+        let deletedFilesCount = 0
+        let failedFilesCount = 0
+        
+        for (const document of documents) {
+          if (!document.file_url) {
+            logger.warn(`Document ${document.id} has no file_url, skipping storage deletion`)
+            continue
+          }
+          
+          // Extract file path from URL (handles both full URLs and relative paths)
+          // Pattern: uses bucketName to construct regex dynamically
+          const pathMatch = document.file_url.match(pathRegex)
+          if (pathMatch && pathMatch[1]) {
+            const filePath = pathMatch[1]
+            
+            try {
+              const { error: storageError } = await serviceRoleClient.storage
+                .from(bucketName)
+                .remove([filePath])
+              
+              if (storageError) {
+                logger.warn(`Failed to delete file from storage: ${filePath}`, { error: storageError })
+                failedFilesCount++
+              } else {
+                deletedFilesCount++
+                logger.info(`Successfully deleted file from storage: ${filePath}`)
+              }
+            } catch (storageErr) {
+              logger.warn(`Error deleting file from storage: ${filePath}`, { error: storageErr })
+              failedFilesCount++
+            }
+          } else {
+            logger.warn(`Could not extract file path from URL: ${document.file_url}`)
+            failedFilesCount++
+          }
+        }
+        
+        logger.info(`Storage deletion complete: ${deletedFilesCount} deleted, ${failedFilesCount} failed`)
+      }
 
+      logger.info(`Beneficiary ${id} deleted successfully${documentsCount > 0 ? ` along with ${documentsCount} associated document(s)` : ''}`)
+      return NextResponse.json({
+        success: true,
+        message: `Beneficiary deleted successfully${documentsCount > 0 ? ` along with ${documentsCount} associated document(s)` : ''}`,
+        data: deletedBeneficiary
+      })
+    }
+    
+    // Fallback: Manual deletion if RPC function doesn't exist
+    // This should not happen if migration is applied, but provides safety
+    logger.warn('Falling back to manual deletion - RPC function may not be available')
+    
+    // 3. Delete all document records from database
+    if (documentsCount > 0) {
+      const { error: deleteDocumentsError } = await serviceRoleClient
+        .from('beneficiary_documents')
+        .delete()
+        .eq('beneficiary_id', id)
+      
+      if (deleteDocumentsError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary documents:', deleteDocumentsError)
+        return NextResponse.json(
+          { success: false, error: 'Failed to delete beneficiary documents' },
+          { status: 500 }
+        )
+      } else {
+        logger.info(`Deleted ${documentsCount} document record(s) from database`)
+      }
+    }
+    
+    // 4. Delete the beneficiary
+    const { data: deletedDataManual, error: deleteError } = await serviceRoleClient
+      .from('beneficiaries')
+      .delete()
+      .eq('id', id)
+      .select()
+
+    if (deleteError) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary:', deleteError)
+      return NextResponse.json(
+        { success: false, error: deleteError.message || 'Failed to delete beneficiary' },
+        { status: 500 }
+      )
+    }
+
+    if (!deletedDataManual || deletedDataManual.length === 0) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'No rows deleted - beneficiary may not exist or deletion was blocked')
+      return NextResponse.json(
+        { success: false, error: 'Beneficiary could not be deleted. It may not exist or may be referenced by other records.' },
+        { status: 404 }
+      )
+    }
+    
+    // Storage deletion for fallback path
+    if (documents && documents.length > 0) {
+      const bucketName = BUCKET_NAMES.BENEFICIARIES
+      const escapedBucketName = bucketName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const pathRegex = new RegExp(`${escapedBucketName}\\/(.+?)(?:\\?|$)`)
+      
+      let deletedFilesCount = 0
+      let failedFilesCount = 0
+      
+      for (const document of documents) {
+        if (!document.file_url) {
+          logger.warn(`Document ${document.id} has no file_url, skipping storage deletion`)
+          continue
+        }
+        
+        const pathMatch = document.file_url.match(pathRegex)
+        if (pathMatch && pathMatch[1]) {
+          const filePath = pathMatch[1]
+          
+          try {
+            const { error: storageError } = await serviceRoleClient.storage
+              .from(bucketName)
+              .remove([filePath])
+            
+            if (storageError) {
+              logger.warn(`Failed to delete file from storage: ${filePath}`, { error: storageError })
+              failedFilesCount++
+            } else {
+              deletedFilesCount++
+              logger.info(`Successfully deleted file from storage: ${filePath}`)
+            }
+          } catch (storageErr) {
+            logger.warn(`Error deleting file from storage: ${filePath}`, { error: storageErr })
+            failedFilesCount++
+          }
+        } else {
+          logger.warn(`Could not extract file path from URL: ${document.file_url}`)
+          failedFilesCount++
+        }
+      }
+      
+      logger.info(`Storage deletion complete: ${deletedFilesCount} deleted, ${failedFilesCount} failed`)
+    }
+
+    logger.info(`Beneficiary ${id} deleted successfully${documentsCount > 0 ? ` along with ${documentsCount} associated document(s)` : ''}`)
     return NextResponse.json({
       success: true,
-      message: 'Beneficiary deleted successfully'
+      message: `Beneficiary deleted successfully${documentsCount > 0 ? ` along with ${documentsCount} associated document(s)` : ''}`,
+      data: deletedDataManual[0]
     })
   } catch (error) {
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary:', error)

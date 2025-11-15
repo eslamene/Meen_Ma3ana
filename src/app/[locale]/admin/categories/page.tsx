@@ -13,9 +13,10 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
+import IconPicker from '@/components/ui/icon-picker'
+import DynamicIcon from '@/components/ui/dynamic-icon'
+import { toast } from 'sonner'
 import { HexColorPicker } from 'react-colorful'
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import { 
@@ -28,7 +29,6 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
-  Smile,
   Palette
 } from 'lucide-react'
 
@@ -52,7 +52,6 @@ export default function AdminCategoriesPage() {
   const params = useParams()
   const locale = params.locale as string
   const t = useTranslations('admin')
-  const { toast } = useEnhancedToast()
   const { containerVariant } = useLayout()
 
   const [categories, setCategories] = useState<Category[]>([])
@@ -67,8 +66,6 @@ export default function AdminCategoriesPage() {
   const [saving, setSaving] = useState(false)
   const [showColorPickerCreate, setShowColorPickerCreate] = useState(false)
   const [showColorPickerEdit, setShowColorPickerEdit] = useState(false)
-  const [showEmojiPickerCreate, setShowEmojiPickerCreate] = useState(false)
-  const [showEmojiPickerEdit, setShowEmojiPickerEdit] = useState(false)
 
   const [formData, setFormData] = useState({
     name_en: '',
@@ -93,11 +90,7 @@ export default function AdminCategoriesPage() {
       setCategories(data.categories || [])
     } catch (error) {
       console.error('Error fetching categories:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load categories',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: 'Failed to load categories' })
     } finally {
       setLoading(false)
     }
@@ -112,14 +105,12 @@ export default function AdminCategoriesPage() {
   useEffect(() => {
     if (!isCreateDialogOpen) {
       setShowColorPickerCreate(false)
-      setShowEmojiPickerCreate(false)
     }
   }, [isCreateDialogOpen])
 
   useEffect(() => {
     if (!isEditDialogOpen) {
       setShowColorPickerEdit(false)
-      setShowEmojiPickerEdit(false)
     }
   }, [isEditDialogOpen])
 
@@ -171,20 +162,12 @@ export default function AdminCategoriesPage() {
         throw new Error(error.error || 'Failed to update category')
       }
 
-      toast({
-        title: 'Success',
-        description: `Category ${!category.is_active ? 'activated' : 'deactivated'} successfully`,
-        variant: 'default'
-      })
+      toast.success('Success', { description: `Category ${!category.is_active ? 'activated' : 'deactivated'} successfully` })
 
       fetchCategories()
     } catch (error: any) {
       console.error('Error toggling category:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update category',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: error.message || 'Failed to update category' })
     } finally {
       setSaving(false)
     }
@@ -195,11 +178,7 @@ export default function AdminCategoriesPage() {
       setSaving(true)
 
       if (!formData.name_en && !formData.name_ar) {
-        toast({
-          title: 'Validation Error',
-          description: 'Please provide at least name_en or name_ar',
-          variant: 'destructive'
-        })
+        toast.error('Validation Error', { description: 'Please provide at least name_en or name_ar' })
         return
       }
 
@@ -214,21 +193,13 @@ export default function AdminCategoriesPage() {
         throw new Error(error.error || 'Failed to create category')
       }
 
-      toast({
-        title: 'Success',
-        description: 'Category created successfully',
-        variant: 'default'
-      })
+      toast.success('Success', { description: 'Category created successfully' })
 
       setIsCreateDialogOpen(false)
       fetchCategories()
     } catch (error: any) {
       console.error('Error creating category:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to create category',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: error.message || 'Failed to create category' })
     } finally {
       setSaving(false)
     }
@@ -241,11 +212,7 @@ export default function AdminCategoriesPage() {
       setSaving(true)
 
       if (!formData.name_en && !formData.name_ar) {
-        toast({
-          title: 'Validation Error',
-          description: 'Please provide at least name_en or name_ar',
-          variant: 'destructive'
-        })
+        toast.error('Validation Error', { description: 'Please provide at least name_en or name_ar' })
         return
       }
 
@@ -260,22 +227,14 @@ export default function AdminCategoriesPage() {
         throw new Error(error.error || 'Failed to update category')
       }
 
-      toast({
-        title: 'Success',
-        description: 'Category updated successfully',
-        variant: 'default'
-      })
+      toast.success('Success', { description: 'Category updated successfully' })
 
       setIsEditDialogOpen(false)
       setEditingCategory(null)
       fetchCategories()
     } catch (error: any) {
       console.error('Error updating category:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update category',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: error.message || 'Failed to update category' })
     } finally {
       setSaving(false)
     }
@@ -295,22 +254,14 @@ export default function AdminCategoriesPage() {
         throw new Error(error.error || 'Failed to delete category')
       }
 
-      toast({
-        title: 'Success',
-        description: 'Category deleted successfully',
-        variant: 'default'
-      })
+      toast.success('Success', { description: 'Category deleted successfully' })
 
       setIsDeleteDialogOpen(false)
       setDeletingCategoryId(null)
       fetchCategories()
     } catch (error: any) {
       console.error('Error deleting category:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to delete category',
-        variant: 'destructive'
-      })
+      toast.error('Error', { description: error.message || 'Failed to delete category' })
     } finally {
       setSaving(false)
     }
@@ -482,7 +433,7 @@ export default function AdminCategoriesPage() {
                     )}
                     <div className="flex items-center gap-2 mb-4">
                       {category.icon && (
-                        <span className="text-2xl">{category.icon}</span>
+                        <DynamicIcon name={category.icon} className="h-6 w-6" />
                       )}
                       {category.color && (
                         <div
@@ -591,33 +542,13 @@ export default function AdminCategoriesPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="icon">Icon (Emoji)</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="icon"
-                        value={formData.icon}
-                        onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                        placeholder="🏥"
-                        className="flex-1"
-                      />
-                      <Popover open={showEmojiPickerCreate} onOpenChange={setShowEmojiPickerCreate}>
-                        <PopoverTrigger asChild>
-                          <Button type="button" variant="outline" size="icon">
-                            <Smile className="h-4 w-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <EmojiPicker
-                            onEmojiClick={(emojiData: EmojiClickData) => {
-                              setFormData({ ...formData, icon: emojiData.emoji })
-                              setShowEmojiPickerCreate(false)
-                            }}
-                            width={350}
-                            height={400}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                    <Label htmlFor="icon">Icon</Label>
+                    <IconPicker
+                      value={formData.icon || null}
+                      onSelect={(iconName) => setFormData({ ...formData, icon: iconName || '' })}
+                      placeholder="Select an icon"
+                      showClearButton={true}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="color">Color (Hex)</Label>
@@ -730,33 +661,13 @@ export default function AdminCategoriesPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="edit_icon">Icon (Emoji)</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="edit_icon"
-                        value={formData.icon}
-                        onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                        placeholder="🏥"
-                        className="flex-1"
-                      />
-                      <Popover open={showEmojiPickerEdit} onOpenChange={setShowEmojiPickerEdit}>
-                        <PopoverTrigger asChild>
-                          <Button type="button" variant="outline" size="icon">
-                            <Smile className="h-4 w-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <EmojiPicker
-                            onEmojiClick={(emojiData: EmojiClickData) => {
-                              setFormData({ ...formData, icon: emojiData.emoji })
-                              setShowEmojiPickerEdit(false)
-                            }}
-                            width={350}
-                            height={400}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                    <Label htmlFor="edit_icon">Icon</Label>
+                    <IconPicker
+                      value={formData.icon || null}
+                      onSelect={(iconName) => setFormData({ ...formData, icon: iconName || '' })}
+                      placeholder="Select an icon"
+                      showClearButton={true}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="edit_color">Color (Hex)</Label>

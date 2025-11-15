@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { Upload, FileText, Image as ImageIcon, Eye, EyeOff, X, Check } from 'lucide-react'
+import { Upload, FileText, Image as ImageIcon, Eye, EyeOff, X, Check, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { BeneficiaryDocumentService } from '@/lib/services/beneficiaryDocumentService'
+import { useAdmin } from '@/lib/admin/hooks'
 import type { BeneficiaryDocument, DocumentType } from '@/types/beneficiary'
 
 interface BeneficiaryDocumentUploadProps {
@@ -28,12 +29,26 @@ export default function BeneficiaryDocumentUpload({
   documents
 }: BeneficiaryDocumentUploadProps) {
   const t = useTranslations('beneficiaries')
+  const { hasRole, loading: adminLoading } = useAdmin()
+  const isAdmin = hasRole('admin') || hasRole('super_admin')
   const [isUploading, setIsUploading] = useState(false)
+
+  // Debug logging
+  useEffect(() => {
+    console.log('BeneficiaryDocumentUpload - Admin check:', {
+      adminLoading,
+      isAdmin,
+      hasAdminRole: hasRole('admin'),
+      hasSuperAdminRole: hasRole('super_admin')
+    })
+  }, [adminLoading, isAdmin, hasRole])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [documentType, setDocumentType] = useState<DocumentType>('identity_copy')
   const [isPublic, setIsPublic] = useState(false)
   const [description, setDescription] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
 
   const documentTypes: { value: DocumentType; label: string; icon: React.ReactNode }[] = [
     { value: 'identity_copy', label: t('identityCopy'), icon: <FileText className="h-4 w-4" /> },
@@ -60,10 +75,49 @@ export default function BeneficiaryDocumentUpload({
   }
 
   const handleUpload = async () => {
-    if (!selectedFile) return
+    console.log('🔄 handleUpload called', { 
+      selectedFile: selectedFile?.name, 
+      beneficiaryId,
+      isAdmin,
+      adminLoading 
+    })
+    
+    if (!selectedFile) {
+      console.error('❌ No file selected')
+      setUploadError('Please select a file to upload')
+      return
+    }
+
+    if (!isAdmin) {
+      console.error('❌ User is not an admin')
+      setUploadError('Only administrators can upload documents')
+      return
+    }
+
+    // Validate file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (selectedFile.size > maxSize) {
+      setUploadError(`File size exceeds 5MB limit. Current size: ${formatFileSize(selectedFile.size)}`)
+      return
+    }
+
+    // Validate file type (must match API allowed types)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
+    // Also check file extension as fallback since some browsers may report different MIME types
+    const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase()
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf']
+    
+    if (!allowedTypes.includes(selectedFile.type) && !allowedExtensions.includes(fileExtension || '')) {
+      setUploadError(`File type not allowed. Allowed types: JPG, PNG, GIF, WebP, PDF`)
+      return
+    }
 
     try {
       setIsUploading(true)
+      setUploadError(null)
+      setUploadSuccess(null)
+
+      console.log('Starting upload...', { beneficiaryId, fileName: selectedFile.name, fileSize: selectedFile.size, fileType: selectedFile.type })
 
       // Create a safe filename
       const safeName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')
@@ -75,31 +129,93 @@ export default function BeneficiaryDocumentUpload({
       formData.append('fileName', fileName)
       formData.append('bucket', 'beneficiaries')
 
+      console.log('Sending upload request to /api/upload...', {
+        beneficiaryId,
+        fileName,
+        fileSize: selectedFile.size,
+        fileType: selectedFile.type
+      })
+
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
 
+      console.log('Upload response status:', uploadResponse.status, uploadResponse.ok)
+      console.log('Upload response headers:', Object.fromEntries(uploadResponse.headers.entries()))
+
       if (!uploadResponse.ok) {
+        let errorMessage = 'Failed to upload file'
+        try {
         const errorData = await uploadResponse.json()
-        throw new Error(errorData.error || 'Failed to upload file')
+          errorMessage = errorData.error || errorMessage
+          console.error('Upload error response:', errorData)
+        } catch (e) {
+          const text = await uploadResponse.text()
+          console.error('Upload error (non-JSON):', text)
+          errorMessage = `Upload failed with status ${uploadResponse.status}: ${text}`
+        }
+        throw new Error(errorMessage)
       }
 
-      const uploadData = await uploadResponse.json()
+      let uploadData
+      try {
+        const responseText = await uploadResponse.text()
+        console.log('Upload response text:', responseText)
+        uploadData = JSON.parse(responseText)
+        console.log('Upload successful, parsed response:', uploadData)
+      } catch (parseError) {
+        console.error('Failed to parse upload response:', parseError)
+        throw new Error('Failed to parse server response')
+      }
 
+      if (!uploadData.url && !uploadData.path) {
+        console.error('No URL or path in upload response:', uploadData)
+        throw new Error('Upload succeeded but no URL or path returned')
+      }
+
+      // Use the URL from response, or construct it if needed
+      const fileUrl = uploadData.url || (uploadData.path ? 
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL || window.location.origin}/storage/v1/object/${uploadData.bucket}/${uploadData.path}` : 
+        null)
+      
+      if (!fileUrl) {
+        throw new Error('No file URL available in response')
+      }
+      console.log('Using file URL:', fileUrl)
+
+      console.log('Creating document record in database...')
+      let newDocument
+      try {
       // Create document record
-      const document = await BeneficiaryDocumentService.create({
+        newDocument = await BeneficiaryDocumentService.create({
         beneficiary_id: beneficiaryId,
         document_type: documentType,
         file_name: selectedFile.name,
-        file_url: uploadData.url,
+          file_url: fileUrl,
         file_size: selectedFile.size,
         mime_type: selectedFile.type,
         is_public: isPublic,
         description: description.trim() || undefined
       })
 
-      onDocumentUploaded(document)
+        console.log('Document created successfully:', newDocument)
+      } catch (dbError) {
+        console.error('Database insert failed:', dbError)
+        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error'
+        console.error('Full error details:', dbError)
+        throw new Error(`Failed to save document record: ${errorMessage}`)
+      }
+
+      // Call the callback to update parent component
+      if (newDocument) {
+        onDocumentUploaded(newDocument)
+      } else {
+        throw new Error('Document was not created')
+      }
+
+      // Show success message
+      setUploadSuccess(`Document "${selectedFile.name}" uploaded successfully!`)
 
       // Reset form
       setSelectedFile(null)
@@ -107,10 +223,24 @@ export default function BeneficiaryDocumentUpload({
       setPreviewUrl(null)
       setDocumentType('identity_copy')
       setIsPublic(false)
+      setUploadError(null)
+      
+      // Reset file input
+      const fileInputElement = document.getElementById('file-upload') as HTMLInputElement
+      if (fileInputElement) {
+        fileInputElement.value = ''
+      }
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setUploadSuccess(null)
+      }, 3000)
 
     } catch (error) {
       console.error('Error uploading document:', error)
-      alert('Failed to upload document. Please try again.')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload document. Please try again.'
+      setUploadError(errorMessage)
+      setUploadSuccess(null)
     } finally {
       setIsUploading(false)
     }
@@ -148,7 +278,8 @@ export default function BeneficiaryDocumentUpload({
 
   return (
     <div className="space-y-4">
-      {/* Upload Form */}
+      {/* Upload Form - Only show for admins */}
+      {!adminLoading && isAdmin && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -243,37 +374,76 @@ export default function BeneficiaryDocumentUpload({
             </div>
           )}
 
+          {/* Success Message */}
+          {uploadSuccess && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-green-800">{uploadSuccess}</p>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {uploadError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-800 font-medium">Error: {uploadError}</p>
+              <p className="text-xs text-red-600 mt-1">Check the browser console for more details.</p>
+            </div>
+          )}
+
           {/* Upload Button */}
           <Button
-            onClick={handleUpload}
-            disabled={!selectedFile || isUploading}
+            onClick={(e) => {
+              console.log('🔘 Upload button clicked', { 
+                selectedFile: selectedFile?.name, 
+                isUploading,
+                isAdmin 
+              })
+              e.preventDefault()
+              handleUpload()
+            }}
+            disabled={!selectedFile || isUploading || !isAdmin}
             className="w-full"
           >
             {isUploading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Uploading...
+                {t('uploading') || 'Uploading...'}
               </>
             ) : (
               <>
                 <Upload className="h-4 w-4 mr-2" />
-                Upload Document
+                {t('uploadDocument') || 'Upload Document'}
               </>
             )}
           </Button>
         </CardContent>
       </Card>
+      )}
+
+      {/* Show message for non-admin users */}
+      {!adminLoading && !isAdmin && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-gray-600">
+              <Shield className="h-5 w-5 text-gray-400" />
+              <p className="text-sm">
+                {t('adminOnlyUpload') || 'Only administrators can upload beneficiary documents.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Documents List */}
-      {documents.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              {t('documents')} ({documents.length})
+            {t('documents')}
+            {documents.length > 0 && <span>({documents.length})</span>}
             </CardTitle>
           </CardHeader>
           <CardContent>
+          {documents.length > 0 ? (
             <div className="space-y-3">
               {documents.map((doc) => (
                 <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -327,9 +497,15 @@ export default function BeneficiaryDocumentUpload({
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+              <p className="text-sm font-medium">{t('noDocuments') || 'No documents uploaded yet'}</p>
+              <p className="text-xs mt-1">{t('uploadDocumentsHint') || 'Upload documents using the form above'}</p>
+            </div>
+          )}
           </CardContent>
         </Card>
-      )}
     </div>
   )
 }

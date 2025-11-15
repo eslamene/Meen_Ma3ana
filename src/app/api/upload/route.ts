@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requirePermission, requireAnyPermission } from '@/lib/security/guards'
+import { requirePermission } from '@/lib/security/guards'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 
@@ -24,12 +24,15 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // For beneficiary bucket, allow any authenticated user (similar to beneficiary update route)
+    // For beneficiary bucket, require admin or super_admin role
     // For other buckets, require manage:files permission
     let user: { id: string } | null = null
     
-    if (bucket === 'beneficiaries') {
-      // For beneficiary uploads, just check if user is authenticated
+    // Check if bucket is beneficiaries dynamically
+    const { getBucketForEntity } = await import('@/lib/utils/storageBuckets')
+    const beneficiariesBucket = getBucketForEntity('beneficiary')
+    if (bucket === beneficiariesBucket) {
+      // For beneficiary uploads, require admin or super_admin role
       const supabase = await createServerClient()
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       
@@ -38,6 +41,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'Authentication required' },
           { status: 401 }
+        )
+      }
+
+      // Check if user has admin or super_admin role
+      const { adminService } = await import('@/lib/admin/service')
+      const hasAdminRole = await adminService.hasRole(authUser.id, 'admin') || 
+                          await adminService.hasRole(authUser.id, 'super_admin')
+      
+      if (!hasAdminRole) {
+        logger.warn('Non-admin user attempted beneficiary upload', { userId: authUser.id })
+        return NextResponse.json(
+          { error: 'Only administrators can upload beneficiary documents' },
+          { status: 403 }
         )
       }
       
@@ -92,26 +108,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate file type - stricter allowlist
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
-    if (!allowedTypes.includes(file.type)) {
+    // Validate file using storage rules
+    const { validateUpload } = await import('@/lib/storage/validateUpload')
+    const validation = await validateUpload(bucket, file)
+    
+    if (!validation.valid) {
+      logger.warn('File validation failed', { 
+        bucket, 
+        fileName, 
+        error: validation.error 
+      })
       return NextResponse.json(
-        { error: 'Invalid file type. Only JPG, PNG, GIF, WebP, and PDF files are allowed.' },
-        { status: 400 }
-      )
-    }
-
-    // Validate file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'File too large. Maximum size is 5MB.' },
+        { error: validation.error || 'File validation failed' },
         { status: 400 }
       )
     }
 
     // Validate bucket name to prevent path traversal
-    const allowedBuckets = ['case-images', 'contributions', 'case-files', 'beneficiaries']
-    if (!allowedBuckets.includes(bucket)) {
+    // Use dynamic bucket validation instead of hardcoded list
+    const { isValidBucket } = await import('@/lib/utils/storageBuckets')
+    const isValid = await isValidBucket(bucket)
+    if (!isValid) {
+      logger.warn('Invalid bucket name attempted', { bucket })
       return NextResponse.json(
         { error: 'Invalid bucket name' },
         { status: 400 }
@@ -148,10 +166,44 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get the public URL
+    // Get the file URL - try public URL first, then signed URL if needed
+    let fileUrl: string
+    
+    // First, try to get public URL (works for public buckets)
     const { data: { publicUrl } } = serviceSupabase.storage
       .from(bucket)
-      .getPublicUrl(fileName)
+      .getPublicUrl(data.path)
+    
+    // For private buckets, we need signed URLs
+    // Check if bucket is private dynamically
+    const { isPrivateBucket } = await import('@/lib/utils/storageBuckets')
+    const isPrivate = await isPrivateBucket(bucket)
+    if (isPrivate) {
+      try {
+        // Try to create signed URL (for private buckets)
+        const { data: signedUrlData, error: signedUrlError } = await serviceSupabase.storage
+          .from(bucket)
+          .createSignedUrl(data.path, 31536000) // 1 year in seconds
+        
+        if (!signedUrlError && signedUrlData?.signedUrl) {
+          fileUrl = signedUrlData.signedUrl
+          logger.info('Using signed URL for private bucket')
+        } else {
+          // Fallback to public URL if signed URL fails (bucket might be public)
+          fileUrl = publicUrl
+          logger.info('Using public URL (signed URL failed or bucket is public)')
+        }
+      } catch (signedUrlErr) {
+        // If signed URL creation fails, use public URL
+        fileUrl = publicUrl
+        logger.warn('Signed URL creation failed, using public URL:', signedUrlErr)
+      }
+    } else {
+      // For other buckets, use public URL
+      fileUrl = publicUrl
+    }
+    
+    logger.info('File URL generated:', { bucket, path: data.path, urlLength: fileUrl.length })
 
     // Log successful upload
     await AuditService.logAdminAction(
@@ -169,11 +221,21 @@ export async function POST(request: NextRequest) {
       userAgent
     )
 
-    return NextResponse.json({
+    const response = {
       success: true,
-      url: publicUrl,
-      fileName: data.path
+      url: fileUrl,
+      fileName: data.path,
+      path: data.path,
+      bucket: bucket
+    }
+    
+    logger.info('Upload successful, returning response:', { 
+      bucket, 
+      path: data.path,
+      urlLength: fileUrl.length 
     })
+    
+    return NextResponse.json(response)
 
   } catch (error) {
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Upload API error:', error)
@@ -186,8 +248,6 @@ export async function POST(request: NextRequest) {
 
 // Handle OPTIONS request for CORS
 export async function OPTIONS() {
-  const logger = new Logger()
-
   return new NextResponse(null, {
     status: 200,
     headers: {

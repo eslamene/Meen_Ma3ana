@@ -37,24 +37,14 @@ interface RecurringContribution {
   case_id: string | null
   project_id: string | null
   created_at: string
-}
-
-interface Case {
-  id: string
-  title: string
-}
-
-interface Project {
-  id: string
-  name: string
+  case_title?: string | null
+  project_name?: string | null
 }
 
 export default function RecurringContributionDashboard() {
   const t = useTranslations('contributions')
   const [user, setUser] = useState<User | null>(null)
   const [contributions, setContributions] = useState<RecurringContribution[]>([])
-  const [cases, setCases] = useState<Record<string, Case>>({})
-  const [projects, setProjects] = useState<Record<string, Project>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -74,56 +64,26 @@ export default function RecurringContributionDashboard() {
   }, [supabase.auth])
 
   const fetchRecurringContributions = useCallback(async () => {
+    if (!user?.id) return
+
     try {
       setLoading(true)
+      setError(null)
       
-      const { data, error } = await supabase
-        .from('recurring_contributions')
-        .select('*')
-        .eq('donor_id', user?.id)
-        .order('created_at', { ascending: false })
+      const response = await fetch('/api/recurring-contributions')
+      const data = await response.json()
 
-      if (error) throw error
-
-      setContributions(data || [])
-
-      // Fetch related cases and projects
-      const caseIds = data?.filter(c => c.case_id).map(c => c.case_id) || []
-      const projectIds = data?.filter(c => c.project_id).map(c => c.project_id) || []
-
-      if (caseIds.length > 0) {
-        const { data: caseData } = await supabase
-          .from('cases')
-          .select('id, title')
-          .in('id', caseIds)
-        
-        const caseMap = (caseData || []).reduce((acc, c) => {
-          acc[c.id] = c
-          return acc
-        }, {} as Record<string, Case>)
-        
-        setCases(caseMap)
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch recurring contributions')
       }
 
-      if (projectIds.length > 0) {
-        const { data: projectData } = await supabase
-          .from('projects')
-          .select('id, name')
-          .in('id', projectIds)
-        
-        const projectMap = (projectData || []).reduce((acc, p) => {
-          acc[p.id] = p
-          return acc
-        }, {} as Record<string, Project>)
-        
-        setProjects(projectMap)
-      }
+      setContributions(data.contributions || [])
     } catch (err: any) {
       setError(err.message || 'Failed to fetch recurring contributions')
     } finally {
       setLoading(false)
     }
-  }, [supabase, user?.id])
+  }, [user?.id])
 
   useEffect(() => {
     if (user) {
@@ -133,12 +93,24 @@ export default function RecurringContributionDashboard() {
 
   const handleStatusChange = async (contributionId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('recurring_contributions')
-        .update({ status: newStatus })
-        .eq('id', contributionId)
+      const action = newStatus === 'paused' ? 'pause' : newStatus === 'active' ? 'resume' : undefined
+      
+      const response = await fetch(`/api/recurring-contributions/${contributionId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          ...(action && { action })
+        }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update contribution status')
+      }
 
       // Refresh the list
       fetchRecurringContributions()
@@ -149,12 +121,21 @@ export default function RecurringContributionDashboard() {
 
   const handleCancel = async (contributionId: string) => {
     try {
-      const { error } = await supabase
-        .from('recurring_contributions')
-        .update({ status: 'cancelled' })
-        .eq('id', contributionId)
+      const response = await fetch(`/api/recurring-contributions/${contributionId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'cancel'
+        }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to cancel contribution')
+      }
 
       // Refresh the list
       fetchRecurringContributions()
@@ -253,8 +234,6 @@ export default function RecurringContributionDashboard() {
           ) : (
             <div className="space-y-4">
               {contributions.map((contribution) => {
-                const relatedCase = contribution.case_id ? cases[contribution.case_id] : null
-                const relatedProject = contribution.project_id ? projects[contribution.project_id] : null
                 const nextDate = new Date(contribution.next_contribution_date)
                 const isOverdue = nextDate < new Date() && contribution.status === 'active'
                 
@@ -267,7 +246,7 @@ export default function RecurringContributionDashboard() {
                             ${contribution.amount.toFixed(2)} {getFrequencyLabel(contribution.frequency)}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {relatedCase?.title || relatedProject?.name || t('generalContribution')}
+                            {contribution.case_title || contribution.project_name || t('generalContribution')}
                           </p>
                         </div>
                         <div className="flex items-center space-x-2">

@@ -56,9 +56,9 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
   
   // Filters
   const [filters, setFilters] = useState({
-    category: '',
-    severity: '',
-    action: '',
+    category: 'all',
+    severity: 'all',
+    action: 'all',
     search: ''
   })
   
@@ -77,23 +77,23 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
         const logs = await getAllAuditLogs({
           limit: pagination.limit,
           offset,
-          category: filters.category || undefined,
-          severity: filters.severity || undefined,
-          action: filters.action || undefined
+          category: filters.category === 'all' ? undefined : filters.category,
+          severity: filters.severity === 'all' ? undefined : filters.severity,
+          action: filters.action === 'all' ? undefined : filters.action
         })
         setAuditLogs(logs)
       } else if (activeTab === 'roles') {
         const logs = await getRoleAssignmentAudit({
           limit: pagination.limit,
           offset,
-          action: filters.action || undefined
+          action: filters.action === 'all' ? undefined : filters.action
         })
         setRoleAuditLogs(logs)
       } else if (activeTab === 'permissions') {
         const logs = await getPermissionChangeAudit({
           limit: pagination.limit,
           offset,
-          action: filters.action || undefined
+          action: filters.action === 'all' ? undefined : filters.action
         })
         setPermissionAuditLogs(logs)
       }
@@ -349,7 +349,7 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 <SelectItem value="rbac">RBAC</SelectItem>
                 <SelectItem value="role_assignment">Role Assignment</SelectItem>
                 <SelectItem value="permission_change">Permission Change</SelectItem>
@@ -363,7 +363,7 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Severities</SelectItem>
+                <SelectItem value="all">All Severities</SelectItem>
                 <SelectItem value="info">Info</SelectItem>
                 <SelectItem value="warning">Warning</SelectItem>
                 <SelectItem value="error">Error</SelectItem>
@@ -378,7 +378,7 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
                 <SelectValue placeholder="Action" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Actions</SelectItem>
+                <SelectItem value="all">All Actions</SelectItem>
                 <SelectItem value="assign">Assign</SelectItem>
                 <SelectItem value="revoke">Revoke</SelectItem>
                 <SelectItem value="grant">Grant</SelectItem>

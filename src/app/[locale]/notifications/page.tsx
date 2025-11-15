@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target, XCircle, AlertTriangle, RefreshCw, Copy, ChevronDown, ChevronRight, ExternalLink, Eye, Download } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useToast } from '@/components/ui/toast'
+import { toast } from 'sonner'
 
 interface Notification {
   id: string
@@ -30,7 +30,6 @@ export default function NotificationsPage() {
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
-  const { toast } = useToast()
   const { containerVariant } = useLayout()
   
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -67,14 +66,11 @@ export default function NotificationsPage() {
       }
     } catch (error) {
       console.error('Error fetching notifications:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load notifications'
-      })
+      toast.error('Error', { description: 'Failed to load notifications' })
     } finally {
       setLoading(false)
     }
-  }, [supabase, toast])
+  }, [supabase])
 
   useEffect(() => {
     fetchNotifications()
@@ -227,10 +223,7 @@ export default function NotificationsPage() {
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text)
-        toast({
-          title: 'Copied',
-          description: 'Transaction ID copied to clipboard'
-        })
+        toast.success('Copied', { description: 'Transaction ID copied to clipboard' })
       } else {
         // Fallback for older browsers or non-HTTPS
         const textArea = document.createElement('textarea')
@@ -244,26 +237,17 @@ export default function NotificationsPage() {
         
         try {
           document.execCommand('copy')
-          toast({
-            title: 'Copied',
-            description: 'Transaction ID copied to clipboard'
-          })
+          toast.success('Copied', { description: 'Transaction ID copied to clipboard' })
         } catch (fallbackError) {
           console.error('Fallback copy failed:', fallbackError)
-          toast({
-            title: 'Copy Failed',
-            description: 'Unable to copy to clipboard. Please copy manually.'
-          })
+          toast.error('Copy Failed', { description: 'Unable to copy to clipboard. Please copy manually.' })
         } finally {
           document.body.removeChild(textArea)
         }
       }
     } catch (error) {
       console.error('Failed to copy:', error)
-      toast({
-        title: 'Copy Failed',
-        description: 'Unable to copy to clipboard. Please copy manually.'
-      })
+      toast.error('Copy Failed', { description: 'Unable to copy to clipboard. Please copy manually.' })
     }
   }
 
@@ -281,26 +265,14 @@ export default function NotificationsPage() {
           })
           setShowProofModal(true)
         } else {
-          toast({
-            title: 'No Proof Available',
-            description: 'This contribution does not have a payment proof attached.',
-            type: 'warning'
-          })
+          toast.warning('No Proof Available', { description: 'This contribution does not have a payment proof attached.' })
         }
       } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch contribution details.',
-          type: 'error'
-        })
+        toast.error('Error', { description: 'Failed to fetch contribution details.' })
       }
     } catch (error) {
       console.error('Error fetching contribution:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch contribution details.',
-        type: 'error'
-      })
+      toast.error('Error', { description: 'Failed to fetch contribution details.' })
     }
   }
 

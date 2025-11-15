@@ -38,6 +38,7 @@ interface Case {
   currentAmount: number
   status: string
   category: string
+  categoryData?: { name: string; icon?: string; color?: string } | null
   type: 'one-time' | 'recurring'
   location: string
   createdAt: string
@@ -51,6 +52,7 @@ interface CaseFilters {
   type: string
   status: string
   category: string
+  detectedCategory: string
   minAmount: string
   maxAmount: string
   sortBy: string
@@ -74,6 +76,7 @@ export default function CasesPage() {
     type: 'all',
     status: 'published',
     category: 'all',
+    detectedCategory: 'all',
     minAmount: '',
     maxAmount: '',
     sortBy: 'createdAt',
@@ -116,6 +119,9 @@ export default function CasesPage() {
       }
       if (filters.category && filters.category !== 'all') {
         params.append('category', filters.category)
+      }
+      if (filters.detectedCategory && filters.detectedCategory !== 'all') {
+        params.append('detectedCategory', filters.detectedCategory)
       }
       if (filters.minAmount) {
         params.append('minAmount', filters.minAmount)
@@ -176,6 +182,7 @@ export default function CasesPage() {
       type: 'all',
       status: 'published',
       category: 'all',
+      detectedCategory: 'all',
       minAmount: '',
       maxAmount: '',
       sortBy: 'createdAt',
@@ -207,6 +214,7 @@ export default function CasesPage() {
     if (filters.type && filters.type !== 'all') count++
     if (filters.status && filters.status !== 'published') count++
     if (filters.category && filters.category !== 'all') count++
+    if (filters.detectedCategory && filters.detectedCategory !== 'all') count++
     if (filters.minAmount) count++
     if (filters.maxAmount) count++
     return count

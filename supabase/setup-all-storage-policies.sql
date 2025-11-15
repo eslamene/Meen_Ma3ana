@@ -248,6 +248,67 @@ USING (
   )
 );
 
+-- =====================================================
+-- 7. BENEFICIARIES BUCKET (Beneficiary documents)
+-- =====================================================
+
+DROP POLICY IF EXISTS "beneficiaries_authenticated_read" ON storage.objects;
+DROP POLICY IF EXISTS "beneficiaries_authenticated_upload" ON storage.objects;
+DROP POLICY IF EXISTS "beneficiaries_owner_update" ON storage.objects;
+DROP POLICY IF EXISTS "beneficiaries_owner_delete" ON storage.objects;
+DROP POLICY IF EXISTS "beneficiaries_admin_access" ON storage.objects;
+
+-- Authenticated users can read beneficiary documents
+CREATE POLICY "beneficiaries_authenticated_read" 
+ON storage.objects 
+FOR SELECT 
+USING (
+  bucket_id = 'beneficiaries' 
+  AND auth.role() = 'authenticated'
+);
+
+-- Authenticated users can upload beneficiary documents
+CREATE POLICY "beneficiaries_authenticated_upload" 
+ON storage.objects 
+FOR INSERT 
+WITH CHECK (
+  bucket_id = 'beneficiaries' 
+  AND auth.role() = 'authenticated'
+);
+
+-- File owners can update their uploaded files
+CREATE POLICY "beneficiaries_owner_update" 
+ON storage.objects 
+FOR UPDATE
+USING (
+  bucket_id = 'beneficiaries' 
+  AND auth.uid() = owner
+);
+
+-- File owners can delete their uploaded files
+CREATE POLICY "beneficiaries_owner_delete" 
+ON storage.objects 
+FOR DELETE
+USING (
+  bucket_id = 'beneficiaries' 
+  AND auth.uid() = owner
+);
+
+-- Admins can access all beneficiary documents
+CREATE POLICY "beneficiaries_admin_access" 
+ON storage.objects 
+FOR ALL 
+USING (
+  bucket_id = 'beneficiaries' 
+  AND EXISTS (
+    SELECT 1 FROM admin_user_roles ur
+    JOIN admin_roles r ON ur.role_id = r.id
+    WHERE ur.user_id = auth.uid() 
+    AND ur.is_active = true
+    AND r.name IN ('admin', 'super_admin')
+  )
+);
+
 COMMIT;
 
 -- =====================================================
@@ -264,6 +325,7 @@ SELECT
     WHEN policyname LIKE 'sponsor_apps%' THEN 'sponsor_applications'
     WHEN policyname LIKE 'recurring%' THEN 'recurring_contributions'
     WHEN policyname LIKE 'case_files%' THEN 'case-files'
+    WHEN policyname LIKE 'beneficiaries%' THEN 'beneficiaries'
     ELSE 'unknown'
   END as bucket,
   cmd as operation,
@@ -282,6 +344,7 @@ SELECT
     WHEN policyname LIKE 'sponsor_apps%' THEN 'sponsor_applications'
     WHEN policyname LIKE 'recurring%' THEN 'recurring_contributions'
     WHEN policyname LIKE 'case_files%' THEN 'case-files'
+    WHEN policyname LIKE 'beneficiaries%' THEN 'beneficiaries'
     ELSE 'unknown'
   END as bucket,
   COUNT(*) as policy_count

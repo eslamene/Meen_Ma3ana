@@ -8,7 +8,7 @@ import { RoleFormModal } from '@/components/admin/rbac/RoleFormModal'
 import { RolesDataTable } from '@/components/admin/rbac/RolesDataTable'
 import { PermissionAssignmentModal } from '@/components/admin/rbac/PermissionAssignmentModal'
 import { Card, CardContent } from '@/components/ui/card'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { Shield, Users, Plus } from 'lucide-react'
 
 // Types
@@ -43,7 +43,6 @@ export default function RolesPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [selectedRole, setSelectedRole] = useState<Role | undefined>(undefined)
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
-  const { toast } = useToast()
 
   const fetchRoles = useCallback(async () => {
     try {
@@ -71,11 +70,11 @@ export default function RolesPage() {
       } else {
         const errorData = await res.json()
         console.error('Roles fetch error:', errorData)
-        toast({ title: 'Error', description: errorData.error || 'Failed to fetch roles', type: 'error' })
+        toast.error('Error', { description: errorData.error || 'Failed to fetch roles' })
       }
     } catch (error) {
       console.error('Roles fetch error:', error)
-      toast({ title: 'Error', description: 'Failed to fetch roles', type: 'error' })
+      toast.error('Error', { description: 'Failed to fetch roles' })
     } finally {
       setLoading(false)
     }
@@ -105,16 +104,16 @@ export default function RolesPage() {
         })
       })
       if (res.ok) {
-        toast({ title: 'Success', description: 'Role created successfully', type: 'success' })
+        toast.success('Success', { description: 'Role created successfully' })
         setCreateModalOpen(false)
         setSelectedPermissions([])
         fetchRoles()
       } else {
         const error = await res.json()
-        toast({ title: 'Error', description: error.error, type: 'error' })
+        toast.error('Error', { description: error.error })
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to create role', type: 'error' })
+      toast.error('Error', { description: 'Failed to create role' })
     }
   }
 
@@ -132,15 +131,15 @@ export default function RolesPage() {
         })
       })
       if (res.ok) {
-        toast({ title: 'Success', description: 'Role updated successfully', type: 'success' })
+        toast.success('Success', { description: 'Role updated successfully' })
         setEditModalOpen(false)
         fetchRoles()
       } else {
         const error = await res.json()
-        toast({ title: 'Error', description: error.error, type: 'error' })
+        toast.error('Error', { description: error.error })
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to update role', type: 'error' })
+      toast.error('Error', { description: 'Failed to update role' })
     }
   }
 
@@ -149,13 +148,13 @@ export default function RolesPage() {
     
     // Prevent deletion of system roles or roles with users assigned
     if (selectedRole.is_system) {
-      toast({ title: 'Error', description: 'System roles cannot be deleted', type: 'error' })
+      toast.error('Error', { description: 'System roles cannot be deleted' })
       setDeleteModalOpen(false)
       return
     }
     
     if (selectedRole.users_count && selectedRole.users_count > 0) {
-      toast({ title: 'Error', description: 'Cannot delete role that is assigned to users. Remove all assignments first.', type: 'error' })
+      toast.error('Error', { description: 'Cannot delete role that is assigned to users. Remove all assignments first.' })
       setDeleteModalOpen(false)
       return
     }
@@ -166,15 +165,15 @@ export default function RolesPage() {
         credentials: 'include'
       })
       if (res.ok) {
-        toast({ title: 'Success', description: 'Role deleted successfully', type: 'success' })
+        toast.success('Success', { description: 'Role deleted successfully' })
         setDeleteModalOpen(false)
         fetchRoles()
       } else {
         const error = await res.json()
-        toast({ title: 'Error', description: error.error, type: 'error' })
+        toast.error('Error', { description: error.error })
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to delete role', type: 'error' })
+      toast.error('Error', { description: 'Failed to delete role' })
     }
   }
 
@@ -190,15 +189,15 @@ export default function RolesPage() {
         })
       })
       if (res.ok) {
-        toast({ title: 'Success', description: 'Permissions assigned successfully', type: 'success' })
+        toast.success('Success', { description: 'Permissions assigned successfully' })
         setAssignModalOpen(false)
         fetchRoles()
       } else {
         const error = await res.json()
-        toast({ title: 'Error', description: error.error, type: 'error' })
+        toast.error('Error', { description: error.error })
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to assign permissions', type: 'error' })
+      toast.error('Error', { description: 'Failed to assign permissions' })
     }
   }
 

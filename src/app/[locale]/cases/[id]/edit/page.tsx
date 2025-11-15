@@ -12,12 +12,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TabsContent } from '@/components/ui/tabs'
+import { BrandedTabs } from '@/components/ui/branded-tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useEnhancedToast } from '@/hooks/use-enhanced-toast'
+import { toast } from 'sonner'
 import CaseFileManager, { CaseFile, FileCategory } from '@/components/cases/CaseFileManager'
 import BeneficiarySelector from '@/components/beneficiaries/BeneficiarySelector'
+import { EditPageHeader, EditPageFooter } from '@/components/crud'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
+import DynamicIcon from '@/components/ui/dynamic-icon'
 import type { Beneficiary } from '@/types/beneficiary'
+import { getValidationSettings, type ValidationSettings } from '@/lib/utils/validationSettings'
 import { 
   ArrowLeft, 
   Save, 
@@ -42,20 +48,7 @@ import {
   Percent,
   Copy,
   Check,
-  type LucideIcon,
-  Heart,
-  GraduationCap,
-  Home,
-  Briefcase,
-  ShoppingBag,
-  Users,
-  Stethoscope,
-  HandHeart,
-  Wrench,
-  BookOpen,
-  Shield,
-  Zap,
-  Gift
+  Clock
 } from 'lucide-react'
 
 interface Case {
@@ -85,6 +78,8 @@ interface Case {
   creator_name?: string | null
   creator_email?: string | null
   supporting_documents?: string // JSON string of CaseFile[]
+  duration?: number | null // Duration in days for one-time cases
+  type?: string | null // Case type: one-time or recurring
   // Add computed fields for UI
   goal_amount?: number | null
   urgency_level?: string | null
@@ -101,10 +96,12 @@ export default function CaseEditPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [validationSettings, setValidationSettings] = useState<ValidationSettings | null>(null)
   const [success, setSuccess] = useState(false)
   const [approvedContributionsTotal, setApprovedContributionsTotal] = useState(0)
   const [totalContributions, setTotalContributions] = useState(0)
-  const [categories, setCategories] = useState<Array<{id: string, name: string, icon: string | null, color: string | null}>>([])
+  const [categories, setCategories] = useState<Array<{id: string, name: string, name_en?: string, name_ar?: string, icon: string | null, color: string | null}>>([])
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<Beneficiary | null>(null)
   
   // Delete dialog state
@@ -118,10 +115,11 @@ export default function CaseEditPage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('')
   const [copiedId, setCopiedId] = useState(false)
-  const { toast } = useEnhancedToast()
+  const { containerVariant } = useLayout()
 
   const supabase = createClient()
   const caseId = params.id as string
+  const locale = params.locale as string
 
   const fetchApprovedContributionsTotal = useCallback(async () => {
     try {
@@ -180,66 +178,81 @@ export default function CaseEditPage() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('case_categories')
-        .select('id, name, icon, color')
-        .eq('is_active', true)
-        .order('name')
-
-      if (error) {
-        console.error('Error fetching categories:', error)
+      const response = await fetch('/api/categories')
+      
+      if (!response.ok) {
+        console.error('Error fetching categories:', response.statusText)
         return
       }
 
-      setCategories(data || [])
+      const result = await response.json()
+      setCategories(result.categories || [])
     } catch (error) {
       console.error('Error fetching categories:', error)
     }
-  }, [supabase])
+  }, [])
 
+  // Load validation settings
+  useEffect(() => {
+    const loadValidationSettings = async () => {
+      try {
+        const settings = await getValidationSettings()
+        console.log('Validation settings loaded in edit form:', settings)
+        setValidationSettings(settings)
+      } catch (error) {
+        console.error('Failed to load validation settings:', error)
+      }
+    }
+    loadValidationSettings()
+  }, [])
+
+  // Re-validate when validation settings are loaded
+  useEffect(() => {
+    if (!validationSettings || !case_) return
+    
+    // Re-validate all fields when settings load to update error messages
+    if (case_.title_en) {
+      handleInputChange('title_en', case_.title_en)
+    }
+    if (case_.title_ar) {
+      handleInputChange('title_ar', case_.title_ar)
+    }
+    if (case_.description_en) {
+      handleInputChange('description_en', case_.description_en)
+    }
+    if (case_.description_ar) {
+      handleInputChange('description_ar', case_.description_ar)
+    }
+    if (case_.target_amount) {
+      handleInputChange('target_amount', case_.target_amount)
+    }
+    if (case_.duration) {
+      handleInputChange('duration', case_.duration)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [validationSettings])
 
   const fetchCase = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const { data, error } = await supabase
-        .from('cases')
-        .select(`
-          id,
-          title_en,
-          title_ar,
-          description_en,
-          description_ar,
-          target_amount,
-          current_amount,
-          status,
-          priority,
-          category_id,
-          location,
-          beneficiary_name,
-          beneficiary_contact,
-          created_at,
-          updated_at,
-          created_by,
-          supporting_documents,
-          case_categories(name, icon, color)
-        `)
-        .eq('id', caseId)
-        .single()
+      const response = await fetch(`/api/cases/${caseId}`)
+      const result = await response.json()
 
-      if (error) {
-        console.error('Error fetching case:', error)
-        setError('Failed to load case details')
+      if (!response.ok) {
+        setError(result.error || 'Failed to load case details')
         return
       }
+
+      const data = result.case
 
       if (!data) {
         setError('Case not found')
         return
       }
 
-      // Fetch creator information separately
+      // Fetch creator information separately (still using direct query for now as it's not critical)
       let creatorName: string | null = null
       let creatorEmail: string | null = null
       
@@ -258,9 +271,6 @@ export default function CaseEditPage() {
             const fullName = `${firstName} ${lastName}`.trim()
             creatorName = fullName || null
             creatorEmail = creatorData.email || null
-            
-            // Log for debugging
-            console.log('Creator data:', { creatorData, fullName, email: creatorEmail })
           } else if (creatorError) {
             console.error('Error fetching creator info:', creatorError)
           }
@@ -281,12 +291,17 @@ export default function CaseEditPage() {
         description: data.description_en || data.description_ar || '', // Fallback for compatibility
         goal_amount: data.target_amount,
         urgency_level: data.priority,
-        category: (categoryData as { name: string; icon: string | null; color: string | null } | null)?.name || null,
-        category_icon: (categoryData as { name: string; icon: string | null; color: string | null } | null)?.icon || null,
-        category_color: (categoryData as { name: string; icon: string | null; color: string | null } | null)?.color || null,
+        category: (() => {
+          const cat = categoryData as { name: string; name_en?: string; name_ar?: string; icon: string | null; color: string | null } | null
+          return cat?.name_en || cat?.name || null
+        })(),
+        category_icon: (categoryData as { name: string; name_en?: string; name_ar?: string; icon: string | null; color: string | null } | null)?.icon || null,
+        category_color: (categoryData as { name: string; name_en?: string; name_ar?: string; icon: string | null; color: string | null } | null)?.color || null,
         creator_name: creatorName,
         creator_email: creatorEmail,
-        beneficiary_contact: data.beneficiary_contact || null
+        beneficiary_contact: data.beneficiary_contact || null,
+        duration: data.duration || null,
+        type: data.type || 'one-time'
       }
       
       setCase(mappedCase)
@@ -391,85 +406,269 @@ export default function CaseEditPage() {
         ...updateObject
       }
     })
+
+    // Validation settings must be loaded before validation
+    if (!validationSettings) {
+      // Settings not loaded yet, skip validation for now
+      // It will be validated when settings load via the useEffect
+      return
+    }
+
+    const settings = validationSettings
+
+    // Real-time validation
+    const newErrors = { ...errors }
+    
+    // Clear existing error for this field
+    if (newErrors[field]) {
+      delete newErrors[field]
+    }
+
+    // Validate title fields
+    if (field === 'title_en' || field === 'title_ar') {
+      const titleEn = field === 'title_en' ? (value as string) : (case_?.title_en || '')
+      const titleAr = field === 'title_ar' ? (value as string) : (case_?.title_ar || '')
+      const finalTitle = titleEn || titleAr
+      
+      if (!finalTitle || !finalTitle.trim()) {
+        newErrors.title = t('validation.titleRequired') || 'At least one language (English or Arabic) is required'
+      } else if (finalTitle.trim().length < settings.caseTitleMinLength) {
+        newErrors.title = t('validation.titleTooShort', { min: settings.caseTitleMinLength }) || `Title must be at least ${settings.caseTitleMinLength} characters`
+      } else if (finalTitle.trim().length > settings.caseTitleMaxLength) {
+        newErrors.title = t('validation.titleTooLong', { max: settings.caseTitleMaxLength }) || `Title must not exceed ${settings.caseTitleMaxLength} characters`
+      }
+      
+      // Individual field errors
+      if (field === 'title_en' && titleEn && titleEn.trim().length > 0 && titleEn.trim().length < settings.caseTitleMinLength) {
+        newErrors.title_en = t('validation.titleTooShort', { min: settings.caseTitleMinLength }) || `Title must be at least ${settings.caseTitleMinLength} characters`
+      }
+      if (field === 'title_ar' && titleAr && titleAr.trim().length > 0 && titleAr.trim().length < settings.caseTitleMinLength) {
+        newErrors.title_ar = t('validation.titleTooShort', { min: settings.caseTitleMinLength }) || `Title must be at least ${settings.caseTitleMinLength} characters`
+      }
+    }
+
+    // Validate description fields
+    if (field === 'description_en' || field === 'description_ar') {
+      const descEn = field === 'description_en' ? (value as string) : (case_?.description_en || '')
+      const descAr = field === 'description_ar' ? (value as string) : (case_?.description_ar || '')
+      const finalDesc = descEn || descAr
+      
+      if (!finalDesc || !finalDesc.trim()) {
+        newErrors.description = t('validation.descriptionRequired') || 'At least one language (English or Arabic) is required'
+      } else if (finalDesc.trim().length < settings.caseDescriptionMinLength) {
+        newErrors.description = t('validation.descriptionTooShort', { min: settings.caseDescriptionMinLength }) || `Description must be at least ${settings.caseDescriptionMinLength} characters`
+      } else if (finalDesc.trim().length > settings.caseDescriptionMaxLength) {
+        newErrors.description = t('validation.descriptionTooLong', { max: settings.caseDescriptionMaxLength }) || `Description must not exceed ${settings.caseDescriptionMaxLength} characters`
+      }
+      
+      // Individual field errors
+      if (field === 'description_en' && descEn && descEn.trim().length > 0 && descEn.trim().length < settings.caseDescriptionMinLength) {
+        newErrors.description_en = t('validation.descriptionTooShort', { min: settings.caseDescriptionMinLength }) || `Description must be at least ${settings.caseDescriptionMinLength} characters`
+      }
+      if (field === 'description_ar' && descAr && descAr.trim().length > 0 && descAr.trim().length < settings.caseDescriptionMinLength) {
+        newErrors.description_ar = t('validation.descriptionTooShort', { min: settings.caseDescriptionMinLength }) || `Description must be at least ${settings.caseDescriptionMinLength} characters`
+      }
+    }
+
+    // Validate target amount
+    if (field === 'target_amount' || field === 'goal_amount') {
+      const amount = value as number
+      if (!amount || amount <= 0) {
+        newErrors.target_amount = t('validation.targetAmountInvalid') || 'Target amount must be greater than 0'
+      } else if (amount > settings.caseTargetAmountMax) {
+        newErrors.target_amount = t('validation.targetAmountTooHigh', { max: settings.caseTargetAmountMax.toLocaleString() }) || `Target amount must not exceed ${settings.caseTargetAmountMax.toLocaleString()} EGP`
+      }
+    }
+
+    // Validate duration
+    if (field === 'duration' && case_?.type === 'one-time') {
+      const duration = value as number
+      if (duration !== null && duration !== undefined) {
+        if (duration <= 0) {
+          newErrors.duration = t('validation.durationInvalid') || 'Duration must be greater than 0'
+        } else if (duration > settings.caseDurationMax) {
+          newErrors.duration = t('validation.durationTooLong', { max: settings.caseDurationMax }) || `Duration must not exceed ${settings.caseDurationMax} days`
+        }
+      }
+    }
+
+    setErrors(newErrors)
+  }
+
+  const validateForm = (): boolean => {
+    if (!case_) return false
+    
+    // Validation settings must be loaded before validation
+    if (!validationSettings) {
+      console.warn('Validation settings not loaded yet, cannot validate form')
+      toast.error('Error', { description: 'Validation settings are loading. Please wait a moment and try again.' })
+      return false
+    }
+
+    const settings = validationSettings
+    
+    const newErrors: Record<string, string> = {}
+
+    // Title validation - at least one language required
+    const finalTitle = case_.title_en || case_.title_ar
+    if (!finalTitle || !finalTitle.trim()) {
+      newErrors.title = t('validation.titleRequired') || 'At least one language (English or Arabic) is required'
+    } else if (finalTitle.trim().length < settings.caseTitleMinLength) {
+      newErrors.title = t('validation.titleTooShort', { min: settings.caseTitleMinLength }) || `Title must be at least ${settings.caseTitleMinLength} characters`
+    } else if (finalTitle.trim().length > settings.caseTitleMaxLength) {
+      newErrors.title = t('validation.titleTooLong', { max: settings.caseTitleMaxLength }) || `Title must not exceed ${settings.caseTitleMaxLength} characters`
+    }
+
+    // Individual title field validation
+    if (case_.title_en && case_.title_en.trim().length > 0 && case_.title_en.trim().length < settings.caseTitleMinLength) {
+      newErrors.title_en = t('validation.titleTooShort', { min: settings.caseTitleMinLength }) || `Title must be at least ${settings.caseTitleMinLength} characters`
+    }
+    if (case_.title_ar && case_.title_ar.trim().length > 0 && case_.title_ar.trim().length < settings.caseTitleMinLength) {
+      newErrors.title_ar = t('validation.titleTooShort', { min: settings.caseTitleMinLength }) || `Title must be at least ${settings.caseTitleMinLength} characters`
+    }
+
+    // Description validation - at least one language required
+    const finalDesc = case_.description_en || case_.description_ar
+    if (!finalDesc || !finalDesc.trim()) {
+      newErrors.description = t('validation.descriptionRequired') || 'At least one language (English or Arabic) is required'
+    } else if (finalDesc.trim().length < settings.caseDescriptionMinLength) {
+      newErrors.description = t('validation.descriptionTooShort', { min: settings.caseDescriptionMinLength }) || `Description must be at least ${settings.caseDescriptionMinLength} characters`
+    } else if (finalDesc.trim().length > settings.caseDescriptionMaxLength) {
+      newErrors.description = t('validation.descriptionTooLong', { max: settings.caseDescriptionMaxLength }) || `Description must not exceed ${settings.caseDescriptionMaxLength} characters`
+    }
+
+    // Individual description field validation
+    if (case_.description_en && case_.description_en.trim().length > 0 && case_.description_en.trim().length < settings.caseDescriptionMinLength) {
+      newErrors.description_en = t('validation.descriptionTooShort', { min: settings.caseDescriptionMinLength }) || `Description must be at least ${settings.caseDescriptionMinLength} characters`
+    }
+    if (case_.description_ar && case_.description_ar.trim().length > 0 && case_.description_ar.trim().length < settings.caseDescriptionMinLength) {
+      newErrors.description_ar = t('validation.descriptionTooShort', { min: settings.caseDescriptionMinLength }) || `Description must be at least ${settings.caseDescriptionMinLength} characters`
+    }
+
+    // Target amount validation
+    const targetAmount = case_.target_amount || case_.goal_amount
+    if (!targetAmount || targetAmount <= 0) {
+      newErrors.target_amount = t('validation.targetAmountRequired') || 'Target amount is required'
+    } else if (targetAmount > settings.caseTargetAmountMax) {
+      newErrors.target_amount = t('validation.targetAmountTooHigh', { max: settings.caseTargetAmountMax.toLocaleString() }) || `Target amount must not exceed ${settings.caseTargetAmountMax.toLocaleString()} EGP`
+    }
+
+    // Duration validation (for one-time cases)
+    if (case_.type === 'one-time' && case_.duration !== null && case_.duration !== undefined) {
+      if (case_.duration <= 0) {
+        newErrors.duration = t('validation.durationInvalid') || 'Duration must be greater than 0'
+      } else if (case_.duration > settings.caseDurationMax) {
+        newErrors.duration = t('validation.durationTooLong', { max: settings.caseDurationMax }) || `Duration must not exceed ${settings.caseDurationMax} days`
+      }
+    }
+
+    // Category validation - required
+    if (!case_.category || !case_.category.trim() || case_.category === '__none__') {
+      newErrors.category = t('validation.categoryRequired') || 'Category is required'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   const handleSave = async () => {
-    if (!case_) return
+    if (!case_) {
+      toast.error('Error', { description: 'Case data not loaded. Please refresh the page.' })
+      return
+    }
+
+    // Validate form
+    if (!validateForm()) {
+      const errorMsg = 'Please fix the validation errors before saving'
+      setError(errorMsg)
+      console.log('Showing validation error toast')
+      toast.error('Validation Failed', { description: errorMsg })
+      setSaving(false)
+      return
+    }
 
     try {
       setSaving(true)
       setError(null)
       setSuccess(false)
 
-      // Get category ID from category name if category is provided
+      // Get category ID - prefer category_id from state, otherwise look up by name
       let categoryId = case_.category_id
-      console.log('🔍 Category Debug:', {
-        currentCategory: case_.category,
-        currentCategoryId: case_.category_id,
-        willLookup: case_.category && !categoryId
-      })
       
+      // If we have a category name but no category_id, look it up
       if (case_.category && !categoryId) {
-        console.log('🔍 Looking up category ID for:', case_.category)
-        const { data: categoryData, error: categoryError } = await supabase
-          .from('case_categories')
-          .select('id')
-          .eq('name', case_.category)
-          .single()
-        
-        console.log('🔍 Category lookup result:', { categoryData, categoryError })
-        
-        if (categoryData) {
-          categoryId = categoryData.id
-          console.log('✅ Found category ID:', categoryId)
+        // Try to find category by name, name_en, or name_ar
+        const selectedCategory = categories.find(cat => 
+          cat.name === case_.category || 
+          cat.name_en === case_.category ||
+          cat.name_ar === case_.category
+        )
+        if (selectedCategory) {
+          categoryId = selectedCategory.id
         } else {
-          console.log('❌ No category found for name:', case_.category)
+          // Fallback: query database if not in local categories list
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('case_categories')
+            .select('id')
+            .or(`name.eq.${case_.category},name_en.eq.${case_.category},name_ar.eq.${case_.category}`)
+            .single()
+          
+          if (categoryData && !categoryError) {
+            categoryId = categoryData.id
+          }
         }
       }
 
-      const updateData: Record<string, string | number | null> = {
-        title_en: case_.title_en || '',
-        title_ar: case_.title_ar || '',
-        description_en: case_.description_en || '',
-        description_ar: case_.description_ar || '',
-        target_amount: case_.target_amount || case_.goal_amount || 0,
-        status: case_.status || 'draft',
-        priority: case_.priority || case_.urgency_level || 'medium',
-        location: case_.location || '',
-        beneficiary_name: selectedBeneficiary?.name || case_.beneficiary_name || '',
-        beneficiary_contact: selectedBeneficiary?.mobile_number || case_.beneficiary_contact || null,
-        supporting_documents: case_.supporting_documents || null,
-        updated_at: new Date().toISOString()
-      }
+      const response = await fetch(`/api/cases/${caseId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title_en: case_.title_en || '',
+          title_ar: case_.title_ar || '',
+          description_en: case_.description_en || '',
+          description_ar: case_.description_ar || '',
+          targetAmount: case_.target_amount || case_.goal_amount || 0,
+          status: case_.status || 'draft',
+          priority: case_.priority || case_.urgency_level || 'medium',
+          location: case_.location || '',
+          beneficiaryName: selectedBeneficiary?.name || case_.beneficiary_name || '',
+          beneficiaryContact: selectedBeneficiary?.mobile_number || case_.beneficiary_contact || null,
+          category_id: categoryId || null,
+          duration: case_.duration || null,
+        }),
+      })
 
-      // Add category_id if we have one
-      if (categoryId) {
-        updateData.category_id = categoryId
-        console.log('✅ Adding category_id to update:', categoryId)
-      } else {
-        console.log('❌ No category_id to add to update')
-      }
+      const result = await response.json()
 
-      console.log('📝 Updating case with data:', updateData)
-
-      const { error } = await supabase
-        .from('cases')
-        .update(updateData)
-        .eq('id', caseId)
-
-      if (error) {
-        console.error('Error updating case:', error)
-        console.error('Error details:', JSON.stringify(error, null, 2))
-        setError(`Failed to update case: ${error.message || 'Unknown error'}`)
+      if (!response.ok) {
+        const errorMsg = result.error || 'Failed to update case'
+        toast.error('Update Failed', { description: errorMsg })
+        setError(errorMsg)
+        setSaving(false)
         return
       }
 
+      // Show success toast
+      const caseTitle = case_.title_en || case_.title_ar || case_.title || 'Untitled'
+      console.log('Showing success toast for case update')
+      toast.success('Case Updated Successfully', {
+        description: `Case "${caseTitle}" has been successfully updated.`
+      })
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
+      
+      // Ensure toast is visible by using a small delay
+      await new Promise(resolve => setTimeout(resolve, 100))
     } catch (error) {
       console.error('Error updating case:', error)
       console.error('Catch block error details:', JSON.stringify(error, null, 2))
-      setError(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error('Update Failed', {
+        description: `An unexpected error occurred: ${errorMessage}`
+      })
+      setError(`An unexpected error occurred: ${errorMessage}`)
     } finally {
       setSaving(false)
     }
@@ -494,10 +693,9 @@ export default function CaseEditPage() {
     } else {
       // Check if user typed exactly "DELETE"
       if (deleteConfirmationText !== 'DELETE') {
-        toast.error(
-          "Invalid Confirmation",
-          "You must type exactly 'DELETE' to confirm deletion."
-        )
+        toast.error("Invalid Confirmation", {
+          description: "You must type exactly 'DELETE' to confirm deletion."
+        })
         return
       }
       performDelete()
@@ -520,10 +718,9 @@ export default function CaseEditPage() {
       // Check if deletion was blocked by business logic (contribution protection)
       if (result.success === false && result.blocked === true && result.reason === 'contribution_protection') {
         // This is expected business logic, not an error
-        toast.error(
-          "Cannot Delete Case with Contributions",
-          result.message || "This case has received contributions and cannot be deleted for data integrity. Please contact an administrator if you need to remove this case."
-        )
+        toast.error("Cannot Delete Case with Contributions", {
+          description: result.message || "This case has received contributions and cannot be deleted for data integrity. Please contact an administrator if you need to remove this case."
+        })
         
         // Close dialog without treating as error
         setDeleteDialog({
@@ -544,11 +741,10 @@ export default function CaseEditPage() {
         step: 'confirm'
       })
 
-      // Show success message
-      toast.success(
-        "Case Deleted Successfully",
-        `Case "${case_?.title_en || case_?.title_ar || case_?.title || 'Untitled'}" and all related data have been permanently deleted.`
-      )
+      // Show destructive action confirmation (different from regular success)
+      toast.error("Case Deleted", {
+        description: `Case "${case_?.title_en || case_?.title_ar || case_?.title || 'Untitled'}" and all related data have been permanently deleted.`
+      })
 
       // Redirect to cases list after successful deletion
       setTimeout(() => {
@@ -562,10 +758,9 @@ export default function CaseEditPage() {
       // Show error message for unexpected errors only
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete case'
       
-      toast.error(
-        "Delete Failed",
-        errorMessage
-      )
+      toast.error("Delete Failed", {
+        description: errorMessage
+      })
     } finally {
       setDeleting(false)
     }
@@ -584,13 +779,12 @@ export default function CaseEditPage() {
     
     // Use color from database if available
     if (categoryColor) {
-      // Parse color - could be a CSS class name or hex color
-      // If it's a CSS class, use it directly
+      // If it's already a Tailwind class (starts with 'bg-'), use it directly
       if (categoryColor.startsWith('bg-')) {
         return categoryColor
       }
-      // If it's a hex color or color name, convert to Tailwind classes
-      // For now, we'll use a mapping approach
+      
+      // Map color names to Tailwind classes
       const colorMap: Record<string, string> = {
         'purple': 'bg-purple-100 text-purple-700 border-purple-300',
         'blue': 'bg-blue-100 text-blue-700 border-blue-300',
@@ -600,66 +794,34 @@ export default function CaseEditPage() {
         'yellow': 'bg-yellow-100 text-yellow-700 border-yellow-300',
         'pink': 'bg-pink-100 text-pink-700 border-pink-300',
         'indigo': 'bg-indigo-100 text-indigo-700 border-indigo-300',
+        'teal': 'bg-teal-100 text-teal-700 border-teal-300',
+        'cyan': 'bg-cyan-100 text-cyan-700 border-cyan-300',
+        'amber': 'bg-amber-100 text-amber-700 border-amber-300',
+        'violet': 'bg-violet-100 text-violet-700 border-violet-300',
+        'fuchsia': 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300',
+        'rose': 'bg-rose-100 text-rose-700 border-rose-300',
+        'slate': 'bg-slate-100 text-slate-700 border-slate-300',
+        'gray': 'bg-gray-100 text-gray-700 border-gray-300',
+        'zinc': 'bg-zinc-100 text-zinc-700 border-zinc-300',
+        'neutral': 'bg-neutral-100 text-neutral-700 border-neutral-300',
+        'stone': 'bg-stone-100 text-stone-700 border-stone-300',
       }
       
-      const lowerColor = categoryColor.toLowerCase()
+      const lowerColor = categoryColor.toLowerCase().trim()
       if (colorMap[lowerColor]) {
         return colorMap[lowerColor]
+      }
+      
+      // If it's a hex color, we could convert it, but for now use default
+      // In the future, we could add hex color to Tailwind class conversion
+      if (categoryColor.startsWith('#')) {
+        // For hex colors, default to purple theme
+        return 'bg-purple-100 text-purple-700 border-purple-300'
       }
     }
     
     // Default purple theme if no color specified
     return 'bg-purple-100 text-purple-700 border-purple-300'
-  }
-
-  const getCategoryIcon = (iconName: string | null | undefined): LucideIcon | null => {
-    if (!iconName) return Tag
-    
-    // Check if it's an emoji
-    const emojiRegex = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/u
-    if (emojiRegex.test(iconName) || iconName.length <= 2) {
-      return null // Return null for emojis, we'll render them directly
-    }
-    
-    const iconMap: Record<string, LucideIcon> = {
-      'Tag': Tag,
-      'Heart': Heart,
-      'GraduationCap': GraduationCap,
-      'Home': Home,
-      'Briefcase': Briefcase,
-      'ShoppingBag': ShoppingBag,
-      'Users': Users,
-      'Stethoscope': Stethoscope,
-      'HandHeart': HandHeart,
-      'Wrench': Wrench,
-      'BookOpen': BookOpen,
-      'Shield': Shield,
-      'Zap': Zap,
-      'Gift': Gift,
-      'Building2': Building2,
-      'FileText': FileText,
-      'Info': Info,
-      // Handle lowercase variations
-      'tag': Tag,
-      'heart': Heart,
-      'graduationcap': GraduationCap,
-      'home': Home,
-      'briefcase': Briefcase,
-      'shoppingbag': ShoppingBag,
-      'users': Users,
-      'stethoscope': Stethoscope,
-      'handheart': HandHeart,
-      'wrench': Wrench,
-      'bookopen': BookOpen,
-      'shield': Shield,
-      'zap': Zap,
-      'gift': Gift,
-      'building2': Building2,
-      'filetext': FileText,
-      'info': Info,
-    }
-    
-    return iconMap[iconName] || Tag
   }
 
   const getPriorityBadgeClass = (priority: string | null) => {
@@ -680,7 +842,7 @@ export default function CaseEditPage() {
         setCopiedId(true)
         toast.success(
           'Copied!',
-          'Case ID copied to clipboard'
+          { description: 'Case ID copied to clipboard' }
         )
         setTimeout(() => setCopiedId(false), 2000)
       } else {
@@ -699,14 +861,14 @@ export default function CaseEditPage() {
           setCopiedId(true)
           toast.success(
             'Copied!',
-            'Case ID copied to clipboard'
+            { description: 'Case ID copied to clipboard' }
           )
           setTimeout(() => setCopiedId(false), 2000)
         } catch (fallbackError) {
           console.error('Fallback copy failed:', fallbackError)
           toast.error(
             'Copy Failed',
-            'Unable to copy to clipboard. Please copy manually.'
+            { description: 'Unable to copy to clipboard. Please copy manually.' }
           )
         } finally {
           document.body.removeChild(textArea)
@@ -716,7 +878,7 @@ export default function CaseEditPage() {
       console.error('Failed to copy:', error)
       toast.error(
         'Copy Failed',
-        'Unable to copy to clipboard. Please copy manually.'
+        { description: 'Unable to copy to clipboard. Please copy manually.' }
       )
     }
   }
@@ -783,53 +945,30 @@ export default function CaseEditPage() {
       </div>
     }>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
-        <div className="max-w-5xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
           {/* Header */}
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex-1">
-                <Button onClick={handleBack} variant="ghost" className="mb-3 -ml-2">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  {t('backToCase')}
-                </Button>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FileEdit className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900">{t('editCase')}</h1>
-                    <p className="text-gray-600 mt-1 text-sm">{t('updateCaseInformation')}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {success && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-green-700">
-                    <CheckCircle className="h-4 w-4" />
-                    <span className="text-sm font-medium">{t('savedSuccessfully')}</span>
-                  </div>
-                )}
-                <Button 
-                  onClick={handleDeleteClick}
-                  variant="outline"
-                  size="sm"
-                  className="border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-                <Button 
-                  onClick={handleSave} 
-                  disabled={saving} 
-                  className="bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-shadow"
-                  size="sm"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? t('saving') : tProfile('saveChanges')}
-                </Button>
-              </div>
-            </div>
-          </div>
+          <EditPageHeader
+            backUrl={`/${locale}/cases/${caseId}`}
+            icon={FileEdit}
+            title={t('editCase') || 'Edit Case'}
+            description={t('updateCaseInformation') || 'Update case information and details'}
+            itemName={
+              (case_?.title_en?.trim() || case_?.title_ar?.trim() || case_?.title?.trim()) || undefined
+            }
+            backLabel={t('backToCase') || 'Back to Case'}
+            badge={success ? {
+              label: t('savedSuccessfully') || 'Saved successfully',
+              variant: 'default',
+            } : undefined}
+            menuActions={[
+              {
+                label: t('delete') || 'Delete',
+                icon: Trash2,
+                onClick: handleDeleteClick,
+                variant: 'destructive',
+              },
+            ]}
+          />
 
           {/* Error Message */}
           {error && (
@@ -844,7 +983,7 @@ export default function CaseEditPage() {
           )}
 
           {/* Progress Card - Quick Overview */}
-          {case_.target_amount && case_.target_amount > 0 && (
+          {(case_.target_amount && case_.target_amount > 0) ? (
             <Card className="mb-6 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -868,32 +1007,28 @@ export default function CaseEditPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
           {/* Edit Form with Tabs */}
           <Card className="shadow-lg">
-            <CardHeader className="border-b bg-gradient-to-r from-white to-gray-50">
-              <CardTitle className="flex items-center gap-2">
-                <FileEdit className="h-5 w-5 text-blue-600" />
-                {t('editCase')}
-              </CardTitle>
-              <CardDescription className="mt-1">
-                {t('updateCaseInformation')}
-              </CardDescription>
-            </CardHeader>
             <CardContent className="p-6">
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'details' | 'files')}>
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="details" className="flex items-center gap-2">
-                    <FileEdit className="h-4 w-4" />
-                    {t('caseDetails')}
-                  </TabsTrigger>
-                  <TabsTrigger value="files" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    {t('files.files')} ({caseFiles.length})
-                  </TabsTrigger>
-                </TabsList>
-
+              <BrandedTabs
+                value={activeTab}
+                onValueChange={(value) => setActiveTab(value as 'details' | 'files')}
+                items={[
+                  {
+                    value: 'details',
+                    label: t('caseDetails'),
+                    icon: FileEdit,
+                  },
+                  {
+                    value: 'files',
+                    label: t('files.files'),
+                    icon: FileText,
+                    badge: caseFiles.length > 0 ? caseFiles.length : undefined,
+                  },
+                ]}
+              >
                 <TabsContent value="details" className="mt-0">
                   <div className="space-y-6">
             {/* Basic Information */}
@@ -910,40 +1045,71 @@ export default function CaseEditPage() {
                   <div className="space-y-2">
                     <Label htmlFor="title_en" className="flex items-center gap-2 text-sm font-semibold">
                       <Globe className="h-4 w-4 text-gray-500" />
-                      {t('caseTitle')} (English)
+                      {t('caseTitle')} (English) <span className="text-red-500">*</span>
                     </Label>
+                    <div className="relative">
                     <Input
                       id="title_en"
                       value={case_.title_en || ''}
                       onChange={(e) => handleInputChange('title_en', e.target.value)}
                       placeholder="Enter case title in English"
                       dir="ltr"
-                      className="h-11"
-                    />
+                        className={`h-11 ${errors.title_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        maxLength={validationSettings?.caseTitleMaxLength || 100}
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                        {(case_.title_en || '').length}/{validationSettings?.caseTitleMaxLength || 100}
+                      </div>
+                    </div>
+                    {errors.title_en && (
+                      <p className="text-red-500 text-xs flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.title_en}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="title_ar" className="flex items-center gap-2 text-sm font-semibold">
                       <Globe className="h-4 w-4 text-gray-500" />
-                      {t('caseTitle')} (Arabic)
+                      {t('caseTitle')} (Arabic) <span className="text-red-500">*</span>
                     </Label>
+                    <div className="relative">
                     <Input
                       id="title_ar"
                       value={case_.title_ar || ''}
                       onChange={(e) => handleInputChange('title_ar', e.target.value)}
                       placeholder="أدخل عنوان الحالة بالعربية"
                       dir="rtl"
-                      className="h-11"
+                        className={`h-11 ${errors.title_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        maxLength={validationSettings?.caseTitleMaxLength || 100}
                     />
+                      <div className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                        {(case_.title_ar || '').length}/{validationSettings?.caseTitleMaxLength || 100}
                   </div>
                 </div>
+                    {errors.title_ar && (
+                      <p className="text-red-500 text-xs flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.title_ar}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {errors.title && (
+                  <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-blue-700 text-sm">{errors.title}</p>
+                  </div>
+                )}
 
                 {/* Bilingual Description Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <Label htmlFor="description_en" className="flex items-center gap-2 text-sm font-semibold">
                       <FileText className="h-4 w-4 text-gray-500" />
-                      {t('description')} (English)
+                      {t('description')} (English) <span className="text-red-500">*</span>
                     </Label>
+                    <div className="relative">
                     <Textarea
                       id="description_en"
                       value={case_.description_en || ''}
@@ -951,14 +1117,26 @@ export default function CaseEditPage() {
                       placeholder="Enter case description in English"
                       rows={5}
                       dir="ltr"
-                      className="resize-none"
-                    />
+                        className={`resize-none ${errors.description_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        maxLength={validationSettings?.caseDescriptionMaxLength || 2000}
+                      />
+                      <div className="absolute bottom-2 right-2 text-xs text-gray-400 bg-white px-1 rounded">
+                        {(case_.description_en || '').length}/{validationSettings?.caseDescriptionMaxLength || 2000}
+                      </div>
+                    </div>
+                    {errors.description_en && (
+                      <p className="text-red-500 text-xs flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.description_en}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="description_ar" className="flex items-center gap-2 text-sm font-semibold">
                       <FileText className="h-4 w-4 text-gray-500" />
-                      {t('description')} (Arabic)
+                      {t('description')} (Arabic) <span className="text-red-500">*</span>
                     </Label>
+                    <div className="relative">
                     <Textarea
                       id="description_ar"
                       value={case_.description_ar || ''}
@@ -966,16 +1144,33 @@ export default function CaseEditPage() {
                       placeholder="أدخل وصف الحالة بالعربية"
                       rows={5}
                       dir="rtl"
-                      className="resize-none"
+                        className={`resize-none ${errors.description_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        maxLength={validationSettings?.caseDescriptionMaxLength || 2000}
                     />
+                      <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white px-1 rounded">
+                        {(case_.description_ar || '').length}/{validationSettings?.caseDescriptionMaxLength || 2000}
                   </div>
                 </div>
+                    {errors.description_ar && (
+                      <p className="text-red-500 text-xs flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.description_ar}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {errors.description && (
+                  <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-blue-700 text-sm">{errors.description}</p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <Label htmlFor="goal_amount" className="flex items-center gap-2 text-sm font-semibold">
                       <Target className="h-4 w-4 text-gray-500" />
-                      {t('goalAmountEGP')}
+                      {t('goalAmountEGP')} <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -985,9 +1180,17 @@ export default function CaseEditPage() {
                         value={case_.goal_amount ? case_.goal_amount.toString() : ''}
                         onChange={(e) => handleInputChange('goal_amount', parseFloat(e.target.value) || 0)}
                         placeholder={t('goalAmountPlaceholder')}
-                        className="h-11 pl-10"
+                        className={`h-11 pl-10 ${errors.target_amount ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        min="1"
+                        max={validationSettings?.caseTargetAmountMax || 1000000}
                       />
                     </div>
+                    {errors.target_amount && (
+                      <p className="text-red-500 text-xs flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.target_amount}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -1020,302 +1223,398 @@ export default function CaseEditPage() {
               </CardContent>
             </Card>
 
-            {/* Case Details */}
-            <Card className="shadow-md border-0">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-gray-200">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Tag className="h-5 w-5 text-purple-600" />
-                  {t('caseDetails')}
-                </CardTitle>
-                <CardDescription className="text-gray-600 mt-1">
-                  Specify the financial and categorical information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <Label htmlFor="status" className="flex items-center gap-2 mb-2">
-                      <Info className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">{t('status')}</span>
-                      {case_.status && (
-                        <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
-                      )}
-                    </Label>
-                    <Select
-                      value={case_.status || 'draft'}
-                      onValueChange={(value) => handleInputChange('status', value)}
-                    >
-                      <SelectTrigger id="status">
-                        <SelectValue>
-                          {case_.status && (
-                            <Badge 
-                              variant="outline" 
-                              className={
-                                case_.status === 'published' ? 'bg-green-100 text-green-700 border-green-300' :
-                                case_.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                                case_.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                                case_.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300' :
-                                'bg-gray-100 text-gray-700 border-gray-300'
-                              }
-                            >
-                              {case_.status.charAt(0).toUpperCase() + case_.status.slice(1)}
-                            </Badge>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="draft">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                            Draft
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="published">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            Published
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="active">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                            Active
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="completed">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                            Completed
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="cancelled">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                            Cancelled
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {case_.status && (
-                      <div className="mt-1.5">
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            case_.status === 'published' ? 'bg-green-100 text-green-700 border-green-300' :
-                            case_.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                            case_.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                            case_.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300' :
-                            'bg-gray-100 text-gray-700 border-gray-300'
-                          }
-                        >
-                          {case_.status.charAt(0).toUpperCase() + case_.status.slice(1)}
-                        </Badge>
-                      </div>
-                    )}
+            {/* Case Details and Beneficiary Information - Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Case Details */}
+              <Card className="shadow-lg border border-purple-100 hover:shadow-xl transition-shadow duration-200">
+                <CardHeader className="bg-gradient-to-r from-purple-50 via-purple-50/80 to-pink-50 border-b border-purple-200/50 pb-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="flex items-center gap-2.5 text-xl font-semibold text-gray-900 mb-1.5">
+                        <div className="p-1.5 rounded-lg bg-purple-100">
+                          <Tag className="h-5 w-5 text-purple-600" />
+                        </div>
+                        {t('caseDetails')}
+                      </CardTitle>
+                      <CardDescription className="text-gray-600 text-sm ml-9">
+                        Specify the financial and categorical information
+                      </CardDescription>
+                    </div>
                   </div>
+                </CardHeader>
+                <CardContent className="pt-6 pb-6">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="status" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                          <div className="p-1 rounded bg-blue-50">
+                            <Info className="h-3.5 w-3.5 text-blue-600" />
+                          </div>
+                          {t('status')}
+                          {case_.status && (
+                            <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                          )}
+                        </Label>
+                        <Select
+                          value={case_.status || 'draft'}
+                          onValueChange={(value) => handleInputChange('status', value)}
+                        >
+                          <SelectTrigger id="status" className="h-10 bg-white hover:bg-gray-50 transition-colors">
+                            <SelectValue>
+                              {case_.status && (
+                                <Badge 
+                                  variant="outline" 
+                                  className={
+                                    case_.status === 'published' ? 'bg-green-100 text-green-700 border-green-300' :
+                                    case_.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                    case_.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                    case_.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300' :
+                                    'bg-gray-100 text-gray-700 border-gray-300'
+                                  }
+                                >
+                                  {case_.status.charAt(0).toUpperCase() + case_.status.slice(1)}
+                                </Badge>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="draft">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                              Draft
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="published">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                              Published
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="active">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                              Active
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="completed">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                              Completed
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="cancelled">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                              Cancelled
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                        </Select>
+                      </div>
 
-                  <div>
-                    <Label htmlFor="category" className="flex items-center gap-2 mb-2">
-                      <Tag className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">{t('category')}</span>
-                      {case_.category && (
-                        <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
-                      )}
-                    </Label>
-                    <Select
-                      value={case_.category || '__none__'}
-                      onValueChange={(value) => {
-                        if (value === '__none__') {
-                          handleInputChange('category', '')
-                          handleInputChange('category_icon', null)
-                          handleInputChange('category_color', null)
-                        } else {
-                          const selectedCategory = categories.find(cat => cat.name === value)
-                          handleInputChange('category', value)
-                          handleInputChange('category_icon', selectedCategory?.icon || null)
-                          handleInputChange('category_color', selectedCategory?.color || null)
-                        }
-                      }}
-                    >
-                      <SelectTrigger id="category">
-                        <SelectValue placeholder={t('notSpecified')}>
-                          {case_.category ? (() => {
-                            const selectedCategory = categories.find(cat => cat.name === case_.category)
-                            const iconValue = case_.category_icon || selectedCategory?.icon || null
-                            const IconComponent = getCategoryIcon(iconValue)
+                      <div className="space-y-2">
+                        <Label htmlFor="category" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                          <div className="p-1 rounded bg-purple-50">
+                            <Tag className="h-3.5 w-3.5 text-purple-600" />
+                          </div>
+                          {t('category')}
+                          <span className="text-red-500">*</span>
+                          {case_.category && case_.category !== '__none__' && (
+                            <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                          )}
+                        </Label>
+                        <Select
+                        value={case_.category || '__none__'}
+                        onValueChange={(value) => {
+                          if (value === '__none__') {
+                            handleInputChange('category', '')
+                            handleInputChange('category_id', null)
+                            handleInputChange('category_icon', null)
+                            handleInputChange('category_color', null)
+                            // Clear category error when user interacts
+                            if (errors.category) {
+                              const newErrors = { ...errors }
+                              delete newErrors.category
+                              setErrors(newErrors)
+                            }
+                          } else {
+                            // Find category by name, name_en, or name_ar
+                            const selectedCategory = categories.find(cat => 
+                              cat.name === value || 
+                              (cat as any).name_en === value ||
+                              (cat as any).name_ar === value
+                            )
+                            // Use name_en if available, otherwise use name
+                            const categoryName = selectedCategory ? ((selectedCategory as any).name_en || selectedCategory.name) : value
+                            handleInputChange('category', categoryName)
+                            handleInputChange('category_id', selectedCategory?.id || null)
+                            handleInputChange('category_icon', selectedCategory?.icon || null)
+                            handleInputChange('category_color', selectedCategory?.color || null)
+                            // Clear category error when user selects a category
+                            if (errors.category) {
+                              const newErrors = { ...errors }
+                              delete newErrors.category
+                              setErrors(newErrors)
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="category" className="h-10 bg-white hover:bg-gray-50 transition-colors">
+                          <SelectValue placeholder={t('notSpecified')}>
+                            {case_.category ? (() => {
+                              // Try to find category by name, name_en, or name_ar
+                              const selectedCategory = categories.find(cat => 
+                                cat.name === case_.category || 
+                                (cat as any).name_en === case_.category ||
+                                (cat as any).name_ar === case_.category
+                              )
+                              // Always prefer the matched category's icon and color from the API
+                              const iconValue = selectedCategory?.icon || case_.category_icon || null
+                              const categoryColor = selectedCategory?.color || case_.category_color || null
+                              return (
+                                <Badge variant="outline" className={getCategoryBadgeClass(case_.category, categoryColor)}>
+                                  <div className="flex items-center gap-1.5">
+                                    {iconValue ? (
+                                      <DynamicIcon name={iconValue} className="h-3 w-3" fallback="tag" />
+                                    ) : (
+                                      <Tag className="h-3 w-3" />
+                                    )}
+                                    {case_.category}
+                                  </div>
+                                </Badge>
+                              )
+                            })() : (
+                              <span className="text-gray-500">{t('notSpecified')}</span>
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-gray-500">{t('notSpecified')}</span>
+                          </SelectItem>
+                          {categories.map((category) => {
+                            const iconValue = category.icon
+                            // Use name_en if available, otherwise use name
+                            const displayName = (category as any).name_en || category.name
+                            const categoryValue = (category as any).name_en || category.name
                             return (
-                              <Badge variant="outline" className={getCategoryBadgeClass(case_.category, case_.category_color || selectedCategory?.color || null)}>
+                              <SelectItem key={category.id} value={categoryValue}>
+                                <div className="flex items-center gap-2">
+                                  {iconValue ? (
+                                    <DynamicIcon name={iconValue} className="h-4 w-4" />
+                                  ) : null}
+                                  <span>{displayName}</span>
+                                </div>
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                        </Select>
+                        {errors.category && (
+                          <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                            <AlertCircle className="h-3 w-3" />
+                            {errors.category}
+                          </p>
+                        )}
+                        {case_.category && case_.category !== '__none__' && (() => {
+                          // Try to find category by name, name_en, or name_ar
+                          const selectedCategory = categories.find(cat => 
+                            cat.name === case_.category || 
+                            (cat as any).name_en === case_.category ||
+                            (cat as any).name_ar === case_.category
+                          )
+                          // Always prefer the matched category's icon and color from the API
+                          const iconValue = selectedCategory?.icon || case_.category_icon || null
+                          const categoryColor = selectedCategory?.color || case_.category_color || null
+                          return (
+                            <div className="mt-2">
+                              <Badge variant="outline" className={getCategoryBadgeClass(case_.category, categoryColor)}>
                                 <div className="flex items-center gap-1.5">
-                                  {IconComponent ? (
-                                    <IconComponent className="h-3 w-3" />
-                                  ) : iconValue ? (
-                                    <span className="text-base">{iconValue}</span>
+                                  {iconValue ? (
+                                    <DynamicIcon name={iconValue} className="h-3 w-3" fallback="tag" />
                                   ) : (
                                     <Tag className="h-3 w-3" />
                                   )}
                                   {case_.category}
                                 </div>
                               </Badge>
-                            )
-                          })() : (
-                            <span className="text-gray-500">{t('notSpecified')}</span>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">
-                          <span className="text-gray-500">{t('notSpecified')}</span>
-                        </SelectItem>
-                        {categories.map((category) => {
-                          const iconValue = category.icon
-                          const IconComponent = getCategoryIcon(iconValue)
-                          return (
-                            <SelectItem key={category.id} value={category.name}>
-                              <div className="flex items-center gap-2">
-                                {IconComponent ? (
-                                  <IconComponent className="h-4 w-4" />
-                                ) : iconValue ? (
-                                  <span className="text-base">{iconValue}</span>
-                                ) : null}
-                                <span>{category.name}</span>
-                              </div>
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
-                    {case_.category && (() => {
-                      const selectedCategory = categories.find(cat => cat.name === case_.category)
-                      const iconValue = case_.category_icon || selectedCategory?.icon || null
-                      const IconComponent = getCategoryIcon(iconValue)
-                      return (
-                        <div className="mt-1.5">
-                          <Badge variant="outline" className={getCategoryBadgeClass(case_.category, case_.category_color || selectedCategory?.color || null)}>
-                            <div className="flex items-center gap-1.5">
-                              {IconComponent ? (
-                                <IconComponent className="h-3 w-3" />
-                              ) : iconValue ? (
-                                <span className="text-base">{iconValue}</span>
-                              ) : (
-                                <Tag className="h-3 w-3" />
-                              )}
-                              {case_.category}
                             </div>
+                          )
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="priority" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <div className="p-1 rounded bg-orange-50">
+                          <Flag className="h-3.5 w-3.5 text-orange-600" />
+                        </div>
+                        {t('priorityLevel')}
+                        {case_.priority && (
+                          <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                        )}
+                      </Label>
+                      <Select
+                        value={case_.priority || 'medium'}
+                        onValueChange={(value) => handleInputChange('priority', value)}
+                      >
+                        <SelectTrigger id="priority" className="h-10 bg-white hover:bg-gray-50 transition-colors">
+                          <SelectValue>
+                            {case_.priority && (
+                              <Badge variant="outline" className={getPriorityBadgeClass(case_.priority)}>
+                                {case_.priority.charAt(0).toUpperCase() + case_.priority.slice(1)}
+                              </Badge>
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                              Low
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="medium">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                              Medium
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="high">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                              High
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="critical">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                              Critical
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {case_.priority && (
+                        <div className="mt-2">
+                          <Badge 
+                            variant="outline" 
+                            className={getPriorityBadgeClass(case_.priority)}
+                          >
+                            {case_.priority.charAt(0).toUpperCase() + case_.priority.slice(1)}
                           </Badge>
                         </div>
-                      )
-                    })()}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="priority" className="flex items-center gap-2 mb-2">
-                      <Flag className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">{t('priorityLevel')}</span>
-                      {case_.priority && (
-                        <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
                       )}
-                    </Label>
-                    <Select
-                      value={case_.priority || 'medium'}
-                      onValueChange={(value) => handleInputChange('priority', value)}
-                    >
-                      <SelectTrigger id="priority">
-                        <SelectValue>
-                          {case_.priority && (
-                            <Badge variant="outline" className={getPriorityBadgeClass(case_.priority)}>
-                              {case_.priority.charAt(0).toUpperCase() + case_.priority.slice(1)}
-                            </Badge>
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-100">
+                      <div className="space-y-2">
+                        <Label htmlFor="location" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                          <div className="p-1 rounded bg-indigo-50">
+                            <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+                          </div>
+                          {t('location')}
+                          <span className="text-xs font-normal text-gray-400 ml-1">(Optional)</span>
+                          {case_.location && (
+                            <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
                           )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            Low
+                        </Label>
+                        <Input
+                          id="location"
+                          value={case_.location || ''}
+                          onChange={(e) => handleInputChange('location', e.target.value)}
+                          placeholder={t('locationPlaceholder') || 'Enter location'}
+                          className="h-10 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Duration field for one-time cases */}
+                    {case_.type === 'one-time' && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <div className="space-y-2">
+                          <Label htmlFor="duration" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <div className="p-1 rounded bg-cyan-50">
+                              <Clock className="h-3.5 w-3.5 text-cyan-600" />
+                            </div>
+                            {t('duration')}
+                            <span className="text-xs font-normal text-gray-400 ml-1">(Optional)</span>
+                            {case_.duration && !errors.duration && (
+                              <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                            )}
+                          </Label>
+                          <div className="relative max-w-md">
+                            <Input
+                              id="duration"
+                              type="number"
+                              value={case_.duration || ''}
+                              onChange={(e) => handleInputChange('duration', e.target.value ? parseInt(e.target.value) : null)}
+                              placeholder={t('durationPlaceholder') || 'Enter duration in days'}
+                              min="1"
+                              max={validationSettings?.caseDurationMax || 365}
+                              className={`h-10 pr-16 bg-white ${errors.duration ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">
+                              days
+                            </span>
                           </div>
-                        </SelectItem>
-                        <SelectItem value="medium">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                            Medium
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="high">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                            High
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="critical">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                            Critical
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {case_.priority && (
-                      <div className="mt-1.5">
-                        <Badge 
-                          variant="outline" 
-                          className={getPriorityBadgeClass(case_.priority)}
-                        >
-                          {case_.priority.charAt(0).toUpperCase() + case_.priority.slice(1)}
-                        </Badge>
+                          {errors.duration && (
+                            <p className="text-red-500 text-xs flex items-center gap-1 mt-1">
+                              <AlertCircle className="h-3 w-3" />
+                              {errors.duration}
+                            </p>
+                          )}
+                          {!errors.duration && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Maximum: {validationSettings?.caseDurationMax || 365} days
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="mt-6">
-                  <Label htmlFor="location" className="flex items-center gap-2 mb-2">
-                    <MapPin className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">{t('location')}</span>
-                    <span className="text-xs text-gray-400">(Optional)</span>
-                    {case_.location && (
-                      <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
-                    )}
-                  </Label>
-                  <Input
-                    id="location"
-                    value={case_.location || ''}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    placeholder={t('locationPlaceholder') || 'Enter location'}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Beneficiary Information */}
-            <Card className="shadow-md border-0">
-              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <User className="h-5 w-5 text-green-600" />
-                  {t('beneficiaryInformation')}
-                </CardTitle>
-                <CardDescription className="text-gray-600 mt-1">
-                  Select or create the beneficiary for this case
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div>
-                  <Label className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-medium text-gray-700">{t('beneficiary')}</span>
-                    {selectedBeneficiary && (
-                      <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
-                    )}
-                  </Label>
-                  <BeneficiarySelector
-                    selectedBeneficiary={selectedBeneficiary}
-                    onSelect={setSelectedBeneficiary}
-                    showOpenButton={true}
-                    defaultName={case_.beneficiary_name || undefined}
-                    defaultMobileNumber={case_.beneficiary_contact || undefined}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+              {/* Beneficiary Information */}
+              <Card className="shadow-lg border border-green-100 hover:shadow-xl transition-shadow duration-200">
+                <CardHeader className="bg-gradient-to-r from-green-50 via-emerald-50/80 to-green-50 border-b border-green-200/50 pb-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="flex items-center gap-2.5 text-xl font-semibold text-gray-900 mb-1.5">
+                        <div className="p-1.5 rounded-lg bg-green-100">
+                          <User className="h-5 w-5 text-green-600" />
+                        </div>
+                        {t('beneficiaryInformation')}
+                      </CardTitle>
+                      <CardDescription className="text-gray-600 text-sm ml-9">
+                        Select or create the beneficiary for this case
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6 pb-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <span>{t('beneficiary')}</span>
+                        {selectedBeneficiary && (
+                          <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                        )}
+                      </Label>
+                      <div className="bg-gray-50 rounded-lg p-1 border border-gray-200">
+                        <BeneficiarySelector
+                          selectedBeneficiary={selectedBeneficiary}
+                          onSelect={setSelectedBeneficiary}
+                          showOpenButton={true}
+                          defaultName={case_.beneficiary_name || undefined}
+                          defaultMobileNumber={case_.beneficiary_contact || undefined}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Case Metadata */}
             <Card className="border-2 border-yellow-200 shadow-sm bg-yellow-50/80">
@@ -1420,10 +1719,34 @@ export default function CaseEditPage() {
                     showUpload={true}
                   />
                 </TabsContent>
-              </Tabs>
+              </BrandedTabs>
             </CardContent>
           </Card>
-        </div>
+
+          {/* Footer */}
+          <EditPageFooter
+            primaryAction={{
+              label: saving ? (t('saving') || 'Saving...') : (tProfile('saveChanges') || 'Save Changes'),
+              onClick: handleSave,
+              disabled: saving,
+              loading: saving,
+              icon: <Save className="h-4 w-4 mr-2" />
+            }}
+            secondaryActions={[
+              {
+                label: t('cancel') || 'Cancel',
+                onClick: handleBack,
+                variant: 'outline'
+              },
+              {
+                label: t('delete') || 'Delete',
+                onClick: handleDeleteClick,
+                variant: 'destructive',
+                icon: <Trash2 className="h-4 w-4 mr-2" />
+              }
+            ]}
+          />
+        </Container>
       </div>
 
       {/* Delete Confirmation Dialog */}
