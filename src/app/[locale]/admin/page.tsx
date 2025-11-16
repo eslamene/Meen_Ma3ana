@@ -28,7 +28,6 @@ import {
   Shield,
   ArrowRight
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {
@@ -49,7 +48,7 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       icon: Target,
       color: 'from-blue-500 to-indigo-600',
       permission: 'cases:update',
-      action: () => router.push(`/${params.locale}/admin/cases`),
+      action: () => router.push(`/${params.locale}/case-management/cases`),
       buttonText: 'View Cases'
     },
     {
@@ -59,7 +58,7 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       icon: Heart,
       color: 'from-green-500 to-emerald-600',
       permission: 'contributions:approve',
-      action: () => router.push(`/${params.locale}/admin/contributions`),
+      action: () => router.push(`/${params.locale}/case-management/contributions`),
       buttonText: 'View Contributions'
     },
     {
@@ -69,7 +68,7 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       icon: BarChart3,
       color: 'from-purple-500 to-violet-600',
       permission: 'admin:analytics',
-      action: () => router.push(`/${params.locale}/admin/analytics`),
+      action: () => router.push(`/${params.locale}/case-management/analytics`),
       buttonText: 'View Reports'
     },
     {
@@ -79,7 +78,7 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       icon: UserCheck,
       color: 'from-red-500 to-rose-600',
       permission: 'admin:dashboard', // Using general admin permission for sponsorships
-      action: () => router.push(`/${params.locale}/admin/sponsorships`),
+      action: () => router.push(`/${params.locale}/case-management/sponsorships`),
       buttonText: 'View Sponsorships'
     }
   ]
@@ -462,7 +461,7 @@ export default function AdminPage() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => router.push(`/${params.locale}/admin/contributions?contribution=${activity.id}`)}
+                            onClick={() => router.push(`/${params.locale}/case-management/contributions?contribution=${activity.id}`)}
                             className="border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200"
                           >
                             <Eye className="h-3 w-3 mr-1" />

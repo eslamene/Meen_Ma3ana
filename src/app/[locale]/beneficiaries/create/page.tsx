@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import { User, FileText, FileEdit, Save } from 'lucide-react'
-import { BrandedTabs, TabsContent } from '@/components/ui/branded-tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { EditPageHeader, EditPageFooter } from '@/components/crud'
 import BeneficiaryForm, { type BeneficiaryFormRef } from '@/components/beneficiaries/BeneficiaryForm'
 import { LookupService } from '@/lib/services/lookupService'
@@ -372,22 +372,28 @@ export default function CreateBeneficiaryPage() {
         {/* Form */}
         <div className="rounded-lg border bg-white text-gray-900 shadow-lg">
           <div className="w-full p-6">
-            <BrandedTabs
+            <Tabs
               value={activeTab}
               onValueChange={(value) => setActiveTab(value as 'data' | 'documents')}
-              items={[
-                {
-                  value: 'data',
-                  label: t('beneficiaryInfo') || 'Beneficiary Information',
-                  icon: FileEdit,
-                },
-                {
-                  value: 'documents',
-                  label: t('documents') || 'Documents',
-                  icon: FileText,
-                },
-              ]}
             >
+              <TabsList variant="branded">
+                <TabsTrigger 
+                  value="data" 
+                  variant="branded"
+                  icon={FileEdit}
+                  tabIndex={0}
+                >
+                  {t('beneficiaryInfo') || 'Beneficiary Information'}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="documents" 
+                  variant="branded"
+                  icon={FileText}
+                  tabIndex={1}
+                >
+                  {t('documents') || 'Documents'}
+                </TabsTrigger>
+              </TabsList>
               <TabsContent value="data" className="mt-0">
                 <div className="space-y-6">
                   <BeneficiaryForm
@@ -417,7 +423,7 @@ export default function CreateBeneficiaryPage() {
                   </div>
                 </div>
               </TabsContent>
-            </BrandedTabs>
+            </Tabs>
           </div>
         </div>
 

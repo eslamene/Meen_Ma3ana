@@ -32,6 +32,7 @@ import {
   Upload,
   Edit,
   ExternalLink,
+  ChevronDown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePrefetchStorageRules } from '@/hooks/use-prefetch-storage-rules'
@@ -532,32 +533,36 @@ export default function CaseFileManager({
 
   const categoryStats = getCategoryStats()
 
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">{t('caseFiles')}</h3>
-          <p className="text-sm text-gray-600">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+        <div className="w-full sm:w-auto">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">{t('caseFiles')}</h3>
+          <p className="text-xs sm:text-sm text-gray-600">
             {t('fileCount', { count: files.length })} • {formatFileSize(files.reduce((total, file) => total + file.size, 0))}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {/* View Mode Toggle */}
           <div className="flex items-center border rounded-lg">
             <Button
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('grid')}
+              className="h-8 sm:h-9"
             >
-              <Grid className="h-4 w-4" />
+              <Grid className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
             <Button
               variant={viewMode === 'list' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('list')}
+              className="h-8 sm:h-9"
             >
-              <List className="h-4 w-4" />
+              <List className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
 
@@ -567,9 +572,11 @@ export default function CaseFileManager({
               <Button 
                 onClick={() => setShowUploadDialog(true)}
                 onMouseEnter={prefetch}
+                className="flex-1 sm:flex-initial h-8 sm:h-9 text-xs sm:text-sm"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                {t('uploadFiles')}
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{t('uploadFiles')}</span>
+                <span className="sm:hidden">Upload</span>
               </Button>
               <GenericFileUploader
                 open={showUploadDialog}
@@ -589,19 +596,31 @@ export default function CaseFileManager({
 
       {/* Search Bar */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
         <Input
           placeholder={t('searchFiles')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
+          className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
         />
       </div>
 
+      {/* Mobile Category Filter Button */}
+      <div className="sm:hidden">
+        <Button
+          variant="outline"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="w-full justify-between"
+        >
+          <span>Categories ({categoryStats[selectedCategory] || 0})</span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${sidebarOpen ? 'rotate-180' : ''}`} />
+        </Button>
+      </div>
+
       {/* Split Layout: Sidebar + Content */}
-      <div className="flex gap-6">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
         {/* Left Sidebar - Categories */}
-        <aside className="w-64 flex-shrink-0">
+        <aside className={`${sidebarOpen ? 'block' : 'hidden'} sm:block w-full sm:w-64 flex-shrink-0`}>
           <Card className="sticky top-4">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold text-gray-700">{t('categories')}</CardTitle>
@@ -823,7 +842,7 @@ function FileGrid({ files, viewMode, canEdit, onPreview, onDelete }: FileGridPro
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4">
       {files.map((file) => (
         <FileGridItem 
           key={file.id} 
@@ -851,12 +870,12 @@ function FileGridItem({ file, canEdit, onPreview, onDelete }: FileItemProps) {
 
   return (
     <Card className="group hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer overflow-hidden">
-      <CardContent className="p-5">
-        <div className="space-y-4">
+      <CardContent className="p-3 sm:p-5">
+        <div className="space-y-3 sm:space-y-4">
           {/* File Icon with Category Badge on Top */}
           <div className="flex items-center justify-between">
-            <div className={`p-4 rounded-xl ${category.color}`}>
-              <IconComponent className="h-8 w-8" />
+            <div className={`p-2 sm:p-4 rounded-lg sm:rounded-xl ${category.color}`}>
+              <IconComponent className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
           </div>
 
@@ -869,10 +888,10 @@ function FileGridItem({ file, canEdit, onPreview, onDelete }: FileItemProps) {
 
           {/* File Info - More Prominent */}
           <div>
-            <h4 className="font-semibold text-base text-gray-900 mb-1 line-clamp-2" title={file.originalName}>
+            <h4 className="font-semibold text-sm sm:text-base text-gray-900 mb-1 line-clamp-2" title={file.originalName}>
               {file.originalName}
             </h4>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500">
               {formatFileSize(file.size)}
             </p>
             <p className="text-xs text-gray-400 mt-1">
@@ -882,21 +901,21 @@ function FileGridItem({ file, canEdit, onPreview, onDelete }: FileItemProps) {
 
           {/* Description */}
           {file.description && (
-            <p className="text-sm text-gray-600 line-clamp-2">
+            <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">
               {file.description}
             </p>
           )}
 
           {/* Actions - Fixed Width Buttons */}
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-            <Button size="sm" variant="outline" onClick={() => onPreview(file)}>
-              <Eye className="h-4 w-4 mr-1" />
-              <span className="text-xs">View</span>
+            <Button size="sm" variant="outline" onClick={() => onPreview(file)} className="h-8 sm:h-9 text-xs">
+              <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+              <span className="hidden sm:inline text-xs">View</span>
             </Button>
-            <Button size="sm" variant="outline" asChild>
+            <Button size="sm" variant="outline" asChild className="h-8 sm:h-9 text-xs">
               <a href={file.url} download target="_blank" rel="noopener noreferrer">
-                <Download className="h-4 w-4 mr-1" />
-                <span className="text-xs">Download</span>
+                <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span className="hidden sm:inline text-xs">Download</span>
               </a>
             </Button>
             {canEdit && (
@@ -904,9 +923,9 @@ function FileGridItem({ file, canEdit, onPreview, onDelete }: FileItemProps) {
                 size="sm" 
                 variant="outline" 
                 onClick={() => onDelete(file.id)}
-                className="col-span-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="col-span-2 h-8 sm:h-9 text-red-600 hover:text-red-700 hover:bg-red-50 text-xs"
               >
-                <Trash2 className="h-4 w-4 mr-1" />
+                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 <span className="text-xs">Delete</span>
               </Button>
             )}

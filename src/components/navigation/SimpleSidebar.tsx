@@ -144,7 +144,8 @@ export default function SimpleSidebar({
         {/* Overlay for mobile */}
         {isOpen && (
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            className="fixed inset-0 z-40 lg:hidden backdrop-blur-sm"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
             onClick={onToggle}
           />
         )}
@@ -261,7 +262,8 @@ export default function SimpleSidebar({
       {/* Overlay for mobile */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden backdrop-blur-sm"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
           onClick={onToggle}
         />
       )}
@@ -477,15 +479,16 @@ function MenuItemComponent({
               ? 'bg-gradient-to-r from-[#6B8E7E] to-[#6B8E7E]/90 text-white shadow-md shadow-[#6B8E7E]/20'
               : 'text-gray-700 hover:bg-gradient-to-r hover:from-[#6B8E7E]/10 hover:to-[#6B8E7E]/5 hover:text-[#6B8E7E] hover:shadow-sm'
           }`}
+          title={item.label}
         >
-          <div className="flex items-center">
-            <IconComponent className="mr-3 h-4 w-4" />
-            {item.label}
+          <div className="flex items-center min-w-0 flex-1">
+            <IconComponent className="mr-3 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">{item.label}</span>
           </div>
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown className="h-4 w-4 flex-shrink-0 ml-2" />
           ) : (
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 flex-shrink-0 ml-2" />
           )}
         </button>
 
@@ -520,14 +523,14 @@ function MenuItemComponent({
           ? 'bg-gradient-to-r from-[#6B8E7E] to-[#6B8E7E]/90 text-white shadow-md shadow-[#6B8E7E]/20'
           : 'text-gray-700 hover:bg-gradient-to-r hover:from-[#6B8E7E]/10 hover:to-[#6B8E7E]/5 hover:text-[#6B8E7E] hover:shadow-sm'
       }`}
-      title={collapsed ? item.label : undefined}
+      title={item.label}
     >
-      <div className={`flex items-center ${collapsed ? '' : 'flex-1'}`}>
-        <IconComponent className={`${collapsed ? '' : 'mr-3'} h-4 w-4`} />
-        {!collapsed && <span>{item.label}</span>}
+      <div className={`flex items-center ${collapsed ? '' : 'flex-1 min-w-0'}`}>
+        <IconComponent className={`${collapsed ? '' : 'mr-3'} h-4 w-4 flex-shrink-0`} />
+        {!collapsed && <span className="truncate">{item.label}</span>}
       </div>
       {!collapsed && isNotifications && notificationCount > 0 && (
-        <Badge variant="destructive" className="ml-2 bg-[#E74C3C] text-white shadow-sm">
+        <Badge variant="destructive" className="ml-2 bg-[#E74C3C] text-white shadow-sm flex-shrink-0">
           {notificationCount}
         </Badge>
       )}

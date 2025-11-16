@@ -9,7 +9,7 @@ import { AlertTriangle, User, Trash2, Save, ArrowLeft, FileText, FileEdit } from
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { BrandedTabs, TabsContent } from '@/components/ui/branded-tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { EditPageHeader, EditPageFooter } from '@/components/crud'
 import BeneficiaryForm, { type BeneficiaryFormRef } from '@/components/beneficiaries/BeneficiaryForm'
 import BeneficiaryFileManager from '@/components/beneficiaries/BeneficiaryFileManager'
@@ -303,23 +303,29 @@ export default function EditBeneficiaryPage() {
         {/* Form Section */}
         <div className="rounded-lg border bg-white text-gray-900 shadow-lg">
           <div className="w-full p-6">
-            <BrandedTabs
+            <Tabs
               value={activeTab}
               onValueChange={(value) => setActiveTab(value as 'data' | 'documents')}
-              items={[
-                {
-                  value: 'data',
-                  label: t('beneficiaryInfo') || 'Beneficiary Information',
-                  icon: FileEdit,
-                },
-                {
-                  value: 'documents',
-                  label: t('documents') || 'Documents',
-                  icon: FileText,
-                  badge: documentCount > 0 ? documentCount : undefined,
-                },
-              ]}
             >
+              <TabsList variant="branded">
+                <TabsTrigger 
+                  value="data" 
+                  variant="branded"
+                  icon={FileEdit}
+                  tabIndex={0}
+                >
+                  {t('beneficiaryInfo') || 'Beneficiary Information'}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="documents" 
+                  variant="branded"
+                  icon={FileText}
+                  badge={documentCount > 0 ? documentCount : undefined}
+                  tabIndex={1}
+                >
+                  {t('documents') || 'Documents'}
+                </TabsTrigger>
+              </TabsList>
               <TabsContent value="data" className="mt-0">
                 <div className="space-y-6">
                   <BeneficiaryForm
@@ -368,7 +374,7 @@ export default function EditBeneficiaryPage() {
                   </div>
                 )}
               </TabsContent>
-            </BrandedTabs>
+            </Tabs>
           </div>
         </div>
 

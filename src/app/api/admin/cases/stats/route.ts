@@ -106,6 +106,7 @@ export async function GET(request: NextRequest) {
         id,
         case_id,
         amount,
+        donor_id,
         contribution_approval_status!contribution_id(
           status,
           created_at,
@@ -123,11 +124,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Group contributions by case_id and compute stats
-    const contributionStats = new Map<string, { approved_amount: number; total_contributions: number }>()
+    const contributionStats = new Map<string, { approved_amount: number; total_contributions: number; contributor_count: number; approved_contributors: Set<string> }>()
     
     // Initialize stats for all cases
     cases.forEach(c => {
-      contributionStats.set(c.id, { approved_amount: 0, total_contributions: 0 })
+      contributionStats.set(c.id, { approved_amount: 0, total_contributions: 0, contributor_count: 0, approved_contributors: new Set() })
     })
 
     // Process contributions and aggregate by case
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest) {
       const amount = parseFloat(contribution.amount || '0')
       
       if (!contributionStats.has(caseId)) {
-        contributionStats.set(caseId, { approved_amount: 0, total_contributions: 0 })
+        contributionStats.set(caseId, { approved_amount: 0, total_contributions: 0, contributor_count: 0, approved_contributors: new Set() })
       }
       
       const stats = contributionStats.get(caseId)!
@@ -160,16 +161,21 @@ export async function GET(request: NextRequest) {
       
       if (latestStatus === 'approved') {
         stats.approved_amount += amount
+        // Track unique approved contributors
+        if (contribution.donor_id) {
+          stats.approved_contributors.add(contribution.donor_id)
+        }
       }
     })
 
     // Merge stats back into cases array
     const casesWithStats = (cases || []).map(case_ => {
-      const stats = contributionStats.get(case_.id) || { approved_amount: 0, total_contributions: 0 }
+      const stats = contributionStats.get(case_.id) || { approved_amount: 0, total_contributions: 0, contributor_count: 0, approved_contributors: new Set() }
       return {
         ...case_,
         approved_amount: stats.approved_amount,
-        total_contributions: stats.total_contributions
+        total_contributions: stats.total_contributions,
+        contributor_count: stats.approved_contributors.size
       }
     })
 

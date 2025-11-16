@@ -228,22 +228,22 @@ export function GenericFileUploader({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>{t('uploadFiles') || 'Upload Files'}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col p-4 sm:p-6">
+        <DialogHeader className="pb-3 sm:pb-4">
+          <DialogTitle className="text-lg sm:text-xl">{t('uploadFiles') || 'Upload Files'}</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             {t('uploadFilesDescription') || 'Select files to upload. You can drag and drop files here.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-3 sm:space-y-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
           {/* Drop Zone */}
           {!uploading && (
             <div
-              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              className={`relative border-2 border-dashed rounded-lg p-4 sm:p-8 text-center transition-colors touch-manipulation ${
                 dragActive 
                   ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                  : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 active:bg-blue-50'
               }`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
@@ -255,31 +255,40 @@ export function GenericFileUploader({
                 type="file"
                 multiple
                 onChange={handleChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer touch-manipulation"
                 accept={defaultAccept}
               />
               
-              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-lg font-medium text-gray-900">
-                {t('dropFilesHere') || 'Drop files here'} {t('clickToBrowse') || 'or click to browse'}
+              <Upload className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-2 sm:mb-4" />
+              <p className="text-sm sm:text-lg font-medium text-gray-900">
+                <span className="block sm:inline">{t('dropFilesHere') || 'Drop files here'}</span>
+                <span className="hidden sm:inline"> </span>
+                <span className="block sm:inline">{t('clickToBrowse') || 'or click to browse'}</span>
               </p>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 px-2">
                 {loadingRules ? (
                   <span>Loading upload rules...</span>
                 ) : storageRule ? (
                   <>
                     <span className="font-medium">Supported formats:</span>{' '}
-                    <span className="text-gray-700">
+                    <span className="text-gray-700 break-words">
                       {storageRule.allowed_extensions.map(e => e.toUpperCase()).join(', ')}
                     </span>
-                    {' • '}
+                    <span className="hidden sm:inline">{' • '}</span>
+                    <span className="block sm:inline mt-1 sm:mt-0">
                     <span className="font-medium">Max size:</span>{' '}
                     <span className="text-gray-700">{storageRule.max_file_size_mb}MB</span>
+                    </span>
                   </>
                 ) : (
                   <>
                     {t('supportedFormats') || `Supported formats: PDF, Images, Videos, Audio, Documents`}
-                    {maxFileSize && ` • Max size: ${maxFileSize}MB`}
+                    {maxFileSize && (
+                      <>
+                        <span className="hidden sm:inline"> • </span>
+                        <span className="block sm:inline mt-1 sm:mt-0">Max size: {maxFileSize}MB</span>
+                      </>
+                    )}
                   </>
                 )}
               </p>
@@ -288,18 +297,18 @@ export function GenericFileUploader({
 
           {/* Upload Progress */}
           {uploading && (
-            <div className="space-y-4 p-6 bg-blue-50 rounded-lg">
-              <div className="flex items-center justify-center space-x-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="text-lg font-medium text-gray-900">{t('uploading') || 'Uploading...'}</p>
+            <div className="space-y-3 sm:space-y-4 p-4 sm:p-6 bg-blue-50 rounded-lg">
+              <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+                <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
+                <p className="text-base sm:text-lg font-medium text-gray-900">{t('uploading') || 'Uploading...'}</p>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
+              <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
                 <div 
-                  className="bg-blue-600 h-3 rounded-full transition-all duration-300" 
+                  className="bg-blue-600 h-2 sm:h-3 rounded-full transition-all duration-300" 
                   style={{ width: `${progress}%` }}
                 ></div>
               </div>
-              <p className="text-center text-sm text-gray-600">
+              <p className="text-center text-xs sm:text-sm text-gray-600">
                 {t('uploadingProgress', { percent: Math.round(progress) }) || `${Math.round(progress)}% complete`}
               </p>
             </div>
@@ -307,8 +316,8 @@ export function GenericFileUploader({
 
           {/* Pending Files List */}
           {pendingFiles.length > 0 && !uploading && (
-            <div className="space-y-3">
-              <h4 className="font-medium text-gray-900">
+            <div className="space-y-2 sm:space-y-3">
+              <h4 className="font-medium text-sm sm:text-base text-gray-900">
                 {t('filesSelected', { count: pendingFiles.length }) || `${pendingFiles.length} file(s) selected`}
               </h4>
               {pendingFiles.map((item, index) => {
@@ -316,13 +325,14 @@ export function GenericFileUploader({
                 const CategoryIcon = categoryConfig.icon
                 
                 return (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    {/* File Icon/Preview */}
+                  <div key={index} className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    {/* File Icon/Preview and Info */}
+                    <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0 w-full sm:w-auto">
                     <div className="flex-shrink-0">
                       {item.preview ? (
-                        <img src={item.preview} alt={item.file.name} className="w-16 h-16 object-cover rounded" />
+                          <img src={item.preview} alt={item.file.name} className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded" />
                       ) : (
-                        <div className="w-16 h-16 flex items-center justify-center bg-white rounded border">
+                          <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center bg-white rounded border">
                           {getFileIcon(item.file.type)}
                         </div>
                       )}
@@ -330,25 +340,25 @@ export function GenericFileUploader({
 
                     {/* File Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{item.file.name}</p>
-                      <p className="text-sm text-gray-500">{formatFileSize(item.file.size)}</p>
+                        <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{item.file.name}</p>
+                        <p className="text-xs sm:text-sm text-gray-500">{formatFileSize(item.file.size)}</p>
                       
                       {/* Category Selector */}
                       {Object.keys(categories).length > 1 && (
-                        <div className="mt-2">
+                          <div className="mt-1.5 sm:mt-2">
                           <Select 
                             value={item.category} 
                             onValueChange={(value) => handleCategoryChange(index, value)}
                           >
-                            <SelectTrigger className="w-full max-w-xs h-9 text-sm">
+                              <SelectTrigger className="w-full sm:max-w-xs h-8 sm:h-9 text-xs sm:text-sm">
                               <SelectValue placeholder={t('selectCategory') || 'Select Category'} />
                             </SelectTrigger>
                             <SelectContent>
                               {Object.entries(categories).map(([key, config]) => (
                                 <SelectItem key={key} value={key}>
                                   <div className="flex items-center gap-2">
-                                    <CategoryIcon className="h-4 w-4" />
-                                    <span>{config.label}</span>
+                                      <CategoryIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                                      <span className="text-xs sm:text-sm">{config.label}</span>
                                   </div>
                                 </SelectItem>
                               ))}
@@ -356,6 +366,7 @@ export function GenericFileUploader({
                           </Select>
                         </div>
                       )}
+                      </div>
                     </div>
 
                     {/* Remove Button */}
@@ -363,9 +374,10 @@ export function GenericFileUploader({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveFile(index)}
-                      className="flex-shrink-0"
+                      className="flex-shrink-0 self-end sm:self-auto w-full sm:w-auto justify-center sm:justify-start"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-4 w-4 mr-1 sm:mr-0" />
+                      <span className="sm:hidden">Remove</span>
                     </Button>
                   </div>
                 )
@@ -376,14 +388,18 @@ export function GenericFileUploader({
 
         {/* Footer Actions */}
         {!uploading && (
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={handleClose}>
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 pt-3 sm:pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={handleClose}
+              className="w-full sm:w-auto order-2 sm:order-1"
+            >
               {tCommon('cancel') || t('cancel') || 'Cancel'}
             </Button>
             <Button 
               onClick={handleUploadClick}
               disabled={pendingFiles.length === 0}
-              className="min-w-[120px]"
+              className="w-full sm:w-auto min-w-[120px] order-1 sm:order-2"
             >
               <Upload className="h-4 w-4 mr-2" />
               {t('upload') || 'Upload'} {pendingFiles.length > 0 && `(${pendingFiles.length})`}

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
+import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination'
 import { 
   Target, 
   Plus, 
@@ -29,7 +30,8 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  User
+  User,
+  Users
 } from 'lucide-react'
 
 interface Beneficiary {
@@ -69,6 +71,7 @@ interface Case {
   // Calculated fields
   approved_amount?: number
   total_contributions?: number
+  contributor_count?: number
 }
 
 export default function AdminCasesPage() {
@@ -79,8 +82,7 @@ export default function AdminCasesPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [sortBy, setSortBy] = useState('created_at_desc')
   const [stats, setStats] = useState({
     total: 0,
     published: 0,
@@ -130,7 +132,14 @@ export default function AdminCasesPage() {
 
       const data = await response.json()
       
-      setCases(data.cases || [])
+      const loadedCases = data.cases || []
+      
+      // Warn if dataset is large (this view loads all cases into memory)
+      if (loadedCases.length > 1000) {
+        console.warn(`Large dataset detected: ${loadedCases.length} cases loaded. This view may experience performance issues with very large datasets. Consider implementing server-side pagination.`)
+      }
+      
+      setCases(loadedCases)
       setStats(data.stats || {
         total: 0,
         published: 0,
@@ -235,21 +244,40 @@ export default function AdminCasesPage() {
     
     const matchesStatus = statusFilter === 'all' || case_.status === statusFilter
     return matchesSearch && matchesStatus
+  }).sort((a, b) => {
+    // Apply sorting based on sortBy state
+    switch (sortBy) {
+      case 'contributors_high':
+        return (b.contributor_count || 0) - (a.contributor_count || 0)
+      case 'contributors_low':
+        return (a.contributor_count || 0) - (b.contributor_count || 0)
+      case 'amount_high':
+        return (b.approved_amount || 0) - (a.approved_amount || 0)
+      case 'amount_low':
+        return (a.approved_amount || 0) - (b.approved_amount || 0)
+      case 'created_at_desc':
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'created_at_asc':
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      default:
+        return 0
+    }
   })
 
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredCases.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedCases = filteredCases.slice(startIndex, endIndex)
+  // Use pagination hook for client-side pagination with Load More button
+  const pagination = useInfiniteScrollPagination({
+    totalItems: filteredCases.length,
+    initialPage: 1,
+    initialItemsPerPage: 10,
+    resetDependencies: [searchTerm, statusFilter, sortBy],
+    useLoadMoreButton: true // Use Load More button instead of infinite scroll
+  })
 
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, statusFilter])
+  // Calculate paginated cases based on hook state
+  const paginatedCases = filteredCases.slice(0, pagination.state.endIndex)
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+    pagination.actions.setCurrentPage(Math.max(1, Math.min(page, pagination.state.totalPages)))
     // Scroll to top when page changes
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -257,6 +285,7 @@ export default function AdminCasesPage() {
   const getPageNumbers = () => {
     const pages: (number | string)[] = []
     const maxVisible = 5
+    const { currentPage, totalPages } = pagination.state
     
     if (totalPages <= maxVisible) {
       // Show all pages if total pages is less than max visible
@@ -401,102 +430,104 @@ export default function AdminCasesPage() {
   return (
     <ProtectedRoute>
       <PermissionGuard permission="cases:manage">
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-          <Container variant={containerVariant} className="py-8">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 overflow-x-hidden">
+          <Container variant={containerVariant} className="py-3 sm:py-4 lg:py-6 px-4 sm:px-6">
             {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
+            <div className="mb-3 sm:mb-4">
+              <div className="flex items-center gap-2 sm:gap-4 mb-2 sm:mb-3">
                 <Button
                   variant="ghost"
                   onClick={() => router.push(`/${params.locale}/case-management`)}
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                  className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 text-sm sm:text-base"
                 >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Dashboard
+                  <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="sm:hidden">Back</span>
                 </Button>
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Case Management</h1>
-                  <p className="text-gray-600 mt-2">Manage all charity cases in the system</p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Case Management</h1>
+                  <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">Manage all charity cases in the system</p>
                 </div>
                 <Button
                   onClick={() => router.push(`/${params.locale}/cases/create`)}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 w-full sm:w-auto text-sm sm:text-base"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Case
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Create New Case</span>
+                  <span className="sm:hidden">Create Case</span>
                 </Button>
               </div>
             </div>
 
             {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-4">
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Cases</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Cases</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
                     </div>
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <Target className="h-6 w-6 text-blue-600" />
+                    <div className="p-2 sm:p-3 bg-blue-100 rounded-full flex-shrink-0 ml-2">
+                      <Target className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Published</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.published}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Published</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.published}</p>
                     </div>
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="p-2 sm:p-3 bg-green-100 rounded-full flex-shrink-0 ml-2">
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Completed</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.completed}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Completed</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.completed}</p>
                     </div>
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <CheckCircle className="h-6 w-6 text-blue-600" />
+                    <div className="p-2 sm:p-3 bg-blue-100 rounded-full flex-shrink-0 ml-2">
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Closed</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.closed}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Closed</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.closed}</p>
                     </div>
-                    <div className="p-3 bg-purple-100 rounded-full">
-                      <XCircle className="h-6 w-6 text-purple-600" />
+                    <div className="p-2 sm:p-3 bg-purple-100 rounded-full flex-shrink-0 ml-2">
+                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Under Review</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.under_review}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Under Review</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.under_review}</p>
                     </div>
-                    <div className="p-3 bg-yellow-100 rounded-full">
-                      <Clock className="h-6 w-6 text-yellow-600" />
+                    <div className="p-2 sm:p-3 bg-yellow-100 rounded-full flex-shrink-0 ml-2">
+                      <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -504,22 +535,22 @@ export default function AdminCasesPage() {
             </div>
 
             {/* Filters */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-6">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-3 sm:mb-4">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                  <div className="flex-1 min-w-0">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
                       <Input
                         placeholder="Search cases..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
+                        className="pl-8 sm:pl-10 text-sm sm:text-base"
                       />
                     </div>
                   </div>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="w-full sm:w-48 text-sm sm:text-base">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -532,11 +563,11 @@ export default function AdminCasesPage() {
                       <SelectItem value="submitted">Submitted</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={itemsPerPage.toString()} onValueChange={(value) => {
-                    setItemsPerPage(Number(value))
-                    setCurrentPage(1)
+                  <Select value={pagination.state.itemsPerPage.toString()} onValueChange={(value) => {
+                    pagination.actions.setItemsPerPage(Number(value))
+                    pagination.actions.reset()
                   }}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32 text-sm sm:text-base">
                       <SelectValue placeholder="Per page" />
                     </SelectTrigger>
                     <SelectContent>
@@ -544,6 +575,22 @@ export default function AdminCasesPage() {
                       <SelectItem value="25">25 per page</SelectItem>
                       <SelectItem value="50">50 per page</SelectItem>
                       <SelectItem value="100">100 per page</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={sortBy} onValueChange={(value) => {
+                    setSortBy(value)
+                    pagination.actions.reset()
+                  }}>
+                    <SelectTrigger className="w-full sm:w-48 text-sm sm:text-base">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="created_at_desc">Newest First</SelectItem>
+                      <SelectItem value="created_at_asc">Oldest First</SelectItem>
+                      <SelectItem value="contributors_high">Contributors (High to Low)</SelectItem>
+                      <SelectItem value="contributors_low">Contributors (Low to High)</SelectItem>
+                      <SelectItem value="amount_high">Amount (High to Low)</SelectItem>
+                      <SelectItem value="amount_low">Amount (Low to High)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -579,16 +626,16 @@ export default function AdminCasesPage() {
             ) : (
               <>
                 {/* Results Info */}
-                <div className="mb-4 text-sm text-gray-600">
-                  Showing {startIndex + 1} to {Math.min(endIndex, filteredCases.length)} of {filteredCases.length} cases
+                <div className="mb-2 sm:mb-3 text-xs sm:text-sm text-gray-600 break-words">
+                  Showing {pagination.state.startIndex + 1} to {Math.min(pagination.state.endIndex, filteredCases.length)} of {filteredCases.length} cases
                   {(searchTerm || statusFilter !== 'all') && (
-                    <span className="ml-2">
+                    <span className="ml-1 sm:ml-2">
                       (filtered from {cases.length} total)
                     </span>
                   )}
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-3 sm:space-y-4">
                   {paginatedCases.map((case_) => {
                     // Handle beneficiary data - Supabase may return as object or array
                     const beneficiaryData = case_.beneficiaries
@@ -615,11 +662,11 @@ export default function AdminCasesPage() {
                           )}
 
                           {/* Main Content */}
-                          <div className="flex-1 p-6">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1 min-w-0 pr-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h3 className="text-xl font-bold text-gray-900 line-clamp-1">
+                          <div className="flex-1 p-3 sm:p-4 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 line-clamp-2 sm:line-clamp-1 break-words">
                                     {case_.title || case_.title_en || case_.title_ar || 'Untitled Case'}
                                   </h3>
                                   {/* Beneficiary Icon - Clickable Action */}
@@ -646,11 +693,11 @@ export default function AdminCasesPage() {
                                       className="flex-shrink-0 p-1.5 rounded-full hover:bg-indigo-50 transition-colors group"
                                       title={`View beneficiary: ${beneficiaryName}`}
                                     >
-                                      <User className="h-4 w-4 text-indigo-500 group-hover:text-indigo-600" />
+                                      <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500 group-hover:text-indigo-600" />
                                     </button>
                                   )}
                                 </div>
-                                <p className="text-gray-600 text-sm line-clamp-2 mb-4">
+                                <p className="text-gray-600 text-xs sm:text-sm line-clamp-2 mb-2 sm:mb-3 break-words">
                                   {case_.description || case_.description_en || case_.description_ar || 'No description'}
                                 </p>
                               </div>
@@ -660,46 +707,55 @@ export default function AdminCasesPage() {
                             </div>
 
                             {/* Progress Bar */}
-                            <div className="mb-4">
-                              <div className="flex items-center justify-between text-sm text-gray-700 mb-2">
+                            <div className="mb-2 sm:mb-3">
+                              <div className="flex items-center justify-between text-xs sm:text-sm text-gray-700 mb-1 sm:mb-1.5">
                                 <span className="font-medium">Funding Progress</span>
                                 <span className="font-semibold text-gray-900">
                                   {getProgressPercentage(case_.approved_amount || 0, case_.target_amount).toFixed(1)}%
                                 </span>
                               </div>
-                              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                              <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 overflow-hidden">
                                 <div
-                                  className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-500 shadow-sm"
+                                  className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-2 sm:h-3 rounded-full transition-all duration-500 shadow-sm"
                                   style={{ width: `${getProgressPercentage(case_.approved_amount || 0, case_.target_amount)}%` }}
                                 ></div>
                               </div>
                             </div>
 
                             {/* Stats Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                              <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-100">
-                                <DollarSign className="h-5 w-5 text-green-600 flex-shrink-0" />
-                                <div className="min-w-0">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-2 sm:mb-3">
+                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 bg-green-50 rounded-lg border border-green-100 min-w-0">
+                                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
                                   <p className="text-xs text-gray-600">Raised</p>
-                                  <p className="text-sm font-semibold text-gray-900 truncate">
+                                  <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
                                     {formatAmount(case_.approved_amount || 0)}
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                <Target className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                                <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 bg-blue-50 rounded-lg border border-blue-100 min-w-0">
+                                <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
                                   <p className="text-xs text-gray-600">Target</p>
-                                  <p className="text-sm font-semibold text-gray-900 truncate">
+                                  <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
                                     {formatAmount(case_.target_amount)}
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-lg border border-purple-100">
-                                <Calendar className="h-5 w-5 text-purple-600 flex-shrink-0" />
-                                <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 bg-indigo-50 rounded-lg border border-indigo-100 min-w-0">
+                                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs text-gray-600">Contributors</p>
+                                  <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
+                                    {case_.contributor_count || 0}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 bg-purple-50 rounded-lg border border-purple-100 min-w-0 col-span-2 sm:col-span-1">
+                                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
                                   <p className="text-xs text-gray-600">Created</p>
-                                  <p className="text-sm font-semibold text-gray-900 truncate">
+                                  <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
                                     {formatDate(case_.created_at)}
                                   </p>
                                 </div>
@@ -709,10 +765,10 @@ export default function AdminCasesPage() {
                             {/* Admin Disclaimer */}
                             {case_.total_contributions != null && case_.approved_amount != null && 
                              case_.total_contributions !== case_.approved_amount && (
-                              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                              <div className="mb-2 sm:mb-3 p-2 sm:p-3 bg-amber-50 border border-amber-200 rounded-lg">
                                 <div className="flex items-start gap-2">
-                                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                                  <p className="text-xs text-amber-800">
+                                  <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                                  <p className="text-xs text-amber-800 break-words">
                                     <strong>Note:</strong> Total contributions: {formatAmount(case_.total_contributions)} 
                                     (includes pending/rejected contributions)
                                   </p>
@@ -722,32 +778,32 @@ export default function AdminCasesPage() {
                           </div>
 
                           {/* Actions Sidebar */}
-                          <div className="flex md:flex-col gap-2 p-6 bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 flex-shrink-0">
+                          <div className="flex flex-row md:flex-col gap-2 p-4 sm:p-6 bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 flex-shrink-0">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => router.push(`/${params.locale}/cases/${case_.id}`)}
-                              className="w-full md:w-auto border-2 border-blue-200 hover:border-blue-500 hover:bg-blue-50 text-blue-700"
+                              className="flex-1 md:flex-none w-full md:w-auto border-2 border-blue-200 hover:border-blue-500 hover:bg-blue-50 text-blue-700 text-xs sm:text-sm"
                             >
-                              <Eye className="h-4 w-4 mr-2" />
+                              <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                               View
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => router.push(`/${params.locale}/cases/${case_.id}/edit`)}
-                              className="w-full md:w-auto border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 text-gray-700"
+                              className="flex-1 md:flex-none w-full md:w-auto border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 text-gray-700 text-xs sm:text-sm"
                             >
-                              <Edit className="h-4 w-4 mr-2" />
+                              <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                               Edit
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleDeleteClick(case_.id, case_.title || case_.title_en || case_.title_ar || 'Untitled Case')}
-                              className="w-full md:w-auto border-2 border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700"
+                              className="flex-1 md:flex-none w-full md:w-auto border-2 border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700 text-xs sm:text-sm"
                             >
-                              <Trash2 className="h-4 w-4 mr-2" />
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                               Delete
                             </Button>
                           </div>
@@ -757,38 +813,66 @@ export default function AdminCasesPage() {
                     )
                   })}
                 </div>
+                
+                {/* Load More button for mobile */}
+                {pagination.showLoadMoreButton && (
+                  <div className="flex justify-center py-4 sm:hidden">
+                    <Button
+                      onClick={pagination.handleLoadMore}
+                      disabled={pagination.state.isLoadingMore}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white min-w-[120px]"
+                    >
+                      {pagination.state.isLoadingMore ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Loading...
+                        </>
+                      ) : (
+                        'Load More'
+                      )}
+                    </Button>
+                  </div>
+                )}
+                
+                {/* End of list indicator on mobile */}
+                {pagination.state.currentPage >= pagination.state.totalPages && filteredCases.length > pagination.state.itemsPerPage && (
+                  <div className="text-center py-4 text-sm text-gray-500 sm:hidden">
+                    You&apos;ve reached the end of the list
+                  </div>
+                )}
 
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-6">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                {/* Pagination Controls - Hidden on mobile, shown on desktop */}
+                {pagination.state.totalPages > 1 && (
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-4 sm:mt-6 hidden sm:block">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
+                        <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center sm:justify-start">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="flex items-center gap-1"
+                            onClick={() => handlePageChange(pagination.state.currentPage - 1)}
+                            disabled={pagination.state.currentPage === 1}
+                            className="flex items-center gap-1 text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
                           >
-                            <ChevronLeft className="h-4 w-4" />
-                            Previous
+                            <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Previous</span>
+                            <span className="sm:hidden">Prev</span>
                           </Button>
                           
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto max-w-full">
                             {getPageNumbers().map((page, index) => (
                               page === '...' ? (
-                                <span key={`ellipsis-${index}`} className="px-2 text-gray-400">
+                                <span key={`ellipsis-${index}`} className="px-1 sm:px-2 text-gray-400 text-xs sm:text-sm">
                                   ...
                                 </span>
                               ) : (
                                 <Button
                                   key={page}
-                                  variant={currentPage === page ? "default" : "outline"}
+                                  variant={pagination.state.currentPage === page ? "default" : "outline"}
                                   size="sm"
                                   onClick={() => handlePageChange(page as number)}
-                                  className={`min-w-[40px] ${
-                                    currentPage === page
+                                  className={`min-w-[32px] sm:min-w-[40px] h-7 sm:h-8 px-1 sm:px-2 text-xs sm:text-sm ${
+                                    pagination.state.currentPage === page
                                       ? 'bg-blue-600 hover:bg-blue-700 text-white'
                                       : ''
                                   }`}
@@ -802,21 +886,29 @@ export default function AdminCasesPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="flex items-center gap-1"
+                            onClick={() => handlePageChange(pagination.state.currentPage + 1)}
+                            disabled={pagination.state.currentPage === pagination.state.totalPages}
+                            className="flex items-center gap-1 text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
                           >
-                            Next
-                            <ChevronRight className="h-4 w-4" />
+                            <span className="hidden sm:inline">Next</span>
+                            <span className="sm:hidden">Next</span>
+                            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
                         </div>
                         
-                        <div className="text-sm text-gray-600">
-                          Page {currentPage} of {totalPages}
+                        <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                          Page {pagination.state.currentPage} of {pagination.state.totalPages}
                         </div>
                       </div>
                     </CardContent>
                   </Card>
+                )}
+                
+                {/* Mobile pagination info - always visible on mobile */}
+                {pagination.state.totalPages > 1 && (
+                  <div className="sm:hidden mt-4 text-center text-xs text-gray-600">
+                    Showing {paginatedCases.length} of {filteredCases.length} cases
+                  </div>
                 )}
               </>
             )}

@@ -224,7 +224,8 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
       {/* Overlay for mobile */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden backdrop-blur-sm"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
           onClick={onToggle}
         />
       )}
@@ -415,15 +416,16 @@ function MenuItemComponent({
               ? 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-r-4 border-blue-600 shadow-sm'
               : 'text-gray-700 hover:bg-gray-50'
           }`}
+          title={item.label}
         >
-          <div className="flex items-center">
-            <IconComponent className="mr-3 h-4 w-4" />
-            <span>{item.label}</span>
+          <div className="flex items-center min-w-0 flex-1">
+            <IconComponent className="mr-3 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">{item.label}</span>
           </div>
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown className="h-4 w-4 flex-shrink-0 ml-2" />
           ) : (
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 flex-shrink-0 ml-2" />
           )}
         </button>
 
@@ -452,17 +454,17 @@ function MenuItemComponent({
     <Link
       href={itemPath}
       className={`${getNavLinkClass(item.href)} flex items-center ${isNotifications ? 'justify-between' : ''} px-3 py-2 text-sm rounded-md transition-all duration-200 transform hover:translate-x-1`}
-      title={item.description}
+      title={item.label || item.description}
     >
-      <div className="flex items-center">
-        <div className={`w-2 h-2 rounded-full mr-3 transition-colors duration-200 ${
+      <div className="flex items-center min-w-0 flex-1">
+        <div className={`w-2 h-2 rounded-full mr-3 transition-colors duration-200 flex-shrink-0 ${
           isActive ? 'bg-blue-600' : 'bg-gray-300'
         }`} />
-        {item.icon && <IconComponent className="mr-2 h-4 w-4" />}
-        <span>{item.label}</span>
+        {item.icon && <IconComponent className="mr-2 h-4 w-4 flex-shrink-0" />}
+        <span className="truncate">{item.label}</span>
       </div>
       {isNotifications && unreadNotifications > 0 && (
-        <Badge variant="destructive" className="ml-2">
+        <Badge variant="destructive" className="ml-2 flex-shrink-0">
           {unreadNotifications}
         </Badge>
       )}

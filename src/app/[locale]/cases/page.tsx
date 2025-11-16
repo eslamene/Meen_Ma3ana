@@ -6,7 +6,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
@@ -19,12 +18,14 @@ import {
   TrendingUp, 
   DollarSign,
   Users,
-  AlertCircle
+  AlertCircle,
+  Filter
 } from 'lucide-react'
 import CaseCard from '@/components/cases/CaseCard'
 import FilterSidebar from '@/components/cases/FilterSidebar'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { useAdmin } from '@/lib/admin/hooks'
+import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination'
 
 interface Case {
   id: string
@@ -70,6 +71,7 @@ export default function CasesPage() {
   const canCreateCase = hasPermission('cases:create')
 
   const [cases, setCases] = useState<Case[]>([])
+  const [allLoadedCases, setAllLoadedCases] = useState<Case[]>([]) // Accumulate all loaded cases for scroll pagination
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<CaseFilters>({
     search: '',
@@ -84,9 +86,7 @@ export default function CasesPage() {
   })
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showFilters, setShowFilters] = useState(false)
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 12,
+  const [serverPagination, setServerPagination] = useState({
     total: 0,
     totalPages: 0
   })
@@ -96,14 +96,15 @@ export default function CasesPage() {
     totalRaised: 0
   })
 
-  const fetchCases = useCallback(async () => {
+  // Fetch cases function - accepts page and limit for pagination hook
+  const fetchCases = useCallback(async (page: number, limit: number) => {
     try {
       setLoading(true)
       console.log('Fetching cases...')
 
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: '12',
+        page: page.toString(),
+        limit: limit.toString(),
         sortBy: filters.sortBy || 'createdAt',
         sortOrder: filters.sortOrder || 'desc'
       })
@@ -151,8 +152,23 @@ export default function CasesPage() {
         })
       }
       
-      setCases(data.cases || [])
-      setPagination(data.pagination || {})
+      const newCases = data.cases || []
+      
+      // If loading more (page > 1), accumulate cases; otherwise replace
+      if (page > 1) {
+        setAllLoadedCases(prev => {
+          // Avoid duplicates by checking IDs
+          const existingIds = new Set(prev.map((c: Case) => c.id))
+          const uniqueNewCases = newCases.filter((c: Case) => !existingIds.has(c.id))
+          return [...prev, ...uniqueNewCases]
+        })
+      } else {
+        // First page or filter change - replace all cases
+        setAllLoadedCases(newCases)
+      }
+      
+      setCases(newCases)
+      setServerPagination(data.pagination || { total: 0, totalPages: 0 })
       setStatistics(data.statistics || { totalCases: 0, activeCases: 0, totalRaised: 0 })
     } catch (error) {
       console.error('Error fetching cases:', error)
@@ -160,20 +176,37 @@ export default function CasesPage() {
       setLoading(false)
       console.log('Fetch completed, loading set to false')
     }
-  }, [filters, pagination.page])
+  }, [filters, locale])
 
+  // Use pagination hook for server-side pagination with Load More button
+  const pagination = useInfiniteScrollPagination({
+    initialPage: 1,
+    initialItemsPerPage: 12,
+    onFetch: fetchCases,
+    resetDependencies: [filters.search, filters.type, filters.status, filters.category, filters.detectedCategory, filters.minAmount, filters.maxAmount, filters.sortBy, filters.sortOrder],
+    externalLoading: loading,
+    totalPages: serverPagination.totalPages,
+    useLoadMoreButton: true // Use Load More button instead of infinite scroll
+  })
+
+  // Initial fetch on mount and when filters change
   useEffect(() => {
-    fetchCases()
-  }, [fetchCases])
+    if (pagination.state.scrollItemsPerPage !== null && pagination.state.currentPage === 1) {
+      fetchCases(1, pagination.state.effectiveItemsPerPage)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, pagination.state.scrollItemsPerPage])
 
   const handleFilterChange = (key: keyof CaseFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }))
-    setPagination(prev => ({ ...prev, page: 1 })) // Reset to first page
+    pagination.actions.reset() // Reset to first page
+    setAllLoadedCases([]) // Clear accumulated cases on filter change
   }
 
   const handleSearch = (value: string) => {
     setFilters(prev => ({ ...prev, search: value }))
-    setPagination(prev => ({ ...prev, page: 1 }))
+    pagination.actions.reset()
+    setAllLoadedCases([]) // Clear accumulated cases on search
   }
 
   const handleClearFilters = () => {
@@ -188,11 +221,13 @@ export default function CasesPage() {
       sortBy: 'createdAt',
       sortOrder: 'desc'
     })
-    setPagination(prev => ({ ...prev, page: 1 }))
+    pagination.actions.reset()
+    setAllLoadedCases([]) // Clear accumulated cases
   }
 
   const handleApplyFilters = () => {
-    fetchCases()
+    pagination.actions.reset()
+    setAllLoadedCases([])
   }
 
   const handleViewDetails = (caseId: string) => {
@@ -235,7 +270,8 @@ export default function CasesPage() {
 
   // Generate pagination page numbers with ellipses
   const getPaginationPages = () => {
-    const { page, totalPages } = pagination
+    const { currentPage } = pagination.state
+    const { totalPages } = serverPagination
     const pages: (number | string)[] = []
     const maxVisible = 7 // Maximum number of page buttons to show
     
@@ -249,13 +285,13 @@ export default function CasesPage() {
       pages.push(1)
       
       // Calculate start and end of visible range around current page
-      let start = Math.max(2, page - 1)
-      let end = Math.min(totalPages - 1, page + 1)
+      let start = Math.max(2, currentPage - 1)
+      let end = Math.min(totalPages - 1, currentPage + 1)
       
       // Adjust range to show more pages if we're near the edges
-      if (page <= 3) {
+      if (currentPage <= 3) {
         end = Math.min(5, totalPages - 1)
-      } else if (page >= totalPages - 2) {
+      } else if (currentPage >= totalPages - 2) {
         start = Math.max(totalPages - 4, 2)
       }
       
@@ -299,86 +335,102 @@ export default function CasesPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
         <Container variant={containerVariant} className="py-8">
         {/* Enhanced Header */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg">
-                  <Target className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                    {t('browseCases')}
-                  </h1>
-                  <p className="text-gray-600 text-lg mt-1">
-                    {t('browseCasesDescription')}
-                  </p>
-                </div>
+        <div className="mb-6 sm:mb-8 w-full">
+          {/* Title and Create Case Button Row */}
+          <div className="flex flex-col md:flex-row justify-between items-start gap-4 sm:gap-6 mb-6 w-full">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex-shrink-0">
+                <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
-              
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <TrendingUp className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">{t('activeCases')}</p>
-                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{getActiveCases()}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <DollarSign className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">{t('totalRaised')}</p>
-                        <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                          EGP {getTotalRaised().toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg sm:col-span-2 lg:col-span-1">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        <Users className="h-5 w-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">{t('totalCases')}</p>
-                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{getTotalCases()}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent break-words">
+                  {t('browseCases')}
+                </h1>
+                <p className="text-sm sm:text-base lg:text-lg text-gray-600 mt-1 break-words">
+                  {t('browseCasesDescription')}
+                </p>
               </div>
             </div>
             
+            {/* Create Case button moved to second row on mobile */}
             {canCreateCase && (
-              <Button 
-                onClick={handleCreateCase} 
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-lg"
-              >
-                <Plus className="h-5 w-5" />
-                {t('createCase')}
-              </Button>
+              <div className="hidden md:block flex-shrink-0">
+                <Button 
+                  onClick={handleCreateCase} 
+                  className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-lg"
+                >
+                  <Plus className="h-5 w-5" />
+                  {t('createCase')}
+                </Button>
+              </div>
             )}
+          </div>
+          
+          {/* Stats Cards - Full width row, not constrained by flex container */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-3 sm:gap-4 w-full">
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg w-full min-w-0">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-gray-600 truncate">{t('activeCases')}</p>
+                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{getActiveCases()}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg w-full min-w-0">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-gray-600 truncate">{t('totalCases')}</p>
+                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{getTotalCases()}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg w-full min-w-0 sm:col-span-2 lg:col-span-1">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-gray-600 truncate">{t('totalRaised')}</p>
+                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">
+                      EGP {getTotalRaised().toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
-          {/* Enhanced Filter Sidebar */}
-          <div className="lg:w-80 lg:flex-shrink-0">
+        <div className="flex flex-col 2xl:flex-row gap-4 sm:gap-6">
+          {/* FilterSidebar - Desktop sidebar shows on >= 1600px, bottom sheet (fixed) shows on < 1600px */}
+          <div className="hidden 2xl:block 2xl:w-80 2xl:flex-shrink-0">
+            <FilterSidebar
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              onClearFilters={handleClearFilters}
+              onApplyFilters={handleApplyFilters}
+              isOpen={showFilters}
+              onToggle={() => setShowFilters(!showFilters)}
+              activeFiltersCount={getActiveFiltersCount()}
+            />
+          </div>
+
+          {/* FilterSidebar bottom sheet - Always rendered, fixed positioned, visible on < 1600px */}
+          <div className="2xl:hidden">
             <FilterSidebar
               filters={filters}
               onFilterChange={handleFilterChange}
@@ -392,75 +444,91 @@ export default function CasesPage() {
 
           {/* Enhanced Main Content */}
           <div className="flex-1 min-w-0">
-            {/* Enhanced Search and View Controls */}
-            <Card className="mb-4 sm:mb-6 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  {/* Enhanced Search Bar */}
+            {/* Search and Filter Row */}
+            <Card className="mb-3 sm:mb-4 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  {/* Search Bar */}
                   <div className="flex-1">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
                       <Input
                         placeholder={t('searchCases')}
                         value={filters.search}
                         onChange={(e) => handleSearch(e.target.value)}
-                        className="pl-12 h-12 text-lg border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl"
+                        className="pl-10 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg sm:rounded-xl"
                       />
                     </div>
                   </div>
 
-                  {/* Enhanced View Mode Toggle */}
-                  <div className="flex border-2 border-gray-200 rounded-xl overflow-hidden">
-                    <Button
-                      variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                      size="lg"
-                      onClick={() => setViewMode('grid')}
-                      className={`rounded-r-none px-6 ${viewMode === 'grid' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'hover:bg-gray-50'}`}
-                    >
-                      <Grid className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      variant={viewMode === 'list' ? 'default' : 'ghost'}
-                      size="lg"
-                      onClick={() => setViewMode('list')}
-                      className={`rounded-l-none px-6 ${viewMode === 'list' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'hover:bg-gray-50'}`}
-                    >
-                      <List className="h-5 w-5" />
-                    </Button>
-                  </div>
+                  {/* Filter Button - Hidden on desktop (>= 1600px) where sidebar is visible */}
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="2xl:hidden h-10 sm:h-12 px-4 sm:px-6 border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-lg sm:rounded-xl whitespace-nowrap"
+                  >
+                    <Filter className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    <span className="text-sm sm:text-base">{t('filters')}</span>
+                    {getActiveFiltersCount() > 0 && (
+                      <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 px-2 py-0.5 text-xs">
+                        {getActiveFiltersCount()}
+                      </Badge>
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Enhanced Results Header */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4 sm:mb-6">
-              <div className="flex items-center gap-4">
-                <div className="text-sm text-gray-600 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-lg shadow-sm">
-                  {loading ? t('loading') : t('showingResults', { count: cases.length, total: pagination.total })}
-                </div>
-                {getActiveFiltersCount() > 0 && (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-1">
-                    {getActiveFiltersCount()} {t('filters')} {t('active')}
-                  </Badge>
+            {/* Create Case + View Toggle + Results Count Row */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+              {/* Left side: Create Case (mobile) + View Toggle */}
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                {/* Create Case Button - Mobile only */}
+                {canCreateCase && (
+                  <Button 
+                    onClick={handleCreateCase}
+                    className="md:hidden flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm flex-shrink-0"
+                  >
+                    <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">{t('createCase')}</span>
+                    <span className="sm:hidden">Create</span>
+                  </Button>
                 )}
+                
+                {/* View Mode Toggle */}
+                <div className="flex border-2 border-gray-200 rounded-lg sm:rounded-xl overflow-hidden flex-shrink-0">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="lg"
+                    onClick={() => setViewMode('grid')}
+                    className={`rounded-r-none px-3 sm:px-4 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'grid' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'hover:bg-gray-50'}`}
+                  >
+                    <Grid className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    size="lg"
+                    onClick={() => setViewMode('list')}
+                    className={`rounded-l-none px-3 sm:px-4 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'list' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'hover:bg-gray-50'}`}
+                  >
+                    <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+                  </Button>
+                </div>
               </div>
 
-              <Select value={filters.sortBy} onValueChange={(value) => handleFilterChange('sortBy', value)}>
-                <SelectTrigger className="w-48 border-2 border-gray-200 focus:border-blue-500">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="createdAt">{t('sortByDate')}</SelectItem>
-                  <SelectItem value="amount">{t('sortByAmount')}</SelectItem>
-                  <SelectItem value="priority">{t('sortByPriority')}</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Right side: Results Count */}
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-end sm:justify-start">
+                <div className="text-xs sm:text-sm text-gray-600 bg-white/80 backdrop-blur-sm px-2.5 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 rounded-lg shadow-sm whitespace-nowrap">
+                  {loading ? t('loading') : t('showingResults', { count: pagination.state.isMobile ? allLoadedCases.length : cases.length, total: serverPagination.total })}
+                </div>
+              </div>
             </div>
 
             {/* Enhanced Cases Grid/List */}
             {loading ? (
               <div className={viewMode === 'grid' 
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6'
+                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5 lg:gap-6'
                 : 'space-y-3'
               }>
                 {[...Array(6)].map((_, i) => (
@@ -498,32 +566,68 @@ export default function CasesPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className={viewMode === 'grid' 
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6'
-                : 'space-y-3'
-              }>
-                {cases.map((caseItem) => (
-                  <CaseCard
-                    key={caseItem.id}
-                    caseItem={caseItem}
-                    onViewDetails={handleViewDetails}
-                    onFavorite={handleFavorite}
-                    viewMode={viewMode}
-                  />
-                ))}
-              </div>
+              <>
+                <div 
+                  id="cases-container"
+                  className={viewMode === 'grid' 
+                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5 lg:gap-6'
+                    : 'space-y-3'
+                  }
+                >
+                  {/* On mobile, show accumulated cases; on desktop, show current page cases */}
+                  {(pagination.state.isMobile ? allLoadedCases : cases).map((caseItem) => (
+                    <CaseCard
+                      key={caseItem.id}
+                      caseItem={caseItem}
+                      onViewDetails={handleViewDetails}
+                      onFavorite={handleFavorite}
+                      viewMode={viewMode}
+                    />
+                  ))}
+                </div>
+                
+                {/* Load More button for mobile */}
+                {pagination.showLoadMoreButton && (
+                  <div className="flex justify-center py-4 sm:hidden">
+                    <Button
+                      onClick={pagination.handleLoadMore}
+                      disabled={pagination.state.isLoadingMore || loading}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white min-w-[120px]"
+                    >
+                      {pagination.state.isLoadingMore || loading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Loading...
+                        </>
+                      ) : (
+                        'Load More'
+                      )}
+                    </Button>
+                  </div>
+                )}
+                
+                {/* End of list indicator on mobile */}
+                {pagination.state.currentPage >= serverPagination.totalPages && allLoadedCases.length > 0 && (
+                  <div className="text-center py-4 text-sm text-gray-500 sm:hidden">
+                    You&apos;ve reached the end of the list
+                  </div>
+                )}
+              </>
             )}
 
-            {/* Enhanced Pagination with Ellipses */}
-            {pagination.totalPages > 1 && (
-              <div className="flex justify-center mt-8">
+            {/* Enhanced Pagination with Ellipses - Hidden on mobile, shown on desktop */}
+            {serverPagination.totalPages > 1 && (
+              <div className="flex justify-center mt-8 hidden sm:flex">
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 flex-wrap justify-center">
                       <Button
                         variant="outline"
-                        disabled={pagination.page === 1}
-                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                        disabled={pagination.state.currentPage === 1}
+                        onClick={() => {
+                          pagination.actions.setCurrentPage(pagination.state.currentPage - 1)
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
                         className="border-2 border-gray-200 hover:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {t('previous')}
@@ -542,13 +646,16 @@ export default function CasesPage() {
                         }
                         
                         const page = pageNum as number
-                        const isActive = pagination.page === page
+                        const isActive = pagination.state.currentPage === page
                         
                         return (
                           <Button
                             key={page}
                             variant={isActive ? 'default' : 'outline'}
-                            onClick={() => setPagination(prev => ({ ...prev, page }))}
+                            onClick={() => {
+                              pagination.actions.setCurrentPage(page)
+                              window.scrollTo({ top: 0, behavior: 'smooth' })
+                            }}
                             className={
                               isActive
                                 ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-0 shadow-md'
@@ -563,8 +670,11 @@ export default function CasesPage() {
                       
                       <Button
                         variant="outline"
-                        disabled={pagination.page === pagination.totalPages}
-                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                        disabled={pagination.state.currentPage >= serverPagination.totalPages}
+                        onClick={() => {
+                          pagination.actions.setCurrentPage(pagination.state.currentPage + 1)
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
                         className="border-2 border-gray-200 hover:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {t('next')}
@@ -572,6 +682,13 @@ export default function CasesPage() {
                     </div>
                   </CardContent>
                 </Card>
+              </div>
+            )}
+            
+            {/* Mobile pagination info - always visible on mobile */}
+            {serverPagination.totalPages > 1 && (
+              <div className="sm:hidden mt-4 text-center text-xs text-gray-600">
+                Showing {allLoadedCases.length} of {serverPagination.total} cases
               </div>
             )}
           </div>

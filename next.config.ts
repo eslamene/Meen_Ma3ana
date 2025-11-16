@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     // Allow builds to proceed with ESLint errors
     ignoreDuringBuilds: true,
   },
+  transpilePackages: ['@heroui/react', '@heroui/theme'],
 };
 
 export default withNextIntl(nextConfig);

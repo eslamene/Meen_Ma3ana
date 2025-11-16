@@ -14,6 +14,7 @@ import { Plus, Calendar, User, MessageSquare, AlertTriangle, Target, FileText, E
 import { CaseUpdate } from '@/lib/case-updates'
 import { createClient } from '@/lib/supabase/client'
 import { useAdmin } from '@/lib/admin/hooks'
+import { cn } from '@/lib/utils'
 
 type UpdateType = 'progress' | 'milestone' | 'general' | 'emergency'
 
@@ -213,14 +214,14 @@ export default function UpdatesTimeline({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header with filters and create button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="text-lg font-semibold">{t('updatesObject.title')}</h3>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+          <h3 className="text-base sm:text-lg font-semibold">{t('updatesObject.title')}</h3>
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={filterType} onValueChange={(value) => setFilterType(value as UpdateType | 'all')}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-full sm:w-32 h-9 sm:h-10 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -237,16 +238,20 @@ export default function UpdatesTimeline({
                   id="showPrivate" 
                   checked={showPrivate} 
                   onCheckedChange={(checked) => setShowPrivate(checked as boolean)}
+                  className="h-4 w-4"
                 />
-                <Label htmlFor="showPrivate" className="text-sm">{t('updatesObject.showPrivate')}</Label>
+                <Label htmlFor="showPrivate" className="text-xs sm:text-sm whitespace-nowrap">{t('updatesObject.showPrivate')}</Label>
               </div>
             )}
           </div>
         </div>
         {canCreate && (
-          <Button onClick={() => setShowCreateForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-                            {t('updatesObject.createUpdate')}
+          <Button 
+            onClick={() => setShowCreateForm(true)}
+            className="w-full sm:w-auto h-9 sm:h-10 text-sm"
+          >
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+            <span className="truncate">{t('updatesObject.createUpdate')}</span>
           </Button>
         )}
       </div>
@@ -282,14 +287,14 @@ export default function UpdatesTimeline({
                   />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="updateType">{t('updatesObject.form.type')}</Label>
                   <Select 
                     value={formData.updateType} 
                     onValueChange={(value) => setFormData({ ...formData, updateType: value as UpdateType })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9 sm:h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -301,27 +306,29 @@ export default function UpdatesTimeline({
                   </Select>
                 </div>
                 
-                <div className="flex items-center space-x-2 pt-6">
+                <div className="flex items-center space-x-2 sm:pt-6">
                   <Checkbox 
                     id="isPublic" 
                     checked={formData.isPublic} 
                     onCheckedChange={(checked) => setFormData({ ...formData, isPublic: checked as boolean })}
+                    className="h-4 w-4"
                   />
                   <Label htmlFor="isPublic" className="text-sm">{t('updatesObject.form.public')}</Label>
                 </div>
               </div>
               
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-9 sm:h-10">
                   {isSubmitting ? t('updatesObject.creating') : t('updatesObject.form.submit')}
                 </Button>
-                                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => setShowCreateForm(false)}
-                  >
-                    {t('updatesObject.cancel')}
-                  </Button>
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => setShowCreateForm(false)}
+                  className="w-full sm:w-auto h-9 sm:h-10"
+                >
+                  {t('updatesObject.cancel')}
+                </Button>
               </div>
             </form>
           </CardContent>
@@ -340,35 +347,35 @@ export default function UpdatesTimeline({
           filteredUpdates.map((update) => (
             <Card key={update.id} className="relative">
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${getUpdateTypeColor(update.updateType)}`}>
+                <div className="flex items-start justify-between gap-2 sm:gap-4">
+                  <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
+                    <div className={`p-1.5 sm:p-2 rounded-full ${getUpdateTypeColor(update.updateType)} flex-shrink-0`}>
                       {getUpdateTypeIcon(update.updateType)}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold">{update.title}</h4>
-                        <Badge variant="secondary" className={getUpdateTypeColor(update.updateType)}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
+                        <h4 className="font-semibold text-sm sm:text-base truncate">{update.title}</h4>
+                        <Badge variant="secondary" className={cn(getUpdateTypeColor(update.updateType), 'text-[10px] sm:text-xs')}>
                           {t(`updatesObject.updateTypes.${update.updateType}`)}
                         </Badge>
                         {!update.isPublic && (
-                          <Badge variant="outline" className="text-xs">
-                            <EyeOff className="h-3 w-3 mr-1" />
+                          <Badge variant="outline" className="text-[10px] sm:text-xs">
+                            <EyeOff className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                             {t('updatesObject.private')}
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                         <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          <span>
+                          <User className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">
                             {update.createdByUser?.first_name && update.createdByUser?.last_name
                               ? `${update.createdByUser.first_name} ${update.createdByUser.last_name}`
                               : t('updatesObject.anonymous')}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
+                          <Calendar className="h-3 w-3 flex-shrink-0" />
                           <span>{formatRelativeDate(update.created_at)}</span>
                         </div>
                       </div>
@@ -376,22 +383,23 @@ export default function UpdatesTimeline({
                   </div>
                   
                   {canModifyUpdate(update) && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setEditingUpdate(update.id)}
+                        className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                       >
-                        <Edit className="h-3 w-3" />
+                        <Edit className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </Button>
                       {canDelete && (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(update.id)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-red-500 hover:text-red-700 h-7 w-7 sm:h-8 sm:w-8 p-0"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         </Button>
                       )}
                     </div>
@@ -417,7 +425,7 @@ export default function UpdatesTimeline({
                       placeholder={t('updatesObject.updateContentPlaceholder')}
                       rows={4}
                     />
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Button 
                         size="sm"
                         onClick={() => handleEdit(update.id, {
@@ -426,6 +434,7 @@ export default function UpdatesTimeline({
                           updateType: update.updateType,
                           isPublic: update.isPublic
                         })}
+                        className="w-full sm:w-auto h-9"
                       >
                         {t('updatesObject.save')}
                       </Button>
@@ -433,6 +442,7 @@ export default function UpdatesTimeline({
                         size="sm" 
                         variant="outline"
                         onClick={() => setEditingUpdate(null)}
+                        className="w-full sm:w-auto h-9"
                       >
                         {t('updatesObject.cancel')}
                       </Button>

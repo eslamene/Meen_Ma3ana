@@ -61,33 +61,33 @@ function QuickActionsSection({ quickActions, t }: QuickActionsSectionProps) {
   }
   
   return (
-    <Card className="mb-6 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+    <Card className="mb-6 sm:mb-8 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-          <TrendingUp className="h-4 w-4 text-blue-600" />
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
+          <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
           {t('quickActions')}
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {visibleActions.map((action, index) => (
             <button
               key={index}
               onClick={action.action}
-              className={`group w-full flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r ${action.color} hover:${action.hoverColor} text-white transition-all duration-200 hover:shadow-md`}
+              className={`group w-full flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg bg-gradient-to-r ${action.color} hover:${action.hoverColor} text-white transition-all duration-200 hover:shadow-md`}
             >
               <div className="flex-shrink-0">
                 {(() => {
                   const Icon = action.icon
-                  return <Icon className="h-5 w-5" />
+                  return <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 })()}
               </div>
-              <div className="flex-1 text-left">
-                <h3 className="font-medium text-base mb-1">{action.title}</h3>
-                <p className="text-sm opacity-90 leading-tight">{action.description}</p>
+              <div className="flex-1 text-left min-w-0">
+                <h3 className="font-medium text-sm sm:text-base mb-0.5 sm:mb-1 truncate">{action.title}</h3>
+                <p className="text-xs sm:text-sm opacity-90 leading-tight line-clamp-2">{action.description}</p>
               </div>
               <div className="flex-shrink-0">
-                <ArrowRight className="h-4 w-4 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
               </div>
             </button>
           ))}
@@ -300,106 +300,106 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-        <Container variant={containerVariant} className="py-8">
+        <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col gap-4">
               <div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
                   {t('welcome')}
                 </h1>
-                <p className="text-lg text-gray-600">
+                <p className="text-base sm:text-lg text-gray-600 break-words">
                   Welcome back, {user?.email}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <Badge variant="outline" className={getRoleColor(userRole || '')}>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <Badge variant="outline" className={`${getRoleColor(userRole || '')} text-xs sm:text-sm`}>
                   <Shield className="h-3 w-3 mr-1" />
-                  {getRoleDisplayName(userRole || '')}
+                  <span className="hidden min-[375px]:inline">{getRoleDisplayName(userRole || '')}</span>
+                  <span className="min-[375px]:hidden">{getRoleDisplayName(userRole || '').split(' ')[0]}</span>
                 </Badge>
                 <Button
                   variant="outline"
                   onClick={refreshUserRole}
                   disabled={refreshingRole}
-                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50 px-2 sm:px-3"
                   title="Refresh role from database"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshingRole ? 'animate-spin' : ''}`} />
-                  {refreshingRole ? 'Refreshing...' : 'Refresh Role'}
+                  <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${refreshingRole ? 'animate-spin' : ''}`} />
                 </Button>
                 <Button
                   variant="outline"
                   onClick={signOut}
-                  className="border-red-200 text-red-700 hover:bg-red-50"
+                  className="border-red-200 text-red-700 hover:bg-red-50 px-2 sm:px-3"
+                  title={t('signOut')}
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  {t('signOut')}
+                  <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </div>
             </div>
           </div>
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Contributions</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Contributions</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                       {loading ? '...' : stats.totalContributions}
                     </p>
                   </div>
-                  <div className="p-3 bg-blue-100 rounded-full">
-                    <Heart className="h-6 w-6 text-blue-600" />
+                  <div className="p-2 sm:p-3 bg-blue-100 rounded-full flex-shrink-0 ml-2">
+                    <Heart className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Amount</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                       {loading ? '...' : formatAmount(stats.totalAmount)}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <DollarSign className="h-6 w-6 text-green-600" />
+                  <div className="p-2 sm:p-3 bg-green-100 rounded-full flex-shrink-0 ml-2">
+                    <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Active Cases</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Cases</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                       {loading ? '...' : stats.activeCases}
                     </p>
                   </div>
-                  <div className="p-3 bg-yellow-100 rounded-full">
-                    <Activity className="h-6 w-6 text-yellow-600" />
+                  <div className="p-2 sm:p-3 bg-yellow-100 rounded-full flex-shrink-0 ml-2">
+                    <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Completed Cases</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Completed Cases</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                       {loading ? '...' : stats.completedCases}
                     </p>
                   </div>
-                  <div className="p-3 bg-purple-100 rounded-full">
-                    <Target className="h-6 w-6 text-purple-600" />
+                  <div className="p-2 sm:p-3 bg-purple-100 rounded-full flex-shrink-0 ml-2">
+                    <Target className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
                   </div>
                 </div>
               </CardContent>
@@ -413,35 +413,35 @@ export default function DashboardPage() {
           />
 
           {/* User Information */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {/* User Profile Card */}
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                  <User className="h-5 w-5 text-blue-600" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                   {t('userInfo')}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-600">Email</span>
-                  <span className="text-sm text-gray-900 font-mono">{user?.email}</span>
+              <CardContent className="space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                  <span className="text-xs sm:text-sm font-medium text-gray-600">Email</span>
+                  <span className="text-xs sm:text-sm text-gray-900 font-mono break-all sm:break-normal sm:text-right">{user?.email}</span>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-600">User ID</span>
-                  <span className="text-xs text-gray-500 font-mono truncate max-w-32">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                  <span className="text-xs sm:text-sm font-medium text-gray-600">User ID</span>
+                  <span className="text-xs text-gray-500 font-mono truncate max-w-full sm:max-w-32 text-right">
                     {user?.id}
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-600">Role</span>
-                  <Badge variant="outline" className={getRoleColor(userRole || '')}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                  <span className="text-xs sm:text-sm font-medium text-gray-600">Role</span>
+                  <Badge variant="outline" className={`${getRoleColor(userRole || '')} text-xs w-fit sm:w-auto`}>
                     {getRoleDisplayName(userRole || '')}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-600">Last Sign In</span>
-                  <span className="text-sm text-gray-900">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                  <span className="text-xs sm:text-sm font-medium text-gray-600">Last Sign In</span>
+                  <span className="text-xs sm:text-sm text-gray-900 text-right">
                     {user?.last_sign_in_at 
                       ? new Date(user.last_sign_in_at).toLocaleDateString()
                       : t('unknown')
@@ -453,41 +453,41 @@ export default function DashboardPage() {
 
             {/* Role Information */}
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                  <Shield className="h-5 w-5 text-purple-600" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
+                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                   {t('roleInfo')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-100">
-                    <h3 className="font-semibold text-purple-900 mb-2">
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="p-3 sm:p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-100">
+                    <h3 className="font-semibold text-sm sm:text-base text-purple-900 mb-1 sm:mb-2">
                       {getRoleDisplayName(userRole || '')}
                     </h3>
-                    <p className="text-sm text-purple-700">
+                    <p className="text-xs sm:text-sm text-purple-700">
                       {getRoleDescription(userRole || '')}
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <h4 className="font-medium text-gray-900">Permissions:</h4>
+                    <h4 className="font-medium text-sm sm:text-base text-gray-900">Permissions:</h4>
                     <div className="space-y-1">
                       <PermissionGuard permissions={["contributions:create"]}>
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          Create contributions
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-green-600">
+                          <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                          <span>Create contributions</span>
                         </div>
                       </PermissionGuard>
                       <PermissionGuard permissions={["cases:create"]}>
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          Create cases
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-green-600">
+                          <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                          <span>Create cases</span>
                         </div>
                       </PermissionGuard>
                       <PermissionGuard permissions={["admin:dashboard"]}>
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          Admin access
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-green-600">
+                          <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                          <span>Admin access</span>
                         </div>
                       </PermissionGuard>
                     </div>
@@ -497,39 +497,39 @@ export default function DashboardPage() {
             </Card>
 
             {/* Recent Activity */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                  <Calendar className="h-5 w-5 text-green-600" />
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg md:col-span-2 lg:col-span-1">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                   Recent Activity
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                    <div className="p-2 bg-blue-100 rounded-full">
-                      <Heart className="h-4 w-4 text-blue-600" />
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-blue-50 rounded-lg">
+                    <div className="p-1.5 sm:p-2 bg-blue-100 rounded-full flex-shrink-0">
+                      <Heart className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Contribution made</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">Contribution made</p>
                       <p className="text-xs text-gray-500">2 hours ago</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                    <div className="p-2 bg-green-100 rounded-full">
-                      <Target className="h-4 w-4 text-green-600" />
+                  <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 rounded-lg">
+                    <div className="p-1.5 sm:p-2 bg-green-100 rounded-full flex-shrink-0">
+                      <Target className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Case sponsored</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">Case sponsored</p>
                       <p className="text-xs text-gray-500">1 day ago</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
-                    <div className="p-2 bg-purple-100 rounded-full">
-                      <Eye className="h-4 w-4 text-purple-600" />
+                  <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-purple-50 rounded-lg">
+                    <div className="p-1.5 sm:p-2 bg-purple-100 rounded-full flex-shrink-0">
+                      <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Profile updated</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">Profile updated</p>
                       <p className="text-xs text-gray-500">3 days ago</p>
                     </div>
                   </div>
@@ -539,12 +539,12 @@ export default function DashboardPage() {
           </div>
 
           {/* Role-specific sections */}
-          <div className="mt-8 space-y-6">
+          <div className="mt-6 sm:mt-8 space-y-4 sm:space-y-6">
             <PermissionGuard permissions={["contributions:read"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                    <Heart className="h-5 w-5 text-blue-600" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
+                    <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                     {t('myContributions')}
                   </CardTitle>
                 </CardHeader>
@@ -556,9 +556,9 @@ export default function DashboardPage() {
 
             <PermissionGuard permissions={["sponsorships:read"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                    <Target className="h-5 w-5 text-green-600" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
+                    <Target className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                     {t('mySponsorships')}
                   </CardTitle>
                 </CardHeader>
@@ -570,9 +570,9 @@ export default function DashboardPage() {
 
             <PermissionGuard permissions={["admin:analytics"]}>
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
+                    <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                     {t('adminReports')}
                   </CardTitle>
                 </CardHeader>

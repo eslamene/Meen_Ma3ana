@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip } from '@heroui/react'
 import { 
   Eye, 
   Heart, 
@@ -347,12 +348,18 @@ export default function CaseCard({
           </div>
         </div>
         
-        <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors" dir={titleDir}>
-          {displayTitle}
-        </CardTitle>
-        <div className="text-gray-600 text-sm leading-relaxed line-clamp-3" dir={descriptionDir}>
-          {displayDescription}
-        </div>
+        <Tooltip content={displayTitle} placement="top" delay={100} closeDelay={0}>
+          <div className="cursor-default">
+            <CardTitle className="text-xl font-bold text-gray-900 line-clamp-1 group-hover:text-blue-600 transition-colors" dir={titleDir}>
+              {displayTitle}
+            </CardTitle>
+          </div>
+        </Tooltip>
+        <Tooltip content={displayDescription} placement="top" delay={100} closeDelay={0}>
+          <div className="text-gray-600 text-sm leading-relaxed line-clamp-1 cursor-default" dir={descriptionDir}>
+            {displayDescription}
+          </div>
+        </Tooltip>
       </CardHeader>
 
       <CardContent className="pt-0 flex-1 flex flex-col">
@@ -551,12 +558,18 @@ export default function CaseCard({
                     </Badge>
                   )}
                 </div>
-                <CardTitle className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors truncate" dir={titleDir}>
-                  {displayTitle}
-                </CardTitle>
-                <div className="text-sm text-gray-600 line-clamp-2 mt-1" dir={descriptionDir}>
-                  {displayDescription}
-                </div>
+                <Tooltip content={displayTitle} placement="top" delay={100} closeDelay={0}>
+                  <div className="cursor-default">
+                    <CardTitle className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors truncate" dir={titleDir}>
+                      {displayTitle}
+                    </CardTitle>
+                  </div>
+                </Tooltip>
+                <Tooltip content={displayDescription} placement="top" delay={100} closeDelay={0}>
+                  <div className="text-sm text-gray-600 line-clamp-1 mt-1 cursor-default" dir={descriptionDir}>
+                    {displayDescription}
+                  </div>
+                </Tooltip>
               </div>
             </div>
 

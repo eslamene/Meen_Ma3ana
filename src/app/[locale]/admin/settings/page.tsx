@@ -26,7 +26,8 @@ import {
   FileText,
   DollarSign,
   Clock,
-  Type
+  Type,
+  Scroll
 } from 'lucide-react'
 
 interface SystemConfig {
@@ -43,6 +44,7 @@ interface ValidationSettings {
   caseDescriptionMaxLength: string
   caseTargetAmountMax: string
   caseDurationMax: string
+  scrollItemsPerPage: string
 }
 
 export default function SystemSettingsPage() {
@@ -62,6 +64,7 @@ export default function SystemSettingsPage() {
     caseDescriptionMaxLength: '2000',
     caseTargetAmountMax: '1000000',
     caseDurationMax: '365',
+    scrollItemsPerPage: '3',
   })
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -95,6 +98,7 @@ export default function SystemSettingsPage() {
         caseDescriptionMaxLength: (settingsMap.get('validation.case.description.max_length') || '2000') as string,
         caseTargetAmountMax: (settingsMap.get('validation.case.target_amount.max') || '1000000') as string,
         caseDurationMax: (settingsMap.get('validation.case.duration.max') || '365') as string,
+        scrollItemsPerPage: (settingsMap.get('pagination.scroll.items_per_page') || '3') as string,
       })
 
       setHasChanges(false)
@@ -134,7 +138,8 @@ export default function SystemSettingsPage() {
             caseDescriptionMinLength: validationSettings.caseDescriptionMinLength,
             caseDescriptionMaxLength: validationSettings.caseDescriptionMaxLength,
             caseTargetAmountMax: validationSettings.caseTargetAmountMax,
-            caseDurationMax: validationSettings.caseDurationMax
+            caseDurationMax: validationSettings.caseDurationMax,
+            scrollItemsPerPage: validationSettings.scrollItemsPerPage
           }
         })
       })
@@ -341,6 +346,35 @@ export default function SystemSettingsPage() {
                         className="h-11"
                       />
                       <p className="text-xs text-gray-500">Maximum duration for one-time cases</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Pagination Settings */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Scroll className="h-4 w-4 text-gray-500" />
+                    <h3 className="text-lg font-semibold text-gray-900">Pagination Settings</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="scroll_items" className="flex items-center gap-2">
+                        <Scroll className="h-4 w-4 text-gray-400" />
+                        Scroll Items Per Page
+                      </Label>
+                      <Input
+                        id="scroll_items"
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={validationSettings.scrollItemsPerPage}
+                        onChange={(e) => handleSettingChange('scrollItemsPerPage', e.target.value)}
+                        className="h-11"
+                      />
+                      <p className="text-xs text-gray-500">Number of items to load per scroll on mobile devices</p>
                     </div>
                   </div>
                 </div>

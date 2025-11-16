@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { RouteContext } from '@/types/next-api'
+import { db } from '@/lib/db'
+import { categoryDetectionRules } from '@/drizzle/schema'
+import { eq, and, desc } from 'drizzle-orm'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
@@ -150,7 +153,7 @@ export async function GET(
         updated_at,
         created_by,
         category_id,
-        case_categories(name)
+        case_categories(name, icon, color)
       `)
       .eq('id', id)
       .single()
@@ -163,7 +166,53 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ case: caseData })
+    // Fetch category detection rules if case has a category and filter by matches
+    let detectionRules: string[] = []
+    if (caseData.category_id) {
+      try {
+        const rules = await db
+          .select({
+            keyword: categoryDetectionRules.keyword,
+            priority: categoryDetectionRules.priority,
+          })
+          .from(categoryDetectionRules)
+          .where(
+            and(
+              eq(categoryDetectionRules.category_id, caseData.category_id),
+              eq(categoryDetectionRules.is_active, true)
+            )
+          )
+          .orderBy(desc(categoryDetectionRules.priority), desc(categoryDetectionRules.created_at))
+
+        // Combine title and description for matching
+        const titleEn = (caseData.title_en || '').toLowerCase()
+        const titleAr = (caseData.title_ar || '').toLowerCase()
+        const descriptionEn = (caseData.description_en || '').toLowerCase()
+        const descriptionAr = (caseData.description_ar || '').toLowerCase()
+        const searchText = `${titleEn} ${titleAr} ${descriptionEn} ${descriptionAr}`
+
+        // Filter rules to only include keywords that match the case title or description
+        const matchedKeywords = rules
+          .filter(rule => {
+            const keywordLower = rule.keyword.toLowerCase()
+            return searchText.includes(keywordLower)
+          })
+          .slice(0, 20) // Limit to top 20 matched keywords by priority
+          .map(r => r.keyword)
+
+        detectionRules = matchedKeywords
+      } catch (rulesError) {
+        // Log but don't fail the request if rules fetch fails
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching detection rules:', rulesError)
+      }
+    }
+
+    return NextResponse.json({ 
+      case: {
+        ...caseData,
+        detectionRules // Return matched keywords as array
+      }
+    })
   } catch (error) {
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in case GET API:', error)
     return NextResponse.json(

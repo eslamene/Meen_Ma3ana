@@ -12,8 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { TabsContent } from '@/components/ui/tabs'
-import { BrandedTabs } from '@/components/ui/branded-tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import CaseFileManager, { CaseFile, FileCategory } from '@/components/cases/CaseFileManager'
@@ -1012,23 +1011,29 @@ export default function CaseEditPage() {
           {/* Edit Form with Tabs */}
           <Card className="shadow-lg">
             <CardContent className="p-6">
-              <BrandedTabs
+              <Tabs
                 value={activeTab}
                 onValueChange={(value) => setActiveTab(value as 'details' | 'files')}
-                items={[
-                  {
-                    value: 'details',
-                    label: t('caseDetails'),
-                    icon: FileEdit,
-                  },
-                  {
-                    value: 'files',
-                    label: t('files.files'),
-                    icon: FileText,
-                    badge: caseFiles.length > 0 ? caseFiles.length : undefined,
-                  },
-                ]}
               >
+                <TabsList variant="branded">
+                  <TabsTrigger 
+                    value="details" 
+                    variant="branded"
+                    icon={FileEdit}
+                    tabIndex={0}
+                  >
+                    {t('caseDetails')}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="files" 
+                    variant="branded"
+                    icon={FileText}
+                    badge={caseFiles.length > 0 ? caseFiles.length : undefined}
+                    tabIndex={1}
+                  >
+                    {t('files.files')}
+                  </TabsTrigger>
+                </TabsList>
                 <TabsContent value="details" className="mt-0">
                   <div className="space-y-6">
             {/* Basic Information */}
@@ -1719,7 +1724,7 @@ export default function CaseEditPage() {
                     showUpload={true}
                   />
                 </TabsContent>
-              </BrandedTabs>
+              </Tabs>
             </CardContent>
           </Card>
 

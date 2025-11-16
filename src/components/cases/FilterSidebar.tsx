@@ -113,8 +113,8 @@ export default function FilterSidebar({
 
   return (
     <>
-      {/* Enhanced Mobile Filter Toggle */}
-      <div className="lg:hidden mb-4">
+      {/* Enhanced Filter Toggle - Hidden on screens < 1600px, use main filter button instead */}
+      <div className="hidden 2xl:block mb-4">
         <Button
           variant="outline"
           onClick={onToggle}
@@ -141,8 +141,332 @@ export default function FilterSidebar({
         </Button>
       </div>
 
-      {/* Enhanced Filter Sidebar */}
-      <div className={`lg:block transition-all duration-300 ease-in-out ${isOpen ? 'block opacity-100' : 'hidden lg:block opacity-100'}`}>
+      {/* Bottom Sheet Overlay - Show on screens < 1600px */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-40 2xl:hidden bg-black/50 backdrop-blur-sm transition-opacity duration-300"
+          onClick={onToggle}
+        />
+      )}
+
+      {/* Bottom Sheet - Show on screens < 1600px */}
+      <div className={`
+        2xl:hidden fixed inset-x-0 bottom-0 z-50 
+        transform transition-transform duration-300 ease-out
+        ${isOpen ? 'translate-y-0' : 'translate-y-full'}
+      `}>
+        <div className="bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col">
+          {/* Drag Handle */}
+          <div className="flex justify-center pt-3 pb-2">
+            <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+          </div>
+
+          {/* Header */}
+          <div className="px-4 pb-4 border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg">
+                  <Filter className="h-5 w-5 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">{t('filters')}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onClearFilters}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    {t('clearAll')}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggle}
+                  className="p-2"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mt-2">
+              {t('filterDescription')}
+            </p>
+          </div>
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="space-y-6 pb-4">
+            {/* Enhanced Case Type Filter */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Target className="h-4 w-4 text-blue-600" />
+                {t('caseType')}
+              </label>
+              <Select value={filters.type} onValueChange={(value) => onFilterChange('type', value)}>
+                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                  <SelectValue placeholder={t('allTypes')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('allTypes')}</SelectItem>
+                  <SelectItem value="one-time">{t('oneTime')}</SelectItem>
+                  <SelectItem value="recurring">{t('recurring')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Enhanced Status Filter */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Eye className="h-4 w-4 text-green-600" />
+                {t('status')}
+              </label>
+              <Select value={filters.status} onValueChange={(value) => onFilterChange('status', value)}>
+                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                  <SelectValue placeholder={t('allStatuses')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('allStatuses')}</SelectItem>
+                  <SelectItem value="published">{t('published')}</SelectItem>
+                  <SelectItem value="completed">{t('completed')}</SelectItem>
+                  <SelectItem value="closed">{t('closed')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Enhanced Category Filter - Assigned Categories */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Gift className="h-4 w-4 text-purple-600" />
+                {t('category')}
+              </label>
+              <Select 
+                value={filters.category} 
+                onValueChange={(value) => onFilterChange('category', value)}
+                disabled={categoriesLoading}
+              >
+                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                  <SelectValue placeholder={categoriesLoading ? t('loading') || 'Loading...' : t('allCategories')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('allCategories')}</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <div className="flex items-center gap-2">
+                        {category.icon && <DynamicIcon name={category.icon} className="h-4 w-4" />}
+                        <span>{category.name_en || category.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Auto-Detected Category Filter - Detection Rules */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-600" />
+                {t('autoDetectedCategory')}
+              </label>
+              <Select value={filters.detectedCategory} onValueChange={(value) => onFilterChange('detectedCategory', value)}>
+                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                  <SelectValue placeholder={t('allCategories')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('allCategories')}</SelectItem>
+                  <SelectItem value="medical">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('medical')}
+                      Medical Support
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="education">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('education')}
+                      Educational Assistance
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="housing">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('housing')}
+                      Housing & Rent
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="appliances">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('appliances')}
+                      Home Appliances
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="emergency">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('emergency')}
+                      Emergency Relief
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="livelihood">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('livelihood')}
+                      Livelihood & Business
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="community">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('community')}
+                      Community & Social
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="basicneeds">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('basicneeds')}
+                      Basic Needs & Clothing
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="other">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon('other')}
+                      Other Support
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Enhanced Amount Range */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-green-600" />
+                {t('amountRange')}
+              </label>
+              <div className="space-y-3">
+                <Input
+                  placeholder={t('minAmount')}
+                  value={filters.minAmount}
+                  onChange={(e) => onFilterChange('minAmount', e.target.value)}
+                  type="number"
+                  className="border-2 border-gray-200 focus:border-blue-500 h-11"
+                />
+                <Input
+                  placeholder={t('maxAmount')}
+                  value={filters.maxAmount}
+                  onChange={(e) => onFilterChange('maxAmount', e.target.value)}
+                  type="number"
+                  className="border-2 border-gray-200 focus:border-blue-500 h-11"
+                />
+              </div>
+            </div>
+
+            {/* Enhanced Sort Options */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+                {t('sortBy')}
+              </label>
+              <Select value={filters.sortBy} onValueChange={(value) => onFilterChange('sortBy', value)}>
+                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="createdAt">{t('sortByDate')}</SelectItem>
+                  <SelectItem value="amount">{t('sortByAmount')}</SelectItem>
+                  <SelectItem value="priority">{t('sortByPriority')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Enhanced Sort Order */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-gray-600" />
+                {t('sortOrder')}
+              </label>
+              <Select value={filters.sortOrder} onValueChange={(value) => onFilterChange('sortOrder', value as 'asc' | 'desc')}>
+                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">{t('newestFirst')}</SelectItem>
+                  <SelectItem value="asc">{t('oldestFirst')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Enhanced Quick Filter Presets */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                <Target className="h-4 w-4 text-orange-600" />
+                {t('quickFilters')}
+              </label>
+              <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start h-11 border-2 border-red-200 hover:border-red-300 hover:bg-red-50 transition-all duration-200"
+                  onClick={() => {
+                    onFilterChange('detectedCategory', 'emergency')
+                    onFilterChange('status', 'published')
+                    onFilterChange('sortBy', 'createdAt')
+                    onFilterChange('sortOrder', 'desc')
+                  }}
+                >
+                  <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
+                  {t('emergencyCases')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start h-11 border-2 border-green-200 hover:border-green-300 hover:bg-green-50 transition-all duration-200"
+                  onClick={() => {
+                    onFilterChange('type', 'one-time')
+                    onFilterChange('status', 'published')
+                    onFilterChange('sortBy', 'amount')
+                    onFilterChange('sortOrder', 'asc')
+                  }}
+                >
+                  <DollarSign className="h-4 w-4 mr-2 text-green-500" />
+                  {t('lowAmountCases')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start h-11 border-2 border-blue-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
+                  onClick={() => {
+                    onFilterChange('detectedCategory', 'education')
+                    onFilterChange('status', 'published')
+                    onFilterChange('sortBy', 'createdAt')
+                    onFilterChange('sortOrder', 'desc')
+                  }}
+                >
+                  <GraduationCap className="h-4 w-4 mr-2 text-blue-500" />
+                  {t('educationCases')}
+                </Button>
+              </div>
+            </div>
+
+            </div>
+          </div>
+
+          {/* Apply Button - Fixed at bottom */}
+          <div className="px-4 py-4 border-t border-gray-200 bg-white flex-shrink-0">
+            <Button 
+              onClick={() => {
+                onApplyFilters()
+                onToggle()
+              }}
+              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 h-12"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {t('applyFilters')}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Filter Sidebar - Show only on screens >= 1600px */}
+      <div className={`hidden 2xl:block transition-all duration-300 ease-in-out ${isOpen ? 'block opacity-100' : 'opacity-100'}`}>
         <Card className="mb-6 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
           <CardHeader className="pb-4 border-b border-gray-100">
             <div className="flex items-center justify-between">
