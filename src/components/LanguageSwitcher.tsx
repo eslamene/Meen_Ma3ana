@@ -31,9 +31,9 @@ export default function LanguageSwitcher() {
   }
 
   return (
-    <div className="relative group">
+    <div className="relative group flex items-center">
       {/* Language Toggle Button */}
-      <div className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
+      <div className="flex items-center justify-center bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
         {locales.map((loc) => {
           // Use pathname-based locale as the primary source since useLocale might not update immediately
           const currentLoc = currentLocaleFromPath || locale || 'en'
@@ -43,7 +43,7 @@ export default function LanguageSwitcher() {
             <button
               key={loc}
               onClick={() => switchLanguage(loc)}
-              className={`relative px-3 py-2 text-sm font-medium transition-all duration-200 flex items-center gap-2 first:rounded-l-lg last:rounded-r-lg ${
+              className={`relative flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 text-sm font-medium transition-all duration-200 min-w-[2.5rem] sm:min-w-0 first:rounded-l-lg last:rounded-r-lg ${
                 isActive
                   ? 'bg-[#E74C3C] text-white shadow-sm transform scale-105 z-10'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -51,12 +51,12 @@ export default function LanguageSwitcher() {
               title={`Switch to ${loc === 'en' ? 'English' : 'Arabic'}`}
             >
               {/* Flag Icon */}
-              <span className="text-base leading-none">
+              <span className="text-base sm:text-lg leading-none flex-shrink-0">
                 {loc === 'en' ? '🇬🇧' : '🇪🇬'}
               </span>
               
               {/* Language Label - Hidden on small screens */}
-              <span className="hidden sm:inline font-semibold">
+              <span className="hidden sm:inline font-semibold whitespace-nowrap">
                 {loc === 'en' ? 'EN' : 'AR'}
               </span>
             </button>

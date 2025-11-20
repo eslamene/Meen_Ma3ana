@@ -316,7 +316,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
           </div>
           
           {/* Language Switcher - Always visible */}
-          <div className="mb-4">
+          <div className="mb-4 flex items-center justify-center">
             <LanguageSwitcher />
           </div>
 

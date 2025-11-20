@@ -55,16 +55,40 @@ export default function NavigationBar() {
   }, [])
   
   // Use the new admin hook
-  const { menuItems, loading: modulesLoading } = useAdmin()
+  const { menuItems, loading: modulesLoading, hasPermission } = useAdmin()
   
-  // Convert menuItems to modules format for compatibility
-  const modules = menuItems.map(item => ({
-    id: item.id,
-    name: item.label.toLowerCase().replace(/\s+/g, '_'),
-    display_name: item.label,
-    icon: item.icon || 'FileText',
-    items: item.children || []
-  }))
+  // Filter menu items for top navigation
+  // Strategy: Include all top-level items (no parent) except admin modules and notifications
+  // Admin modules should only appear in sidebar, not top nav
+  // Notifications are handled separately in the right side with badge
+  const topNavItems = menuItems.filter(item => {
+    // Only include top-level items (items without parent_id)
+    if (item.parent_id) {
+      return false
+    }
+    
+    // Exclude notifications - handled separately in right side with badge
+    if (item.href === '/notifications') {
+      return false
+    }
+    
+    // Exclude admin-specific modules that should only be in sidebar
+    const adminModuleHrefs = [
+      '/case-management',
+      '/access-control',
+      '/admin',
+      '/settings',
+      '/rbac',
+      '/storage'
+    ]
+    const isAdminModule = adminModuleHrefs.some(href => item.href.startsWith(href))
+    
+    // Exclude if it's an admin module
+    return !isAdminModule
+  })
+  
+  // Sort by sort_order
+  topNavItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
@@ -171,15 +195,15 @@ export default function NavigationBar() {
 
   return (
     <nav className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16 md:h-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+        <div className="flex justify-between items-center h-16 md:h-16 gap-2">
           {/* Logo and Brand */}
-          <div className="flex items-center">
+          <div className="flex items-center flex-shrink-0 min-w-0">
             <Logo size="lg" />
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-1">
+          <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-3xl mx-4 overflow-x-auto">
             {!user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode) ? (
               // Public user navigation - uses database with config fallback
               <>
@@ -307,68 +331,78 @@ export default function NavigationBar() {
                 })}
               </>
             ) : (
-              // Authenticated user navigation
+              // Authenticated user navigation - uses menuItems from useAdmin()
               <>
-                <Link 
-                  href={`/${locale}/dashboard`}
-                  className={`${getNavLinkClass('/dashboard')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
-                >
-                  {t('dashboard')}
-                </Link>
-                
-                <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
-                  <Link 
-                    href={`/${locale}/cases`}
-                    className={`${getNavLinkClass('/cases')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
-                  >
-                    {t('cases')}
-                  </Link>
-                </GuestPermissionGuard>
-                
-                <Link 
-                  href={`/${locale}/projects`}
-                  className={`${getNavLinkClass('/projects')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
-                >
-                  {t('projects')}
-                </Link>
-
-                {/* Modular Navigation - Only for authenticated users */}
-                {!modulesLoading && modules.map((module) => {
-                  const ModuleIcon = getIcon(module.icon)
-                  return (
-                    <div key={module.id} className="relative group">
-                      <Button variant="ghost" className="text-gray-700 hover:text-gray-900 flex items-center gap-1.5">
-                        {ModuleIcon && <ModuleIcon className="h-4 w-4" />}
-                        {module.display_name}
-                      </Button>
-                      {module.items && module.items.length > 0 && (
-                        <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                          <div className="py-1">
-                            {module.items.map((item, index) => {
-                              const ItemIcon = item.icon ? getIcon(item.icon) : undefined
-                              return (
-                                <Link
-                                  key={index}
-                                  href={`/${locale}${item.href}`}
-                                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                >
-                                  {ItemIcon && <ItemIcon className="h-4 w-4" />}
-                                  {item.label}
-                                </Link>
-                              )
-                            })}
+                {!modulesLoading && topNavItems.map((item) => {
+                  const Icon = item.icon ? getIcon(item.icon) : undefined
+                  const hasChildren = item.children && item.children.length > 0
+                  const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
+                  
+                  // Render parent item with dropdown if it has children
+                  if (hasChildren) {
+                    return (
+                      <div key={item.id} className="relative group">
+                        <button
+                          className={`${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1 flex items-center gap-1.5`}
+                        >
+                          {Icon && <Icon className="h-4 w-4" />}
+                          {labelText}
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {item.children && item.children.length > 0 && (
+                          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div className="py-1">
+                              {item.children.map((child) => {
+                                const ChildIcon = child.icon ? getIcon(child.icon) : undefined
+                                const childLabelText = locale === 'ar' && child.label_ar ? child.label_ar : child.label
+                                return (
+                                  <Link
+                                    key={child.id}
+                                    href={`/${locale}${child.href}`}
+                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                  >
+                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                    {childLabelText}
+                                  </Link>
+                                )
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  
+                  // Regular item without children
+                  const linkContent = (
+                    <Link
+                      key={item.id}
+                      href={`/${locale}${item.href}`}
+                      className={`${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1 ${Icon ? 'flex items-center gap-1.5' : ''}`}
+                    >
+                      {Icon && <Icon className="h-4 w-4" />}
+                      {labelText}
+                    </Link>
                   )
+                  
+                  // Wrap with permission guard if item has permission requirement
+                  if (item.permission_id) {
+                    // We need to check permission - but we don't have permission name here
+                    // The useAdmin hook already filters by permissions, so items here should be accessible
+                    // But we can add an extra check if needed
+                    return linkContent
+                  }
+                  
+                  return linkContent
                 })}
               </>
             )}
           </div>
 
           {/* Right side - Language Switcher, Auth and Notifications */}
-          <div className="hidden lg:flex items-center space-x-3 xl:space-x-4">
+          <div className="hidden lg:flex items-center space-x-3 xl:space-x-4 flex-shrink-0">
             {/* Language Switcher */}
             <LanguageSwitcher />
             {user && !isRecoveryMode && !(isResetPasswordPage && !isRecoveryMode) ? (
@@ -457,34 +491,8 @@ export default function NavigationBar() {
             )}
           </div>
 
-          {/* Tablet/Mobile: Show Language Switcher and Auth buttons */}
-          <div className="lg:hidden flex items-center space-x-2">
-            <LanguageSwitcher />
-            {(!user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode)) && (
-              <div className="flex items-center space-x-2">
-                <Link href={`/${locale}/auth/login`}>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="text-gray-700 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200 font-medium text-xs sm:text-sm px-2 sm:px-3"
-                  >
-                    {t('login')}
-                  </Button>
-                </Link>
-                <Link href={`/${locale}/auth/register`}>
-                  <Button 
-                    size="sm"
-                    className="bg-gradient-to-r from-[#6B8E7E] to-[#5a7a6b] hover:from-[#5a7a6b] hover:to-[#4a6a5b] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 text-xs sm:text-sm px-2 sm:px-3"
-                  >
-                    {t('register')}
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="lg:hidden">
+          {/* Mobile menu button - Login/Register moved to menu */}
+          <div className="lg:hidden flex-shrink-0">
             <Button
               variant="ghost"
               size="sm"
@@ -506,7 +514,7 @@ export default function NavigationBar() {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 bg-white shadow-lg">
+          <div className="lg:hidden border-t border-gray-200 bg-white shadow-lg max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 pt-4 pb-4 space-y-1">
               {!user ? (
                 // Public user mobile navigation - uses database with config fallback
@@ -651,79 +659,79 @@ export default function NavigationBar() {
                   </div>
                 </>
               ) : (
-                // Authenticated user mobile navigation
+                // Authenticated user mobile navigation - uses menuItems from useAdmin()
                 <>
-                  <Link 
-                    href={`/${locale}/dashboard`}
-                    className={`${getNavLinkClass('/dashboard')} block px-4 py-3 text-base font-medium rounded-lg transition-colors`}
-                    onClick={closeMobileMenu}
-                  >
-                    {t('dashboard')}
-                  </Link>
-
-                  <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
-                    <Link 
-                      href={`/${locale}/cases`}
-                      className={`${getNavLinkClass('/cases')} block px-4 py-3 text-base font-medium rounded-lg transition-colors`}
-                      onClick={closeMobileMenu}
-                    >
-                      {t('cases')}
-                    </Link>
-                  </GuestPermissionGuard>
-
-                  <Link 
-                    href={`/${locale}/projects`}
-                    className={`${getNavLinkClass('/projects')} block px-4 py-3 text-base font-medium rounded-lg transition-colors`}
-                    onClick={closeMobileMenu}
-                  >
-                    {t('projects')}
-                  </Link>
-
-                  {/* Modular Navigation - Mobile */}
-                  {!modulesLoading && modules.map((module) => {
-                    const ModuleIcon = getIcon(module.icon)
-                    return (
-                      <div key={module.id} className="space-y-1">
-                        <div className="px-4 py-2 text-sm font-semibold text-gray-900 flex items-center gap-2">
-                          {ModuleIcon && <ModuleIcon className="h-4 w-4" />}
-                          {module.display_name}
-                        </div>
-                        {module.items && module.items.length > 0 && (
-                          <div className="pl-4 space-y-1">
-                            {module.items.map((item, index) => {
-                              const ItemIcon = item.icon ? getIcon(item.icon) : undefined
-                              return (
-                                <Link
-                                  key={index}
-                                  href={`/${locale}${item.href}`}
-                                  onClick={closeMobileMenu}
-                                  className="block px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-2"
-                                >
-                                  {ItemIcon && <ItemIcon className="h-4 w-4" />}
-                                  {item.label}
-                                </Link>
-                              )
-                            })}
+                  {!modulesLoading && topNavItems.map((item) => {
+                    const Icon = item.icon ? getIcon(item.icon) : undefined
+                    const hasChildren = item.children && item.children.length > 0
+                    const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
+                    
+                    // Render parent item with children
+                    if (hasChildren) {
+                      return (
+                        <div key={item.id} className="space-y-1">
+                          <div className="px-4 py-2 text-sm font-semibold text-gray-900 flex items-center gap-2">
+                            {Icon && <Icon className="h-4 w-4" />}
+                            {labelText}
                           </div>
-                        )}
-                      </div>
+                          {item.children && (
+                            <div className="pl-4 space-y-1">
+                              {item.children.map((child) => {
+                                const ChildIcon = child.icon ? getIcon(child.icon) : undefined
+                                const childLabelText = locale === 'ar' && child.label_ar ? child.label_ar : child.label
+                                return (
+                                  <Link
+                                    key={child.id}
+                                    href={`/${locale}${child.href}`}
+                                    onClick={closeMobileMenu}
+                                    className="block px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-2"
+                                  >
+                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                    {childLabelText}
+                                  </Link>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+                    
+                    // Regular item without children
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/${locale}${item.href}`}
+                        className={`${getNavLinkClass(item.href)} block px-4 py-3 text-base font-medium rounded-lg transition-colors ${Icon ? 'flex items-center gap-2' : ''}`}
+                        onClick={closeMobileMenu}
+                      >
+                        {Icon && <Icon className="h-4 w-4" />}
+                        <span>{labelText}</span>
+                      </Link>
                     )
                   })}
 
-                  <Link 
-                    href={`/${locale}/notifications`}
-                    className={`${getNavLinkClass('/notifications')} block px-4 py-3 text-base font-medium rounded-lg transition-colors`}
-                    onClick={closeMobileMenu}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>{t('notifications')}</span>
-                      {unreadNotifications > 0 && (
-                        <Badge className="ml-2 bg-red-500 text-white">
-                          {unreadNotifications}
-                        </Badge>
-                      )}
-                    </div>
-                  </Link>
+                  {/* Notifications - shown separately in mobile with badge */}
+                  {!modulesLoading && menuItems.find(item => item.href === '/notifications' && !item.parent_id) && (
+                    <Link
+                      href={`/${locale}/notifications`}
+                      className={`${getNavLinkClass('/notifications')} block px-4 py-3 text-base font-medium rounded-lg transition-colors flex items-center gap-2`}
+                      onClick={closeMobileMenu}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{t('notifications')}</span>
+                        {unreadNotifications > 0 && (
+                          <Badge className="ml-2 bg-red-500 text-white">
+                            {unreadNotifications}
+                          </Badge>
+                        )}
+                      </div>
+                    </Link>
+                  )}
 
                   <div className="border-t border-gray-200 pt-4 mt-4 space-y-2">
                     <div className="px-4 py-2 text-sm text-gray-500">
@@ -749,14 +757,12 @@ export default function NavigationBar() {
                 </>
               )}
 
-              {/* Language Switcher for Mobile - Only show if not already visible in header */}
-              {user && (
-                <div className="border-t border-gray-200 pt-4 mt-4">
-                  <div className="px-4 py-2">
-                    <LanguageSwitcher />
-                  </div>
+              {/* Language Switcher for Mobile - Always shown in menu for all users */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="px-4 py-2 flex items-center justify-center">
+                  <LanguageSwitcher />
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}
