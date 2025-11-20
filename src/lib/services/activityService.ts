@@ -50,7 +50,7 @@ export interface ActivityLogEntry {
 export interface ActivityQueryParams {
   limit?: number
   offset?: number
-  user_id?: string
+  user_id?: string | 'null' | 'not_null' // 'null' for visitors, 'not_null' for authenticated, string for specific user
   activity_type?: ActivityType
   category?: ActivityCategory
   action?: string
@@ -345,8 +345,12 @@ export class ActivityService {
 
   /**
    * Get activity logs with filtering
+   * Returns both logs and total count
    */
-  static async getActivityLogs(params: ActivityQueryParams = {}): Promise<ActivityLogEntry[]> {
+  static async getActivityLogs(params: ActivityQueryParams = {}): Promise<{
+    logs: ActivityLogEntry[]
+    total: number
+  }> {
     try {
       const limit = params.limit || 100
       const offset = params.offset || 0
@@ -357,8 +361,17 @@ export class ActivityService {
       let paramIndex = 1
 
       if (params.user_id) {
-        conditions.push(`user_id = $${paramIndex++}`)
-        values.push(params.user_id)
+        if (params.user_id === 'null') {
+          // Filter for visitors only (user_id IS NULL)
+          conditions.push(`user_id IS NULL`)
+        } else if (params.user_id === 'not_null') {
+          // Filter for authenticated users only (user_id IS NOT NULL)
+          conditions.push(`user_id IS NOT NULL`)
+        } else {
+          // Filter for specific user
+          conditions.push(`user_id = $${paramIndex++}`)
+          values.push(params.user_id)
+        }
       }
 
       if (params.activity_type) {
@@ -415,10 +428,29 @@ export class ActivityService {
         query += ' AND ' + conditions.join(' AND ')
       }
 
+      // Build count query (same conditions, but count instead of select)
+      let countQuery = 'SELECT COUNT(*) as total FROM site_activity_log WHERE 1=1'
+      if (conditions.length > 0) {
+        countQuery += ' AND ' + conditions.join(' AND ')
+      }
+      
+      // Get total count (without limit/offset)
+      const countValues = [...values] // Copy values without limit/offset
+      const countResult = await client.unsafe(countQuery, countValues as any[])
+      
+      const countRows = Array.isArray(countResult)
+        ? countResult
+        : (countResult && typeof countResult === 'object' && 'rows' in countResult && Array.isArray((countResult as { rows?: unknown[] }).rows))
+          ? (countResult as { rows: unknown[] }).rows
+          : []
+      
+      const total = countRows.length > 0 ? parseInt((countRows[0] as any).total || '0') : 0
+
+      // Get paginated results
       query += ` ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`
       values.push(limit, offset)
 
-      const result = await client.unsafe(query, values)
+      const result = await client.unsafe(query, values as any[])
 
       // Extract rows from drizzle result
       const extractedRows = Array.isArray(result)
@@ -427,10 +459,13 @@ export class ActivityService {
           ? (result as { rows: unknown[] }).rows
           : []
 
-      return extractedRows as ActivityLogEntry[]
+      return {
+        logs: extractedRows as ActivityLogEntry[],
+        total
+      }
     } catch (error) {
       defaultLogger.error('Error getting activity logs:', error)
-      return []
+      return { logs: [], total: 0 }
     }
   }
 
@@ -488,7 +523,7 @@ export class ActivityService {
         ORDER BY period DESC, activity_type
       `
 
-      const result = await client.unsafe(query, values)
+      const result = await client.unsafe(query, values as any[])
 
       const extractedRows = Array.isArray(result)
         ? result
@@ -524,7 +559,7 @@ export class ActivityService {
           ? (result as { rows: unknown[] }).rows
           : []
 
-      return extractedRows.length > 0 ? parseInt(extractedRows[0].cleanup_old_activity_logs || '0') : 0
+      return extractedRows.length > 0 ? parseInt((extractedRows[0] as any).cleanup_old_activity_logs || '0') : 0
     } catch (error) {
       defaultLogger.error('Error cleaning up old logs:', error)
       return 0
@@ -586,7 +621,7 @@ export class ActivityService {
         ORDER BY period DESC
       `
 
-      const result = await client.unsafe(query, values)
+      const result = await client.unsafe(query, values as any[])
 
       const extractedRows = Array.isArray(result)
         ? result
@@ -606,7 +641,7 @@ export class ActivityService {
         GROUP BY DATE_TRUNC('${truncFormat}', session_start)
       `
 
-      const sessionResult = await client.unsafe(sessionQuery, values)
+      const sessionResult = await client.unsafe(sessionQuery, values as any[])
       const sessionRows = Array.isArray(sessionResult)
         ? sessionResult
         : (sessionResult && typeof sessionResult === 'object' && 'rows' in sessionResult && Array.isArray((sessionResult as { rows?: unknown[] }).rows))
@@ -681,7 +716,7 @@ export class ActivityService {
       query += ` ORDER BY session_start DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`
       values.push(limit, offset)
 
-      const result = await client.unsafe(query, values)
+      const result = await client.unsafe(query, values as any[])
 
       const extractedRows = Array.isArray(result)
         ? result

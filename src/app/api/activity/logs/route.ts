@@ -43,7 +43,6 @@ export async function GET(request: NextRequest) {
     const queryParams: ActivityQueryParams = {
       limit: parseInt(searchParams.get('limit') || '100'),
       offset: parseInt(searchParams.get('offset') || '0'),
-      user_id: searchParams.get('user_id') || undefined,
       activity_type: searchParams.get('activity_type') as any,
       category: searchParams.get('category') as any,
       action: searchParams.get('action') || undefined,
@@ -51,6 +50,18 @@ export async function GET(request: NextRequest) {
       resource_id: searchParams.get('resource_id') || undefined,
       severity: searchParams.get('severity') as any,
       search: searchParams.get('search') || undefined,
+    }
+
+    // Handle user_id filtering (for visitor vs authenticated filtering)
+    const userIdParam = searchParams.get('user_id')
+    if (userIdParam === 'null') {
+      // Filter for visitors only (user_id IS NULL)
+      queryParams.user_id = 'null'
+    } else if (userIdParam === 'not_null') {
+      // Filter for authenticated users only (user_id IS NOT NULL)
+      queryParams.user_id = 'not_null'
+    } else if (userIdParam) {
+      queryParams.user_id = userIdParam
     }
 
     // Parse date filters
@@ -62,18 +73,16 @@ export async function GET(request: NextRequest) {
     }
 
     // If not admin, only show user's own logs
-    // Note: Visitors (anonymous users) can't query logs - only admins can see visitor logs
     if (!isAdmin) {
       queryParams.user_id = user.id
-      // Non-admins can't see visitor logs (where user_id is NULL)
-      // This is handled by the query - we don't need to filter it here
     }
 
-    const logs = await ActivityService.getActivityLogs(queryParams)
+    const { logs, total } = await ActivityService.getActivityLogs(queryParams)
 
     return NextResponse.json({
       logs,
       count: logs.length,
+      total,
       limit: queryParams.limit,
       offset: queryParams.offset,
     })
