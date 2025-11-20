@@ -209,20 +209,7 @@ export default function Stats() {
           </div>
         </div>
 
-        {/* Inspirational Quote */}
-        <div className="text-center">
-          <div className="inline-block max-w-4xl">
-            <div className="relative">
-              <div className="absolute -top-4 -left-4 text-6xl text-[#6B8E7E]/20 font-serif">&quot;</div>
-              <p className="text-xl md:text-2xl text-gray-700 italic leading-relaxed relative z-10 px-8" dir={isRTL ? 'rtl' : 'ltr'}>
-                {isRTL
-                  ? 'الخير لا ينتهي أبداً. كلما أعطيت أكثر، كلما نمت أكثر.'
-                  : 'Goodness never ends. The more you give, the more you grow.'}
-              </p>
-              <div className="absolute -bottom-4 -right-4 text-6xl text-[#6B8E7E]/20 font-serif">&quot;</div>
-            </div>
-          </div>
-        </div>
+
       </div>
     </section>
   )
