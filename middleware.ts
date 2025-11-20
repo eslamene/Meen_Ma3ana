@@ -195,6 +195,26 @@ export default async function middleware(request: NextRequest) {
       // Preserve all cookie attributes (path, domain, secure, httpOnly, etc.)
       intlResponse.headers.append('Set-Cookie', cookie.toString());
     });
+    
+    // Track page views for visitors and authenticated users (non-blocking)
+    // Only track actual page routes, not API routes or static assets
+    const pathname = requestWithCorrelationId.nextUrl.pathname
+    const isPageRoute = !pathname.startsWith('/api/') && 
+                       !pathname.startsWith('/_next/') && 
+                       !pathname.startsWith('/_static/') &&
+                       !pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot)$/)
+    
+    if (isPageRoute) {
+      // Import and log page view asynchronously (non-blocking)
+      import('@/lib/middleware/activityLogger').then(({ logPageView }) => {
+        logPageView(requestWithCorrelationId, pathname).catch(() => {
+          // Silently fail - don't break the request
+        })
+      }).catch(() => {
+        // Silently fail if import fails
+      })
+    }
+    
     return intlResponse;
   }
   
