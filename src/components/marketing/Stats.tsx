@@ -203,7 +203,7 @@ export default function Stats() {
               href={`/${locale}/cases`}
               className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[#6B8E7E] rounded-lg hover:bg-gray-50 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              <span>{isRTL ? 'استكشف المبادرات' : 'Explore Initiatives'}</span>
+              <span>{isRTL ? 'حالات محتاجة دعم' : 'Cases Needing Support'}</span>
               <ArrowRight className={`h-5 w-5 transition-transform ${isRTL ? 'rotate-180' : ''}`} />
             </Link>
           </div>
