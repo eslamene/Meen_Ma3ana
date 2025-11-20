@@ -101,17 +101,17 @@ export default function Stats() {
       color: 'text-[#E74C3C]',
       bgColor: 'bg-[#E74C3C]/10',
       description: 'Community contributions making a real difference',
-      descriptionAr: 'مساهمات المجتمع تحدث فرقاً حقيقياً',
+      descriptionAr: 'ساعدنا بكام',
     },
     {
       icon: <Users className="h-8 w-8" />,
       value: loading ? '...' : formatNumber(stats.beneficiaries),
       label: 'Lives Touched',
-      labelAr: 'أرواح مستفيدة',
+      labelAr: 'عدد المستفيدين',
       color: 'text-[#6B8E7E]',
       bgColor: 'bg-[#6B8E7E]/10',
       description: 'Families and individuals supported by our community',
-      descriptionAr: 'أسر وأفراد دعمتهم مجتمعنا',
+      descriptionAr: 'أسر وأفراد و ومشرروعات  تم دعمهما',
     },
     {
       icon: <HandHeart className="h-8 w-8" />,
@@ -121,17 +121,17 @@ export default function Stats() {
       color: 'text-[#3498DB]',
       bgColor: 'bg-[#3498DB]/10',
       description: 'People coming together to create positive change',
-      descriptionAr: 'أشخاص يتحدون لخلق تغيير إيجابي',
+      descriptionAr:  'اتجمعت عشان تساعد معانا',
     },
     {
       icon: <Sparkles className="h-8 w-8" />,
       value: loading ? '...' : formatNumber(stats.activeCases),
       label: 'Active Initiatives',
-      labelAr: 'مبادرات نشطة',
+      labelAr: 'حالات محتاجة دعم',
       color: 'text-[#9B59B6]',
       bgColor: 'bg-[#9B59B6]/10',
       description: 'Ongoing projects transforming lives every day',
-      descriptionAr: 'مشاريع مستمرة تحول الأرواح كل يوم',
+      descriptionAr: 'حالات حقيقية محتاجة دعم',
     },
   ]
 
@@ -192,12 +192,12 @@ export default function Stats() {
           <div className="relative z-10 text-center text-white">
             <TrendingUp className="h-12 w-12 mx-auto mb-6 opacity-90" />
             <h3 className="text-2xl md:text-3xl font-bold mb-4" dir={isRTL ? 'rtl' : 'ltr'}>
-              {isRTL ? 'قوة المجتمع في العمل' : 'The Power of Community in Action'}
+              {isRTL ? 'قوة مين معانا' : 'The Power of Meen Ma3an'}
             </h3>
             <p className="text-lg md:text-xl opacity-95 max-w-3xl mx-auto leading-relaxed mb-8" dir={isRTL ? 'rtl' : 'ltr'}>
               {isRTL 
-                ? 'كل مساهمة، مهما كانت صغيرة، تساهم في بناء مستقبل أفضل. نحن نؤمن بأن التغيير الحقيقي يبدأ عندما نتحد معاً.'
-                : 'Every contribution, no matter how small, helps build a better future. We believe real change happens when we come together.'}
+                ? 'كل مساهمة، حتي لو بسيطة هتفرق بجد .'
+                : 'Every contribution, even a small one, truly makes a difference.'}
             </p>
             <Link
               href={`/${locale}/cases`}
