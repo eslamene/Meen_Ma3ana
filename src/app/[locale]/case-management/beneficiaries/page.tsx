@@ -35,6 +35,7 @@ export default function BeneficiariesPage() {
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<Beneficiary | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [assignedCases, setAssignedCases] = useState<Array<{ id: string; title: string }>>([])
 
   // Load data
   useEffect(() => {
@@ -128,6 +129,10 @@ export default function BeneficiariesPage() {
         // Add specific context based on error type
         if (errorData.assignedCasesCount !== undefined && errorData.assignedCasesCount > 0) {
           errorDetails = `This beneficiary is currently assigned to ${errorData.assignedCasesCount} case(s). Please remove the beneficiary from all cases before attempting to delete.`
+          // Store assigned cases for display in dialog
+          if (errorData.assignedCases && Array.isArray(errorData.assignedCases)) {
+            setAssignedCases(errorData.assignedCases)
+          }
         } else if (response.status === 404) {
           errorDetails = 'The beneficiary may have already been deleted or does not exist.'
         } else if (response.status === 500) {
@@ -174,6 +179,7 @@ export default function BeneficiariesPage() {
       setFilteredBeneficiaries(prev => prev.filter(b => b.id !== beneficiary.id))
       setIsDeleteDialogOpen(false)
       setSelectedBeneficiary(null)
+      setAssignedCases([])
     } catch (error) {
       // Only log actual exceptions/errors, not expected API responses
       const errorMessage = error instanceof Error 
@@ -545,7 +551,12 @@ export default function BeneficiariesPage() {
 
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <Dialog open={isDeleteDialogOpen} onOpenChange={(open) => {
+        setIsDeleteDialogOpen(open)
+        if (!open) {
+          setAssignedCases([])
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('deleteBeneficiary') || 'Delete Beneficiary'}</DialogTitle>
@@ -558,6 +569,21 @@ export default function BeneficiariesPage() {
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <p className="font-medium">{selectedBeneficiary.name}</p>
                 <p className="text-sm text-gray-600">{selectedBeneficiary.mobile_number}</p>
+              </div>
+            )}
+            {assignedCases.length > 0 && (
+              <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-sm font-semibold text-red-800 mb-2">
+                  This beneficiary is assigned to {assignedCases.length} case(s):
+                </p>
+                <ul className="space-y-1 max-h-32 overflow-y-auto">
+                  {assignedCases.map((caseItem) => (
+                    <li key={caseItem.id} className="text-xs text-gray-700 flex items-start gap-2">
+                      <span className="text-gray-500 font-mono">#{caseItem.id.slice(0, 8)}</span>
+                      <span className="truncate">{caseItem.title}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

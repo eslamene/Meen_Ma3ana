@@ -311,7 +311,7 @@ export async function DELETE(
     // Check cases linked via beneficiary_id
     const { data: casesById, error: casesByIdError, count: countById } = await serviceRoleClient
       .from('cases')
-      .select('id', { count: 'exact' })
+      .select('id, title, title_en, title_ar', { count: 'exact' })
       .eq('beneficiary_id', id)
     
     if (casesByIdError) {
@@ -337,7 +337,7 @@ export async function DELETE(
     if (orConditions.length > 0) {
       const { data: casesByName, error: casesByNameError, count: countByName } = await serviceRoleClient
         .from('cases')
-        .select('id', { count: 'exact' })
+        .select('id, title, title_en, title_ar', { count: 'exact' })
         .or(orConditions.join(','))
       
       if (casesByNameError) {
@@ -348,13 +348,13 @@ export async function DELETE(
       }
     }
     
-    // Combine results and remove duplicates
-    const allCaseIds = new Set([
-      ...casesByBeneficiaryId.map(c => c.id),
-      ...casesByNameContact.map(c => c.id)
-    ])
+    // Combine results and remove duplicates by ID
+    const caseMap = new Map<string, any>()
+    casesByBeneficiaryId.forEach(c => caseMap.set(c.id, c))
+    casesByNameContact.forEach(c => caseMap.set(c.id, c))
     
-    const totalCasesCount = allCaseIds.size
+    const allCases = Array.from(caseMap.values())
+    const totalCasesCount = allCases.length
     const countByIdValue = countById ?? casesByBeneficiaryId.length
     const totalCount = Math.max(countByIdValue, countByNameContact, totalCasesCount)
     
@@ -367,7 +367,11 @@ export async function DELETE(
         { 
           success: false, 
           error: `Cannot delete beneficiary. This beneficiary is assigned to ${totalCount} case(s). Please remove the beneficiary from all cases before deleting.`,
-          assignedCasesCount: totalCount
+          assignedCasesCount: totalCount,
+          assignedCases: allCases.map(c => ({
+            id: c.id,
+            title: c.title || c.title_en || c.title_ar || 'Untitled Case'
+          }))
         },
         { status: 400 }
       )
