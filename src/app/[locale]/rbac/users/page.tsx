@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { theme, brandColors } from '@/lib/theme'
 import { 
   Users, 
   Search, 
@@ -331,7 +332,7 @@ export default function AdminUsersPage() {
                               onClick={() => handlePageChange(pageNum as number)}
                               className={`min-w-[40px] ${
                                 pagination.page === pageNum
-                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  ? 'text-white'
                                   : ''
                               }`}
                             >

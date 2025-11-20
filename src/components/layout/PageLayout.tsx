@@ -37,8 +37,11 @@ export default function PageLayout({
     ? layoutContext.containerVariant 
     : 'boxed')
   
-  // Don't show breadcrumbs on home page or if explicitly disabled
-  const shouldShowBreadcrumbs = showBreadcrumbs && !pathname?.endsWith('/en') && !pathname?.endsWith('/ar')
+  // Don't show breadcrumbs on home page, auth pages, or if explicitly disabled
+  const shouldShowBreadcrumbs = showBreadcrumbs && 
+    !pathname?.endsWith('/en') && 
+    !pathname?.endsWith('/ar') &&
+    !pathname?.includes('/auth/')
 
   return (
     <ConditionalLayout>

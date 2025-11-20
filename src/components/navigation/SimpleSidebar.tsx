@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import type { AdminMenuItem } from '@/lib/admin/types'
+import { getIcon } from '@/lib/icons/registry'
 
 interface SimpleSidebarProps {
   isOpen: boolean
@@ -94,27 +95,19 @@ export default function SimpleSidebar({
     }
   }, [user, fetchUnreadNotifications])
 
-  // Icon mapping - memoized to prevent re-creation
-  const getIcon = useMemo(() => {
-    const icons: Record<string, React.ComponentType<any>> = {
-      'BarChart3': BarChart3,
-      'Heart': Heart,
-      'Users': Users,
-      'CreditCard': CreditCard,
-      'Plus': Plus,
-      'UserPlus': UserPlus,
-      'Settings': Settings,
-      'Bell': Bell,
-      'Home': Home
+  // Icon resolver - uses icon registry with fallback
+  const getIconComponent = useMemo(() => {
+    return (iconName: string) => {
+      const Icon = getIcon(iconName)
+      return Icon || Heart // Fallback to Heart if icon not found
     }
-    return (iconName: string) => icons[iconName] || Heart
   }, [])
 
   // Handle sign out
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut()
-      router.push(`/${locale}/auth/signin`)
+      router.push(`/${locale}/landing`)
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -132,8 +125,29 @@ export default function SimpleSidebar({
   }
 
   // Check if path is active
-  const isActive = (href: string) => {
-    return pathname === `/${locale}${href}` || pathname.startsWith(`/${locale}${href}/`)
+  // For items with children, only exact match (to prevent parent highlighting when child is active)
+  // For items without children, allow startsWith for nested routes
+  const isActive = (href: string, hasChildren: boolean = false) => {
+    const fullPath = `/${locale}${href}`
+    if (hasChildren) {
+      // For parent items, only highlight on exact match
+      return pathname === fullPath
+    }
+    // For leaf items, allow exact match or starts with
+    return pathname === fullPath || pathname.startsWith(`${fullPath}/`)
+  }
+
+  // Helper to check if any child is active
+  const hasActiveChild = (item: AdminMenuItem): boolean => {
+    if (!item.children || item.children.length === 0) {
+      return false
+    }
+    return item.children.some(child => {
+      const childPath = `/${locale}${child.href}`
+      const childIsActive = pathname === childPath || pathname.startsWith(`${childPath}/`)
+      // Recursively check grandchildren
+      return childIsActive || hasActiveChild(child)
+    })
   }
 
   // Show loading only on initial load, not on every re-render
@@ -212,19 +226,25 @@ export default function SimpleSidebar({
               <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'} w-full`}>
                 {stableUser ? (
                   <>
-                    <div className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#6B8E7E]/80 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ring-2 ring-white">
+                    <Link 
+                      href={`/${locale}/dashboard`}
+                      className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#6B8E7E]/80 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ring-2 ring-white cursor-pointer hover:opacity-80 transition-opacity"
+                    >
                       <UserIcon className="w-5 h-5 text-white" />
-                    </div>
-                    {!collapsed && (
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {stableUser.email?.split('@')[0] || 'User'}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {stableUser.email || 'Loading...'}
-                        </p>
-                      </div>
-                    )}
+                    </Link>
+                  {!collapsed && (
+                    <Link 
+                      href={`/${locale}/dashboard`}
+                      className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {stableUser.email?.split('@')[0] || 'User'}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {stableUser.email || 'Loading...'}
+                      </p>
+                    </Link>
+                  )}
                   </>
                 ) : (
                   <>
@@ -324,7 +344,8 @@ export default function SimpleSidebar({
                   expandedModules={expandedModules}
                   toggleModule={toggleModule}
                   isActive={isActive}
-                  getIcon={getIcon}
+                  hasActiveChild={hasActiveChild}
+                  getIcon={getIconComponent}
                   notificationCount={notificationCount}
                   level={0}
                   collapsed={collapsed}
@@ -385,18 +406,24 @@ export default function SimpleSidebar({
             <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'} w-full`}>
               {stableUser ? (
                 <>
-                  <div className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#6B8E7E]/80 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ring-2 ring-white">
+                  <Link 
+                    href={`/${locale}/dashboard`}
+                    className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#6B8E7E]/80 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ring-2 ring-white cursor-pointer hover:opacity-80 transition-opacity"
+                  >
                     <UserIcon className="w-5 h-5 text-white" />
-                  </div>
+                  </Link>
                   {!collapsed && (
-                    <div className="flex-1 min-w-0">
+                    <Link 
+                      href={`/${locale}/dashboard`}
+                      className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                    >
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {stableUser.email?.split('@')[0] || 'User'}
                       </p>
                       <p className="text-xs text-gray-500 truncate">
                         {stableUser.email || 'Loading...'}
                       </p>
-                    </div>
+                    </Link>
                   )}
                 </>
               ) : (
@@ -441,6 +468,7 @@ function MenuItemComponent({
   expandedModules,
   toggleModule,
   isActive,
+  hasActiveChild,
   getIcon,
   notificationCount = 0,
   level = 0,
@@ -451,17 +479,23 @@ function MenuItemComponent({
   pathname: string
   expandedModules: Set<string>
   toggleModule: (id: string) => void
-  isActive: (href: string) => boolean
+  isActive: (href: string, hasChildren?: boolean) => boolean
+  hasActiveChild: (item: AdminMenuItem) => boolean
   getIcon: (iconName: string) => React.ComponentType<any>
   notificationCount?: number
   level?: number
   collapsed?: boolean
 }) {
-  const IconComponent = getIcon(item.icon || 'FileText')
+  const IconComponent = getIcon(item.icon || 'Heart')
   const hasChildren = item.children && item.children.length > 0
   const isExpanded = expandedModules.has(item.id)
   const itemPath = `/${locale}${item.href}`
-  const itemIsActive = isActive(item.href)
+  // For parent items, check if any child is active
+  const childIsActive = hasChildren ? hasActiveChild(item) : false
+  // Only highlight parent if it's exactly active AND no child is active
+  const itemIsActive = hasChildren 
+    ? (isActive(item.href, true) && !childIsActive)
+    : isActive(item.href, false)
   const isNotifications = item.href === '/notifications'
 
   if (hasChildren) {
@@ -503,6 +537,7 @@ function MenuItemComponent({
                 expandedModules={expandedModules}
                 toggleModule={toggleModule}
                 isActive={isActive}
+                hasActiveChild={hasActiveChild}
                 getIcon={getIcon}
                 notificationCount={notificationCount}
                 level={level + 1}

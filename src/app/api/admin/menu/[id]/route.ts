@@ -30,7 +30,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { permission_id, sort_order, label, label_ar, href, icon, description, is_active, parent_id } = body
+    const { permission_id, sort_order, label, label_ar, href, icon, description, is_active, parent_id, is_public_nav, nav_metadata } = body
 
     defaultLogger.info('Updating menu item:', {
       menuItemId: params.id,
@@ -51,6 +51,8 @@ export async function PUT(
     if (description !== undefined) updateData.description = description || null
     if (is_active !== undefined) updateData.is_active = is_active
     if (parent_id !== undefined) updateData.parent_id = parent_id || null
+    if (is_public_nav !== undefined) updateData.is_public_nav = is_public_nav || false
+    if (nav_metadata !== undefined) updateData.nav_metadata = nav_metadata || {}
 
     defaultLogger.info('Update data prepared:', {
       menuItemId: params.id,

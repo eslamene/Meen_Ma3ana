@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination'
+import { theme, brandColors } from '@/lib/theme'
 import { 
   Target, 
   Plus, 
@@ -163,42 +164,42 @@ export default function AdminCasesPage() {
     switch (status) {
       case 'published':
         return (
-          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+          <Badge variant="outline" style={{ backgroundColor: brandColors.meen[100], color: brandColors.meen[800], borderColor: brandColors.meen[200] }}>
             <CheckCircle className="h-3 w-3 mr-1" />
             Published
           </Badge>
         )
       case 'closed':
         return (
-          <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+          <Badge variant="outline" style={{ backgroundColor: brandColors.ma3ana[100], color: brandColors.ma3ana[800], borderColor: brandColors.ma3ana[200] }}>
             <XCircle className="h-3 w-3 mr-1" />
             Closed
           </Badge>
         )
       case 'under_review':
         return (
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+          <Badge variant="outline" style={{ background: theme.gradients.brandSubtle, color: brandColors.meen[800], borderColor: brandColors.meen[200] }}>
             <Clock className="h-3 w-3 mr-1" />
             Under Review
           </Badge>
         )
       case 'draft':
         return (
-          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+          <Badge variant="outline" style={{ backgroundColor: brandColors.ma3ana[50], color: brandColors.ma3ana[700], borderColor: brandColors.ma3ana[200] }}>
             <Edit className="h-3 w-3 mr-1" />
             Draft
           </Badge>
         )
       case 'submitted':
         return (
-          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+          <Badge variant="outline" style={{ backgroundColor: brandColors.meen[50], color: brandColors.meen[700], borderColor: brandColors.meen[200] }}>
             <CheckCircle className="h-3 w-3 mr-1" />
             Submitted
           </Badge>
         )
       case 'completed':
         return (
-          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+          <Badge variant="outline" style={{ backgroundColor: brandColors.meen[100], color: brandColors.meen[800], borderColor: brandColors.meen[200] }}>
             <CheckCircle className="h-3 w-3 mr-1" />
             Completed
           </Badge>
@@ -430,7 +431,7 @@ export default function AdminCasesPage() {
   return (
     <ProtectedRoute>
       <PermissionGuard permission="cases:manage">
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 overflow-x-hidden">
+        <div className="min-h-screen overflow-x-hidden" style={{ background: theme.gradients.brandSubtle }}>
           <Container variant={containerVariant} className="py-3 sm:py-4 lg:py-6 px-4 sm:px-6">
             {/* Header */}
             <div className="mb-3 sm:mb-4">
@@ -451,8 +452,18 @@ export default function AdminCasesPage() {
                   <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">Manage all charity cases in the system</p>
                 </div>
                 <Button
-                  onClick={() => router.push(`/${params.locale}/cases/create`)}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 w-full sm:w-auto text-sm sm:text-base"
+                  onClick={() => router.push(`/${params.locale}/case-management/create`)}
+                  className="w-full sm:w-auto text-sm sm:text-base text-white"
+                  style={{
+                    background: theme.gradients.primary,
+                    boxShadow: theme.shadows.primary
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = theme.gradients.primary
+                  }}
                 >
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Create New Case</span>
@@ -463,71 +474,71 @@ export default function AdminCasesPage() {
 
             {/* Statistics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-4">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Cases</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
                     </div>
-                    <div className="p-2 sm:p-3 bg-blue-100 rounded-full flex-shrink-0 ml-2">
-                      <Target className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.meen[100] }}>
+                      <Target className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Published</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.published}</p>
                     </div>
-                    <div className="p-2 sm:p-3 bg-green-100 rounded-full flex-shrink-0 ml-2">
-                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.meen[100] }}>
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Completed</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.completed}</p>
                     </div>
-                    <div className="p-2 sm:p-3 bg-blue-100 rounded-full flex-shrink-0 ml-2">
-                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.secondary }}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Closed</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.closed}</p>
                     </div>
-                    <div className="p-2 sm:p-3 bg-purple-100 rounded-full flex-shrink-0 ml-2">
-                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Under Review</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.under_review}</p>
                     </div>
-                    <div className="p-2 sm:p-3 bg-yellow-100 rounded-full flex-shrink-0 ml-2">
-                      <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ background: theme.gradients.brandSubtle }}>
+                      <Clock className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
@@ -535,7 +546,7 @@ export default function AdminCasesPage() {
             </div>
 
             {/* Filters */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-3 sm:mb-4">
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-3 sm:mb-4" style={{ boxShadow: theme.shadows.primary }}>
               <CardContent className="p-3 sm:p-4">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                   <div className="flex-1 min-w-0">
@@ -600,11 +611,11 @@ export default function AdminCasesPage() {
             {/* Cases List */}
             {loading ? (
               <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: brandColors.meen[600] }}></div>
                 <p className="text-gray-600 mt-4">Loading cases...</p>
               </div>
             ) : filteredCases.length === 0 ? (
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-12 text-center">
                   <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">No cases found</h3>
@@ -615,8 +626,18 @@ export default function AdminCasesPage() {
                     }
                   </p>
                   <Button
-                    onClick={() => router.push(`/${params.locale}/cases/create`)}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                    onClick={() => router.push(`/${params.locale}/case-management/create`)}
+                    className="text-white"
+                    style={{
+                      background: theme.gradients.primary,
+                      boxShadow: theme.shadows.primary
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = theme.gradients.primary
+                    }}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Create First Case
@@ -645,7 +666,7 @@ export default function AdminCasesPage() {
                     const beneficiaryName = beneficiary?.name || case_.beneficiary_name || null
                     
                     return (
-                    <Card key={case_.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden">
+                    <Card key={case_.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden" style={{ boxShadow: theme.shadows.primary }}>
                       <CardContent className="p-0">
                         <div className="flex flex-col md:flex-row">
                           {/* Case Image */}
@@ -690,10 +711,19 @@ export default function AdminCasesPage() {
                                           })
                                         }
                                       }}
-                                      className="flex-shrink-0 p-1.5 rounded-full hover:bg-indigo-50 transition-colors group"
+                                      className="flex-shrink-0 p-1.5 rounded-full transition-colors group"
+                                      style={{ 
+                                        backgroundColor: 'transparent'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = brandColors.meen[50]
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'transparent'
+                                      }}
                                       title={`View beneficiary: ${beneficiaryName}`}
                                     >
-                                      <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500 group-hover:text-indigo-600" />
+                                      <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:transition-colors" style={{ color: brandColors.meen[500] }} />
                                     </button>
                                   )}
                                 </div>
@@ -716,16 +746,19 @@ export default function AdminCasesPage() {
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 overflow-hidden">
                                 <div
-                                  className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-2 sm:h-3 rounded-full transition-all duration-500 shadow-sm"
-                                  style={{ width: `${getProgressPercentage(case_.approved_amount || 0, case_.target_amount)}%` }}
+                                  className="h-2 sm:h-3 rounded-full transition-all duration-500 shadow-sm"
+                                  style={{ 
+                                    width: `${getProgressPercentage(case_.approved_amount || 0, case_.target_amount)}%`,
+                                    background: theme.gradients.progress
+                                  }}
                                 ></div>
                               </div>
                             </div>
 
                             {/* Stats Grid */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-2 sm:mb-3">
-                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 bg-green-50 rounded-lg border border-green-100 min-w-0">
-                                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
+                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-lg border min-w-0" style={{ backgroundColor: brandColors.ma3ana[50], borderColor: brandColors.ma3ana[200] }}>
+                                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" style={{ color: brandColors.ma3ana[600] }} />
                                 <div className="min-w-0 flex-1">
                                   <p className="text-xs text-gray-600">Raised</p>
                                   <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
@@ -733,8 +766,8 @@ export default function AdminCasesPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 bg-blue-50 rounded-lg border border-blue-100 min-w-0">
-                                <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-lg border min-w-0" style={{ backgroundColor: brandColors.meen[50], borderColor: brandColors.meen[200] }}>
+                                <Target className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" style={{ color: brandColors.meen[600] }} />
                                 <div className="min-w-0 flex-1">
                                   <p className="text-xs text-gray-600">Target</p>
                                   <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
@@ -742,8 +775,8 @@ export default function AdminCasesPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 bg-indigo-50 rounded-lg border border-indigo-100 min-w-0">
-                                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 flex-shrink-0" />
+                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-lg border min-w-0" style={{ background: theme.gradients.brandSubtle, borderColor: brandColors.meen[200] }}>
+                                <Users className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" style={{ color: brandColors.meen[600] }} />
                                 <div className="min-w-0 flex-1">
                                   <p className="text-xs text-gray-600">Contributors</p>
                                   <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
@@ -751,8 +784,8 @@ export default function AdminCasesPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 bg-purple-50 rounded-lg border border-purple-100 min-w-0 col-span-2 sm:col-span-1">
-                                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
+                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-lg border min-w-0" style={{ backgroundColor: brandColors.ma3ana[50], borderColor: brandColors.ma3ana[200] }}>
+                                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" style={{ color: brandColors.ma3ana[600] }} />
                                 <div className="min-w-0 flex-1">
                                   <p className="text-xs text-gray-600">Created</p>
                                   <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
@@ -783,7 +816,19 @@ export default function AdminCasesPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => router.push(`/${params.locale}/cases/${case_.id}`)}
-                              className="flex-1 md:flex-none w-full md:w-auto border-2 border-blue-200 hover:border-blue-500 hover:bg-blue-50 text-blue-700 text-xs sm:text-sm"
+                              className="flex-1 md:flex-none w-full md:w-auto border-2 text-xs sm:text-sm"
+                              style={{
+                                borderColor: brandColors.meen[200],
+                                color: brandColors.meen[700]
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = brandColors.meen[500]
+                                e.currentTarget.style.backgroundColor = brandColors.meen[50]
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = brandColors.meen[200]
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                              }}
                             >
                               <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                               View
@@ -791,8 +836,20 @@ export default function AdminCasesPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => router.push(`/${params.locale}/cases/${case_.id}/edit`)}
-                              className="flex-1 md:flex-none w-full md:w-auto border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 text-gray-700 text-xs sm:text-sm"
+                              onClick={() => router.push(`/${params.locale}/case-management/cases/${case_.id}/edit`)}
+                              className="flex-1 md:flex-none w-full md:w-auto border-2 text-xs sm:text-sm"
+                              style={{
+                                borderColor: brandColors.meen[200],
+                                color: brandColors.meen[700]
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = brandColors.meen[500]
+                                e.currentTarget.style.backgroundColor = brandColors.meen[50]
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = brandColors.meen[200]
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                              }}
                             >
                               <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                               Edit
@@ -801,7 +858,21 @@ export default function AdminCasesPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleDeleteClick(case_.id, case_.title || case_.title_en || case_.title_ar || 'Untitled Case')}
-                              className="flex-1 md:flex-none w-full md:w-auto border-2 border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 hover:text-red-700 text-xs sm:text-sm"
+                              className="flex-1 md:flex-none w-full md:w-auto border-2 text-xs sm:text-sm"
+                              style={{
+                                borderColor: brandColors.ma3ana[200],
+                                color: brandColors.ma3ana[600]
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = brandColors.ma3ana[500]
+                                e.currentTarget.style.backgroundColor = brandColors.ma3ana[50]
+                                e.currentTarget.style.color = brandColors.ma3ana[700]
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = brandColors.ma3ana[200]
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                                e.currentTarget.style.color = brandColors.ma3ana[600]
+                              }}
                             >
                               <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                               Delete
@@ -820,7 +891,21 @@ export default function AdminCasesPage() {
                     <Button
                       onClick={pagination.handleLoadMore}
                       disabled={pagination.state.isLoadingMore}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white min-w-[120px]"
+                      className="text-white min-w-[120px]"
+                      style={{
+                        background: theme.gradients.primary,
+                        boxShadow: theme.shadows.primary
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!pagination.state.isLoadingMore) {
+                          e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!pagination.state.isLoadingMore) {
+                          e.currentTarget.style.background = theme.gradients.primary
+                        }
+                      }}
                     >
                       {pagination.state.isLoadingMore ? (
                         <>
@@ -843,7 +928,7 @@ export default function AdminCasesPage() {
 
                 {/* Pagination Controls - Hidden on mobile, shown on desktop */}
                 {pagination.state.totalPages > 1 && (
-                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-4 sm:mt-6 hidden sm:block">
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-4 sm:mt-6 hidden sm:block" style={{ boxShadow: theme.shadows.primary }}>
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
                         <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center sm:justify-start">
@@ -853,6 +938,22 @@ export default function AdminCasesPage() {
                             onClick={() => handlePageChange(pagination.state.currentPage - 1)}
                             disabled={pagination.state.currentPage === 1}
                             className="flex items-center gap-1 text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
+                            style={{
+                              borderColor: brandColors.meen[200],
+                              color: brandColors.meen[700]
+                            }}
+                            onMouseEnter={(e) => {
+                              if (pagination.state.currentPage !== 1) {
+                                e.currentTarget.style.borderColor = brandColors.meen[500]
+                                e.currentTarget.style.backgroundColor = brandColors.meen[50]
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (pagination.state.currentPage !== 1) {
+                                e.currentTarget.style.borderColor = brandColors.meen[200]
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                              }
+                            }}
                           >
                             <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                             <span className="hidden sm:inline">Previous</span>
@@ -871,11 +972,32 @@ export default function AdminCasesPage() {
                                   variant={pagination.state.currentPage === page ? "default" : "outline"}
                                   size="sm"
                                   onClick={() => handlePageChange(page as number)}
-                                  className={`min-w-[32px] sm:min-w-[40px] h-7 sm:h-8 px-1 sm:px-2 text-xs sm:text-sm ${
+                                  className="min-w-[32px] sm:min-w-[40px] h-7 sm:h-8 px-1 sm:px-2 text-xs sm:text-sm"
+                                  style={
                                     pagination.state.currentPage === page
-                                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                      : ''
-                                  }`}
+                                      ? {
+                                          background: theme.gradients.primary,
+                                          boxShadow: theme.shadows.primary,
+                                          color: 'white',
+                                          borderColor: 'transparent'
+                                        }
+                                      : {
+                                          borderColor: brandColors.meen[200],
+                                          color: brandColors.meen[700]
+                                        }
+                                  }
+                                  onMouseEnter={(e) => {
+                                    if (pagination.state.currentPage !== page) {
+                                      e.currentTarget.style.borderColor = brandColors.meen[500]
+                                      e.currentTarget.style.backgroundColor = brandColors.meen[50]
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (pagination.state.currentPage !== page) {
+                                      e.currentTarget.style.borderColor = brandColors.meen[200]
+                                      e.currentTarget.style.backgroundColor = 'transparent'
+                                    }
+                                  }}
                                 >
                                   {page}
                                 </Button>
@@ -889,6 +1011,22 @@ export default function AdminCasesPage() {
                             onClick={() => handlePageChange(pagination.state.currentPage + 1)}
                             disabled={pagination.state.currentPage === pagination.state.totalPages}
                             className="flex items-center gap-1 text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
+                            style={{
+                              borderColor: brandColors.meen[200],
+                              color: brandColors.meen[700]
+                            }}
+                            onMouseEnter={(e) => {
+                              if (pagination.state.currentPage !== pagination.state.totalPages) {
+                                e.currentTarget.style.borderColor = brandColors.meen[500]
+                                e.currentTarget.style.backgroundColor = brandColors.meen[50]
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (pagination.state.currentPage !== pagination.state.totalPages) {
+                                e.currentTarget.style.borderColor = brandColors.meen[200]
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                              }
+                            }}
                           >
                             <span className="hidden sm:inline">Next</span>
                             <span className="sm:hidden">Next</span>

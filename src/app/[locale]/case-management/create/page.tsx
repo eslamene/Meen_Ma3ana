@@ -830,8 +830,8 @@ export default function CreateCasePage() {
       })
       setErrors({})
     } else {
-      // Otherwise, go back to cases list
-      router.push(`/${locale}/cases`)
+      // Otherwise, go back to case management dashboard
+      router.push(`/${locale}/case-management`)
     }
   }
 
@@ -851,110 +851,6 @@ export default function CreateCasePage() {
     setCaseFiles(updatedFiles)
   }, [draftCaseId, caseType, caseFiles.length, ensureDraftCase, validationSettings])
 
-  // Show type selection if not selected
-  if (!caseType) {
-    return (
-      <PermissionGuard permissions={["cases:create"]} fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <Card className="max-w-md w-full">
-            <CardContent className="p-6 text-center">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
-              <p className="text-gray-600 mb-4">You don&apos;t have permission to create cases.</p>
-              <Button onClick={handleBack} variant="outline">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Go Back
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      }>
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
-          <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
-            <div className="max-w-4xl mx-auto">
-              <div className="mb-8">
-                <Button
-                  variant="ghost"
-                  onClick={handleBack}
-                  className="mb-4"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  {t('back')}
-                </Button>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  {t('createCase')}
-                </h1>
-                <p className="text-gray-600">
-                  {t('createCaseDescription')}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <Card 
-                  className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
-                    caseType === 'one-time' 
-                      ? 'ring-2 ring-blue-500 bg-blue-50' 
-                      : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => {
-                    setCaseType('one-time')
-                    setFormData(prev => ({ ...prev, case_type: 'one-time' }))
-                  }}
-                >
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center">
-                        <Clock className="h-5 w-5 mr-2 text-blue-600" />
-                        {t('oneTimeCase')}
-                      </CardTitle>
-                      {caseType === 'one-time' && (
-                        <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-gray-600 mb-4">
-                      {t('oneTimeCaseDescription')}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-
-                <Card 
-                  className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
-                    caseType === 'recurring' 
-                      ? 'ring-2 ring-green-500 bg-green-50' 
-                      : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => {
-                    setCaseType('recurring')
-                    setFormData(prev => ({ ...prev, case_type: 'recurring' }))
-                  }}
-                >
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center">
-                        <Repeat className="h-5 w-5 mr-2 text-green-600" />
-                        {t('recurringCase')}
-                      </CardTitle>
-                      {caseType === 'recurring' && (
-                        <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-gray-600 mb-4">
-                      {t('recurringCaseDescription')}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </Container>
-        </div>
-      </PermissionGuard>
-    )
-  }
-
   return (
     <PermissionGuard permissions={["cases:create"]} fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -971,58 +867,20 @@ export default function CreateCasePage() {
         </Card>
       </div>
     }>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-[#6B8E7E]/5 to-gray-50">
         <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
           {/* Header */}
           <EditPageHeader
-            backUrl={`/${locale}/cases`}
+            backUrl={`/${locale}/case-management`}
             icon={FileEdit}
             title={t('createCase') || 'Create Case'}
-            description={caseType 
-              ? (t('createCaseDescription') || 'Provide detailed information to help beneficiaries.')
-              : (t('createCaseDescription') || 'Choose the type of charity case you want to create and provide detailed information to help beneficiaries.')
-            }
+            description={t('createCaseDescription') || 'Choose the type of charity case and provide detailed information to help beneficiaries.'}
             backLabel={t('back') || 'Back'}
             showBackButton={true}
-            actions={
-              caseType && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    // Clean up draft case before changing type
-                    if (draftCaseId) {
-                      await cleanupDraftCase()
-                    }
-                    setCaseType(null)
-                    setDraftCaseId(null)
-      setFormData({
-        title_en: '',
-        title_ar: '',
-        description_en: '',
-        description_ar: '',
-        target_amount: null,
-        status: 'draft',
-        priority: 'medium',
-        category_id: null,
-        category: null,
-        category_icon: null,
-        category_color: null,
-        location: '',
-        duration: null,
-        case_type: 'one-time' as CaseType,
-        beneficiary_name: null,
-        beneficiary_contact: null,
-      })
-                    setErrors({})
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <Clock className="h-4 w-4" />
-                  <span className="hidden sm:inline">{t('changeType') || 'Change Type'}</span>
-                </Button>
-              )
-            }
+            badge={caseType ? {
+              label: caseType === 'one-time' ? 'One-time Case' : 'Recurring Case',
+              variant: 'secondary'
+            } : undefined}
           />
 
           {/* Error Message */}
@@ -1037,72 +895,153 @@ export default function CreateCasePage() {
             </Card>
           )}
 
-          {/* Case Type Badge */}
-          <Card className="mb-6 border-blue-200 bg-blue-50 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                {caseType === 'one-time' ? (
-                  <Clock className="h-5 w-5 text-blue-600" />
-                ) : (
-                  <Repeat className="h-5 w-5 text-green-600" />
-                )}
-                <Badge variant="outline" className={caseType === 'one-time' ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-green-100 text-green-700 border-green-300'}>
-                  {caseType === 'one-time' ? t('oneTimeCase') : t('recurringCase')}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={async () => {
-                    // Clean up draft case before changing type
-                    if (draftCaseId) {
-                      await cleanupDraftCase()
-                    }
-                    setCaseType(null)
-                    setDraftCaseId(null)
-                    setFormData({
-                      title_en: '',
-                      title_ar: '',
-                      description_en: '',
-                      description_ar: '',
-                      target_amount: null,
-                      status: 'draft',
-                      priority: 'medium',
-                      category_id: null,
-                      category: null,
-                      category_icon: null,
-                      category_color: null,
-                      location: '',
-                      duration: null,
-                      case_type: 'one-time' as CaseType,
-                      beneficiary_name: null,
-                      beneficiary_contact: null,
-                    })
-                    setErrors({})
-                  }}
-                  className="ml-auto"
-                >
-                  Change Type
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Case Type Selection - Compact when selected, full when not */}
+          {!caseType ? (
+            <Card className="mb-6 shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Select Case Type</CardTitle>
+                <CardDescription>Choose the type of charity case you want to create</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* One-time Case Card */}
+                  <Card 
+                    className={`group cursor-pointer transition-all duration-300 hover:shadow-lg border-2 ${
+                      caseType === 'one-time' 
+                        ? 'ring-2 ring-[#6B8E7E] border-[#6B8E7E] bg-gradient-to-br from-[#6B8E7E]/10 to-[#6B8E7E]/5 shadow-lg' 
+                        : 'border-gray-200 hover:border-[#6B8E7E]/50'
+                    }`}
+                    onClick={() => {
+                      setCaseType('one-time')
+                      setFormData(prev => ({ ...prev, case_type: 'one-time' }))
+                    }}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[#6B8E7E]/10 text-[#6B8E7E] group-hover:bg-[#6B8E7E] group-hover:text-white transition-colors">
+                          <Clock className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <CardTitle className="text-base font-semibold text-gray-900">
+                        {t('oneTimeCase')}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <CardDescription className="text-sm text-gray-600">
+                        {t('oneTimeCaseDescription')}
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
 
-          {/* Create Form with Tabs */}
-          <Card className="shadow-lg">
-            <CardContent className="p-6">
-              <Tabs
-                value={activeTab}
-                onValueChange={(value) => {
-                  // When switching to files tab, ensure draft case exists if titles are valid
-                  if (value === 'files' && !draftCaseId && !creatingDraft && caseType && validationSettings) {
-                    const titleEn = formData.title_en?.trim() || ''
-                    const titleAr = formData.title_ar?.trim() || ''
-                    const minLength = validationSettings.caseTitleMinLength
+                  {/* Recurring Case Card */}
+                  <Card 
+                    className={`group cursor-pointer transition-all duration-300 hover:shadow-lg border-2 ${
+                      caseType === 'recurring' 
+                        ? 'ring-2 ring-[#6B8E7E] border-[#6B8E7E] bg-gradient-to-br from-[#6B8E7E]/10 to-[#6B8E7E]/5 shadow-lg' 
+                        : 'border-gray-200 hover:border-[#6B8E7E]/50'
+                    }`}
+                    onClick={() => {
+                      setCaseType('recurring')
+                      setFormData(prev => ({ ...prev, case_type: 'recurring' }))
+                    }}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[#6B8E7E]/10 text-[#6B8E7E] group-hover:bg-[#6B8E7E] group-hover:text-white transition-colors">
+                          <Repeat className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <CardTitle className="text-base font-semibold text-gray-900">
+                        {t('recurringCase')}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <CardDescription className="text-sm text-gray-600">
+                        {t('recurringCaseDescription')}
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="mb-6 border-[#6B8E7E]/30 bg-[#6B8E7E]/5 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[#6B8E7E] text-white">
+                      {caseType === 'one-time' ? (
+                        <Clock className="h-5 w-5" />
+                      ) : (
+                        <Repeat className="h-5 w-5" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">
+                        {caseType === 'one-time' ? t('oneTimeCase') : t('recurringCase')}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {caseType === 'one-time' ? t('oneTimeCaseDescription') : t('recurringCaseDescription')}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      // Clean up draft case before changing type
+                      if (draftCaseId) {
+                        await cleanupDraftCase()
+                      }
+                      setCaseType(null)
+                      setDraftCaseId(null)
+                      setFormData({
+                        title_en: '',
+                        title_ar: '',
+                        description_en: '',
+                        description_ar: '',
+                        target_amount: null,
+                        status: 'draft',
+                        priority: 'medium',
+                        category_id: null,
+                        category: null,
+                        category_icon: null,
+                        category_color: null,
+                        location: '',
+                        duration: null,
+                        case_type: 'one-time' as CaseType,
+                        beneficiary_name: null,
+                        beneficiary_contact: null,
+                      })
+                      setErrors({})
+                    }}
+                    className="text-[#6B8E7E] hover:text-[#5A7A6B] hover:bg-[#6B8E7E]/10"
+                  >
+                    <Repeat className="h-4 w-4 mr-2" />
+                    Change Type
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-                    if (titleEn.length >= minLength && titleAr.length >= minLength) {
-                      // Create draft case before switching tabs
-                      ensureDraftCase().then(() => {
-                        setActiveTab(value as 'details' | 'files')
+          {/* Create Form with Tabs - Only show when case type is selected */}
+          {caseType && (
+            <Card className="shadow-lg">
+              <CardContent className="p-6">
+                <Tabs
+                  value={activeTab}
+                  onValueChange={(value) => {
+                    // When switching to files tab, ensure draft case exists if titles are valid
+                    if (value === 'files' && !draftCaseId && !creatingDraft && caseType && validationSettings) {
+                      const titleEn = formData.title_en?.trim() || ''
+                      const titleAr = formData.title_ar?.trim() || ''
+                      const minLength = validationSettings.caseTitleMinLength
+
+                      if (titleEn.length >= minLength && titleAr.length >= minLength) {
+                        // Create draft case before switching tabs
+                        ensureDraftCase().then(() => {
+                          setActiveTab(value as 'details' | 'files')
                       }).catch(err => {
                         console.error('Error creating draft case for file upload:', err)
                         toast.error('Cannot Upload Files', {
@@ -1756,8 +1695,10 @@ export default function CreateCasePage() {
               </Tabs>
             </CardContent>
           </Card>
+          )}
 
-            {/* Footer */}
+          {/* Footer - Only show when case type is selected */}
+          {caseType && (
             <EditPageFooter
               primaryAction={{
                 label: saving ? (t('creating') || 'Creating...') : (t('createCase') || 'Create Case'),
@@ -1774,6 +1715,7 @@ export default function CreateCasePage() {
                 }
               ]}
             />
+          )}
           </Container>
         </div>
       </PermissionGuard>

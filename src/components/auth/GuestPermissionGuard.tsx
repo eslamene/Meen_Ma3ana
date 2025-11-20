@@ -1,12 +1,52 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useState, useEffect, useContext } from 'react'
 import { useAdmin } from '@/lib/admin/hooks'
-import { useAuth } from '@/components/auth/AuthProvider'
+import { AuthContext } from '@/components/auth/AuthProvider'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Lock, LogIn, UserPlus } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { User } from '@supabase/supabase-js'
+
+// Safe hook to get auth context or fallback
+function useAuthSafe() {
+  const context = useContext(AuthContext)
+  const [fallbackUser, setFallbackUser] = useState<User | null>(null)
+  const [fallbackLoading, setFallbackLoading] = useState(true)
+  const supabase = createClient()
+  
+  useEffect(() => {
+    if (context === undefined) {
+      // No AuthProvider - use direct Supabase check
+      const getUser = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          setFallbackUser(user)
+        } catch (error) {
+          setFallbackUser(null)
+        } finally {
+          setFallbackLoading(false)
+        }
+      }
+      getUser()
+      
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        setFallbackUser(session?.user || null)
+        setFallbackLoading(false)
+      })
+      
+      return () => subscription.unsubscribe()
+    }
+  }, [context, supabase])
+  
+  if (context !== undefined) {
+    return { user: context.user, loading: context.loading }
+  }
+  
+  return { user: fallbackUser, loading: fallbackLoading }
+}
 
 interface GuestPermissionGuardProps {
   children: ReactNode
@@ -39,11 +79,14 @@ export function GuestPermissionGuard({
   description = "Please sign in to access this content.",
   showAuthPrompt = true
 }: GuestPermissionGuardProps) {
-  const { user } = useAuth()
+  // Use safe auth hook that works with or without AuthProvider
+  const { user, loading: authLoading } = useAuthSafe()
+  
+  // useAdmin doesn't require AuthProvider - it uses Supabase directly
   const { hasPermission, loading } = useAdmin()
 
   // Show loading state
-  if (loading && showLoading) {
+  if ((loading || authLoading) && showLoading) {
     return loadingComponent || (
       <div className="flex items-center gap-2 p-2">
         <div className="w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>

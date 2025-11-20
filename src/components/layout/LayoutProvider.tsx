@@ -74,3 +74,12 @@ export function useLayout() {
   return context
 }
 
+/**
+ * Optional version of useLayout that returns null if LayoutProvider is not available
+ * Useful for components that may be used in contexts without LayoutProvider
+ */
+export function useLayoutOptional() {
+  const context = useContext(LayoutContext)
+  return context || null
+}
+

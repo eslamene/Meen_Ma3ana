@@ -12,6 +12,7 @@ import { ArrowLeft, DollarSign, User, MessageSquare, CheckCircle, XCircle, Clock
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import ContributionRevisionModal from '@/components/contributions/ContributionRevisionModal'
+import { theme, brandColors } from '@/lib/theme'
 
 interface Contribution {
   id: string
@@ -257,7 +258,7 @@ export default function ContributionDetailsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
         <div className="w-full px-4 py-8">
           <div className="animate-pulse space-y-8">
             <div className="h-12 bg-white/50 rounded-2xl w-1/3"></div>
@@ -279,12 +280,12 @@ export default function ContributionDetailsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
         <div className="w-full px-4 py-8">
           <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
             <CardContent className="p-8">
               <div className="text-center">
-                <AlertCircle className="h-20 w-20 text-red-500 mx-auto mb-6" />
+                <AlertCircle className="h-20 w-20 text-ma3ana mx-auto mb-6" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('error')}</h3>
                 <p className="text-gray-600 mb-6 text-lg">{error}</p>
                 <Button onClick={() => router.back()} variant="outline" size="lg" className="hover:bg-gray-50 transition-colors">
@@ -301,7 +302,7 @@ export default function ContributionDetailsPage() {
 
   if (!contribution) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
         <div className="w-full px-4 py-8">
           <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
             <CardContent className="p-8">
@@ -322,7 +323,7 @@ export default function ContributionDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
       <div className="w-full px-4 py-8">
         {/* Header */}
         <div className="bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-2xl p-6 mb-8">
@@ -353,7 +354,7 @@ export default function ContributionDetailsPage() {
             <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
+                  <DollarSign className="h-5 w-5 text-meen" />
                   {t('contributionOverview')}
                 </CardTitle>
               </CardHeader>
@@ -361,7 +362,7 @@ export default function ContributionDetailsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-600">{t('amount')}</label>
-                    <p className="text-2xl font-bold text-green-600">{formatAmount(contribution.amount)}</p>
+                    <p className="text-2xl font-bold text-meen">{formatAmount(contribution.amount)}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">{t('status')}</label>
@@ -398,7 +399,7 @@ export default function ContributionDetailsPage() {
             <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-blue-600" />
+                  <User className="h-5 w-5 text-meen" />
                   {t('donorInformation')}
                 </CardTitle>
               </CardHeader>
@@ -422,8 +423,8 @@ export default function ContributionDetailsPage() {
                   )}
                 </div>
                 {contribution.anonymous && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                    <p className="text-sm text-yellow-800">{t('anonymousMessage')}</p>
+                  <div className="bg-meen-50 border border-meen-200 rounded-md p-3">
+                    <p className="text-sm text-meen-800">{t('anonymousMessage')}</p>
                   </div>
                 )}
               </CardContent>
@@ -432,33 +433,33 @@ export default function ContributionDetailsPage() {
 
             {/* Previous Rejection Information */}
             {contribution.original_contribution && contribution.is_revision && (
-              <Card className="bg-red-50/95 backdrop-blur-sm border-red-200 shadow-xl rounded-2xl">
+              <Card className="bg-ma3ana-50/95 backdrop-blur-sm border-ma3ana-200 shadow-xl rounded-2xl" style={{ boxShadow: theme.shadows.secondary }}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-red-800">
-                    <XCircle className="h-5 w-5 text-red-600" />
+                  <CardTitle className="flex items-center gap-2 text-ma3ana-800">
+                    <XCircle className="h-5 w-5 text-ma3ana" />
                     {t('originalRejectedContribution')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium text-red-700">{t('originalTransactionId')}</label>
-                      <p className="text-sm font-mono text-red-800 bg-red-100 p-2 rounded">
+                      <label className="text-sm font-medium text-ma3ana-700">{t('originalTransactionId')}</label>
+                      <p className="text-sm font-mono text-ma3ana-800 bg-ma3ana-100 p-2 rounded">
                         {truncateId(contribution.original_contribution.id)}
                       </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-red-700">{t('originalAmount')}</label>
-                      <p className="text-lg font-bold text-red-600">{contribution.original_contribution.amount} EGP</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-red-700">{t('originalDate')}</label>
-                      <p className="text-red-800">{formatDate(contribution.original_contribution.created_at)}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-red-700">{t('originalStatus')}</label>
+                      <label className="text-sm font-medium text-ma3ana-700">{t('originalAmount')}</label>
+                      <p className="text-lg font-bold text-ma3ana">{contribution.original_contribution.amount} EGP</p>
+                  </div>
+                  <div>
+                      <label className="text-sm font-medium text-ma3ana-700">{t('originalDate')}</label>
+                      <p className="text-ma3ana-800">{formatDate(contribution.original_contribution.created_at)}</p>
+                  </div>
+                  <div>
+                      <label className="text-sm font-medium text-ma3ana-700">{t('originalStatus')}</label>
                       <div className="mt-1">
-                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                        <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200">
                           <XCircle className="h-3 w-3 mr-1" />
                           {t('statuses.rejected')}
                         </Badge>
@@ -467,22 +468,22 @@ export default function ContributionDetailsPage() {
                   </div>
                   
                   {contribution.original_contribution.rejection_reason && (
-                    <div className="bg-red-100 border border-red-200 rounded-lg p-3">
+                    <div className="bg-ma3ana-100 border border-ma3ana-200 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
-                        <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="font-medium text-red-800">{t('rejectionReason')}</span>
+                        <XCircle className="h-4 w-4 text-ma3ana" />
+                        <span className="font-medium text-ma3ana-800">{t('rejectionReason')}</span>
                       </div>
-                      <p className="text-red-700 text-sm">{contribution.original_contribution.rejection_reason}</p>
+                      <p className="text-ma3ana-700 text-sm">{contribution.original_contribution.rejection_reason}</p>
                     </div>
                   )}
 
                   {contribution.original_contribution.admin_comment && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="bg-meen-50 border border-meen-200 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
-                        <MessageSquare className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium text-blue-800">{t('adminComment')}</span>
+                        <MessageSquare className="h-4 w-4 text-meen" />
+                        <span className="font-medium text-meen-800">{t('adminComment')}</span>
                       </div>
-                      <p className="text-blue-700 text-sm">{contribution.original_contribution.admin_comment}</p>
+                      <p className="text-meen-700 text-sm">{contribution.original_contribution.admin_comment}</p>
                     </div>
                   )}
                 </CardContent>

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
@@ -34,6 +34,12 @@ import { useAdmin } from '@/lib/admin/hooks'
 import { SortableTree, SimpleTreeItemWrapper, TreeItemComponentProps } from 'dnd-kit-sortable-tree'
 import type { TreeItems } from 'dnd-kit-sortable-tree'
 import DynamicIcon from '@/components/ui/dynamic-icon'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface MenuItem {
   id: string
@@ -48,6 +54,12 @@ interface MenuItem {
   sort_order: number
   parent_id?: string
   children?: MenuItem[]
+  is_public_nav?: boolean
+  nav_metadata?: {
+    isHashLink?: boolean
+    showOnLanding?: boolean
+    showOnOtherPages?: boolean
+  }
 }
 
 interface Permission {
@@ -158,6 +170,7 @@ export default function AdminMenuPage() {
   const [deletingItem, setDeletingItem] = useState<MenuItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const { permissions, refresh: refreshAdmin } = useAdmin()
+  const hasShownUnsavedToast = useRef(false)
 
   // Fetch menu items - API returns flat list, we build tree structure
   const fetchMenuItems = useCallback(async () => {
@@ -176,13 +189,11 @@ export default function AdminMenuPage() {
         setTreeItems(converted)
         setOriginalTreeItems(JSON.parse(JSON.stringify(converted)))
       } else {
-        console.error('Failed to fetch menu items:', menuRes)
         toast.error('Error', {
           description: 'Failed to fetch menu items'
         })
       }
     } catch (error) {
-      console.error('Fetch error:', error)
       toast.error('Error', {
         description: 'Failed to fetch menu items'
       })
@@ -223,9 +234,24 @@ export default function AdminMenuPage() {
     return JSON.stringify(treeItems) !== JSON.stringify(originalTreeItems)
   }, [treeItems, originalTreeItems])
 
+  // Show toast when unsaved changes are detected
+  useEffect(() => {
+    if (hasUnsavedChanges && !hasShownUnsavedToast.current && !loading) {
+      toast.warning('You have unsaved changes', {
+        description: 'Your menu order changes are not saved yet. Click "Save Changes" to apply them.',
+        duration: 5000,
+      })
+      hasShownUnsavedToast.current = true
+    } else if (!hasUnsavedChanges) {
+      // Reset when changes are saved
+      hasShownUnsavedToast.current = false
+    }
+  }, [hasUnsavedChanges, loading])
+
   // Discard changes
   const handleDiscardChanges = useCallback(() => {
     setTreeItems(JSON.parse(JSON.stringify(originalTreeItems)))
+    hasShownUnsavedToast.current = false
     toast('Changes Discarded', {
       description: 'All unsaved changes have been discarded'
     })
@@ -336,7 +362,9 @@ export default function AdminMenuPage() {
       description: '',
       permission_id: undefined,
       is_active: true,
-      parent_id: undefined
+      parent_id: undefined,
+      is_public_nav: false,
+      nav_metadata: {}
     })
   }, [])
 
@@ -352,7 +380,9 @@ export default function AdminMenuPage() {
       description: item.description || '',
       permission_id: item.permission_id,
       is_active: item.is_active,
-      parent_id: item.parent_id
+      parent_id: item.parent_id,
+      is_public_nav: item.is_public_nav || false,
+      nav_metadata: item.nav_metadata ? { ...item.nav_metadata } : {}
     })
   }, [])
 
@@ -368,7 +398,9 @@ export default function AdminMenuPage() {
       description: item.description || '',
       permission_id: item.permission_id,
       is_active: item.is_active,
-      parent_id: item.parent_id
+      parent_id: item.parent_id,
+      is_public_nav: item.is_public_nav || false,
+      nav_metadata: item.nav_metadata || {}
     })
   }, [])
 
@@ -390,6 +422,8 @@ export default function AdminMenuPage() {
       if (editForm.is_active !== undefined) cleanedForm.is_active = editForm.is_active
       if (editForm.parent_id !== undefined) cleanedForm.parent_id = editForm.parent_id || null
       if (editForm.sort_order !== undefined) cleanedForm.sort_order = editForm.sort_order
+      if (editForm.is_public_nav !== undefined) cleanedForm.is_public_nav = editForm.is_public_nav || false
+      if (editForm.nav_metadata !== undefined) cleanedForm.nav_metadata = editForm.nav_metadata || {}
 
       if (isAdding) {
         // Create new menu item
@@ -462,10 +496,17 @@ export default function AdminMenuPage() {
             status: res.status,
             error: res.error,
             data: res.data,
-            menuItemId: editingItem.id
+            menuItemId: editingItem.id,
+            cleanedForm: cleanedForm,
+            responseKeys: res.data ? Object.keys(res.data) : []
           })
           
-          throw new Error(errorMessage)
+          // Show user-friendly error message
+          const userMessage = res.data?.details 
+            ? `${res.data.error || 'Failed to update menu item'}: ${res.data.details}`
+            : errorMessage
+          
+          throw new Error(userMessage)
         }
       }
     } catch (error) {
@@ -579,24 +620,6 @@ export default function AdminMenuPage() {
             }
           />
 
-          {/* Unsaved Changes Banner */}
-          {hasUnsavedChanges && (
-            <Card className="mb-6 border-yellow-200 bg-yellow-50">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                  <div>
-                    <h3 className="text-sm font-medium text-yellow-800">
-                      You have unsaved changes
-                    </h3>
-                    <p className="text-sm text-yellow-700 mt-1">
-                      Your menu order changes are not saved yet. Click &quot;Save Changes&quot; to apply them.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Main Content Card */}
           <Card>
@@ -619,7 +642,7 @@ export default function AdminMenuPage() {
               ) : filteredTreeItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No menu items found</div>
               ) : (
-                <div className="min-h-[400px]">
+                <div className="min-h-[400px] w-full">
                   <SortableTree
                     items={filteredTreeItems}
                     onItemsChanged={handleItemsChanged}
@@ -740,6 +763,73 @@ export default function AdminMenuPage() {
                     />
                     <Label htmlFor="is_active">Active</Label>
                   </div>
+                  
+                  {/* Public Navigation Settings */}
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is_public_nav"
+                        checked={editForm.is_public_nav || false}
+                        onChange={(e) => setEditForm({ ...editForm, is_public_nav: e.target.checked })}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="is_public_nav">Show in Public Navigation Bar</Label>
+                    </div>
+                    
+                    {editForm.is_public_nav && (
+                      <div className="pl-6 space-y-3 border-l-2 border-gray-200">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="isHashLink"
+                            checked={editForm.nav_metadata?.isHashLink || false}
+                            onChange={(e) => setEditForm({ 
+                              ...editForm, 
+                              nav_metadata: { 
+                                ...(editForm.nav_metadata || {}),
+                                isHashLink: e.target.checked 
+                              } 
+                            })}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor="isHashLink">Hash Link (e.g., #features, #contact)</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="showOnLanding"
+                            checked={editForm.nav_metadata?.showOnLanding !== false}
+                            onChange={(e) => setEditForm({ 
+                              ...editForm, 
+                              nav_metadata: { 
+                                ...(editForm.nav_metadata || {}),
+                                showOnLanding: e.target.checked 
+                              } 
+                            })}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor="showOnLanding">Show on Landing Page</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="showOnOtherPages"
+                            checked={editForm.nav_metadata?.showOnOtherPages !== false}
+                            onChange={(e) => setEditForm({ 
+                              ...editForm, 
+                              nav_metadata: { 
+                                ...(editForm.nav_metadata || {}),
+                                showOnOtherPages: e.target.checked 
+                              } 
+                            })}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor="showOnOtherPages">Show on Other Pages</Label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => {
@@ -839,58 +929,94 @@ const TreeItemComponent = React.forwardRef<HTMLDivElement, TreeItemComponentProp
         ref={ref}
         handleProps={handleProps}
         item={item}
+        className="w-full"
       >
-        <div className="flex items-center justify-between gap-2 p-2 border rounded">
-          <div className="flex items-center gap-2 flex-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 border rounded-lg hover:bg-gray-50/50 transition-colors w-full">
+          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
             {menuItem.icon && (
-              <DynamicIcon name={menuItem.icon} className="h-4 w-4" />
+              <DynamicIcon name={menuItem.icon} className="h-4 w-4 flex-shrink-0 text-gray-600" />
             )}
-            <span className="font-medium">{menuItem.label}</span>
-            {menuItem.label_ar && (
-              <span className="text-sm text-muted-foreground">({menuItem.label_ar})</span>
-            )}
-            {!menuItem.is_active && <Badge variant="secondary">Inactive</Badge>}
-            {menuItem.permission && (
-              <Badge variant="outline">{menuItem.permission.display_name}</Badge>
-            )}
-            <Badge variant="outline">{menuItem.href}</Badge>
-            <Badge variant="outline">#{menuItem.sort_order}</Badge>
+            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+              <span className="font-medium text-gray-900 truncate">{menuItem.label}</span>
+              {menuItem.label_ar && (
+                <span className="text-sm text-gray-500 hidden sm:inline">({menuItem.label_ar})</span>
+              )}
+              {!menuItem.is_active && (
+                <Badge variant="secondary" className="text-xs flex-shrink-0">Inactive</Badge>
+              )}
+              {menuItem.permission && (
+                <Badge variant="outline" className="text-xs flex-shrink-0 hidden md:inline-flex">
+                  {menuItem.permission.display_name}
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-xs font-mono flex-shrink-0 hidden lg:inline-flex">
+                {menuItem.href}
+              </Badge>
+              <Badge variant="outline" className="text-xs flex-shrink-0 hidden xl:inline-flex">
+                #{menuItem.sort_order}
+              </Badge>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                window.dispatchEvent(new CustomEvent('menu-item-edit', { detail: menuItem }))
-              }}
-            >
-              <Edit2 className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                window.dispatchEvent(new CustomEvent('menu-item-duplicate', { detail: menuItem }))
-              }}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicate
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                window.dispatchEvent(new CustomEvent('menu-item-delete', { detail: menuItem }))
-              }}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
-          </div>
+          <TooltipProvider>
+            <div className="flex items-center gap-1.5 ml-auto flex-shrink-0 justify-end">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      window.dispatchEvent(new CustomEvent('menu-item-edit', { detail: menuItem }))
+                    }}
+                    className="h-8 w-8 p-0 border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300 transition-colors"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Edit</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      window.dispatchEvent(new CustomEvent('menu-item-duplicate', { detail: menuItem }))
+                    }}
+                    className="h-8 w-8 p-0 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 hover:border-green-300 transition-colors"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Duplicate</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      window.dispatchEvent(new CustomEvent('menu-item-delete', { detail: menuItem }))
+                    }}
+                    className="h-8 w-8 p-0 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 hover:border-red-300 transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Delete</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
       </SimpleTreeItemWrapper>
     )

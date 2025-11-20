@@ -75,3 +75,4 @@ Both client-side and server-side validation use the same extension list:
 - Extensions are stored in the database as lowercase strings
 - The UI displays extensions in uppercase for better readability
 
+

@@ -26,6 +26,7 @@ import FilterSidebar from '@/components/cases/FilterSidebar'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { useAdmin } from '@/lib/admin/hooks'
 import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination'
+import { theme, brandColors } from '@/lib/theme'
 
 interface Case {
   id: string
@@ -240,7 +241,7 @@ export default function CasesPage() {
   }
 
   const handleCreateCase = () => {
-    router.push(`/${locale}/cases/create`)
+    router.push(`/${locale}/case-management/create`)
   }
 
   const getActiveFiltersCount = () => {
@@ -322,7 +323,7 @@ export default function CasesPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <AlertCircle className="h-12 w-12 text-ma3ana mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
             <p className="text-gray-600 mb-4">You don&apos;t have permission to view cases.</p>
             <Button onClick={() => router.push(`/${locale}/`)}>
@@ -332,14 +333,14 @@ export default function CasesPage() {
         </Card>
       </div>
     }>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
         <Container variant={containerVariant} className="py-8">
         {/* Enhanced Header */}
         <div className="mb-6 sm:mb-8 w-full">
           {/* Title and Create Case Button Row */}
           <div className="flex flex-col md:flex-row justify-between items-start gap-4 sm:gap-6 mb-6 w-full">
             <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex-shrink-0">
+              <div className="p-2 rounded-lg flex-shrink-0" style={{ background: theme.gradients.primary }}>
                 <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
               <div className="min-w-0 flex-1">
@@ -357,7 +358,14 @@ export default function CasesPage() {
               <div className="hidden md:block flex-shrink-0">
                 <Button 
                   onClick={handleCreateCase} 
-                  className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-lg"
+                  style={{ background: theme.gradients.primary, boxShadow: theme.shadows.primary }}
+                  className="flex items-center gap-2 text-white hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-lg"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = theme.gradients.primary
+                  }}
                 >
                   <Plus className="h-5 w-5" />
                   {t('createCase')}
@@ -371,8 +379,8 @@ export default function CasesPage() {
             <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg w-full min-w-0">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
-                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                  <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: brandColors.meen[100] }}>
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: brandColors.meen[600] }} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs sm:text-sm text-gray-600 truncate">{t('activeCases')}</p>
@@ -398,8 +406,8 @@ export default function CasesPage() {
             <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg w-full min-w-0 sm:col-span-2 lg:col-span-1">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                  <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: brandColors.ma3ana[600] }} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs sm:text-sm text-gray-600 truncate">{t('totalRaised')}</p>
@@ -456,7 +464,8 @@ export default function CasesPage() {
                         placeholder={t('searchCases')}
                         value={filters.search}
                         onChange={(e) => handleSearch(e.target.value)}
-                        className="pl-10 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg sm:rounded-xl"
+                        className="pl-10 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base border-2 border-gray-200 focus:border-meen focus:ring-2 rounded-lg sm:rounded-xl"
+                        style={{ '--tw-ring-color': brandColors.meen[200] } as React.CSSProperties}
                       />
                     </div>
                   </div>
@@ -466,12 +475,12 @@ export default function CasesPage() {
                     variant="outline"
                     size="lg"
                     onClick={() => setShowFilters(!showFilters)}
-                    className="2xl:hidden h-10 sm:h-12 px-4 sm:px-6 border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-lg sm:rounded-xl whitespace-nowrap"
+                    className="2xl:hidden h-10 sm:h-12 px-4 sm:px-6 border-2 border-gray-200 hover:border-meen hover:bg-meen-50 rounded-lg sm:rounded-xl whitespace-nowrap"
                   >
                     <Filter className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                     <span className="text-sm sm:text-base">{t('filters')}</span>
                     {getActiveFiltersCount() > 0 && (
-                      <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 px-2 py-0.5 text-xs">
+                      <Badge variant="secondary" className="ml-2 bg-meen-100 text-meen-800 px-2 py-0.5 text-xs">
                         {getActiveFiltersCount()}
                       </Badge>
                     )}
@@ -488,7 +497,14 @@ export default function CasesPage() {
                 {canCreateCase && (
                   <Button 
                     onClick={handleCreateCase}
-                    className="md:hidden flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm flex-shrink-0"
+                    style={{ background: theme.gradients.primary, boxShadow: theme.shadows.primary }}
+                    className="md:hidden flex items-center gap-1.5 sm:gap-2 text-white shadow-md hover:shadow-lg transition-all duration-200 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm flex-shrink-0"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = theme.gradients.primary
+                    }}
                   >
                     <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span className="hidden sm:inline">{t('createCase')}</span>
@@ -502,7 +518,8 @@ export default function CasesPage() {
                     variant={viewMode === 'grid' ? 'default' : 'ghost'}
                     size="lg"
                     onClick={() => setViewMode('grid')}
-                    className={`rounded-r-none px-3 sm:px-4 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'grid' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'hover:bg-gray-50'}`}
+                    style={viewMode === 'grid' ? { background: theme.gradients.primary } : {}}
+                    className={`rounded-r-none px-3 sm:px-4 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'grid' ? 'text-white' : 'hover:bg-gray-50'}`}
                   >
                     <Grid className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
                   </Button>
@@ -510,7 +527,8 @@ export default function CasesPage() {
                     variant={viewMode === 'list' ? 'default' : 'ghost'}
                     size="lg"
                     onClick={() => setViewMode('list')}
-                    className={`rounded-l-none px-3 sm:px-4 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'list' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'hover:bg-gray-50'}`}
+                    style={viewMode === 'list' ? { background: theme.gradients.primary } : {}}
+                    className={`rounded-l-none px-3 sm:px-4 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'list' ? 'text-white' : 'hover:bg-gray-50'}`}
                   >
                     <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
                   </Button>
@@ -557,7 +575,14 @@ export default function CasesPage() {
                   {canCreateCase && (
                     <Button 
                       onClick={handleCreateCase}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
+                      style={{ background: theme.gradients.primary }}
+                      className="text-white"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = theme.gradients.primary
+                      }}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       {t('createCase')}
@@ -592,7 +617,14 @@ export default function CasesPage() {
                     <Button
                       onClick={pagination.handleLoadMore}
                       disabled={pagination.state.isLoadingMore || loading}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white min-w-[120px]"
+                      style={{ background: theme.gradients.primary }}
+                      className="text-white min-w-[120px]"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = theme.gradients.primary
+                      }}
                     >
                       {pagination.state.isLoadingMore || loading ? (
                         <>
@@ -658,8 +690,8 @@ export default function CasesPage() {
                             }}
                             className={
                               isActive
-                                ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-0 shadow-md'
-                                : 'border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50'
+                                ? 'text-white border-0 shadow-md'
+                                : 'border-2 border-gray-200 hover:border-meen hover:bg-meen-50'
                             }
                             size="sm"
                           >

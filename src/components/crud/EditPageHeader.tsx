@@ -96,7 +96,7 @@ export default function EditPageHeader({
   return (
     <div className="mb-6 sm:mb-8">
       {/* Enhanced Header with Background */}
-      <div className="bg-gradient-to-r from-white via-blue-50/30 to-white rounded-xl border border-gray-200/60 shadow-sm p-4 sm:p-6">
+      <div className="bg-gradient-to-r from-white via-[#6B8E7E]/5 to-white rounded-xl border border-gray-200/60 shadow-sm p-4 sm:p-6">
         <div className="flex flex-col gap-4">
           {/* Top Row: Back Button */}
           <div className="flex items-center justify-between gap-4">
@@ -117,10 +117,10 @@ export default function EditPageHeader({
           <div className="flex items-start gap-4">
             {/* Icon with Enhanced Styling */}
             <div className="relative shrink-0">
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+              <div className="p-3 bg-gradient-to-br from-[#6B8E7E] to-[#5A7A6B] rounded-xl shadow-lg">
                 <Icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
               </div>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-400 rounded-full border-2 border-white"></div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#6B8E7E]/80 rounded-full border-2 border-white"></div>
             </div>
 
             {/* Title and Description */}
@@ -191,7 +191,7 @@ export default function EditPageHeader({
               
               {itemName && itemName.trim() && (
                 <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs font-medium bg-blue-50 text-blue-700 border-blue-200">
+                  <Badge variant="outline" className="text-xs font-medium bg-[#6B8E7E]/10 text-[#6B8E7E] border-[#6B8E7E]/30">
                     <span className="font-semibold">Editing:</span>
                     <span className="ml-1">{itemName}</span>
                   </Badge>

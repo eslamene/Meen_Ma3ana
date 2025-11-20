@@ -152,7 +152,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut()
-      router.push(`/${locale}`)
+      router.push(`/${locale}/landing`)
     } catch (error) {
       console.error('Error signing out:', error)
     }

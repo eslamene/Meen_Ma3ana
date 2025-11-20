@@ -304,6 +304,7 @@ export const systemConfig = pgTable('system_config', {
   configValue: text('config_value').notNull(),
   description: text('description'),
   descriptionAr: text('description_ar'),
+  groupType: text('group_type'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   updatedBy: uuid('updated_by').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

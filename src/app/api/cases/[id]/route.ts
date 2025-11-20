@@ -7,6 +7,7 @@ import { eq, and, desc } from 'drizzle-orm'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
+import { isValidUUID } from '@/lib/utils/uuid'
 
 export async function PATCH(
   request: NextRequest,
@@ -131,6 +132,15 @@ export async function GET(
   const logger = new Logger(correlationId)
   try {
     const { id } = await context.params
+    
+    // Validate UUID format before making database queries
+    if (!isValidUUID(id)) {
+      return NextResponse.json(
+        { error: 'Invalid case ID format' },
+        { status: 404 }
+      )
+    }
+    
     const supabase = await createClient()
 
     const { data: caseData, error } = await supabase

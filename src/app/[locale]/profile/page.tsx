@@ -38,6 +38,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import ContributionHistory from '@/components/profile/ContributionHistory'
 import UserRoleInfo from '@/components/profile/UserRoleInfo'
+import { theme, brandColors } from '@/lib/theme'
 
 interface UserProfile {
   id: string
@@ -197,9 +198,9 @@ export default function ProfilePage() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'admin': return 'bg-red-100 text-red-800 border-red-200'
-      case 'sponsor': return 'bg-purple-100 text-purple-800 border-purple-200'
-      default: return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'admin': return 'bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200'
+      case 'sponsor': return 'bg-meen-100 text-meen-800 border-meen-200'
+      default: return 'bg-meen-100 text-meen-800 border-meen-200'
     }
   }
 
@@ -219,11 +220,11 @@ export default function ProfilePage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
-        return 'text-green-600'
+        return 'text-meen'
       case 'pending':
-        return 'text-yellow-600'
+        return 'text-ma3ana'
       case 'rejected':
-        return 'text-red-600'
+        return 'text-ma3ana'
       default:
         return 'text-gray-600'
     }
@@ -244,7 +245,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
+      <div className="min-h-screen py-8" style={{ background: theme.gradients.brandSubtle }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-1/4"></div>
@@ -266,13 +267,13 @@ export default function ProfilePage() {
 
   if (error || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
+      <div className="min-h-screen py-8" style={{ background: theme.gradients.brandSubtle }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
             <CardContent className="pt-6">
               <div className="text-center">
-                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                <p className="text-red-500 mb-4">{error || 'User not found'}</p>
+                <AlertCircle className="h-12 w-12 text-ma3ana mx-auto mb-4" />
+                <p className="text-ma3ana mb-4">{error || 'User not found'}</p>
                 <Button onClick={fetchUserProfile} className="bg-gradient-to-r from-blue-500 to-indigo-600">
                   Try Again
                 </Button>
@@ -310,14 +311,14 @@ export default function ProfilePage() {
               <Button 
                 variant="outline" 
                 onClick={() => router.push(`/${params.locale}/profile/edit`)}
-                className="border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200"
+                className="border-2 border-gray-200 hover:border-meen hover:bg-meen-50 transition-all duration-200"
               >
                 <Edit className="h-4 w-4 mr-2" />
                 {t('editProfile')}
               </Button>
               <Button 
                 variant="outline"
-                className="border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all duration-200"
+                className="border-2 border-gray-200 hover:border-meen hover:bg-meen-50 transition-all duration-200"
               >
                 <Bell className="h-4 w-4" />
               </Button>
@@ -358,7 +359,7 @@ export default function ProfilePage() {
                           {getRoleLabel(user.role)}
                         </Badge>
                         {user.email_verified && (
-                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                          <Badge variant="outline" className="bg-meen-100 text-meen-800 border-meen-200">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Verified
                           </Badge>
@@ -383,8 +384,8 @@ export default function ProfilePage() {
                       </div>
                       
                       {(!user.first_name || !user.last_name) && (
-                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <div className="flex items-center gap-2 text-yellow-800">
+                        <div className="mt-3 p-3 bg-ma3ana-50 border border-ma3ana-200 rounded-lg">
+                          <div className="flex items-center gap-2 text-ma3ana-800">
                             <AlertCircle className="h-4 w-4" />
                             <span className="text-sm font-medium">
                               Complete your profile by adding your name in the edit profile section
@@ -403,8 +404,8 @@ export default function ProfilePage() {
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Heart className="h-5 w-5 text-green-600" />
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <Heart className="h-5 w-5" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Total Contributions</p>
@@ -417,8 +418,8 @@ export default function ProfilePage() {
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <DollarSign className="h-5 w-5 text-blue-600" />
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: brandColors.meen[100] }}>
+                      <DollarSign className="h-5 w-5" style={{ color: brandColors.meen[600] }} />
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Total Amount</p>
@@ -433,8 +434,8 @@ export default function ProfilePage() {
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Target className="h-5 w-5 text-purple-600" />
+                    <div className="p-2 rounded-lg" style={{ background: theme.gradients.brandSubtle }}>
+                      <Target className="h-5 w-5" style={{ color: brandColors.meen[600] }} />
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Active Cases</p>
@@ -569,11 +570,11 @@ export default function ProfilePage() {
                       <div className="space-y-3">
                         {stats.latestContribution ? (
                           <div className="flex items-start gap-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
-                            <div className="flex-shrink-0 w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
+                            <div className="flex-shrink-0 w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: brandColors.meen[500] }}></div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <Heart className="h-4 w-4 text-green-600" />
+                                  <Heart className="h-4 w-4 text-meen" />
                                   <span className="font-medium text-gray-800">Latest Contribution</span>
                                 </div>
                                 <span className="text-sm text-gray-500">{getTimeAgo(stats.latestContribution.created_at)}</span>

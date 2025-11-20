@@ -86,7 +86,9 @@ export async function POST(request: NextRequest) {
       permission_id, 
       is_active = true, 
       parent_id, 
-      sort_order 
+      sort_order,
+      is_public_nav = false,
+      nav_metadata = {}
     } = body
 
     // Validate required fields
@@ -144,7 +146,9 @@ export async function POST(request: NextRequest) {
         permission_id: permission_id || null,
         is_active,
         parent_id: finalParentId,
-        sort_order: finalSortOrder
+        sort_order: finalSortOrder,
+        is_public_nav: is_public_nav || false,
+        nav_metadata: nav_metadata || {}
       })
       .select(`
         *,

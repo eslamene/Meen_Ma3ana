@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import MarketingHeader from '@/components/marketing/Header'
+import NavigationBar from '@/components/navigation/NavigationBar'
 import Hero from '@/components/marketing/Hero'
 import Stats from '@/components/marketing/Stats'
 import Features from '@/components/marketing/Features'
@@ -20,7 +20,7 @@ export default function LandingPage() {
   
   return (
     <div className="min-h-screen bg-white scroll-smooth">
-      <MarketingHeader />
+      <NavigationBar />
       <main>
         <Hero />
         <Stats />

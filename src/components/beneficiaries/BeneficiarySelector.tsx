@@ -534,7 +534,6 @@ export default function BeneficiarySelector({
                               variant: 'outline'
                             }
                           ]}
-                          showSeparator={false}
                         />
                       </div>
                     </DialogContent>
@@ -857,7 +856,6 @@ export default function BeneficiarySelector({
                       variant: 'outline'
                     }
                   ]}
-                  showSeparator={false}
                 />
               </div>
             </DialogContent>

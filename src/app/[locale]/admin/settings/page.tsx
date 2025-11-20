@@ -1,9 +1,8 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import PermissionGuard from '@/components/auth/PermissionGuard'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,29 +22,68 @@ import {
   Info,
   AlertCircle,
   CheckCircle,
-  FileText,
-  DollarSign,
-  Clock,
-  Type,
-  Scroll
+  Plus,
+  X,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  Grid3x3,
+  List,
+  BarChart3
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface SystemConfig {
   config_key: string
   config_value: string
   description: string | null
   description_ar: string | null
+  group_type: string | null
 }
 
-interface ValidationSettings {
-  caseTitleMinLength: string
-  caseTitleMaxLength: string
-  caseDescriptionMinLength: string
-  caseDescriptionMaxLength: string
-  caseTargetAmountMax: string
-  caseDurationMax: string
-  scrollItemsPerPage: string
+type ConfigGroup = {
+  [key: string]: SystemConfig[]
 }
+
+const GROUP_DISPLAY_NAMES: { [key: string]: string } = {
+  auth: 'Authentication',
+  validation: 'Validation',
+  pagination: 'Pagination',
+  contact: 'Contact Information',
+  general: 'General Settings',
+}
+
+const GROUP_ICONS: { [key: string]: string } = {
+  auth: '🔐',
+  validation: '✓',
+  pagination: '📄',
+  contact: '📞',
+  general: '⚙️',
+}
+
+type ViewMode = 'detailed' | 'compact'
 
 export default function SystemSettingsPage() {
   const router = useRouter()
@@ -57,16 +95,20 @@ export default function SystemSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [configs, setConfigs] = useState<SystemConfig[]>([])
-  const [validationSettings, setValidationSettings] = useState<ValidationSettings>({
-    caseTitleMinLength: '10',
-    caseTitleMaxLength: '100',
-    caseDescriptionMinLength: '50',
-    caseDescriptionMaxLength: '2000',
-    caseTargetAmountMax: '1000000',
-    caseDurationMax: '365',
-    scrollItemsPerPage: '3',
-  })
+  const [editedConfigs, setEditedConfigs] = useState<Map<string, SystemConfig>>(new Map())
   const [hasChanges, setHasChanges] = useState(false)
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedGroup, setSelectedGroup] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('detailed')
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [newConfig, setNewConfig] = useState<Partial<SystemConfig>>({
+    config_key: '',
+    config_value: '',
+    description: '',
+    description_ar: '',
+    group_type: null,
+  })
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -85,23 +127,12 @@ export default function SystemSettingsPage() {
       const data = await response.json()
       const configs = data.configs || []
       setConfigs(configs)
-
-      // Map configs to validation settings
-      const settingsMap = new Map<string, string>(
-        configs.map((item: SystemConfig) => [item.config_key, item.config_value])
-      )
-
-      setValidationSettings({
-        caseTitleMinLength: (settingsMap.get('validation.case.title.min_length') || '10') as string,
-        caseTitleMaxLength: (settingsMap.get('validation.case.title.max_length') || '100') as string,
-        caseDescriptionMinLength: (settingsMap.get('validation.case.description.min_length') || '50') as string,
-        caseDescriptionMaxLength: (settingsMap.get('validation.case.description.max_length') || '2000') as string,
-        caseTargetAmountMax: (settingsMap.get('validation.case.target_amount.max') || '1000000') as string,
-        caseDurationMax: (settingsMap.get('validation.case.duration.max') || '365') as string,
-        scrollItemsPerPage: (settingsMap.get('pagination.scroll.items_per_page') || '3') as string,
-      })
-
+      setEditedConfigs(new Map())
       setHasChanges(false)
+      
+      // Auto-expand all groups initially
+      const groups = new Set(configs.map((c: any) => c.group_type || 'general'))
+      setExpandedGroups(groups as Set<string>)
     } catch (error) {
       console.error('Error fetching settings:', error)
       toast.error('Error', { description: 'Failed to load system settings' })
@@ -114,11 +145,76 @@ export default function SystemSettingsPage() {
     fetchSettings()
   }, [fetchSettings])
 
-  const handleSettingChange = (key: keyof ValidationSettings, value: string) => {
-    setValidationSettings(prev => ({
-      ...prev,
-      [key]: value
-    }))
+  // Group configs by group_type
+  const groupedConfigs: ConfigGroup = useMemo(() => {
+    return configs.reduce((acc, config) => {
+      const group = config.group_type || 'general'
+      if (!acc[group]) {
+        acc[group] = []
+      }
+      acc[group].push(config)
+      return acc
+    }, {} as ConfigGroup)
+  }, [configs])
+
+  // Filter configs based on search query and selected group
+  const filteredConfigs = useMemo(() => {
+    let filtered = configs
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(config =>
+        config.config_key.toLowerCase().includes(query) ||
+        config.config_value.toLowerCase().includes(query) ||
+        (config.description && config.description.toLowerCase().includes(query)) ||
+        (config.description_ar && config.description_ar.toLowerCase().includes(query))
+      )
+    }
+
+    // Filter by selected group
+    if (selectedGroup !== 'all') {
+      filtered = filtered.filter(config => (config.group_type || 'general') === selectedGroup)
+    }
+
+    return filtered
+  }, [configs, searchQuery, selectedGroup])
+
+  // Group filtered configs
+  const filteredGroupedConfigs: ConfigGroup = useMemo(() => {
+    return filteredConfigs.reduce((acc, config) => {
+      const group = config.group_type || 'general'
+      if (!acc[group]) {
+        acc[group] = []
+      }
+      acc[group].push(config)
+      return acc
+    }, {} as ConfigGroup)
+  }, [filteredConfigs])
+
+  // Get all group types for tabs
+  const groupTypes = useMemo(() => {
+    const groups = Array.from(new Set(configs.map(c => c.group_type || 'general')))
+    return groups.sort()
+  }, [configs])
+
+  // Stats
+  const stats = useMemo(() => {
+    const total = configs.length
+    const edited = editedConfigs.size
+    const groups = Object.keys(groupedConfigs).length
+    const filtered = filteredConfigs.length
+    return { total, edited, groups, filtered }
+  }, [configs.length, editedConfigs.size, groupedConfigs, filteredConfigs.length])
+
+  const handleConfigChange = (configKey: string, field: keyof SystemConfig, value: string | null) => {
+    const config = configs.find(c => c.config_key === configKey)
+    if (!config) return
+
+    const edited = editedConfigs.get(configKey) || { ...config }
+    edited[field] = value as any
+    editedConfigs.set(configKey, edited)
+    setEditedConfigs(new Map(editedConfigs))
     setHasChanges(true)
   }
 
@@ -126,21 +222,20 @@ export default function SystemSettingsPage() {
     try {
       setSaving(true)
 
+      const configsToSave = Array.from(editedConfigs.values())
+
+      if (configsToSave.length === 0) {
+        toast.info('No changes to save')
+        return
+      }
+
       const response = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          settings: {
-            caseTitleMinLength: validationSettings.caseTitleMinLength,
-            caseTitleMaxLength: validationSettings.caseTitleMaxLength,
-            caseDescriptionMinLength: validationSettings.caseDescriptionMinLength,
-            caseDescriptionMaxLength: validationSettings.caseDescriptionMaxLength,
-            caseTargetAmountMax: validationSettings.caseTargetAmountMax,
-            caseDurationMax: validationSettings.caseDurationMax,
-            scrollItemsPerPage: validationSettings.scrollItemsPerPage
-          }
+          configs: configsToSave
         })
       })
 
@@ -152,7 +247,7 @@ export default function SystemSettingsPage() {
 
       toast.success('Success', { description: 'System settings updated successfully' })
       setHasChanges(false)
-      await fetchSettings() // Refresh to get updated values
+      await fetchSettings()
     } catch (error) {
       console.error('Error saving settings:', error)
       toast.error('Error', { description: 'Failed to save system settings' })
@@ -161,9 +256,105 @@ export default function SystemSettingsPage() {
     }
   }
 
+  const handleCreateConfig = async () => {
+    if (!newConfig.config_key || !newConfig.config_value) {
+      toast.error('Error', { description: 'Config key and value are required' })
+      return
+    }
+
+    try {
+      setSaving(true)
+
+      const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newConfig)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        toast.error('Error', { description: errorData.error || 'Failed to create config' })
+        return
+      }
+
+      toast.success('Success', { description: 'Config created successfully' })
+      setIsCreateDialogOpen(false)
+      setNewConfig({
+        config_key: '',
+        config_value: '',
+        description: '',
+        description_ar: '',
+        group_type: null,
+      })
+      await fetchSettings()
+    } catch (error) {
+      console.error('Error creating config:', error)
+      toast.error('Error', { description: 'Failed to create config' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleReset = () => {
     fetchSettings()
     setHasChanges(false)
+  }
+
+  const toggleGroup = (groupType: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupType)) {
+        next.delete(groupType)
+      } else {
+        next.add(groupType)
+      }
+      return next
+    })
+  }
+
+  const expandAll = () => {
+    setExpandedGroups(new Set(groupTypes))
+  }
+
+  const collapseAll = () => {
+    setExpandedGroups(new Set())
+  }
+
+  const getConfigValue = (configKey: string): string => {
+    const edited = editedConfigs.get(configKey)
+    if (edited) return edited.config_value
+    const config = configs.find(c => c.config_key === configKey)
+    return config?.config_value || ''
+  }
+
+  const getConfigDescription = (configKey: string, lang: 'en' | 'ar'): string | null => {
+    const edited = editedConfigs.get(configKey)
+    if (edited) {
+      return lang === 'en' ? edited.description : edited.description_ar
+    }
+    const config = configs.find(c => c.config_key === configKey)
+    return lang === 'en' ? (config?.description || null) : (config?.description_ar || null)
+  }
+
+  const getGroupType = (configKey: string): string => {
+    if (!configKey) return 'general'
+    
+    if (configKey.includes('.')) {
+      const firstSegment = configKey.split('.')[0]
+      if (['auth', 'validation', 'pagination', 'contact', 'notification', 'email', 'storage'].includes(firstSegment)) {
+        return firstSegment
+      }
+      return firstSegment
+    }
+    
+    const contactKeys = ['email', 'facebook_url', 'instagram_url', 'whatsapp_number', 'whatsapp_default_message', 'whatsapp_default_message_ar']
+    if (contactKeys.includes(configKey)) {
+      return 'contact'
+    }
+    
+    return 'general'
   }
 
   if (loading) {
@@ -191,240 +382,466 @@ export default function SystemSettingsPage() {
     }>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
         <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
-          <DetailPageHeader
-            backUrl={`/${locale}/admin`}
-            icon={Settings}
-            title="System Settings"
-            description="Manage system configuration and validation rules"
-          />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <DetailPageHeader
+              backUrl={`/${locale}/admin`}
+              icon={Settings}
+              title="System Settings"
+              description="Manage all system configuration settings"
+            />
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Config
+            </Button>
+          </div>
 
-          <div className="space-y-6">
-            {/* Validation Settings Card */}
-            <Card className="shadow-lg">
-              <CardHeader className="border-b bg-gradient-to-r from-white to-gray-50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FileText className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <CardTitle>Validation Settings</CardTitle>
-                    <CardDescription>
-                      Configure validation rules for case forms
-                    </CardDescription>
+          {/* Stats Bar */}
+          <Card className="mb-6 shadow-sm">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
+                  <div className="text-xs text-gray-500">Total Configs</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{stats.groups}</div>
+                  <div className="text-xs text-gray-500">Groups</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-amber-600">{stats.edited}</div>
+                  <div className="text-xs text-gray-500">Edited</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{stats.filtered}</div>
+                  <div className="text-xs text-gray-500">Filtered</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Search and Filters */}
+          <Card className="mb-6 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search configs by key, value, or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                    <SelectTrigger className="w-[180px]">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Filter by group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Groups ({stats.total})</SelectItem>
+                      {groupTypes.map(group => (
+                        <SelectItem key={group} value={group}>
+                          {GROUP_DISPLAY_NAMES[group] || group} ({groupedConfigs[group]?.length || 0})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex border rounded-md">
+                    <Button
+                      variant={viewMode === 'detailed' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('detailed')}
+                      className="rounded-r-none"
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === 'compact' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('compact')}
+                      className="rounded-l-none"
+                    >
+                      <Grid3x3 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                {/* Case Title Validation */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Type className="h-4 w-4 text-gray-500" />
-                    <h3 className="text-lg font-semibold text-gray-900">Case Title Validation</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="title_min" className="flex items-center gap-2">
-                        <Info className="h-4 w-4 text-gray-400" />
-                        Minimum Length
-                      </Label>
-                      <Input
-                        id="title_min"
-                        type="number"
-                        min="1"
-                        max="1000"
-                        value={validationSettings.caseTitleMinLength}
-                        onChange={(e) => handleSettingChange('caseTitleMinLength', e.target.value)}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-gray-500">Minimum characters required for case title</p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="title_max" className="flex items-center gap-2">
-                        <Info className="h-4 w-4 text-gray-400" />
-                        Maximum Length
-                      </Label>
-                      <Input
-                        id="title_max"
-                        type="number"
-                        min="1"
-                        max="1000"
-                        value={validationSettings.caseTitleMaxLength}
-                        onChange={(e) => handleSettingChange('caseTitleMaxLength', e.target.value)}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-gray-500">Maximum characters allowed for case title</p>
-                    </div>
-                  </div>
+              </div>
+              {searchQuery && (
+                <div className="mt-3 flex items-center justify-between text-sm">
+                  <span className="text-gray-600">
+                    Found {stats.filtered} config{stats.filtered !== 1 ? 's' : ''} matching &quot;{searchQuery}&quot;
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                <Separator />
-
-                {/* Case Description Validation */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <FileText className="h-4 w-4 text-gray-500" />
-                    <h3 className="text-lg font-semibold text-gray-900">Case Description Validation</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="desc_min" className="flex items-center gap-2">
-                        <Info className="h-4 w-4 text-gray-400" />
-                        Minimum Length
-                      </Label>
-                      <Input
-                        id="desc_min"
-                        type="number"
-                        min="1"
-                        max="10000"
-                        value={validationSettings.caseDescriptionMinLength}
-                        onChange={(e) => handleSettingChange('caseDescriptionMinLength', e.target.value)}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-gray-500">Minimum characters required for case description</p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="desc_max" className="flex items-center gap-2">
-                        <Info className="h-4 w-4 text-gray-400" />
-                        Maximum Length
-                      </Label>
-                      <Input
-                        id="desc_max"
-                        type="number"
-                        min="1"
-                        max="10000"
-                        value={validationSettings.caseDescriptionMaxLength}
-                        onChange={(e) => handleSettingChange('caseDescriptionMaxLength', e.target.value)}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-gray-500">Maximum characters allowed for case description</p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Financial & Duration Validation */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <DollarSign className="h-4 w-4 text-gray-500" />
-                    <h3 className="text-lg font-semibold text-gray-900">Financial & Duration Limits</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="target_max" className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-gray-400" />
-                        Maximum Target Amount (EGP)
-                      </Label>
-                      <Input
-                        id="target_max"
-                        type="number"
-                        min="1"
-                        value={validationSettings.caseTargetAmountMax}
-                        onChange={(e) => handleSettingChange('caseTargetAmountMax', e.target.value)}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-gray-500">Maximum target amount allowed for cases</p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="duration_max" className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        Maximum Duration (Days)
-                      </Label>
-                      <Input
-                        id="duration_max"
-                        type="number"
-                        min="1"
-                        max="3650"
-                        value={validationSettings.caseDurationMax}
-                        onChange={(e) => handleSettingChange('caseDurationMax', e.target.value)}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-gray-500">Maximum duration for one-time cases</p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Pagination Settings */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Scroll className="h-4 w-4 text-gray-500" />
-                    <h3 className="text-lg font-semibold text-gray-900">Pagination Settings</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="scroll_items" className="flex items-center gap-2">
-                        <Scroll className="h-4 w-4 text-gray-400" />
-                        Scroll Items Per Page
-                      </Label>
-                      <Input
-                        id="scroll_items"
-                        type="number"
-                        min="1"
-                        max="50"
-                        value={validationSettings.scrollItemsPerPage}
-                        onChange={(e) => handleSettingChange('scrollItemsPerPage', e.target.value)}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-gray-500">Number of items to load per scroll on mobile devices</p>
-                    </div>
-                  </div>
-                </div>
+          {/* Main Content */}
+          {Object.keys(filteredGroupedConfigs).length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 text-lg mb-2">No configurations found</p>
+                <p className="text-gray-400 text-sm mb-4">
+                  {searchQuery ? 'Try adjusting your search query' : 'Get started by creating your first configuration'}
+                </p>
+                <Button
+                  onClick={() => {
+                    setSearchQuery('')
+                    setSelectedGroup('all')
+                    setIsCreateDialogOpen(true)
+                  }}
+                  variant="outline"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Config
+                </Button>
               </CardContent>
             </Card>
+          ) : (
+            <div className="space-y-4">
+              {/* Group Controls */}
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={expandAll}
+                  >
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                    Expand All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={collapseAll}
+                  >
+                    <ChevronUp className="h-4 w-4 mr-1" />
+                    Collapse All
+                  </Button>
+                </div>
+                <div className="text-sm text-gray-500">
+                  Showing {stats.filtered} of {stats.total} configs
+                </div>
+              </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={handleReset}
-                disabled={saving || !hasChanges}
-                className="min-w-[100px]"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Reset
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={saving || !hasChanges}
-                className="min-w-[120px] bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
+              {/* Config Groups */}
+              {Object.entries(filteredGroupedConfigs).map(([groupType, groupConfigs]) => {
+                const isExpanded = expandedGroups.has(groupType)
+                const displayName = GROUP_DISPLAY_NAMES[groupType] || groupType
+                const icon = GROUP_ICONS[groupType] || '⚙️'
+
+                return (
+                  <Collapsible
+                    key={groupType}
+                    open={isExpanded}
+                    onOpenChange={() => toggleGroup(groupType)}
+                  >
+                    <Card className="shadow-lg">
+                      <CollapsibleTrigger className="w-full">
+                        <CardHeader className="border-b bg-gradient-to-r from-white to-gray-50 hover:from-gray-50 hover:to-gray-100 transition-colors cursor-pointer">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="text-2xl">{icon}</div>
+                              <div className="text-left">
+                                <CardTitle className="flex items-center gap-2">
+                                  {displayName}
+                                  <Badge variant="secondary" className="text-xs">
+                                    {groupConfigs.length}
+                                  </Badge>
+                                </CardTitle>
+                                <CardDescription>
+                                  {groupConfigs.length} configuration{groupConfigs.length !== 1 ? 's' : ''}
+                                </CardDescription>
+                              </div>
+                            </div>
+                            {isExpanded ? (
+                              <ChevronUp className="h-5 w-5 text-gray-400" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-gray-400" />
+                            )}
+                          </div>
+                        </CardHeader>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <CardContent className="p-6">
+                          {viewMode === 'compact' ? (
+                            <div className="space-y-2">
+                              {groupConfigs.map((config) => (
+                                <div
+                                  key={config.config_key}
+                                  className="grid grid-cols-12 gap-4 items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                                >
+                                  <div className="col-span-4">
+                                    <div className="flex items-center gap-2">
+                                      <Label className="font-mono text-sm">{config.config_key}</Label>
+                                      <Badge variant="outline" className="text-xs">
+                                        {config.group_type || 'general'}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <div className="col-span-6">
+                                    <Input
+                                      type="text"
+                                      value={getConfigValue(config.config_key)}
+                                      onChange={(e) => handleConfigChange(config.config_key, 'config_value', e.target.value)}
+                                      className="h-9 text-sm"
+                                    />
+                                  </div>
+                                  <div className="col-span-2 text-right">
+                                    {editedConfigs.has(config.config_key) && (
+                                      <Badge variant="default" className="bg-amber-500">
+                                        Edited
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="space-y-6">
+                              {groupConfigs.map((config) => (
+                                <div key={config.config_key} className="space-y-3 pb-4 border-b last:border-b-0 last:pb-0">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Label htmlFor={config.config_key} className="font-semibold text-sm font-mono">
+                                          {config.config_key}
+                                        </Label>
+                                        <Badge variant="outline" className="text-xs">
+                                          {config.group_type || 'general'}
+                                        </Badge>
+                                        {editedConfigs.has(config.config_key) && (
+                                          <Badge variant="default" className="bg-amber-500 text-xs">
+                                            Edited
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      
+                                      <Input
+                                        id={config.config_key}
+                                        type="text"
+                                        value={getConfigValue(config.config_key)}
+                                        onChange={(e) => handleConfigChange(config.config_key, 'config_value', e.target.value)}
+                                        className="h-10"
+                                        placeholder="Config value"
+                                      />
+                                      
+                                      {getConfigDescription(config.config_key, 'en') && (
+                                        <p className="text-xs text-gray-500">
+                                          {getConfigDescription(config.config_key, 'en')}
+                                        </p>
+                                      )}
+                                      
+                                      {getConfigDescription(config.config_key, 'ar') && (
+                                        <p className="text-xs text-gray-500 text-right" dir="rtl">
+                                          {getConfigDescription(config.config_key, 'ar')}
+                                        </p>
+                                      )}
+
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                                        <div className="space-y-1">
+                                          <Label className="text-xs text-gray-500">Description (EN)</Label>
+                                          <Textarea
+                                            value={getConfigDescription(config.config_key, 'en') || ''}
+                                            onChange={(e) => handleConfigChange(config.config_key, 'description', e.target.value || null)}
+                                            className="h-16 text-sm"
+                                            placeholder="English description"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <Label className="text-xs text-gray-500">Description (AR)</Label>
+                                          <Textarea
+                                            value={getConfigDescription(config.config_key, 'ar') || ''}
+                                            onChange={(e) => handleConfigChange(config.config_key, 'description_ar', e.target.value || null)}
+                                            className="h-16 text-sm"
+                                            placeholder="Arabic description"
+                                            dir="rtl"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </CardContent>
+                      </CollapsibleContent>
+                    </Card>
+                  </Collapsible>
+                )
+              })}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-gray-500">
+                  {hasChanges && (
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{stats.edited} unsaved change{stats.edited !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleReset}
+                    disabled={saving || !hasChanges}
+                    className="min-w-[100px]"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reset
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving || !hasChanges}
+                    className="min-w-[120px] bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
-
-            {hasChanges && (
-              <Card className="border-amber-200 bg-amber-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-amber-700">
-                    <AlertCircle className="h-4 w-4" />
-                    <p className="text-sm font-medium">You have unsaved changes</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          )}
         </Container>
       </div>
+
+      {/* Create Config Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Configuration</DialogTitle>
+            <DialogDescription>
+              Add a new system configuration setting. The group type will be automatically determined based on the config key pattern.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new_config_key">Config Key *</Label>
+              <Input
+                id="new_config_key"
+                value={newConfig.config_key || ''}
+                onChange={(e) => {
+                  const key = e.target.value
+                  setNewConfig({
+                    ...newConfig,
+                    config_key: key,
+                    group_type: getGroupType(key) || null
+                  })
+                }}
+                placeholder="e.g., validation.case.title.min_length"
+              />
+              <p className="text-xs text-gray-500">
+                Group type will be: <Badge variant="outline">{newConfig.config_key ? getGroupType(newConfig.config_key) : 'general'}</Badge>
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="new_config_value">Config Value *</Label>
+              <Input
+                id="new_config_value"
+                value={newConfig.config_value || ''}
+                onChange={(e) => setNewConfig({ ...newConfig, config_value: e.target.value })}
+                placeholder="Enter the configuration value"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new_description">Description (EN)</Label>
+                <Textarea
+                  id="new_description"
+                  value={newConfig.description || ''}
+                  onChange={(e) => setNewConfig({ ...newConfig, description: e.target.value })}
+                  placeholder="English description"
+                  className="h-20"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_description_ar">Description (AR)</Label>
+                <Textarea
+                  id="new_description_ar"
+                  value={newConfig.description_ar || ''}
+                  onChange={(e) => setNewConfig({ ...newConfig, description_ar: e.target.value })}
+                  placeholder="Arabic description"
+                  className="h-20"
+                  dir="rtl"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new_group_type">Group Type (Optional)</Label>
+              <Input
+                id="new_group_type"
+                value={newConfig.group_type || ''}
+                onChange={(e) => setNewConfig({ ...newConfig, group_type: e.target.value || null })}
+                placeholder="Leave empty for auto-detection"
+              />
+              <p className="text-xs text-gray-500">
+                If left empty, will be determined automatically from the config key pattern
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCreateDialogOpen(false)
+                setNewConfig({
+                  config_key: '',
+                  config_value: '',
+                  description: '',
+                  description_ar: '',
+                  group_type: null,
+                })
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateConfig}
+              disabled={saving || !newConfig.config_key || !newConfig.config_value}
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Config
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PermissionGuard>
   )
 }
-

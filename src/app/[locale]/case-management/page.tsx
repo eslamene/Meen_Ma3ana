@@ -29,6 +29,7 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { theme, brandColors } from '@/lib/theme'
 
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {
@@ -47,7 +48,8 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       title: 'Manage Cases',
       description: 'Create, edit, and monitor donation cases',
       icon: Target,
-      color: 'from-blue-500 to-indigo-600',
+      color: theme.gradients.primary,
+      hoverColor: `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`,
       permission: 'cases:update',
       action: () => router.push(`/${params.locale}/case-management/cases`),
       buttonText: 'View Cases'
@@ -57,7 +59,8 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       title: 'Review Contributions',
       description: 'Approve, reject, and manage donations',
       icon: Heart,
-      color: 'from-green-500 to-emerald-600',
+      color: theme.gradients.brand,
+      hoverColor: `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.ma3ana[600]} 100%)`,
       permission: 'contributions:approve',
       action: () => router.push(`/${params.locale}/case-management/contributions`),
       buttonText: 'View Contributions'
@@ -67,7 +70,8 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       title: 'View Analytics',
       description: 'Track performance and insights',
       icon: BarChart3,
-      color: 'from-purple-500 to-violet-600',
+      color: theme.gradients.secondary,
+      hoverColor: `linear-gradient(135deg, ${brandColors.ma3ana[600]} 0%, ${brandColors.ma3ana[700]} 100%)`,
       permission: 'admin:analytics',
       action: () => router.push(`/${params.locale}/case-management/analytics`),
       buttonText: 'View Reports'
@@ -77,7 +81,8 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       title: 'Manage Sponsorships',
       description: 'Handle sponsorship requests and approvals',
       icon: UserCheck,
-      color: 'from-red-500 to-rose-600',
+      color: theme.gradients.brandReverse,
+      hoverColor: `linear-gradient(135deg, ${brandColors.ma3ana[600]} 0%, ${brandColors.meen[600]} 100%)`,
       permission: 'admin:dashboard', // Using general admin permission for sponsorships
       action: () => router.push(`/${params.locale}/case-management/sponsorships`),
       buttonText: 'View Sponsorships'
@@ -95,10 +100,10 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
   }
   
   return (
-    <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-6">
+    <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-6" style={{ boxShadow: theme.shadows.primary }}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-          <Settings className="h-4 w-4 text-blue-600" />
+          <Settings className="h-4 w-4 text-meen" />
           Quick Actions
         </CardTitle>
       </CardHeader>
@@ -108,7 +113,19 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
             <button
               key={action.id}
               onClick={action.action}
-              className={`group w-full flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r ${action.color} text-white transition-all duration-200 hover:shadow-md hover:scale-[1.02]`}
+              style={{
+                background: action.color,
+                boxShadow: theme.shadows.primary
+              }}
+              className="group w-full flex items-center gap-4 p-4 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:scale-[1.02]"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = action.hoverColor || action.color
+                e.currentTarget.style.boxShadow = theme.shadows.primary
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = action.color
+                e.currentTarget.style.boxShadow = theme.shadows.primary
+              }}
             >
               <div className="flex-shrink-0">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
@@ -232,21 +249,21 @@ export default function AdminPage() {
     switch (status) {
       case 'approved':
         return (
-          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+          <Badge variant="outline" className="bg-meen-100 text-meen-800 border-meen-200">
             <CheckCircle className="h-3 w-3 mr-1" />
             Approved
           </Badge>
         )
       case 'rejected':
         return (
-          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+          <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200">
             <XCircle className="h-3 w-3 mr-1" />
             Rejected
           </Badge>
         )
       case 'pending':
         return (
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+          <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200">
             <Clock className="h-3 w-3 mr-1" />
             Pending
           </Badge>
@@ -263,7 +280,7 @@ export default function AdminPage() {
   return (
     <ProtectedRoute>
       <PermissionGuard permission="admin:dashboard">
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+        <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
           <Container variant={containerVariant} className="py-8">
             {/* Header */}
             <div className="mb-8">
@@ -277,7 +294,7 @@ export default function AdminPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                  <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200">
                     <Shield className="h-3 w-3 mr-1" />
                     {userRoleDisplayName}
                   </Badge>
@@ -287,7 +304,7 @@ export default function AdminPage() {
 
             {/* System Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -296,14 +313,14 @@ export default function AdminPage() {
                         {loading ? '...' : stats.totalUsers}
                       </p>
                     </div>
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <Users className="h-6 w-6 text-blue-600" />
+                    <div className="p-3 rounded-full" style={{ backgroundColor: brandColors.meen[100] }}>
+                      <Users className="h-6 w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -312,14 +329,14 @@ export default function AdminPage() {
                         {loading ? '...' : stats.totalContributions}
                       </p>
                     </div>
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <Heart className="h-6 w-6 text-green-600" />
+                    <div className="p-3 rounded-full" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <Heart className="h-6 w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -328,14 +345,14 @@ export default function AdminPage() {
                         {loading ? '...' : formatAmount(stats.totalAmount)}
                       </p>
                     </div>
-                    <div className="p-3 bg-emerald-100 rounded-full">
-                      <DollarSign className="h-6 w-6 text-emerald-600" />
+                    <div className="p-3 rounded-full" style={{ background: theme.gradients.brandSubtle }}>
+                      <DollarSign className="h-6 w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -344,8 +361,8 @@ export default function AdminPage() {
                         {loading ? '...' : stats.activeCases}
                       </p>
                     </div>
-                    <div className="p-3 bg-yellow-100 rounded-full">
-                      <Activity className="h-6 w-6 text-yellow-600" />
+                    <div className="p-3 rounded-full" style={{ background: theme.gradients.brandSubtle }}>
+                      <Activity className="h-6 w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
@@ -354,7 +371,7 @@ export default function AdminPage() {
 
             {/* Additional Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.secondary }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -363,14 +380,14 @@ export default function AdminPage() {
                         {loading ? '...' : stats.completedCases}
                       </p>
                     </div>
-                    <div className="p-3 bg-purple-100 rounded-full">
-                      <Target className="h-6 w-6 text-purple-600" />
+                    <div className="p-3 rounded-full" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <Target className="h-6 w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -379,14 +396,14 @@ export default function AdminPage() {
                         {loading ? '...' : stats.pendingContributions}
                       </p>
                     </div>
-                    <div className="p-3 bg-orange-100 rounded-full">
-                      <Clock className="h-6 w-6 text-orange-600" />
+                    <div className="p-3 rounded-full" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <Clock className="h-6 w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -395,14 +412,14 @@ export default function AdminPage() {
                         {loading ? '...' : stats.approvedContributions}
                       </p>
                     </div>
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="p-3 rounded-full" style={{ backgroundColor: brandColors.meen[100] }}>
+                      <CheckCircle className="h-6 w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.secondary }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -411,8 +428,8 @@ export default function AdminPage() {
                         {loading ? '...' : stats.rejectedContributions}
                       </p>
                     </div>
-                    <div className="p-3 bg-red-100 rounded-full">
-                      <XCircle className="h-6 w-6 text-red-600" />
+                    <div className="p-3 rounded-full" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <XCircle className="h-6 w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
@@ -427,17 +444,17 @@ export default function AdminPage() {
             />
 
             {/* Recent Activity */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-blue-600" />
+                  <Activity className="h-5 w-5 text-meen" />
                   Recent Activity
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto" style={{ borderColor: brandColors.meen[600] }}></div>
                     <p className="text-gray-600 mt-2">Loading recent activity...</p>
                   </div>
                 ) : stats.recentActivity.length > 0 ? (
@@ -445,8 +462,8 @@ export default function AdminPage() {
                     {stats.recentActivity.map((activity) => (
                       <div key={activity.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 rounded-full">
-                            <Heart className="h-4 w-4 text-blue-600" />
+                          <div className="p-2 rounded-full" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                            <Heart className="h-4 w-4" style={{ color: brandColors.ma3ana[600] }} />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">
@@ -463,7 +480,7 @@ export default function AdminPage() {
                             variant="outline" 
                             size="sm"
                             onClick={() => router.push(`/${params.locale}/case-management/contributions?contribution=${activity.id}`)}
-                            className="border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200"
+                            className="border-2 border-gray-200 hover:border-meen hover:bg-meen-50 transition-all duration-200"
                           >
                             <Eye className="h-3 w-3 mr-1" />
                             View
@@ -486,4 +503,5 @@ export default function AdminPage() {
     </ProtectedRoute>
   )
 }
+
 

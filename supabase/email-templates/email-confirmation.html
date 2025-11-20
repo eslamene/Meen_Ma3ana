@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Email - Meen Ma3ana</title>
+  <!--[if mso]>
+  <style type="text/css">
+    body, table, td {font-family: Arial, sans-serif !important;}
+  </style>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <!-- Main Container -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Header with Gradient Background -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #FEF3C7 0%, #FED7AA 50%, #FEE2E2 100%); padding: 40px 30px; border-radius: 12px 12px 0 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <h1 style="margin: 0; font-size: 28px; font-weight: bold; line-height: 1.2;">
+                      <span style="color: #6B8E7E;">Meen</span> <span style="color: #E74C3C;">Ma3ana</span>
+                    </h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <h2 style="margin: 0 0 20px 0; color: #1a1a1a; font-size: 24px; font-weight: 600; line-height: 1.3;">
+                Confirm Your Email Address
+              </h2>
+              
+              <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
+                Hello,
+              </p>
+              
+              <p style="margin: 0 0 30px 0; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
+                Thank you for signing up for Meen Ma3ana! Please confirm your email address by clicking the button below:
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td align="center" style="padding: 0 0 30px 0;">
+                    <a href="{{ .ConfirmationURL }}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #6B8E7E 0%, #5a7a6b 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: center; box-shadow: 0 4px 6px rgba(107, 142, 126, 0.3);">
+                      Confirm Email Address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Alternative Link -->
+              <p style="margin: 0 0 20px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                If the button doesn't work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 30px 0; word-break: break-all;">
+                <a href="{{ .ConfirmationURL }}" style="color: #6B8E7E; text-decoration: underline; font-size: 14px;">{{ .ConfirmationURL }}</a>
+              </p>
+
+              <!-- Welcome Message -->
+              <div style="background-color: #F0F5F3; border-left: 4px solid #6B8E7E; padding: 16px; border-radius: 4px; margin: 30px 0;">
+                <p style="margin: 0; color: #273E32; font-size: 14px; line-height: 1.5;">
+                  <strong>Welcome to Meen Ma3ana!</strong> Once you confirm your email, you'll be able to start making a difference in your community through our donation platform.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #6B8E7E; padding: 30px; border-radius: 0 0 12px 12px; text-align: center;">
+              <p style="margin: 0 0 10px 0; color: #ffffff; font-size: 14px; line-height: 1.5;">
+                You're receiving this email because you signed up for an application powered by Meen Ma3ana ⚡
+              </p>
+              <p style="margin: 0; color: rgba(255, 255, 255, 0.8); font-size: 12px; line-height: 1.5;">
+                © {{ .Year }} Meen Ma3ana. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+

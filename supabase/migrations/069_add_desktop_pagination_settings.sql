@@ -22,3 +22,4 @@ ON CONFLICT (config_key) DO UPDATE SET
 -- Add comment
 COMMENT ON TABLE system_config IS 'Generic key-value store for system configuration values including validation rules and pagination settings';
 
+

@@ -6,6 +6,7 @@ import { useTranslations, useLocale } from 'next-intl'
 import { useParams as useNextParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import { isValidUUID } from '@/lib/utils/uuid'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +54,9 @@ import DynamicIcon from '@/components/ui/dynamic-icon'
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
 import { useAdmin } from '@/lib/admin/hooks'
 import { toast } from 'sonner'
+import { theme, brandColors } from '@/lib/theme'
+import Container from '@/components/layout/Container'
+import { useLayout } from '@/components/layout/LayoutProvider'
 import type { Beneficiary } from '@/types/beneficiary'
 
 interface Case {
@@ -116,13 +120,26 @@ export default function CaseDetailPage() {
   const router = useRouter()
   const caseId = params.id as string
 
+  // Validate case ID is a valid UUID format
+  // If not, redirect to 404 page
+  const [isInvalidId, setIsInvalidId] = useState(false)
+  
+  useEffect(() => {
+    if (!isValidUUID(caseId)) {
+      setIsInvalidId(true)
+    }
+  }, [caseId])
+
   const [caseData, setCaseData] = useState<Case | null>(null)
   const [updates, setUpdates] = useState<CaseUpdate[]>([])
   const [caseFiles, setCaseFiles] = useState<CaseFile[]>([])
   const [loading, setLoading] = useState(true)
   
   // Use centralized hook for approved contributions
-  const { contributions: approvedContributions, totalAmount: approvedTotal, isLoading: contributionsLoading, error: contributionsError } = useApprovedContributions(caseId)
+  // Only call if caseId is valid UUID to prevent errors
+  const { contributions: approvedContributions, totalAmount: approvedTotal, isLoading: contributionsLoading, error: contributionsError } = useApprovedContributions(
+    isValidUUID(caseId) ? caseId : ''
+  )
   const [apiProgress, setApiProgress] = useState<{ approvedTotal: number; progressPercentage: number; contributorCount: number } | null>(null)
   const { hasPermission } = useAdmin()
   const [error, setError] = useState<string | null>(null)
@@ -137,6 +154,7 @@ export default function CaseDetailPage() {
   const [contributionsPage, setContributionsPage] = useState(1)
   const contributionsPerPage = 10
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
+  const { containerVariant } = useLayout()
 
   // Helper functions to get locale-aware title and description
   // Simple logic: show the language that matches the locale
@@ -176,6 +194,13 @@ export default function CaseDetailPage() {
   }, [])
 
   const fetchCaseDetails = useCallback(async () => {
+    // Don't fetch if caseId is not a valid UUID
+    if (!isValidUUID(caseId)) {
+      setIsInvalidId(true)
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -185,10 +210,13 @@ export default function CaseDetailPage() {
       
       if (!caseResponse.ok) {
         const errorData = await caseResponse.json().catch(() => ({}))
-        const errorMessage = caseResponse.status === 404
-          ? 'Case not found or you do not have permission to view it'
-          : errorData.error || 'Failed to load case details'
-        
+        if (caseResponse.status === 404) {
+          // Case not found - show 404 state
+          setIsInvalidId(true)
+          setLoading(false)
+          return
+        }
+        const errorMessage = errorData.error || 'Failed to load case details'
         setError(errorMessage)
         toast.error('Error Loading Case', { description: errorMessage })
         return
@@ -269,6 +297,10 @@ export default function CaseDetailPage() {
 
   // Fetch progress from API as fallback for public users
   const fetchProgressFromAPI = useCallback(async () => {
+    // Don't fetch if caseId is not a valid UUID
+    if (!isValidUUID(caseId)) {
+      return
+    }
     try {
       const response = await fetch(`/api/cases/${caseId}/progress`)
       if (response.ok) {
@@ -293,6 +325,10 @@ export default function CaseDetailPage() {
   }, [caseId])
 
   const fetchTotalContributions = useCallback(async () => {
+    // Don't fetch if caseId is not a valid UUID
+    if (!isValidUUID(caseId)) {
+      return
+    }
     try {
       const client = createClient()
       const { data, error } = await client
@@ -374,6 +410,10 @@ export default function CaseDetailPage() {
   }, [beneficiaryPopoverOpen, beneficiaryData, beneficiaryLoading, fetchBeneficiaryData])
 
   const fetchUpdates = useCallback(async () => {
+    // Don't fetch if caseId is not a valid UUID
+    if (!isValidUUID(caseId)) {
+      return
+    }
     try {
       const response = await fetch(`/api/cases/${caseId}/updates`)
       if (response.ok) {
@@ -407,6 +447,10 @@ export default function CaseDetailPage() {
   }, [caseData])
 
   const setupRealtimeSubscriptions = useCallback(() => {
+    // Don't setup subscriptions if caseId is not a valid UUID
+    if (!isValidUUID(caseId)) {
+      return
+    }
     // Subscribe to case progress updates
     realtimeCaseUpdates.subscribeToCaseProgress(
       caseId,
@@ -585,13 +629,32 @@ export default function CaseDetailPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'published': return 'bg-green-100 text-green-800'
-      case 'under_review': return 'bg-yellow-100 text-yellow-800'
+      case 'published': return `bg-[${brandColors.meen[100]}] text-[${brandColors.meen[800]}]`
+      case 'under_review': return `bg-[${brandColors.meen[50]}] text-[${brandColors.meen[700]}]`
       case 'closed': return 'bg-gray-100 text-gray-800'
-      case 'completed': return 'bg-green-100 text-green-800'
-      case 'draft': return 'bg-orange-100 text-orange-800'
-      case 'submitted': return 'bg-blue-100 text-blue-800'
-      default: return 'bg-blue-100 text-blue-800'
+      case 'completed': return `bg-[${brandColors.meen[100]}] text-[${brandColors.meen[800]}]`
+      case 'draft': return `bg-[${brandColors.ma3ana[50]}] text-[${brandColors.ma3ana[700]}]`
+      case 'submitted': return `bg-[${brandColors.meen[50]}] text-[${brandColors.meen[700]}]`
+      default: return `bg-[${brandColors.meen[50]}] text-[${brandColors.meen[700]}]`
+    }
+  }
+  
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case 'published':
+        return { backgroundColor: brandColors.meen[100], color: brandColors.meen[800], borderColor: brandColors.meen[200] }
+      case 'under_review':
+        return { background: theme.gradients.brandSubtle, color: brandColors.meen[800], borderColor: brandColors.meen[200] }
+      case 'closed':
+        return { backgroundColor: brandColors.ma3ana[100], color: brandColors.ma3ana[800], borderColor: brandColors.ma3ana[200] }
+      case 'completed':
+        return { backgroundColor: brandColors.meen[100], color: brandColors.meen[800], borderColor: brandColors.meen[200] }
+      case 'draft':
+        return { backgroundColor: brandColors.ma3ana[50], color: brandColors.ma3ana[700], borderColor: brandColors.ma3ana[200] }
+      case 'submitted':
+        return { backgroundColor: brandColors.meen[50], color: brandColors.meen[700], borderColor: brandColors.meen[200] }
+      default:
+        return { backgroundColor: brandColors.meen[50], color: brandColors.meen[700], borderColor: brandColors.meen[200] }
     }
   }
 
@@ -818,6 +881,42 @@ export default function CaseDetailPage() {
     }
   }
 
+  // Show 404 page for invalid IDs or when case is not found
+  if (isInvalidId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-100 mb-4">
+            <XCircle className="h-6 w-6 text-gray-600" />
+          </div>
+          
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Case Not Found
+          </h2>
+          
+          <p className="text-gray-600 mb-6">
+            The case you&apos;re looking for doesn&apos;t exist or has been moved.
+          </p>
+          
+          <div className="space-y-3">
+            <Button onClick={handleBack} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {t('backToCases')}
+            </Button>
+            
+            <Button
+              onClick={() => router.push(`/${locale}/cases`)}
+              variant="outline"
+              className="w-full"
+            >
+              View All Cases
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -860,8 +959,8 @@ export default function CaseDetailPage() {
         </Card>
       </div>
     }>
-      <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 lg:py-8">
+      <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
+      <Container variant={containerVariant} className="px-4 sm:px-6 py-4 sm:py-6 lg:py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <Button variant="ghost" onClick={handleBack} className="text-sm sm:text-base">
@@ -881,9 +980,9 @@ export default function CaseDetailPage() {
 
         {/* Case Details Drawer - Premium Collapsible Component */}
         <div className="mb-4 sm:mb-6">
-          <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-300 hover:shadow-xl">
+          <div className="relative overflow-hidden rounded-xl border-0 bg-white/90 backdrop-blur-sm transition-all duration-300 hover:shadow-xl" style={{ boxShadow: theme.shadows.primary }}>
             {/* Gradient Top Border */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+            <div className="absolute top-0 left-0 right-0 h-1" style={{ background: theme.gradients.progress }}></div>
             
             {/* Collapsed Header - Always Visible */}
             <button
@@ -917,7 +1016,7 @@ export default function CaseDetailPage() {
                         fallback="gift"
                       />
                     </div>
-                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-gradient-to-r from-pink-400 to-rose-400 rounded-full animate-pulse"></div>
+                    <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full animate-pulse" style={{ background: theme.gradients.secondary }}></div>
                   </div>
                   <div className="flex-1 min-w-0">
                     {/* Title and Description - Header Data */}
@@ -930,7 +1029,7 @@ export default function CaseDetailPage() {
                     
                     {/* Status and Priority - Below Header Data */}
                     <div className="flex flex-wrap items-center gap-2 mb-3">
-                      <Badge variant="secondary" className={`${getStatusColor(caseData.status)} font-semibold px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm`}>
+                      <Badge variant="outline" className="font-semibold px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm" style={getStatusBadgeStyle(caseData.status)}>
                         {caseData.status ? t(caseData.status) : t('notSpecified')}
                       </Badge>
                       <div className="flex items-center gap-1">
@@ -1302,8 +1401,8 @@ export default function CaseDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Modern Funding Progress Section */}
-            <Card className="border-0 bg-gradient-to-br from-white to-blue-50 shadow-xl overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 via-blue-500 to-purple-600"></div>
+            <Card className="border-0 bg-white/90 backdrop-blur-sm shadow-xl overflow-hidden" style={{ boxShadow: theme.shadows.primary }}>
+              <div className="absolute top-0 left-0 w-full h-1" style={{ background: theme.gradients.progress }}></div>
               <CardHeader className="pb-4 sm:pb-6 pt-6 sm:pt-8 px-4 sm:px-6">
                 <div className="flex items-center justify-between gap-2 sm:gap-3">
                   <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl font-bold text-gray-800 min-w-0 flex-1">
@@ -1362,7 +1461,7 @@ export default function CaseDetailPage() {
                   <div className="space-y-2 sm:space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
                       <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gradient-to-r from-green-400 to-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
+                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: brandColors.ma3ana[500] }}></div>
                         <span className="text-xs sm:text-sm font-medium text-gray-700">Progress Overview</span>
                       </div>
                       <div className="text-left sm:text-right">
@@ -1375,9 +1474,10 @@ export default function CaseDetailPage() {
                     <div className="relative">
                       <div className="w-full h-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full overflow-hidden shadow-inner">
                         <div 
-                          className="h-full bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 rounded-full transition-all duration-1000 ease-out shadow-lg relative overflow-hidden"
+                          className="h-full rounded-full transition-all duration-1000 ease-out shadow-lg relative overflow-hidden"
                           style={{
-                            width: `${Math.min((getApprovedContributionsTotal() / Number(realTimeProgress?.targetAmount || caseData.target_amount)) * 100, 100)}%`
+                            width: `${Math.min((getApprovedContributionsTotal() / Number(realTimeProgress?.targetAmount || caseData.target_amount)) * 100, 100)}%`,
+                            background: theme.gradients.progress
                           }}
                         >
                           {/* Animated shine effect */}
@@ -1389,16 +1489,16 @@ export default function CaseDetailPage() {
                         </div>
                       </div>
                       {/* Progress markers */}
-                      <div className="absolute -top-1 left-0 w-1 h-6 bg-green-500 rounded-full shadow-lg"></div>
-                      <div className="absolute -top-1 right-0 w-1 h-6 bg-purple-500 rounded-full shadow-lg"></div>
+                      <div className="absolute -top-1 left-0 w-1 h-6 rounded-full shadow-lg" style={{ backgroundColor: '#8B5CF6' }}></div>
+                      <div className="absolute -top-1 right-0 w-1 h-6 rounded-full shadow-lg" style={{ backgroundColor: '#10B981' }}></div>
                     </div>
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span className="flex items-center gap-1">
-                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#8B5CF6' }}></div>
                         Start
                       </span>
                       <span className="flex items-center gap-1">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#10B981' }}></div>
                         Goal
                       </span>
                     </div>
@@ -1473,8 +1573,8 @@ export default function CaseDetailPage() {
             </Card>
 
             {/* Tabs */}
-            <Card className="border-2 border-blue-50 bg-gradient-to-br from-white to-blue-50 shadow-lg overflow-hidden">
-              <div className="w-full h-1 bg-gradient-to-r from-green-400 via-blue-500 to-purple-600"></div>
+            <Card className="border-0 bg-white/90 backdrop-blur-sm shadow-lg overflow-hidden" style={{ boxShadow: theme.shadows.primary }}>
+              <div className="w-full h-1" style={{ background: theme.gradients.progress }}></div>
               <Tabs 
                 value={activeTab} 
                 onValueChange={(value) => {
@@ -1633,10 +1733,10 @@ export default function CaseDetailPage() {
           {/* Sidebar */}
           <div className="space-y-4 sm:space-y-6">
             {/* Action Card */}
-            <Card className="border-2 border-blue-50 bg-gradient-to-br from-blue-50 to-indigo-50">
+            <Card className="border-0 bg-white/90 backdrop-blur-sm" style={{ boxShadow: theme.shadows.primary }}>
               <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
                 <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                  <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                  <Target className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: brandColors.meen[600] }} />
                   {t('takeAction')}
                 </CardTitle>
                 <p className="text-xs sm:text-sm text-gray-600 mt-1">
@@ -1648,12 +1748,22 @@ export default function CaseDetailPage() {
                 <div className="relative">
                   <Button 
                     onClick={handleDonate} 
-                    className="w-full h-10 sm:h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] justify-start px-4 sm:px-6"
+                    className="w-full h-10 sm:h-12 text-white font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] justify-start px-4 sm:px-6"
+                    style={{
+                      background: theme.gradients.primary,
+                      boxShadow: theme.shadows.primary
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = theme.gradients.primary
+                    }}
                   >
                     <Heart className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3" />
                     {t('donateNow')}
                   </Button>
-                  <div className="absolute -top-1 -right-1 w-2 h-2 sm:w-3 sm:h-3 bg-green-400 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 -right-1 w-2 h-2 sm:w-3 sm:h-3 rounded-full animate-pulse" style={{ backgroundColor: brandColors.ma3ana[500] }}></div>
                 </div>
 
                 {/* Secondary Actions */}
@@ -1679,7 +1789,7 @@ export default function CaseDetailPage() {
                   {hasPermission('cases:update') && (
                     <div className="pt-3 border-t border-gray-200">
                       <p className="text-xs text-gray-500 mb-3 px-1 font-medium uppercase tracking-wide">{t('adminActions')}</p>
-                      <Link href={`/${params.locale}/cases/${caseData.id}/edit`}>
+                      <Link href={`/${params.locale}/case-management/cases/${caseData.id}/edit`}>
                         <Button 
                           variant="ghost" 
                           className="w-full h-11 text-amber-700 hover:text-amber-800 hover:bg-amber-50 border border-amber-200 hover:border-amber-300 transition-all duration-200 group justify-start px-6 bg-gradient-to-r from-amber-50 to-orange-50"
@@ -1702,8 +1812,11 @@ export default function CaseDetailPage() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                     <div 
-                      className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100, 100)}%` }}
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: `${Math.min((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100, 100)}%`,
+                        background: theme.gradients.progress
+                      }}
                     ></div>
                   </div>
                 </div>
@@ -1807,7 +1920,7 @@ export default function CaseDetailPage() {
         </div>
 
 
-      </div>
+      </Container>
     </div>
     </PermissionGuard>
   )

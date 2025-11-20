@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayout } from './LayoutProvider'
+import { useLayoutOptional } from './LayoutProvider'
 import { ContainerVariant } from './Container'
 import { Button } from '@/components/ui/button'
 import { Maximize2, Columns } from 'lucide-react'
@@ -25,7 +25,14 @@ const variantConfig: Record<ContainerVariant, { icon: typeof Maximize2; label: s
 }
 
 export default function LayoutToggle() {
-  const { containerVariant, setContainerVariant } = useLayout()
+  const layoutContext = useLayoutOptional()
+  
+  // If LayoutProvider is not available, don't render the toggle
+  if (!layoutContext) {
+    return null
+  }
+  
+  const { containerVariant, setContainerVariant } = layoutContext
   
   const variants: ContainerVariant[] = ['full', 'boxed']
   

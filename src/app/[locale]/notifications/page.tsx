@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target, XCircle, AlertTriangle, RefreshCw, Copy, ChevronDown, ChevronRight, ExternalLink, Eye, Download } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { theme, brandColors } from '@/lib/theme'
 
 interface Notification {
   id: string
@@ -180,21 +181,21 @@ export default function NotificationsPage() {
   const getNotificationColor = (type: string) => {
     switch (type) {
       case 'case_update':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
+        return 'bg-meen-100 text-meen-800 border-meen-200'
       case 'case_progress':
-        return 'bg-green-100 text-green-800 border-green-200'
+        return 'bg-meen-100 text-meen-800 border-meen-200'
       case 'case_contribution':
-        return 'bg-purple-100 text-purple-800 border-purple-200'
+        return 'bg-gradient-brand-subtle text-meen-800 border-meen-200'
       case 'case_milestone':
-        return 'bg-orange-100 text-orange-800 border-orange-200'
+        return 'bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200'
       case 'contribution_approved':
-        return 'bg-green-100 text-green-800 border-green-200'
+        return 'bg-meen-100 text-meen-800 border-meen-200'
       case 'contribution_rejected':
-        return 'bg-red-100 text-red-800 border-red-200'
+        return 'bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200'
       case 'contribution_pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+        return 'bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200'
       case 'contribution_revised':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
+        return 'bg-meen-100 text-meen-800 border-meen-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -278,9 +279,9 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: theme.gradients.brandSubtle }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: brandColors.meen[600] }}></div>
           <p className="text-gray-600">Loading notifications...</p>
         </div>
       </div>
@@ -288,20 +289,20 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
       <Container variant={containerVariant} className="py-8">
       <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
 
-        <Card>
+        <Card style={{ boxShadow: theme.shadows.primary }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
+              <Bell className="h-5 w-5 text-meen" />
               {t('notifications')}
               {unreadCount > 0 && (
-                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200">
                   {unreadCount} unread
                 </Badge>
               )}
@@ -339,8 +340,9 @@ export default function NotificationsPage() {
                   <div
                     key={notification.id}
                     className={`border rounded-lg transition-all hover:shadow-md ${
-                      !notification.read ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-gray-200'
+                      !notification.read ? 'bg-meen-50 border-meen-200 shadow-sm' : 'bg-white border-gray-200'
                     }`}
+                    style={!notification.read ? { boxShadow: theme.shadows.primary } : {}}
                   >
                     <div
                       className="p-4 cursor-pointer"
@@ -388,7 +390,7 @@ export default function NotificationsPage() {
                               {notification.type.replace('_', ' ')}
                             </Badge>
                             {notification.type === 'contribution_pending' && (
-                              <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                              <Badge variant="outline" className="bg-meen-100 text-meen-800 border-meen-200">
                                 New
                               </Badge>
                             )}
@@ -397,7 +399,7 @@ export default function NotificationsPage() {
                         <div className="flex items-center gap-2">
                           {!notification.read && (
                             <div className="flex-shrink-0">
-                              <Check className="h-4 w-4 text-blue-600" />
+                              <Check className="h-4 w-4 text-meen" />
                             </div>
                           )}
                           <button
@@ -461,7 +463,7 @@ export default function NotificationsPage() {
                             <div className="flex justify-between">
                               <span className="text-gray-600">Status:</span>
                               <span className={`font-medium ${
-                                notification.read ? 'text-green-600' : 'text-blue-600'
+                                notification.read ? 'text-meen' : 'text-ma3ana'
                               }`}>
                                 {notification.read ? 'Read' : 'Unread'}
                               </span>
@@ -491,7 +493,7 @@ export default function NotificationsPage() {
                                   }}
                                   variant="outline"
                                   size="sm"
-                                  className="flex items-center justify-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                  className="flex items-center justify-center gap-2 text-meen border-meen-300 hover:bg-meen-50"
                                 >
                                   <Eye className="h-4 w-4" />
                                   View Proof

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import NavigationBar from '@/components/navigation/NavigationBar'
@@ -13,13 +14,37 @@ interface ConditionalLayoutProps {
 }
 
 export default function ConditionalLayout({ children }: ConditionalLayoutProps) {
+  const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false) // Start closed on mobile
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false)
 
   const [supabase] = useState(() => createClient())
+  
+  // Check if we're on the reset password page
+  const isResetPasswordPage = pathname?.includes('/auth/reset-password') || false
+  
+  // Check for recovery mode
+  useEffect(() => {
+    const checkRecoveryMode = () => {
+      if (typeof window !== 'undefined') {
+        const recoveryMode = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('recovery_mode='))
+          ?.split('=')[1] === 'true'
+        setIsRecoveryMode(recoveryMode || false)
+      }
+    }
+    
+    checkRecoveryMode()
+    
+    // Check periodically in case cookie changes
+    const interval = setInterval(checkRecoveryMode, 1000)
+    return () => clearInterval(interval)
+  }, [])
   
   // Load sidebar state from localStorage and set initial mobile state
   useEffect(() => {
@@ -91,8 +116,11 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
     )
   }
 
-  // Show top navigation for guests
-  if (!user) {
+  // Show top navigation for guests, users in recovery mode, or on reset password page without recovery mode
+  // If on reset password page, require recovery mode cookie to show authenticated UI
+  const shouldShowPublicNav = !user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode)
+  
+  if (shouldShowPublicNav) {
     return (
       <div className="min-h-screen bg-gray-50">
         <NavigationBar />
@@ -103,7 +131,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
     )
   }
 
-  // Show sidebar navigation for authenticated users
+  // Show sidebar navigation for authenticated users (not in recovery mode)
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile menu button */}

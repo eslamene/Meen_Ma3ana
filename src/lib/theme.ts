@@ -86,6 +86,8 @@ export const theme = {
     primarySubtle: `linear-gradient(135deg, ${brandColors.meen[50]} 0%, ${brandColors.meen[100]} 100%)`,
     secondarySubtle: `linear-gradient(135deg, ${brandColors.ma3ana[50]} 0%, ${brandColors.ma3ana[100]} 100%)`,
     brandSubtle: `linear-gradient(135deg, ${brandColors.meen[50]} 0%, ${brandColors.ma3ana[50]} 100%)`,
+    // Progress bar gradient: green -> teal -> blue -> purple
+    progress: `linear-gradient(135deg, #8B5CF6 0%, #3B82F6 33%, #14B8A6 66%, #10B981 100%)`,
   },
   
   // Shadows with brand colors

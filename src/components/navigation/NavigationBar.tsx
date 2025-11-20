@@ -14,7 +14,8 @@ import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useAdmin } from '@/lib/admin/hooks'
 import GuestPermissionGuard from '@/components/auth/GuestPermissionGuard'
-import { Heart } from 'lucide-react'
+import { getPublicNavItems } from '@/lib/navigation/public-nav-config'
+import { getIcon } from '@/lib/icons/registry'
 
 export default function NavigationBar() {
   const t = useTranslations('navigation')
@@ -26,8 +27,32 @@ export default function NavigationBar() {
   const [user, setUser] = useState<User | null>(null)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [publicNavItems, setPublicNavItems] = useState<Awaited<ReturnType<typeof getPublicNavItems>>>([])
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false)
 
   const supabase = createClient()
+  
+  // Check if we're on the reset password page
+  const isResetPasswordPage = pathname?.includes('/auth/reset-password') || false
+  
+  // Check for recovery mode
+  useEffect(() => {
+    const checkRecoveryMode = () => {
+      if (typeof window !== 'undefined') {
+        const recoveryMode = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('recovery_mode='))
+          ?.split('=')[1] === 'true'
+        setIsRecoveryMode(recoveryMode || false)
+      }
+    }
+    
+    checkRecoveryMode()
+    
+    // Check periodically in case cookie changes
+    const interval = setInterval(checkRecoveryMode, 1000)
+    return () => clearInterval(interval)
+  }, [])
   
   // Use the new admin hook
   const { menuItems, loading: modulesLoading } = useAdmin()
@@ -83,6 +108,23 @@ export default function NavigationBar() {
     return () => subscription.unsubscribe()
   }, [supabase.auth, fetchUserAndNotifications, fetchUnreadNotifications])
 
+  // Fetch public navigation items from database
+  useEffect(() => {
+    const fetchNavItems = async () => {
+      // Show public nav if no user, in recovery mode, or on reset password page without recovery mode
+      const shouldShowPublicNav = !user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode)
+      
+      if (shouldShowPublicNav) {
+        const items = await getPublicNavItems(pathname?.includes('/landing') || false, locale)
+        setPublicNavItems(items)
+      } else {
+        // Clear nav items when user is authenticated (and not in recovery)
+        setPublicNavItems([])
+      }
+    }
+    fetchNavItems()
+  }, [pathname, locale, user, isRecoveryMode, isResetPasswordPage])
+
   // Note: useAdmin handles permission refresh automatically
 
   // Note: useAdmin handles cross-tab synchronization automatically
@@ -93,7 +135,7 @@ export default function NavigationBar() {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut()
-      router.push(`/${locale}`)
+      router.push(`/${locale}/landing`)
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -108,42 +150,161 @@ export default function NavigationBar() {
   }
 
   // Memoize navigation link class calculation to prevent unnecessary re-renders
-  const getNavLinkClass = useCallback((path: string) => {
-    return pathname.includes(path) 
-      ? 'text-blue-700 font-semibold bg-blue-50 border-b-2 border-blue-600' 
-      : 'text-gray-800 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200'
-  }, [pathname])
+  const getNavLinkClass = useCallback((href: string) => {
+    // Handle hash links - they're never active
+    if (href.startsWith('#')) {
+      return 'text-gray-800 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200'
+    }
+    
+    // Extract the path from full href (e.g., /en/cases -> /cases)
+    const path = href.replace(new RegExp(`^/${locale}`), '') || '/'
+    const currentPath = pathname.replace(new RegExp(`^/${locale}`), '') || '/'
+    
+    // Check if current path matches
+    const isActive = currentPath === path || currentPath.startsWith(path + '/')
+    
+    // Use theme colors: #6B8E7E (meen green) for primary brand color
+    return isActive
+      ? 'text-[#6B8E7E] font-semibold bg-[#6B8E7E]/10 border-b-2 border-[#6B8E7E]' 
+      : 'text-gray-800 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200'
+  }, [pathname, locale])
 
   return (
-    <nav className="bg-white shadow-lg border-b border-gray-200">
+    <nav className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-16 md:h-16">
           {/* Logo and Brand */}
           <div className="flex items-center">
             <Logo size="lg" />
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
-            {!user ? (
-              // Public user navigation - focused on discovery and engagement
+          <div className="hidden lg:flex items-center space-x-1">
+            {!user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode) ? (
+              // Public user navigation - uses database with config fallback
               <>
-                <Link 
-                  href={`/${locale}/landing`}
-                  className={`${getNavLinkClass('/landing')} px-4 py-2 text-sm font-medium rounded-lg mx-1`}
-                >
-                  {t('home')}
-                </Link>
-                
-                <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
-                  <Link 
-                    href={`/${locale}/cases`}
-                    className={`${getNavLinkClass('/cases')} px-4 py-2 text-sm font-medium rounded-lg mx-1 flex items-center gap-1.5`}
-                  >
-                    <Heart className="h-4 w-4" />
-                    {t('cases')}
-                  </Link>
-                </GuestPermissionGuard>
+                {publicNavItems.map((item) => {
+                  const Icon = item.icon
+                  const isHashLink = item.isHashLink
+                  const hasChildren = item.children && item.children.length > 0
+                  
+                  // Render parent item with dropdown if it has children
+                  if (hasChildren) {
+                    return (
+                      <div key={item.key} className="relative group">
+                        <button
+                          className={`${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1 flex items-center gap-1.5`}
+                        >
+                          {Icon && <Icon className="h-4 w-4" />}
+                          {t(item.labelKey)}
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {item.children && item.children.length > 0 && (
+                          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div className="py-1">
+                              {item.children.map((child) => {
+                                const ChildIcon = child.icon
+                                const childIsHashLink = child.isHashLink
+                                const childLinkContent = (
+                                  <Link
+                                    key={child.key}
+                                    href={child.href}
+                                    className={`block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 ${childIsHashLink ? 'cursor-pointer' : ''}`}
+                                    onClick={childIsHashLink ? (e) => {
+                                      e.preventDefault()
+                                      if (child.href.includes('/landing')) {
+                                        router.push(child.href)
+                                        setTimeout(() => {
+                                          const hash = child.href.split('#')[1]
+                                          const element = document.getElementById(hash)
+                                          element?.scrollIntoView({ behavior: 'smooth' })
+                                        }, 100)
+                                      } else {
+                                        const hash = child.href.replace('#', '')
+                                        const element = document.getElementById(hash)
+                                        element?.scrollIntoView({ behavior: 'smooth' })
+                                      }
+                                    } : undefined}
+                                  >
+                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                    {t(child.labelKey)}
+                                  </Link>
+                                )
+
+                                if (child.requiresPermission) {
+                                  return (
+                                    <GuestPermissionGuard
+                                      key={child.key}
+                                      visitorPermissions={[child.requiresPermission]}
+                                      showLoading={false}
+                                      showAuthPrompt={false}
+                                    >
+                                      {childLinkContent}
+                                    </GuestPermissionGuard>
+                                  )
+                                }
+
+                                return childLinkContent
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  
+                  // Regular item without children
+                  const linkClass = isHashLink
+                    ? 'px-4 py-2 text-sm font-medium rounded-lg mx-1 text-gray-800 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200'
+                    : `${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1`
+                  
+                  const linkContent = (
+                    <Link
+                      key={item.key}
+                      href={item.href}
+                      className={`${linkClass} ${Icon ? 'flex items-center gap-1.5' : ''}`}
+                      onClick={isHashLink ? (e) => {
+                        e.preventDefault()
+                        // If href already includes landing page, just scroll
+                        if (item.href.includes('/landing')) {
+                          router.push(item.href)
+                          // Wait for navigation then scroll
+                          setTimeout(() => {
+                            const hash = item.href.split('#')[1]
+                            const element = document.getElementById(hash)
+                            element?.scrollIntoView({ behavior: 'smooth' })
+                          }, 100)
+                        } else {
+                          // On landing page, just scroll
+                          const hash = item.href.replace('#', '')
+                          const element = document.getElementById(hash)
+                          element?.scrollIntoView({ behavior: 'smooth' })
+                        }
+                      } : undefined}
+                    >
+                      {Icon && <Icon className="h-4 w-4" />}
+                      {t(item.labelKey)}
+                    </Link>
+                  )
+
+                  // Wrap with permission guard if required
+                  if (item.requiresPermission) {
+                    return (
+                      <GuestPermissionGuard
+                        key={item.key}
+                        visitorPermissions={[item.requiresPermission]}
+                        showLoading={false}
+                        showAuthPrompt={false}
+                      >
+                        {linkContent}
+                      </GuestPermissionGuard>
+                    )
+                  }
+
+                  return linkContent
+                })}
               </>
             ) : (
               // Authenticated user navigation
@@ -172,43 +333,51 @@ export default function NavigationBar() {
                 </Link>
 
                 {/* Modular Navigation - Only for authenticated users */}
-                {!modulesLoading && modules.map((module) => (
-                  <div key={module.id} className="relative group">
-                    <Button variant="ghost" className="text-gray-700 hover:text-gray-900">
-                      {module.display_name}
-                    </Button>
-                    {module.items && module.items.length > 0 && (
-                      <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                        <div className="py-1">
-                          {module.items.map((item, index) => (
-                            <Link
-                              key={index}
-                              href={`/${locale}${item.href}`}
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            >
-                              {item.label}
-                            </Link>
-                          ))}
+                {!modulesLoading && modules.map((module) => {
+                  const ModuleIcon = getIcon(module.icon)
+                  return (
+                    <div key={module.id} className="relative group">
+                      <Button variant="ghost" className="text-gray-700 hover:text-gray-900 flex items-center gap-1.5">
+                        {ModuleIcon && <ModuleIcon className="h-4 w-4" />}
+                        {module.display_name}
+                      </Button>
+                      {module.items && module.items.length > 0 && (
+                        <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                          <div className="py-1">
+                            {module.items.map((item, index) => {
+                              const ItemIcon = item.icon ? getIcon(item.icon) : undefined
+                              return (
+                                <Link
+                                  key={index}
+                                  href={`/${locale}${item.href}`}
+                                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                >
+                                  {ItemIcon && <ItemIcon className="h-4 w-4" />}
+                                  {item.label}
+                                </Link>
+                              )
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  )
+                })}
               </>
             )}
           </div>
 
-          {/* Right side - Layout Toggle, Language Switcher, Auth and Notifications */}
-          <div className="hidden md:flex items-center space-x-4">
-            {/* Layout Toggle - Available for all users */}
-            <LayoutToggle />
+          {/* Right side - Language Switcher, Auth and Notifications */}
+          <div className="hidden lg:flex items-center space-x-3 xl:space-x-4">
             {/* Language Switcher */}
             <LanguageSwitcher />
-            {user ? (
+            {user && !isRecoveryMode && !(isResetPasswordPage && !isRecoveryMode) ? (
               <>
+                {/* Layout Toggle - Only for authenticated users */}
+                <LayoutToggle />
                 {/* Notifications */}
                 <Link href={`/${locale}/notifications`} className="relative">
-                  <Button variant="ghost" size="sm" className="relative p-2 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 rounded-lg">
+                  <Button variant="ghost" size="sm" className="relative p-2 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-all duration-200 rounded-lg">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -223,8 +392,8 @@ export default function NavigationBar() {
 
                 {/* User Menu */}
                 <div className="relative group">
-                  <Button variant="ghost" size="sm" className="flex items-center space-x-3 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 rounded-lg px-3 py-2">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center shadow-md">
+                  <Button variant="ghost" size="sm" className="flex items-center space-x-3 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-all duration-200 rounded-lg px-3 py-2">
+                    <div className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#5A7A6B] rounded-full flex items-center justify-center shadow-md">
                       <span className="text-white text-sm font-semibold">
                         {user.email?.charAt(0).toUpperCase() || 'U'}
                       </span>
@@ -241,7 +410,7 @@ export default function NavigationBar() {
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-100">
                     <Link 
                       href={`/${locale}/profile`}
-                      className="block px-4 py-3 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-700 transition-colors mx-2 rounded-lg"
+                      className="block px-4 py-3 text-sm text-gray-800 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors mx-2 rounded-lg"
                       onClick={closeMobileMenu}
                     >
                       <div className="flex items-center space-x-3">
@@ -288,13 +457,41 @@ export default function NavigationBar() {
             )}
           </div>
 
+          {/* Tablet/Mobile: Show Language Switcher and Auth buttons */}
+          <div className="lg:hidden flex items-center space-x-2">
+            <LanguageSwitcher />
+            {(!user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode)) && (
+              <div className="flex items-center space-x-2">
+                <Link href={`/${locale}/auth/login`}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="text-gray-700 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200 font-medium text-xs sm:text-sm px-2 sm:px-3"
+                  >
+                    {t('login')}
+                  </Button>
+                </Link>
+                <Link href={`/${locale}/auth/register`}>
+                  <Button 
+                    size="sm"
+                    className="bg-gradient-to-r from-[#6B8E7E] to-[#5a7a6b] hover:from-[#5a7a6b] hover:to-[#4a6a5b] text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 text-xs sm:text-sm px-2 sm:px-3"
+                  >
+                    {t('register')}
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+
           {/* Mobile menu button */}
-          <div className="md:hidden">
+          <div className="lg:hidden">
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleMobileMenu}
               className="p-2"
+              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMobileMenuOpen}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMobileMenuOpen ? (
@@ -309,41 +506,144 @@ export default function NavigationBar() {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t">
+          <div className="lg:hidden border-t border-gray-200 bg-white shadow-lg">
+            <div className="px-4 pt-4 pb-4 space-y-1">
               {!user ? (
-                // Public user mobile navigation
+                // Public user mobile navigation - uses database with config fallback
                 <>
-                  <Link 
-                    href={`/${locale}/landing`}
-                    className={`${getNavLinkClass('/landing')} block px-3 py-2 text-base font-medium`}
-                    onClick={closeMobileMenu}
-                  >
-                    {t('home')}
-                  </Link>
-                  
-                  <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
-                    <Link 
-                      href={`/${locale}/cases`}
-                      className={`${getNavLinkClass('/cases')} block px-3 py-2 text-base font-medium flex items-center gap-2`}
-                      onClick={closeMobileMenu}
-                    >
-                      <Heart className="h-4 w-4" />
-                      {t('cases')}
-                    </Link>
-                  </GuestPermissionGuard>
+                  {publicNavItems.map((item) => {
+                    const Icon = item.icon
+                    const isHashLink = item.isHashLink
+                    const hasChildren = item.children && item.children.length > 0
+                    
+                    // Render parent item with children
+                    if (hasChildren) {
+                      return (
+                        <div key={item.key} className="space-y-1">
+                          <div className="px-4 py-2 text-sm font-semibold text-gray-900 flex items-center gap-2">
+                            {Icon && <Icon className="h-4 w-4" />}
+                            {t(item.labelKey)}
+                          </div>
+                          {item.children && (
+                            <div className="pl-4 space-y-1">
+                              {item.children.map((child) => {
+                                const ChildIcon = child.icon
+                                const childIsHashLink = child.isHashLink
+                                const childLinkClass = childIsHashLink
+                                  ? 'block px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors'
+                                  : `${getNavLinkClass(child.href)} block px-4 py-2 text-sm rounded-lg transition-colors`
+                                
+                                const childLinkContent = (
+                                  <Link
+                                    key={child.key}
+                                    href={child.href}
+                                    className={`${childLinkClass} ${ChildIcon ? 'flex items-center gap-2' : ''}`}
+                                    onClick={childIsHashLink ? (e) => {
+                                      e.preventDefault()
+                                      closeMobileMenu()
+                                      if (child.href.includes('/landing')) {
+                                        router.push(child.href)
+                                        setTimeout(() => {
+                                          const hash = child.href.split('#')[1]
+                                          const element = document.getElementById(hash)
+                                          element?.scrollIntoView({ behavior: 'smooth' })
+                                        }, 100)
+                                      } else {
+                                        const hash = child.href.replace('#', '')
+                                        const element = document.getElementById(hash)
+                                        element?.scrollIntoView({ behavior: 'smooth' })
+                                      }
+                                    } : closeMobileMenu}
+                                  >
+                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                    {t(child.labelKey)}
+                                  </Link>
+                                )
 
-                  <div className="border-t pt-4 mt-4 space-y-2">
+                                if (child.requiresPermission) {
+                                  return (
+                                    <GuestPermissionGuard
+                                      key={child.key}
+                                      visitorPermissions={[child.requiresPermission]}
+                                      showLoading={false}
+                                      showAuthPrompt={false}
+                                    >
+                                      {childLinkContent}
+                                    </GuestPermissionGuard>
+                                  )
+                                }
+
+                                return childLinkContent
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+                    
+                    // Regular item without children
+                    const linkClass = isHashLink
+                      ? 'block px-4 py-3 text-base font-medium rounded-lg transition-colors text-gray-800 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10'
+                      : `${getNavLinkClass(item.href)} block px-4 py-3 text-base font-medium rounded-lg transition-colors`
+                    
+                    const linkContent = (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        className={`${linkClass} ${Icon ? 'flex items-center gap-2' : ''}`}
+                        onClick={isHashLink ? (e) => {
+                          e.preventDefault()
+                          closeMobileMenu()
+                          // If href already includes landing page, navigate then scroll
+                          if (item.href.includes('/landing')) {
+                            router.push(item.href)
+                            // Wait for navigation then scroll
+                            setTimeout(() => {
+                              const hash = item.href.split('#')[1]
+                              const element = document.getElementById(hash)
+                              element?.scrollIntoView({ behavior: 'smooth' })
+                            }, 100)
+                          } else {
+                            // On landing page, just scroll
+                            const hash = item.href.replace('#', '')
+                            const element = document.getElementById(hash)
+                            element?.scrollIntoView({ behavior: 'smooth' })
+                          }
+                        } : closeMobileMenu}
+                      >
+                        {Icon && <Icon className="h-4 w-4" />}
+                        {t(item.labelKey)}
+                      </Link>
+                    )
+
+                    // Wrap with permission guard if required
+                    if (item.requiresPermission) {
+                      return (
+                        <GuestPermissionGuard
+                          key={item.key}
+                          visitorPermissions={[item.requiresPermission]}
+                          showLoading={false}
+                          showAuthPrompt={false}
+                        >
+                          {linkContent}
+                        </GuestPermissionGuard>
+                      )
+                    }
+
+                    return linkContent
+                  })}
+
+                  <div className="border-t border-gray-200 pt-4 mt-4 space-y-2">
                     <Link 
                       href={`/${locale}/auth/login`}
-                      className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-[#6B8E7E] rounded-lg hover:bg-[#6B8E7E]/10 transition-colors"
+                      className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-[#6B8E7E] rounded-lg hover:bg-[#6B8E7E]/10 transition-colors"
                       onClick={closeMobileMenu}
                     >
                       {t('login')}
                     </Link>
                     <Link 
                       href={`/${locale}/auth/register`}
-                      className="block px-3 py-2 text-base font-medium text-white bg-gradient-to-r from-[#6B8E7E] to-[#5a7a6b] rounded-lg text-center hover:from-[#5a7a6b] hover:to-[#4a6a5b] transition-all duration-200"
+                      className="block px-4 py-3 text-base font-medium text-white bg-gradient-to-r from-[#6B8E7E] to-[#5a7a6b] rounded-lg text-center hover:from-[#5a7a6b] hover:to-[#4a6a5b] transition-all duration-200 shadow-md"
                       onClick={closeMobileMenu}
                     >
                       {t('register')}
@@ -355,7 +655,7 @@ export default function NavigationBar() {
                 <>
                   <Link 
                     href={`/${locale}/dashboard`}
-                    className={`${getNavLinkClass('/dashboard')} block px-3 py-2 text-base font-medium`}
+                    className={`${getNavLinkClass('/dashboard')} block px-4 py-3 text-base font-medium rounded-lg transition-colors`}
                     onClick={closeMobileMenu}
                   >
                     {t('dashboard')}
@@ -364,7 +664,7 @@ export default function NavigationBar() {
                   <GuestPermissionGuard visitorPermissions={["cases:view_public"]} showLoading={false} showAuthPrompt={false}>
                     <Link 
                       href={`/${locale}/cases`}
-                      className={`${getNavLinkClass('/cases')} block px-3 py-2 text-base font-medium`}
+                      className={`${getNavLinkClass('/cases')} block px-4 py-3 text-base font-medium rounded-lg transition-colors`}
                       onClick={closeMobileMenu}
                     >
                       {t('cases')}
@@ -373,57 +673,65 @@ export default function NavigationBar() {
 
                   <Link 
                     href={`/${locale}/projects`}
-                    className={`${getNavLinkClass('/projects')} block px-3 py-2 text-base font-medium`}
+                    className={`${getNavLinkClass('/projects')} block px-4 py-3 text-base font-medium rounded-lg transition-colors`}
                     onClick={closeMobileMenu}
                   >
                     {t('projects')}
                   </Link>
 
                   {/* Modular Navigation - Mobile */}
-                  {!modulesLoading && modules.map((module) => (
-                    <div key={module.id} className="space-y-1">
-                      <div className="px-3 py-2 text-sm font-medium text-gray-900">
-                        {module.display_name}
-                      </div>
-                      {module.items && module.items.length > 0 && (
-                        <div className="pl-4 space-y-1">
-                          {module.items.map((item, index) => (
-                            <Link
-                              key={index}
-                              href={`/${locale}${item.href}`}
-                              onClick={closeMobileMenu}
-                              className="block px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
-                            >
-                              {item.label}
-                            </Link>
-                          ))}
+                  {!modulesLoading && modules.map((module) => {
+                    const ModuleIcon = getIcon(module.icon)
+                    return (
+                      <div key={module.id} className="space-y-1">
+                        <div className="px-4 py-2 text-sm font-semibold text-gray-900 flex items-center gap-2">
+                          {ModuleIcon && <ModuleIcon className="h-4 w-4" />}
+                          {module.display_name}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {module.items && module.items.length > 0 && (
+                          <div className="pl-4 space-y-1">
+                            {module.items.map((item, index) => {
+                              const ItemIcon = item.icon ? getIcon(item.icon) : undefined
+                              return (
+                                <Link
+                                  key={index}
+                                  href={`/${locale}${item.href}`}
+                                  onClick={closeMobileMenu}
+                                  className="block px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-2"
+                                >
+                                  {ItemIcon && <ItemIcon className="h-4 w-4" />}
+                                  {item.label}
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
 
                   <Link 
                     href={`/${locale}/notifications`}
-                    className={`${getNavLinkClass('/notifications')} block px-3 py-2 text-base font-medium`}
+                    className={`${getNavLinkClass('/notifications')} block px-4 py-3 text-base font-medium rounded-lg transition-colors`}
                     onClick={closeMobileMenu}
                   >
                     <div className="flex items-center justify-between">
                       <span>{t('notifications')}</span>
                       {unreadNotifications > 0 && (
-                        <Badge className="ml-2">
+                        <Badge className="ml-2 bg-red-500 text-white">
                           {unreadNotifications}
                         </Badge>
                       )}
                     </div>
                   </Link>
 
-                  <div className="border-t pt-4 mt-4">
-                    <div className="px-3 py-2 text-sm text-gray-500">
+                  <div className="border-t border-gray-200 pt-4 mt-4 space-y-2">
+                    <div className="px-4 py-2 text-sm text-gray-500">
                       {user.email}
                     </div>
                     <Link 
                       href={`/${locale}/profile`}
-                      className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600"
+                      className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 rounded-lg transition-colors"
                       onClick={closeMobileMenu}
                     >
                       {t('profile')}
@@ -433,7 +741,7 @@ export default function NavigationBar() {
                         handleSignOut()
                         closeMobileMenu()
                       }}
-                      className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600"
+                      className="block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       {t('logout')}
                     </button>
@@ -441,12 +749,14 @@ export default function NavigationBar() {
                 </>
               )}
 
-              {/* Language Switcher for Mobile */}
-              <div className="border-t pt-4 mt-4">
-                <div className="px-3 py-2">
-                  <LanguageSwitcher />
+              {/* Language Switcher for Mobile - Only show if not already visible in header */}
+              {user && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <div className="px-4 py-2">
+                    <LanguageSwitcher />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}

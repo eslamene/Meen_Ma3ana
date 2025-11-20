@@ -39,6 +39,13 @@ export {
   validateNavigationTranslations
 } from '@/lib/navigation/translations'
 
+// Export public navigation configuration
+export {
+  PUBLIC_NAV_ITEMS,
+  getPublicNavItems,
+  type PublicNavItem
+} from '@/lib/navigation/public-nav-config'
+
 // Re-export commonly used types
 export type { LucideIcon } from 'lucide-react'
 

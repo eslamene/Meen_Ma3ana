@@ -92,6 +92,7 @@ export default function Logo({
         width={config.image.width}
         height={config.image.height}
         className={`object-contain ${config.image.className} ${imageClassName}`}
+        style={{ width: 'auto' }}
         priority
       />
       {showText && (

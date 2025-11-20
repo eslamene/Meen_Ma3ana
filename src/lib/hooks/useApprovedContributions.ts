@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 import { defaultLogger } from '@/lib/logger'
+import { isValidUUID } from '@/lib/utils/uuid'
 
 interface Contribution {
   id: string
@@ -31,6 +32,15 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
   const [error, setError] = useState<string | null>(null)
 
   const fetchApprovedContributions = useCallback(async () => {
+    // Don't fetch if caseId is not a valid UUID
+    if (!isValidUUID(caseId)) {
+      setContributions([])
+      setTotalAmount(0)
+      setIsLoading(false)
+      setError(null)
+      return
+    }
+
     try {
       setIsLoading(true)
       setError(null)
@@ -76,13 +86,24 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
               // Set total amount from API, but contributions list will be empty for public users
               setTotalAmount(apiData.approvedTotal || 0)
               setContributions([]) // Public users don't see individual contributions
-              setIsLoading(false)
               setError(null) // Clear error since API fallback succeeded
+              setIsLoading(false)
               return // Successfully fetched from API, exit early
+            } else {
+              // API returned error, but don't throw - just set empty state
+              setTotalAmount(0)
+              setContributions([])
+              setError(null) // Don't show error for public users
+              setIsLoading(false)
+              return
             }
           } catch (apiError) {
-            // API also failed, fall through to error handling
-            console.warn('API fallback also failed:', apiError)
+            // API also failed, but for public users we'll just set empty state
+            setTotalAmount(0)
+            setContributions([])
+            setError(null) // Don't show error for public users
+            setIsLoading(false)
+            return // Exit early for RLS errors even if API fails
           }
         }
         throw fetchError
@@ -130,28 +151,67 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
 
     } catch (err: unknown) {
       // Check if this is an RLS/permission error for public users
-      const isRLSError = err && typeof err === 'object' && 'code' in err && (
-        err.code === 'PGRST116' || 
-        err.code === '42501' ||
-        (typeof err === 'object' && err !== null && 'message' in err && 
-         typeof (err as { message: unknown }).message === 'string' &&
-         ((err as { message: string }).message.toLowerCase().includes('permission') || 
-          (err as { message: string }).message.toLowerCase().includes('policy') ||
-          (err as { message: string }).message.toLowerCase().includes('row-level security')))
-      )
+      let isRLSError = false
+      
+      if (err && typeof err === 'object') {
+        const errorObj = err as Record<string, unknown>
+        
+        // Check for RLS error codes
+        if ('code' in errorObj) {
+          const code = errorObj.code
+          isRLSError = code === 'PGRST116' || code === '42501' || code === 'PGRST301'
+        }
+        
+        // Check for RLS-related messages
+        if (!isRLSError && 'message' in errorObj && typeof errorObj.message === 'string') {
+          const message = errorObj.message.toLowerCase()
+          isRLSError = message.includes('permission') || 
+                      message.includes('policy') ||
+                      message.includes('row-level security') ||
+                      message.includes('new row violates') ||
+                      message.includes('insufficient privileges')
+        }
+        
+        // Check for Supabase PostgREST errors
+        if (!isRLSError && 'hint' in errorObj && typeof errorObj.hint === 'string') {
+          const hint = errorObj.hint.toLowerCase()
+          isRLSError = hint.includes('policy') || hint.includes('permission')
+        }
+      }
       
       // Only log non-RLS errors to avoid console noise for expected public user restrictions
       if (!isRLSError) {
-        console.error('Error fetching approved contributions', err)
-        defaultLogger.error('Error fetching approved contributions', err)
+        // Format error for better logging
+        const errorMessage = err instanceof Error
+          ? err.message
+          : (err && typeof err === 'object' && 'message' in err)
+            ? String((err as { message: unknown }).message)
+            : (err && typeof err === 'object' && 'code' in err)
+              ? `Error code: ${String((err as { code: unknown }).code)}`
+              : 'Unknown error occurred'
+        
+        const errorDetails = err instanceof Error
+          ? { message: err.message, name: err.name, stack: err.stack }
+          : err && typeof err === 'object'
+            ? { ...err }
+            : { error: String(err) }
+        
+        console.error('Error fetching approved contributions:', errorMessage, errorDetails)
+        defaultLogger.error('Error fetching approved contributions', { errorMessage, errorDetails })
       } else {
         // Silently handle RLS errors - they're expected for public users
         // The API fallback should have already been attempted above
+        // Set empty state for RLS errors (public users can't see contributions)
+        setTotalAmount(0)
+        setContributions([])
+        setError(null) // Don't show error for public users
+        setIsLoading(false)
+        return
       }
       
       const message = err instanceof Error
         ? err.message
-        : (typeof err === 'object' && err !== null && 'message' in err)
+        : (err && typeof err === 'object' && 'message' in err)
           ? String((err as { message: unknown }).message)
           : 'Failed to fetch contributions'
       setError(message)
@@ -161,8 +221,15 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
   }, [caseId])
 
   useEffect(() => {
-    if (caseId) {
+    // Only fetch if caseId is a valid UUID
+    if (isValidUUID(caseId)) {
       fetchApprovedContributions()
+    } else {
+      // Set empty state for invalid UUIDs
+      setContributions([])
+      setTotalAmount(0)
+      setIsLoading(false)
+      setError(null)
     }
   }, [caseId, fetchApprovedContributions])
 

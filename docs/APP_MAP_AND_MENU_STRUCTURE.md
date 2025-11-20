@@ -32,8 +32,8 @@ Meen Ma3ana Application
 │   └── /[locale]/cases/[id]/donate (Donate to case)
 │
 ├── 📝 Case Management Routes
-│   ├── /[locale]/cases/create (Create case - unified form)
-│   └── /[locale]/cases/[id]/edit (Edit case)
+│   ├── /[locale]/case-management/create (Create case - unified form)
+│   └── /[locale]/case-management/cases/[id]/edit (Edit case)
 │
 ├── 🤝 Sponsor Routes
 │   ├── /[locale]/sponsor/apply (Apply as sponsor)
@@ -89,8 +89,8 @@ Meen Ma3ana Application
 ### Case Management
 | Page | Route | Permission Required |
 |------|-------|---------------------|
-| Create Case | `/[locale]/cases/create` | `cases:create` |
-| Edit Case | `/[locale]/cases/[id]/edit` | `cases:update` |
+| Create Case | `/[locale]/case-management/create` | `cases:create` |
+| Edit Case | `/[locale]/case-management/cases/[id]/edit` | `cases:update` |
 | Donate to Case | `/[locale]/cases/[id]/donate` | `contributions:create` |
 
 ### Sponsor Pages

@@ -3,7 +3,6 @@
 import { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
 
 export interface EditPageFooterAction {
   /**
@@ -78,11 +77,6 @@ export interface EditPageFooterProps {
    */
   className?: string
   
-  /**
-   * Whether to show a separator above the footer
-   * @default true
-   */
-  showSeparator?: boolean
 }
 
 export default function EditPageFooter({
@@ -91,17 +85,17 @@ export default function EditPageFooter({
   children,
   show = true,
   className = '',
-  showSeparator = true,
 }: EditPageFooterProps) {
   if (!show) return null
 
   // If custom children provided, use them
   if (children) {
     return (
-      <div className={`mt-8 ${className}`}>
-        {showSeparator && <Separator className="mb-6" />}
-        <div className="flex flex-col sm:flex-row justify-end gap-3">
-          {children}
+      <div className={`sticky bottom-0 z-50 mt-8 ${className}`}>
+        <div className="bg-gradient-to-r from-gray-50 via-white to-gray-50 rounded-t-xl border-t border-l border-r border-gray-200/60 shadow-lg p-4 sm:p-6 backdrop-blur-sm bg-white/95">
+          <div className="flex flex-col sm:flex-row justify-end gap-3">
+            {children}
+          </div>
         </div>
       </div>
     )
@@ -112,11 +106,9 @@ export default function EditPageFooter({
   const otherSecondaryActions = secondaryActions.filter(action => action.variant !== 'destructive')
 
   return (
-    <div className={`mt-8 ${className}`}>
-      {showSeparator && <Separator className="mb-6" />}
-      
-      {/* Footer Actions Container */}
-      <div className="bg-gradient-to-r from-gray-50 via-white to-gray-50 rounded-xl border border-gray-200/60 shadow-sm p-4 sm:p-6">
+    <div className={`sticky bottom-0 z-50 mt-8 ${className}`}>
+      {/* Footer Actions Container - Sticky at bottom */}
+      <div className="bg-gradient-to-r from-gray-50 via-white to-gray-50 rounded-t-xl border-t border-l border-r border-gray-200/60 shadow-lg p-4 sm:p-6 backdrop-blur-sm bg-white/95">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           {/* Left Side: Secondary Actions */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 order-2 sm:order-1">
@@ -183,7 +175,7 @@ export default function EditPageFooter({
             <Button
               onClick={primaryAction.onClick}
               disabled={primaryAction.disabled || primaryAction.loading}
-              className="min-w-[180px] w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold"
+              className="min-w-[180px] w-full sm:w-auto bg-gradient-to-r from-[#6B8E7E] to-[#5A7A6B] hover:from-[#5A7A6B] hover:to-[#496658] text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold"
               size="lg"
             >
               {primaryAction.loading ? (
