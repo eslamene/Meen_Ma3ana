@@ -137,7 +137,8 @@ export function usePageViewTracking() {
 
     // Track page view
     const sessionId = getSessionId()
-    trackPageView(fullPath, user?.id, sessionId)
+    const timeoutId = setTimeout(() => {
+      trackPageView(fullPath, user?.id, sessionId)
     }, 100) // Small delay to ensure page is loaded
 
     return () => clearTimeout(timeoutId)
