@@ -1573,30 +1573,30 @@
     },
     "features": {
       "title": "Why Choose Meen Ma3ana",
-      "subtitle": "A platform built with compassion and transparency",
+      "subtitle": "A place where compassion and transparency meet",
       "communitySupport": {
-        "title": "Community Support",
-        "description": "Connect with your community and make a real difference in people's lives through our platform."
+        "title": "Support the Needy",
+        "description": "Stay connected with your community and help create real impact."
       },
       "secureDonations": {
-        "title": "Secure Donations",
-        "description": "Your donations are processed securely with full transparency and tracking."
+        "title": "Safe Donations",
+        "description": "Your donations are handled safely with full transparency—no complications."
       },
       "impactTracking": {
         "title": "Impact Tracking",
-        "description": "See the real impact of your contributions with detailed progress tracking."
+        "description": "See exactly where your donations go and the difference they make, step by step."
       },
       "transparency": {
-        "title": "Full Transparency",
-        "description": "Every contribution is tracked and visible, ensuring trust and accountability."
+        "title": "Transparency",
+        "description": "Every donation is clearly tracked and visible, ensuring trust and accountability."
       },
       "easyProcess": {
         "title": "Easy Process",
-        "description": "Simple, intuitive interface for both donors and beneficiaries."
+        "description": "A simple, intuitive interface that makes things easy for both donors and beneficiaries."
       },
       "trustedPlatform": {
-        "title": "Trusted Platform",
-        "description": "Built on reliable infrastructure with security and privacy as top priorities."
+        "title": "Trusted Place",
+        "description": "A secure, reliable system designed to keep your data and privacy fully protected."
       }
     },
     "stats": {

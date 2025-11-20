@@ -97,11 +97,11 @@ export default function Stats() {
       icon: <Heart className="h-8 w-8" />,
       value: loading ? '...' : formatAmount(stats.totalRaised),
       label: 'Total Raised',
-      labelAr: 'إجمالي المبلغ',
+      labelAr: 'إجمالي المبالغ',
       color: 'text-[#E74C3C]',
       bgColor: 'bg-[#E74C3C]/10',
-      description: 'Community contributions making a real difference',
-      descriptionAr: 'ساعدنا بكام',
+      description: 'contributions making a real difference',
+      descriptionAr: 'مساهمات عملت فرق حقيقي',
     },
     {
       icon: <Users className="h-8 w-8" />,
@@ -111,7 +111,7 @@ export default function Stats() {
       color: 'text-[#6B8E7E]',
       bgColor: 'bg-[#6B8E7E]/10',
       description: 'Families and individuals supported by our community',
-      descriptionAr: 'أسر وأفراد و ومشرروعات  تم دعمهما',
+      descriptionAr: 'أسر وأفراد و ومشرروعات دعمناهم',
     },
     {
       icon: <HandHeart className="h-8 w-8" />,
@@ -208,8 +208,6 @@ export default function Stats() {
             </Link>
           </div>
         </div>
-
-
       </div>
     </section>
   )
