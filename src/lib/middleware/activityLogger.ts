@@ -18,8 +18,9 @@ export function getSessionId(request: Request): string {
   }
   
   // Generate new session ID if not found
-  const newSessionId = generateSessionId()
-  return newSessionId
+  // Note: We can't set cookies in middleware for Next.js edge runtime
+  // Session ID will be set on client-side
+  return generateSessionId()
 }
 
 /**

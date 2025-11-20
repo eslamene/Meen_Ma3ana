@@ -15,7 +15,7 @@ import { User } from '@supabase/supabase-js'
  */
 async function trackPageView(path: string, userId?: string, sessionId?: string) {
   try {
-    await fetch('/api/activity/track', {
+    const response = await fetch('/api/activity/track', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -30,6 +30,10 @@ async function trackPageView(path: string, userId?: string, sessionId?: string) 
         session_id: sessionId,
       }),
     })
+    
+    if (!response.ok) {
+      console.error('Failed to track page view:', response.status, response.statusText)
+    }
   } catch (error) {
     // Silently fail - don't break the app
     console.error('Failed to track page view:', error)
@@ -68,13 +72,22 @@ async function trackUserAction(
 
 /**
  * Get or create session ID
+ * Uses sessionStorage for browser sessions, falls back to localStorage for persistence
  */
 function getSessionId(): string {
   if (typeof window === 'undefined') return ''
   
+  // Try sessionStorage first (cleared when tab closes)
   let sessionId = sessionStorage.getItem('activity_session_id')
   if (!sessionId) {
-    sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+    // Fall back to localStorage (persists across tabs)
+    sessionId = localStorage.getItem('activity_session_id')
+    if (!sessionId) {
+      // Generate new session ID
+      sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+      localStorage.setItem('activity_session_id', sessionId)
+    }
+    // Also store in sessionStorage for this tab
     sessionStorage.setItem('activity_session_id', sessionId)
   }
   return sessionId
@@ -125,6 +138,9 @@ export function usePageViewTracking() {
     // Track page view
     const sessionId = getSessionId()
     trackPageView(fullPath, user?.id, sessionId)
+    }, 100) // Small delay to ensure page is loaded
+
+    return () => clearTimeout(timeoutId)
   }, [pathname, searchParams, user])
 }
 

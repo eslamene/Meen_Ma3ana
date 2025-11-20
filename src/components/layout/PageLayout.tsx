@@ -6,6 +6,7 @@ import ConditionalLayout from '@/components/layout/ConditionalLayout'
 import Breadcrumbs from '@/components/navigation/Breadcrumbs'
 import Container, { ContainerVariant } from '@/components/layout/Container'
 import { LayoutContext } from '@/components/layout/LayoutProvider'
+import { usePageViewTracking } from '@/hooks/useActivityTracking'
 
 interface PageLayoutProps {
   children: ReactNode
@@ -31,6 +32,9 @@ export default function PageLayout({
 }: PageLayoutProps) {
   const pathname = usePathname()
   const layoutContext = useContext(LayoutContext)
+  
+  // Track page views for activity logging
+  usePageViewTracking()
   
   // Use page-specific variant if provided, otherwise use global or default to boxed
   const variant = containerVariant || (useGlobalLayout && layoutContext 

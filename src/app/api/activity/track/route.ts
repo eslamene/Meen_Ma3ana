@@ -24,6 +24,14 @@ export async function POST(request: NextRequest) {
 
     // Use user_id from body or from auth
     const userId = body.user_id || user?.id
+    
+    // Log for debugging (can be removed in production)
+    logger.debug('Tracking activity', {
+      activity_type: body.activity_type,
+      user_id: userId,
+      session_id: body.session_id,
+      path: body.resource_path,
+    })
 
     // Log the activity based on type
     switch (body.activity_type) {

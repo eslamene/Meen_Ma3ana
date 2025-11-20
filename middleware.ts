@@ -205,14 +205,19 @@ export default async function middleware(request: NextRequest) {
                        !pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot)$/)
     
     if (isPageRoute) {
-      // Import and log page view asynchronously (non-blocking)
-      import('@/lib/middleware/activityLogger').then(({ logPageView }) => {
-        logPageView(requestWithCorrelationId, pathname).catch(() => {
-          // Silently fail - don't break the request
+      // Log page view asynchronously (non-blocking) - fire and forget
+      // Use setTimeout to ensure it doesn't block the response
+      setTimeout(() => {
+        import('@/lib/middleware/activityLogger').then(({ logPageView }) => {
+          logPageView(requestWithCorrelationId, pathname).catch((error) => {
+            // Log error but don't break the request
+            console.error('Failed to log page view in middleware:', error)
+          })
+        }).catch((error) => {
+          // Silently fail if import fails
+          console.error('Failed to import activityLogger:', error)
         })
-      }).catch(() => {
-        // Silently fail if import fails
-      })
+      }, 0)
     }
     
     return intlResponse;

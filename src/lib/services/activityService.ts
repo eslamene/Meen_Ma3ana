@@ -295,6 +295,15 @@ export class ActivityService {
    */
   private static async logActivity(entry: ActivityLogEntry): Promise<void> {
     try {
+      // Log for debugging (can be removed in production)
+      defaultLogger.debug('Logging activity', {
+        activity_type: entry.activity_type,
+        action: entry.action,
+        user_id: entry.user_id,
+        session_id: entry.session_id,
+        resource_path: entry.resource_path,
+      })
+
       await client`
         INSERT INTO site_activity_log (
           user_id,
@@ -334,11 +343,21 @@ export class ActivityService {
           NOW()
         )
       `
+      
+      defaultLogger.debug('Activity logged successfully', {
+        activity_type: entry.activity_type,
+        action: entry.action,
+      })
     } catch (error) {
       // Log to default logger but don't throw - activity logging should never break the app
       defaultLogger.error('Error logging activity:', error, {
         activity_type: entry.activity_type,
         action: entry.action,
+        user_id: entry.user_id,
+        session_id: entry.session_id,
+        resource_path: entry.resource_path,
+        error_message: error instanceof Error ? error.message : String(error),
+        error_stack: error instanceof Error ? error.stack : undefined,
       })
     }
   }
