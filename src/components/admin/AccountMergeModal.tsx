@@ -61,14 +61,41 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
       setFetching(true)
       const response = await safeFetch(`/api/admin/users/${sourceUserId}`)
       
-      if (response.ok) {
+      if (response.ok && response.data?.user) {
         setSourceUser(response.data.user)
       } else {
-        throw new Error(response.error || 'Failed to fetch source user')
+        // Handle different error scenarios
+        let errorMessage = 'Failed to load source user'
+        
+        if (response.status === 404) {
+          errorMessage = 'User not found'
+        } else if (response.status === 403) {
+          errorMessage = 'You do not have permission to view this user'
+        } else if (response.status === 401) {
+          errorMessage = 'Authentication required. Please log in again.'
+        } else if (response.status === 0) {
+          // Network error (CORS, offline, etc.)
+          errorMessage = 'Network error. Please check your connection and try again.'
+        } else if (response.error) {
+          errorMessage = response.error
+        }
+        
+        // Only log unexpected errors (not 404, 403, 401)
+        if (response.status >= 500 || response.status === 0) {
+          console.error('Error fetching source user:', {
+            status: response.status,
+            error: response.error,
+            userId: sourceUserId
+          })
+        }
+        
+        toast.error('Error', { description: errorMessage })
       }
     } catch (error) {
-      console.error('Error fetching source user:', error)
-      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to load source user' })
+      // This catch block should rarely be hit since safeFetch handles errors
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load source user'
+      console.error('Unexpected error fetching source user:', error)
+      toast.error('Error', { description: errorMessage })
     } finally {
       setFetching(false)
     }
@@ -84,7 +111,7 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
       setSearching(true)
       const response = await safeFetch('/api/admin/users')
       
-      if (response.ok) {
+      if (response.ok && response.data?.users) {
         const users = response.data.users || []
         const filtered = users.filter((user: User) => 
           user.id !== sourceUserId &&
@@ -96,9 +123,19 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
         ).slice(0, 10) // Limit to 10 results
         
         setSearchResults(filtered)
+      } else {
+        // Only log unexpected errors (not auth/permission errors)
+        if (response.status >= 500 || response.status === 0) {
+          console.error('Error searching users:', {
+            status: response.status,
+            error: response.error
+          })
+        }
+        // Don't show toast for search errors to avoid noise
       }
     } catch (error) {
-      console.error('Error searching users:', error)
+      // This catch block should rarely be hit since safeFetch handles errors
+      console.error('Unexpected error searching users:', error)
     } finally {
       setSearching(false)
     }

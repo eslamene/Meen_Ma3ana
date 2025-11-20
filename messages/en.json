@@ -1608,7 +1608,7 @@
     },
     "values": {
       "title": "Our Values",
-      "subtitle": "What drives us every day",
+      "subtitle": "What motivates us every day",
       "transparency": {
         "title": "Transparency",
         "description": "Complete visibility into where your contributions go and how they're used."
@@ -1622,8 +1622,8 @@
         "description": "Every contribution makes a measurable difference in someone's life."
       },
       "community": {
-        "title": "Community",
-        "description": "Building stronger communities through collective support and compassion."
+        "title": "Support the Needy",
+        "description": "Support the needy through collective support and compassion."
       }
     },
     "contact": {
@@ -1697,7 +1697,7 @@
     },
     "monthlyBreakdown": {
       "title": "Monthly Impact",
-      "subtitle": "Our progress month by month",
+      "subtitle": "Month by month",
       "cases": "cases",
       "totalAmount": "Total Amount",
       "contributors": "Contributors",
