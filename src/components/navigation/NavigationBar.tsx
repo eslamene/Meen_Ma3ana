@@ -194,16 +194,16 @@ export default function NavigationBar() {
   }, [pathname, locale])
 
   return (
-    <nav className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
-        <div className="flex justify-between items-center h-16 md:h-16 gap-2">
+    <nav className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50 overflow-visible">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 overflow-visible">
+        <div className="flex justify-between items-center h-16 md:h-16 gap-2 overflow-visible">
           {/* Logo and Brand */}
           <div className="flex items-center flex-shrink-0 min-w-0">
             <Logo size="lg" />
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-3xl mx-4 overflow-x-auto">
+          <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-3xl mx-4 overflow-visible">
             {!user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode) ? (
               // Public user navigation - uses database with config fallback
               <>
@@ -215,7 +215,7 @@ export default function NavigationBar() {
                   // Render parent item with dropdown if it has children
                   if (hasChildren) {
                     return (
-                      <div key={item.key} className="relative group">
+                      <div key={item.key} className="relative group overflow-visible">
                         <button
                           className={`${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1 flex items-center gap-1.5`}
                         >
@@ -226,7 +226,7 @@ export default function NavigationBar() {
                           </svg>
                         </button>
                         {item.children && item.children.length > 0 && (
-                          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
                             <div className="py-1">
                               {item.children.map((child) => {
                                 const ChildIcon = child.icon
@@ -341,7 +341,7 @@ export default function NavigationBar() {
                   // Render parent item with dropdown if it has children
                   if (hasChildren) {
                     return (
-                      <div key={item.id} className="relative group">
+                      <div key={item.id} className="relative group overflow-visible">
                         <button
                           className={`${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1 flex items-center gap-1.5`}
                         >
@@ -352,7 +352,7 @@ export default function NavigationBar() {
                           </svg>
                         </button>
                         {item.children && item.children.length > 0 && (
-                          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
                             <div className="py-1">
                               {item.children.map((child) => {
                                 const ChildIcon = child.icon ? getIcon(child.icon) : undefined
@@ -402,7 +402,7 @@ export default function NavigationBar() {
           </div>
 
           {/* Right side - Language Switcher, Auth and Notifications */}
-          <div className="hidden lg:flex items-center space-x-3 xl:space-x-4 flex-shrink-0">
+          <div className="hidden lg:flex items-center space-x-3 xl:space-x-4 flex-shrink-0 overflow-visible">
             {/* Language Switcher */}
             <LanguageSwitcher />
             {user && !isRecoveryMode && !(isResetPasswordPage && !isRecoveryMode) ? (
@@ -425,7 +425,7 @@ export default function NavigationBar() {
                 </Link>
 
                 {/* User Menu */}
-                <div className="relative group">
+                <div className="relative group overflow-visible">
                   <Button variant="ghost" size="sm" className="flex items-center space-x-3 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-all duration-200 rounded-lg px-3 py-2">
                     <div className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#5A7A6B] rounded-full flex items-center justify-center shadow-md">
                       <span className="text-white text-sm font-semibold">
@@ -441,7 +441,7 @@ export default function NavigationBar() {
                   </Button>
 
                   {/* Dropdown Menu */}
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-100">
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl py-2 z-[100] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-100 pointer-events-none group-hover:pointer-events-auto">
                     <Link 
                       href={`/${locale}/profile`}
                       className="block px-4 py-3 text-sm text-gray-800 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors mx-2 rounded-lg"
@@ -514,7 +514,7 @@ export default function NavigationBar() {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 bg-white shadow-lg max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <div className="lg:hidden border-t border-gray-200 bg-white shadow-lg max-h-[calc(100vh-4rem)] overflow-y-auto overflow-x-hidden">
             <div className="px-4 pt-4 pb-4 space-y-1">
               {!user ? (
                 // Public user mobile navigation - uses database with config fallback
