@@ -97,26 +97,31 @@ export default function RegisterPage() {
                 <div className="space-y-5 sm:space-y-6">
                   <AuthForm mode="register" />
 
-                  <div className="relative pt-4 sm:pt-6">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300/50"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white/40 backdrop-blur-sm text-gray-600 rounded-full">{t('or')}</span>
-                    </div>
-                  </div>
+                  {/* Social Sign-In - Only show if enabled */}
+                  {process.env.NEXT_PUBLIC_ENABLE_SOCIAL_LOGIN === 'true' && (
+                    <>
+                      <div className="relative pt-4 sm:pt-6">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-300/50"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-4 bg-white/40 backdrop-blur-sm text-gray-600 rounded-full">{t('or')}</span>
+                        </div>
+                      </div>
 
-                  {/* Social Sign-In */}
-                  <SocialSignIn mode="register" />
+                      {/* Social Sign-In */}
+                      <SocialSignIn mode="register" />
 
-                  <div className="relative pt-4 sm:pt-6">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300/50"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white/40 backdrop-blur-sm text-gray-600 rounded-full">{t('or')}</span>
-                    </div>
-                  </div>
+                      <div className="relative pt-4 sm:pt-6">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-300/50"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-4 bg-white/40 backdrop-blur-sm text-gray-600 rounded-full">{t('or')}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div className="text-center">
                     <p className="text-sm sm:text-base text-gray-700">
