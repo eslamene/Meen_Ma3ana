@@ -8,8 +8,11 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
-import { Loader2, Users, AlertTriangle, ArrowRight, Trash2 } from 'lucide-react'
+import { Loader2, Users, AlertTriangle, ArrowRight, Trash2, Eye, CheckCircle, Shield, RefreshCw } from 'lucide-react'
 import { safeFetch } from '@/lib/utils/safe-fetch'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 interface User {
   id: string
@@ -17,6 +20,24 @@ interface User {
   first_name?: string | null
   last_name?: string | null
   contribution_count?: number
+}
+
+interface MergePreview {
+  source_user: User
+  target_user: User
+  records_to_migrate: Record<string, number>
+  validation: {
+    can_merge: boolean
+    warnings: string[]
+    errors: string[]
+  }
+}
+
+interface MergeSummary {
+  total_records_to_migrate: number
+  tables_affected: string[]
+  validation_passed: boolean
+  has_warnings: boolean
 }
 
 interface AccountMergeModalProps {
@@ -36,6 +57,12 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [searching, setSearching] = useState(false)
+  const [preview, setPreview] = useState<MergePreview | null>(null)
+  const [previewSummary, setPreviewSummary] = useState<MergeSummary | null>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [mergeId, setMergeId] = useState<string | null>(null)
+  const [backupId, setBackupId] = useState<string | null>(null)
 
   useEffect(() => {
     if (open && sourceUserId) {
@@ -52,6 +79,11 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
     setDeleteSource(false)
     setSearchTerm('')
     setSearchResults([])
+    setPreview(null)
+    setPreviewSummary(null)
+    setShowPreview(false)
+    setMergeId(null)
+    setBackupId(null)
   }
 
   const fetchSourceUser = async () => {
@@ -158,6 +190,32 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
     setTargetUser(user)
     setSearchTerm(user.email)
     setSearchResults([])
+    setPreview(null)
+    setPreviewSummary(null)
+    setShowPreview(false)
+    // Auto-load preview when target is selected
+    if (sourceUserId) {
+      loadPreview(sourceUserId, user.id)
+    }
+  }
+
+  const loadPreview = async (fromUserId: string, toUserId: string) => {
+    try {
+      setLoadingPreview(true)
+      const response = await safeFetch(`/api/admin/users/merge/preview?fromUserId=${fromUserId}&toUserId=${toUserId}`)
+      
+      if (response.ok && response.data) {
+        setPreview(response.data.preview)
+        setPreviewSummary(response.data.summary)
+      } else {
+        console.error('Failed to load preview:', response.error)
+        // Don't show error toast for preview failures, just log
+      }
+    } catch (error) {
+      console.error('Error loading preview:', error)
+    } finally {
+      setLoadingPreview(false)
+    }
   }
 
   const handleMerge = async () => {
@@ -188,15 +246,59 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to merge accounts')
+        
+        // Log full error details for debugging
+        console.error('Merge error details:', error)
+        
+        // Provide helpful error message if migration is required
+        if (error.migration_required) {
+          throw new Error(
+            error.error + '\n\n' + 
+            'Please run the database migration:\n' +
+            'supabase/migrations/078_create_user_merge_backup_system.sql\n\n' +
+            'Or contact your database administrator to apply this migration.'
+          )
+        }
+        
+        // Show detailed error if available
+        const errorMessage = error.error || 'Failed to merge accounts'
+        const details = error.details ? `\n\nDetails: ${error.details}` : ''
+        const hint = error.hint ? `\n\nHint: ${error.hint}` : ''
+        const errorCode = error.error_code ? `\n\nError Code: ${error.error_code}` : ''
+        
+        throw new Error(errorMessage + details + hint + errorCode)
       }
 
       const data = await response.json()
 
-      toast.success('Success', { description: data.message || 'Accounts merged successfully' })
+      // Store merge_id and backup_id for rollback reference
+      if (data.merge_id) {
+        setMergeId(data.merge_id)
+        setBackupId(data.backup_id)
+      }
+
+      toast.success('Success', { 
+        description: data.message || 'Accounts merged successfully',
+        duration: 10000,
+        action: data.merge_id ? {
+          label: 'View Details',
+          onClick: () => {
+            // Show merge details
+            console.log('Merge ID:', data.merge_id)
+            console.log('Backup ID:', data.backup_id)
+            toast.info('Merge Details', {
+              description: `Merge ID: ${data.merge_id}\nSave this ID for rollback if needed.`,
+              duration: 15000
+            })
+          }
+        } : undefined
+      })
 
       onSuccess()
-      onClose()
+      // Don't close immediately, show success state with merge_id
+      setTimeout(() => {
+        onClose()
+      }, 2000)
     } catch (error) {
       console.error('Error merging accounts:', error)
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to merge accounts' })
@@ -207,24 +309,26 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
           <DialogTitle>Merge User Accounts</DialogTitle>
           <DialogDescription>
             Merge contributions and data from one account into another
           </DialogDescription>
         </DialogHeader>
 
-        {fetching ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : sourceUser ? (
-          <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {fetching ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : sourceUser ? (
+            <div className="space-y-6">
             <Alert className="border-yellow-200 bg-yellow-50">
               <AlertTriangle className="h-4 w-4 text-yellow-600" />
               <AlertDescription className="text-yellow-700">
-                This action will reassign all contributions, notifications, and related data from the source account to the target account. This action cannot be undone.
+                This action will reassign all contributions, notifications, and related data from the source account to the target account. 
+                A backup will be created automatically, and you can rollback if needed. However, this action should be performed carefully.
               </AlertDescription>
             </Alert>
 
@@ -339,36 +443,184 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
               </div>
             </div>
 
-            {/* Summary */}
+            {/* Preview Section */}
             {targetUser && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm font-medium text-blue-900 mb-2">Merge Summary:</p>
-                <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Contributions: {sourceUser.contribution_count || 0} → {targetUser.email}</li>
-                  <li>• Notifications: Reassigned to {targetUser.email}</li>
-                  {deleteSource && (
-                    <li>• Source account: Will be deleted</li>
-                  )}
-                </ul>
+              <div className="space-y-4">
+                {/* Preview Toggle */}
+                <Collapsible open={showPreview} onOpenChange={setShowPreview}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between"
+                      disabled={loadingPreview || !preview}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-4 w-4" />
+                        <span>Preview Merge Details</span>
+                        {previewSummary && (
+                          <Badge variant="secondary">
+                            {previewSummary.total_records_to_migrate} records
+                          </Badge>
+                        )}
+                      </div>
+                      {loadingPreview && <Loader2 className="h-4 w-4 animate-spin" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent className="space-y-4 pt-4">
+                    {preview && previewSummary ? (
+                      <>
+                        {/* Safety Indicators */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Shield className="h-4 w-4 text-green-600" />
+                              <span className="text-sm font-medium text-green-900">Automatic Backup</span>
+                            </div>
+                            <p className="text-xs text-green-700">A backup will be created before merge</p>
+                          </div>
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <RefreshCw className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-medium text-blue-900">Rollback Available</span>
+                            </div>
+                            <p className="text-xs text-blue-700">You can rollback if needed</p>
+                          </div>
+                        </div>
+
+                        {/* Validation Status */}
+                        {preview.validation.errors.length > 0 && (
+                          <Alert className="border-red-200 bg-red-50">
+                            <AlertTriangle className="h-4 w-4 text-red-600" />
+                            <AlertDescription className="text-red-700">
+                              <p className="font-medium mb-1">Validation Errors:</p>
+                              <ul className="list-disc list-inside space-y-1">
+                                {preview.validation.errors.map((error, idx) => (
+                                  <li key={idx} className="text-sm">{error}</li>
+                                ))}
+                              </ul>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        {preview.validation.warnings.length > 0 && (
+                          <Alert className="border-yellow-200 bg-yellow-50">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                            <AlertDescription className="text-yellow-700">
+                              <p className="font-medium mb-1">Warnings:</p>
+                              <ul className="list-disc list-inside space-y-1">
+                                {preview.validation.warnings.map((warning, idx) => (
+                                  <li key={idx} className="text-sm">{warning}</li>
+                                ))}
+                              </ul>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        {preview.validation.can_merge && preview.validation.errors.length === 0 && (
+                          <Alert className="border-green-200 bg-green-50">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <AlertDescription className="text-green-700">
+                              Validation passed. Ready to merge.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        {/* Detailed Records Preview */}
+                        <div className="p-4 bg-muted/50 border rounded-lg">
+                          <p className="text-sm font-medium mb-3">Records to be Migrated:</p>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            {Object.entries(preview.records_to_migrate)
+                              .filter(([_, count]) => count > 0)
+                              .map(([table, count]) => (
+                                <div key={table} className="flex items-center justify-between p-2 bg-background rounded">
+                                  <span className="text-muted-foreground capitalize">
+                                    {table.replace(/_/g, ' ')}
+                                  </span>
+                                  <Badge variant="outline">{count}</Badge>
+                                </div>
+                              ))}
+                          </div>
+                          {previewSummary.total_records_to_migrate === 0 && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                              No records found to migrate.
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Summary Stats */}
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm font-medium text-blue-900 mb-2">Summary:</p>
+                          <ul className="text-sm text-blue-800 space-y-1">
+                            <li>• Total Records: {previewSummary.total_records_to_migrate}</li>
+                            <li>• Tables Affected: {previewSummary.tables_affected.length}</li>
+                            <li>• Contributions: {preview.records_to_migrate.contributions || 0} → {targetUser.email}</li>
+                            <li>• Notifications: {preview.records_to_migrate.notifications || 0} → {targetUser.email}</li>
+                            {deleteSource && (
+                              <li>• Source account: Will be permanently deleted</li>
+                            )}
+                          </ul>
+                        </div>
+                      </>
+                    ) : loadingPreview ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">Loading preview...</span>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground text-center py-4">
+                        Click &quot;Preview Merge Details&quot; to see what will be merged
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* Success State with Merge ID */}
+                {mergeId && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700">
+                      <p className="font-medium mb-2">Merge completed successfully!</p>
+                      <div className="space-y-1 text-xs">
+                        <p><strong>Merge ID:</strong> {mergeId}</p>
+                        {backupId && <p><strong>Backup ID:</strong> {backupId}</p>}
+                        <p className="text-muted-foreground mt-2">
+                          Save the Merge ID to rollback this operation if needed.
+                        </p>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             )}
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleMerge}
-                disabled={loading || !targetUserId || sourceUserId === targetUserId}
-                variant="destructive"
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <Users className="mr-2 h-4 w-4" />
-                Merge Accounts
-              </Button>
-            </DialogFooter>
           </div>
         ) : null}
+        </div>
+
+        {/* Footer - Fixed at bottom */}
+        {sourceUser && !fetching && (
+          <DialogFooter className="px-6 py-4 border-t flex-shrink-0 bg-background">
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleMerge}
+              disabled={
+                loading || 
+                !targetUserId || 
+                sourceUserId === targetUserId ||
+                !!(preview && !preview.validation.can_merge) ||
+                !!(preview && preview.validation.errors.length > 0)
+              }
+              variant="destructive"
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Users className="mr-2 h-4 w-4" />
+              Merge Accounts
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -15,6 +15,7 @@ import {
   validateEmail
 } from '@/lib/security/auth-utils'
 import { getAuthSettings, getDefaultAuthSettings, type AuthSettings } from '@/lib/utils/authSettings'
+import { getAppUrl } from '@/lib/utils/app-url'
 import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight } from 'lucide-react'
 
 interface AuthFormProps {
@@ -160,7 +161,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           email: sanitizedEmail,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/${localeParam}/auth/callback`,
+            emailRedirectTo: `${getAppUrl()}/${localeParam}/auth/callback`,
             data: {
               first_name: firstName.trim(),
               last_name: lastName.trim(),

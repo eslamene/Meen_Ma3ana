@@ -9,6 +9,7 @@ import { useAdmin } from '@/lib/admin/hooks'
 import { UserProfileEditModal } from '@/components/admin/UserProfileEditModal'
 import { PasswordResetModal } from '@/components/admin/PasswordResetModal'
 import { AccountMergeModal } from '@/components/admin/AccountMergeModal'
+import { UserRoleAssignmentModal } from '@/components/admin/rbac/UserRoleAssignmentModal'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +26,8 @@ import {
   GitMerge,
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Shield
 } from 'lucide-react'
 
 // Types
@@ -74,7 +76,10 @@ export default function AdminUsersPage() {
   const [editProfileModal, setEditProfileModal] = useState<{ open: boolean; userId: string | null }>({ open: false, userId: null })
   const [passwordResetModal, setPasswordResetModal] = useState<{ open: boolean; userId: string | null; userEmail: string | null }>({ open: false, userId: null, userEmail: null })
   const [mergeAccountModal, setMergeAccountModal] = useState<{ open: boolean; userId: string | null }>({ open: false, userId: null })
-  const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([])
+  const [roleAssignmentModal, setRoleAssignmentModal] = useState<{ open: boolean; userId: string | null; userEmail: string | null }>({ open: false, userId: null, userEmail: null })
+  const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string; description: string; is_system: boolean }>>([])
+  const [userCurrentRoles, setUserCurrentRoles] = useState<string[]>([])
+  const [loadingUserRoles, setLoadingUserRoles] = useState(false)
   const { user: currentUser } = useAdmin()
 
   // Fetch users with pagination, search, and filtering
@@ -115,18 +120,93 @@ export default function AdminUsersPage() {
     setPagination(prev => ({ ...prev, page: 1 }))
   }, [searchTerm, roleFilter])
 
-  // Fetch available roles for filter dropdown
+  // Fetch available roles for filter dropdown and role assignment
   const fetchRoles = useCallback(async () => {
     try {
       const rolesRes = await safeFetch('/api/admin/roles')
       if (rolesRes.ok) {
-        setAvailableRoles(rolesRes.data?.roles || [])
+        const roles = rolesRes.data?.roles || []
+        setAvailableRoles(roles.map((role: any) => ({
+          id: role.id,
+          name: role.name,
+          display_name: role.display_name,
+          description: role.description || '',
+          is_system: role.is_system || false
+        })))
       }
     } catch (error) {
       console.error('Error fetching roles:', error)
       toast.error('Error', { description: 'Failed to fetch roles' })
     }
   }, [toast])
+
+  // Fetch user's current roles
+  const fetchUserRoles = useCallback(async (userId: string) => {
+    try {
+      setLoadingUserRoles(true)
+      const rolesRes = await safeFetch(`/api/admin/users/${userId}/roles`)
+      if (rolesRes.ok) {
+        const userRoles = rolesRes.data?.userRoles || []
+        // Extract role_id from each user role assignment
+        const roleIds = userRoles
+          .map((ur: any) => {
+            // Handle both direct role_id and nested role object
+            return ur.role_id || (ur.role && (Array.isArray(ur.role) ? ur.role[0]?.id : ur.role.id))
+          })
+          .filter(Boolean)
+        setUserCurrentRoles(roleIds)
+      } else {
+        toast.error('Error', { description: rolesRes.error || 'Failed to fetch user roles' })
+        setUserCurrentRoles([])
+      }
+    } catch (error) {
+      console.error('Error fetching user roles:', error)
+      toast.error('Error', { description: 'Failed to fetch user roles' })
+      setUserCurrentRoles([])
+    } finally {
+      setLoadingUserRoles(false)
+    }
+  }, [toast])
+
+  // Handle opening role assignment modal
+  const handleOpenRoleAssignment = async (userId: string, userEmail: string) => {
+    setRoleAssignmentModal({ open: true, userId, userEmail })
+    await fetchUserRoles(userId)
+  }
+
+  // Handle saving role assignments
+  const handleSaveRoles = async (userId: string, roleIds: string[]) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/roles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ role_ids: roleIds })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to assign roles')
+      }
+
+      toast.success('Success', {
+        description: 'User roles updated successfully'
+      })
+
+      // Refresh users list to show updated roles
+      await fetchUsers()
+      
+      // Close modal
+      setRoleAssignmentModal({ open: false, userId: null, userEmail: null })
+    } catch (error) {
+      console.error('Error saving roles:', error)
+      toast.error('Error', {
+        description: error instanceof Error ? error.message : 'Failed to assign roles'
+      })
+      throw error
+    }
+  }
 
   useEffect(() => {
     fetchRoles()
@@ -274,6 +354,14 @@ export default function AdminUsersPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleOpenRoleAssignment(user.id, user.email)}
+                          title="Assign Roles"
+                        >
+                          <Shield className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setEditProfileModal({ open: true, userId: user.id })}
                           title="Edit Profile"
                         >
@@ -392,6 +480,21 @@ export default function AdminUsersPage() {
             toast.success('Success', { description: 'Accounts merged successfully' })
           }}
         />
+
+        {/* Role Assignment Modal */}
+        {roleAssignmentModal.userId && roleAssignmentModal.userEmail && (
+          <UserRoleAssignmentModal
+            open={roleAssignmentModal.open}
+            onClose={() => setRoleAssignmentModal({ open: false, userId: null, userEmail: null })}
+            userId={roleAssignmentModal.userId}
+            userEmail={roleAssignmentModal.userEmail}
+            currentRoles={userCurrentRoles}
+            allRoles={availableRoles}
+            onSave={async (roleIds) => {
+              await handleSaveRoles(roleAssignmentModal.userId!, roleIds)
+            }}
+          />
+        )}
         </Container>
       </div>
     </PermissionGuard>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { getAppUrl } from '@/lib/utils/app-url'
 import { Chrome, Apple, Facebook } from 'lucide-react'
 
 interface SocialSignInProps {
@@ -30,7 +31,7 @@ export default function SocialSignIn({ mode = 'login', onSuccess, onError }: Soc
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/${locale}/auth/callback`,
+          redirectTo: `${getAppUrl()}/${locale}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

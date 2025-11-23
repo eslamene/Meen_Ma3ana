@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { getAppUrl } from '@/lib/utils/app-url'
 import { Mail, ArrowRight } from 'lucide-react'
 
 export default function PasswordResetForm() {
@@ -40,7 +41,7 @@ export default function PasswordResetForm() {
 
     try {
       // Use the locale-specific reset password route
-      const redirectTo = `${window.location.origin}/${params.locale}/auth/reset-password`
+      const redirectTo = `${getAppUrl()}/${params.locale}/auth/reset-password`
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectTo

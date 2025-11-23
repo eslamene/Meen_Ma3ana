@@ -3,6 +3,7 @@ import { requireAdminPermission } from '@/lib/security/rls'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createClient } from '@supabase/supabase-js'
 import { RouteContext } from '@/types/next-api'
+import { getAppUrl } from '@/lib/utils/app-url'
 
 import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
@@ -70,7 +71,7 @@ export async function POST(
     const locale = searchParams.get('locale') || 'en'
 
     // Send password reset email
-    const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/${locale}/auth/reset-password`
+    const redirectTo = `${getAppUrl()}/${locale}/auth/reset-password`
     
     const { error: resetError } = await serviceRoleClient.auth.admin.generateLink({
       type: 'recovery',
