@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PublicNavItem } from './public-nav-config'
 import { getIcon } from '@/lib/icons/registry'
 import { LucideIcon } from 'lucide-react'
+import { normalizeLandingPath } from '@/lib/utils/app-url'
 
 interface MenuItemFromDB {
   id: string
@@ -94,27 +95,9 @@ export async function getPublicNavItemsFromDB(
         // Regular links - add locale if not present
         if (!href.startsWith('/')) href = `/${href}`
         
-        // Normalize landing page hrefs - handle cases like /, /landing, /landing/landing, etc.
-        // Remove any locale prefix first to normalize
-        const hasLocalePrefix = href.startsWith(`/${locale}/`)
-        let normalizedHref = hasLocalePrefix ? href.replace(`/${locale}`, '') : href
-        
-        // Remove duplicate /landing segments (e.g., /landing/landing -> /landing)
-        normalizedHref = normalizedHref.replace(/^\/landing(\/landing)+/, '/landing')
-        
-        // Normalize root and landing paths to /landing
-        if (normalizedHref === '/' || normalizedHref === '/landing') {
-          href = `/${locale}/landing`
-        } else if (normalizedHref.startsWith('/landing/')) {
-          // Has additional segments after /landing (shouldn't normally happen, but handle it)
-          href = `/${locale}${normalizedHref}`
-        } else if (!hasLocalePrefix) {
-          // Add locale prefix for other paths
-          href = `/${locale}${normalizedHref}`
-        } else {
-          // Already has locale prefix and is not a landing path, use normalized version with locale
-          href = `/${locale}${normalizedHref}`
-        }
+        // Normalize landing page hrefs using utility function
+        // This handles cases like /, /landing, /landing/landing, /en/landing/landing, etc.
+        href = normalizeLandingPath(href, locale)
       }
 
       // Use label based on locale - convert to translation key

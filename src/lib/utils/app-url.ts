@@ -41,3 +41,56 @@ export function getAppUrl(): string {
   return 'https://meen.ma3ana.org'
 }
 
+/**
+ * Normalize landing page paths to prevent duplicate /landing segments
+ * Handles cases like /landing/landing, /en/landing/landing, etc.
+ * 
+ * @param path - The path to normalize
+ * @param locale - Optional locale to ensure proper formatting
+ * @returns Normalized path with duplicate /landing segments removed
+ */
+export function normalizeLandingPath(path: string, locale?: string): string {
+  if (!path) return path
+  
+  // Remove locale prefix if present to normalize
+  const localePrefix = locale ? `/${locale}` : ''
+  const hasLocalePrefix = locale && path.startsWith(localePrefix + '/')
+  let normalizedPath = hasLocalePrefix ? path.replace(localePrefix, '') : path
+  
+  // Remove duplicate /landing segments
+  // Handle patterns like /landing/landing, /landing/landing/landing, etc.
+  normalizedPath = normalizedPath.replace(/(\/landing)+/g, '/landing')
+  
+  // If path contains /landing, ensure it only appears once
+  const pathParts = normalizedPath.split('/').filter(Boolean)
+  const landingIndex = pathParts.indexOf('landing')
+  if (landingIndex !== -1 && pathParts.filter(p => p === 'landing').length > 1) {
+    // Remove all 'landing' segments except the first one
+    const filteredParts = []
+    let landingFound = false
+    for (const part of pathParts) {
+      if (part === 'landing') {
+        if (!landingFound) {
+          filteredParts.push(part)
+          landingFound = true
+        }
+      } else {
+        filteredParts.push(part)
+      }
+    }
+    normalizedPath = '/' + filteredParts.join('/')
+  }
+  
+  // Normalize root and landing paths
+  if (normalizedPath === '/' || normalizedPath === '/landing') {
+    return locale ? `/${locale}/landing` : '/landing'
+  }
+  
+  // Re-add locale prefix if it was present
+  if (hasLocalePrefix && locale) {
+    return `/${locale}${normalizedPath}`
+  }
+  
+  return normalizedPath
+}
+
