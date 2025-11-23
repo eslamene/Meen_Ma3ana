@@ -19,14 +19,52 @@ export async function GET(
     const supabase = await createClient()
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error && data?.user) {
+    if (error) {
+      // Log the error for debugging
+      console.error('Email confirmation error:', {
+        message: error.message,
+        status: error.status,
+        name: error.name
+      })
+      
+      // Handle specific error cases
+      let errorParam = 'auth-code-error'
+      if (error.message?.includes('expired') || error.message?.includes('invalid')) {
+        errorParam = 'auth-code-expired'
+      } else if (error.message?.includes('already been used')) {
+        errorParam = 'auth-code-used'
+      }
+      
+      return NextResponse.redirect(
+        `${requestUrl.origin}/${validLocale}/auth/login?error=${errorParam}&error_description=${encodeURIComponent(error.message || 'Error confirming user')}`
+      )
+    }
+    
+    if (data?.user) {
       // If this is an email confirmation (not password reset), sync email_verified
       if (type !== 'recovery' && data.user.email_confirmed_at) {
-        // Sync email_verified in users table when email is confirmed
-        await supabase
+        // Ensure user exists in users table, then sync email_verified
+        // Use upsert to handle case where user record doesn't exist yet
+        const { error: userError } = await supabase
           .from('users')
-          .update({ email_verified: true })
-          .eq('id', data.user.id)
+          .upsert(
+            {
+              id: data.user.id,
+              email: data.user.email || `${data.user.id}@placeholder.local`,
+              email_verified: true,
+              role: 'donor'
+            },
+            {
+              onConflict: 'id',
+              ignoreDuplicates: false
+            }
+          )
+        
+        if (userError) {
+          console.error('Error syncing email_verified:', userError)
+          // Don't fail the confirmation if this update fails - the trigger should handle it
+          // But log it for debugging
+        }
       }
 
       // Check if this is a password reset flow by checking the 'type' parameter

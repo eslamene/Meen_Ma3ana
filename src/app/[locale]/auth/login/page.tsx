@@ -2,19 +2,21 @@
 
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import AuthForm from '@/components/auth/AuthForm'
 import SocialSignIn from '@/components/auth/SocialSignIn'
-import { ArrowRight, Shield } from 'lucide-react'
+import { ArrowRight, Shield, AlertCircle, X } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
 
 export default function LoginPage() {
   const t = useTranslations('auth')
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const locale = params.locale as string
   const { user, loading } = useAuth()
+  const [urlError, setUrlError] = useState<string | null>(null)
 
   // Redirect authenticated users away from login page
   useEffect(() => {
@@ -22,6 +24,44 @@ export default function LoginPage() {
       router.replace(`/${locale}/dashboard`)
     }
   }, [user, loading, router, locale])
+
+  // Handle URL error parameters
+  useEffect(() => {
+    const error = searchParams.get('error')
+    const errorDescription = searchParams.get('error_description')
+    
+    if (error) {
+      let errorMessage = ''
+      
+      switch (error) {
+        case 'auth-code-error':
+          errorMessage = t('authCodeError')
+          break
+        case 'auth-code-expired':
+          errorMessage = t('authCodeExpired')
+          break
+        case 'auth-code-used':
+          errorMessage = t('authCodeUsed')
+          break
+        default:
+          errorMessage = errorDescription 
+            ? decodeURIComponent(errorDescription)
+            : t('authErrorGeneric')
+      }
+      
+      setUrlError(errorMessage)
+      
+      // Clear error from URL after displaying it
+      const newSearchParams = new URLSearchParams(searchParams.toString())
+      newSearchParams.delete('error')
+      newSearchParams.delete('error_description')
+      newSearchParams.delete('error_code')
+      const newUrl = newSearchParams.toString()
+        ? `${window.location.pathname}?${newSearchParams.toString()}`
+        : window.location.pathname
+      router.replace(newUrl, { scroll: false })
+    }
+  }, [searchParams, router, t])
 
   // Security: Clear any sensitive data from sessionStorage on mount
   useEffect(() => {
@@ -86,6 +126,23 @@ export default function LoginPage() {
           </p>
         </div>
         
+              {/* URL Error Display */}
+              {urlError && (
+                <div className="mb-4 sm:mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm sm:text-base text-red-800">{urlError}</p>
+                  </div>
+                  <button
+                    onClick={() => setUrlError(null)}
+                    className="flex-shrink-0 text-red-600 hover:text-red-800 transition-colors"
+                    aria-label={t('dismissError')}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              )}
+
               {/* Form */}
               <div className="space-y-5 sm:space-y-6">
           <AuthForm mode="login" />
