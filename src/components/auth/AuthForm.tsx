@@ -517,6 +517,24 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       })
 
       if (resendError) {
+        // Handle rate limiting specifically
+        if (resendError.message?.includes('For security purposes, you can only request this after')) {
+          // Extract wait time from error message (e.g., "after 29 seconds")
+          const waitMatch = resendError.message.match(/(\d+)\s+seconds?/i)
+          const waitSeconds = waitMatch ? parseInt(waitMatch[1], 10) : 30
+          const waitMinutes = Math.ceil(waitSeconds / 60)
+          
+          const rateLimitMessage = waitMinutes > 1
+            ? t('resendRateLimitMinutes', { minutes: waitMinutes }) || `Please wait ${waitMinutes} minutes before requesting another verification email.`
+            : t('resendRateLimitSeconds', { seconds: waitSeconds }) || `Please wait ${waitSeconds} seconds before requesting another verification email.`
+          
+          setError(rateLimitMessage)
+          toast.error(t('resendRateLimit') || 'Please wait before resending', {
+            description: rateLimitMessage,
+            duration: 7000
+          })
+          return
+        }
         throw resendError
       }
 
@@ -527,8 +545,11 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       })
     } catch (error) {
       console.error('Error resending verification email:', error)
-      setError(t('resendError') || 'Failed to send verification email. Please try again.')
-      toast.error(t('resendError') || 'Failed to send verification email')
+      const errorMessage = error instanceof Error && error.message?.includes('rate limit')
+        ? t('resendRateLimit') || 'Please wait before resending another email.'
+        : t('resendError') || 'Failed to send verification email. Please try again.'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setResending(false)
     }
