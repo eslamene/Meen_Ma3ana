@@ -40,6 +40,8 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const passwordInputRef = useRef<HTMLInputElement>(null)
+  const confirmPasswordInputRef = useRef<HTMLInputElement>(null)
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
   const [rateLimitState, setRateLimitState] = useState<{
     allowed: boolean
@@ -718,15 +720,16 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             <Lock className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500" />
           </div>
         <input
+          ref={passwordInputRef}
           id="password"
-            type={showPassword ? 'text' : 'password'}
+          type={showPassword ? 'text' : 'password'}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-            minLength={authSettings?.passwordMinLength || 8}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            disabled={isLockedOut || loading}
-            className={getInputClasses(true)}
+          minLength={authSettings?.passwordMinLength || 8}
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+          disabled={isLockedOut || loading}
+          className={getInputClasses(true)}
           placeholder={t('passwordPlaceholder')}
         />
           <button
@@ -734,9 +737,35 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              setShowPassword(prev => !prev)
+              const newShowPassword = !showPassword
+              setShowPassword(newShowPassword)
+              
+              // Safari fix: blur and refocus to ensure type change takes effect
+              if (passwordInputRef.current) {
+                const input = passwordInputRef.current
+                const currentValue = input.value
+                const currentSelectionStart = input.selectionStart
+                const currentSelectionEnd = input.selectionEnd
+                
+                // Blur to release focus
+                input.blur()
+                
+                // Use setTimeout to ensure Safari processes the type change
+                setTimeout(() => {
+                  if (passwordInputRef.current) {
+                    passwordInputRef.current.focus()
+                    // Restore cursor position
+                    if (currentSelectionStart !== null && currentSelectionEnd !== null) {
+                      passwordInputRef.current.setSelectionRange(currentSelectionStart, currentSelectionEnd)
+                    }
+                  }
+                }, 10)
+              }
             }}
-            onMouseDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
             className={getRightIconButtonClasses()}
             tabIndex={-1}
             disabled={isLockedOut || loading}
@@ -791,15 +820,16 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
               <Lock className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500" />
             </div>
           <input
+            ref={confirmPasswordInputRef}
             id="confirmPassword"
-              type={showConfirmPassword ? 'text' : 'password'}
+            type={showConfirmPassword ? 'text' : 'password'}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-              minLength={authSettings?.passwordMinLength || 8}
-              autoComplete="new-password"
-              disabled={loading}
-              className={getInputClasses(true)}
+            minLength={authSettings?.passwordMinLength || 8}
+            autoComplete="new-password"
+            disabled={loading}
+            className={getInputClasses(true)}
             placeholder={t('confirmPasswordPlaceholder')}
           />
             <button
@@ -807,9 +837,35 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                setShowConfirmPassword(prev => !prev)
+                const newShowConfirmPassword = !showConfirmPassword
+                setShowConfirmPassword(newShowConfirmPassword)
+                
+                // Safari fix: blur and refocus to ensure type change takes effect
+                if (confirmPasswordInputRef.current) {
+                  const input = confirmPasswordInputRef.current
+                  const currentValue = input.value
+                  const currentSelectionStart = input.selectionStart
+                  const currentSelectionEnd = input.selectionEnd
+                  
+                  // Blur to release focus
+                  input.blur()
+                  
+                  // Use setTimeout to ensure Safari processes the type change
+                  setTimeout(() => {
+                    if (confirmPasswordInputRef.current) {
+                      confirmPasswordInputRef.current.focus()
+                      // Restore cursor position
+                      if (currentSelectionStart !== null && currentSelectionEnd !== null) {
+                        confirmPasswordInputRef.current.setSelectionRange(currentSelectionStart, currentSelectionEnd)
+                      }
+                    }
+                  }, 10)
+                }
               }}
-              onMouseDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
               className={getRightIconButtonClasses()}
               tabIndex={-1}
               disabled={loading}
