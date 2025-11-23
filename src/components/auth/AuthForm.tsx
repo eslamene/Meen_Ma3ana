@@ -51,6 +51,8 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
   const [authSettings, setAuthSettings] = useState<AuthSettings | null>(null)
   const [success, setSuccess] = useState(false)
   const [successEmail, setSuccessEmail] = useState('')
+  const [resending, setResending] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
   
   // Inline validation errors
   const [emailError, setEmailError] = useState('')
@@ -485,6 +487,37 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
   const isLockedOut = rateLimitState ? !rateLimitState.allowed : false
 
+  const handleResendVerification = async () => {
+    if (!successEmail) return
+
+    try {
+      setResending(true)
+      setResendSuccess(false)
+      setError('')
+
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: successEmail
+      })
+
+      if (resendError) {
+        throw resendError
+      }
+
+      setResendSuccess(true)
+      toast.success(t('verificationEmailSent') || 'Verification email sent!', {
+        description: t('checkEmailInbox') || 'Please check your email inbox.',
+        duration: 5000
+      })
+    } catch (error) {
+      console.error('Error resending verification email:', error)
+      setError(t('resendError') || 'Failed to send verification email. Please try again.')
+      toast.error(t('resendError') || 'Failed to send verification email')
+    } finally {
+      setResending(false)
+    }
+  }
+
   // Show success message instead of form for registration
   if (mode === 'register' && success) {
     return (
@@ -498,13 +531,60 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
             {t('accountCreated') || 'Account Created'}
           </h3>
-          <p className="text-base sm:text-lg text-gray-700 mb-8">
+          <p className="text-base sm:text-lg text-gray-700 mb-2">
             {t('signUpSuccessSimple') || 'Please check your email to verify your account.'}
           </p>
-          <div className="text-center">
+          {successEmail && (
+            <p className="text-sm text-gray-600 mb-6">
+              {t('emailSentTo') || 'Email sent to:'} <span className="font-semibold">{successEmail}</span>
+            </p>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
+          {/* Success message for resend */}
+          {resendSuccess && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-center space-x-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+              <p className="text-sm text-green-800">{t('verificationEmailSent') || 'Verification email sent!'}</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {/* Resend button */}
+            <button
+              onClick={handleResendVerification}
+              disabled={resending || resendSuccess}
+              className="w-full inline-flex items-center justify-center px-6 py-3 bg-white border-2 border-[#6B8E7E] text-[#6B8E7E] font-semibold rounded-xl hover:bg-[#6B8E7E] hover:text-white transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resending ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  {t('sending') || 'Sending...'}
+                </>
+              ) : resendSuccess ? (
+                <>
+                  <CheckCircle2 className="mr-2 h-5 w-5" />
+                  {t('emailSent') || 'Email Sent!'}
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-5 w-5" />
+                  {t('resendVerificationEmail') || 'Resend Verification Email'}
+                </>
+              )}
+            </button>
+
+            {/* Go to Login button */}
             <Link 
               href={`/${localeParam}/auth/login`}
-              className="inline-flex items-center justify-center px-6 py-3 bg-[#6B8E7E] text-white font-semibold rounded-xl hover:bg-[#5a7a6b] transition-colors shadow-lg"
+              className="block w-full inline-flex items-center justify-center px-6 py-3 bg-[#6B8E7E] text-white font-semibold rounded-xl hover:bg-[#5a7a6b] transition-colors shadow-lg"
             >
               {t('goToLogin') || 'Go to Login'} <ArrowRight className="ml-2 h-5 w-5" />
             </Link>

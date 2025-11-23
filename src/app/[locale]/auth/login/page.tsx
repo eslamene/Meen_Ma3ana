@@ -51,17 +51,23 @@ export default function LoginPage() {
       
       setUrlError(errorMessage)
       
-      // Clear error from URL after displaying it
-      const newSearchParams = new URLSearchParams(searchParams.toString())
-      newSearchParams.delete('error')
-      newSearchParams.delete('error_description')
-      newSearchParams.delete('error_code')
-      const newUrl = newSearchParams.toString()
-        ? `${window.location.pathname}?${newSearchParams.toString()}`
-        : window.location.pathname
-      router.replace(newUrl, { scroll: false })
+      // Don't clear error from URL immediately - keep it so we can show the resend link
+      // Only clear it when user dismisses the error
     }
   }, [searchParams, router, t])
+
+  const handleDismissError = () => {
+    setUrlError(null)
+    // Clear error from URL when user dismisses
+    const newSearchParams = new URLSearchParams(searchParams.toString())
+    newSearchParams.delete('error')
+    newSearchParams.delete('error_description')
+    newSearchParams.delete('error_code')
+    const newUrl = newSearchParams.toString()
+      ? `${window.location.pathname}?${newSearchParams.toString()}`
+      : window.location.pathname
+    router.replace(newUrl, { scroll: false })
+  }
 
   // Security: Clear any sensitive data from sessionStorage on mount
   useEffect(() => {
@@ -128,18 +134,43 @@ export default function LoginPage() {
         
               {/* URL Error Display */}
               {urlError && (
-                <div className="mb-4 sm:mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
-                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm sm:text-base text-red-800">{urlError}</p>
+                <div className="mb-4 sm:mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm sm:text-base text-red-800 mb-3">{urlError}</p>
+                      {(searchParams.get('error') === 'auth-code-error' || 
+                        searchParams.get('error') === 'auth-code-expired' || 
+                        searchParams.get('error') === 'auth-code-used') && (
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                          {user ? (
+                            <Link
+                              href={`/${locale}/auth/verify-email`}
+                              className="text-sm font-medium text-red-700 hover:text-red-900 underline inline-flex items-center"
+                            >
+                              {t('resendVerificationEmail')}
+                              <ArrowRight className="ml-1 h-3 w-3" />
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/${locale}/auth/register`}
+                              className="text-sm font-medium text-red-700 hover:text-red-900 underline inline-flex items-center"
+                            >
+                              {t('requestNewVerification')}
+                              <ArrowRight className="ml-1 h-3 w-3" />
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleDismissError}
+                      className="flex-shrink-0 text-red-600 hover:text-red-800 transition-colors"
+                      aria-label={t('dismissError')}
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setUrlError(null)}
-                    className="flex-shrink-0 text-red-600 hover:text-red-800 transition-colors"
-                    aria-label={t('dismissError')}
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
                 </div>
               )}
 
