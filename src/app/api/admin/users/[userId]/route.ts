@@ -194,6 +194,27 @@ export async function PUT(
       )
     }
 
+    // Check if phone number is being updated and if it's already in use
+    if (body.phone !== undefined && body.phone && body.phone.trim()) {
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('phone', body.phone.trim())
+        .neq('id', userId)
+        .maybeSingle()
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking phone uniqueness:', checkError)
+      }
+
+      if (existingUser) {
+        return NextResponse.json(
+          { error: 'Phone number is already in use by another account' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Prepare update data for users table
     const profileUpdates: Record<string, unknown> = {
       updated_at: new Date().toISOString()
@@ -217,6 +238,14 @@ export async function PUT(
       .single()
 
     if (profileError) {
+      // Check if error is due to duplicate phone number
+      if (profileError.code === '23505' && profileError.message.includes('phone')) {
+        return NextResponse.json(
+          { error: 'Phone number is already in use by another account' },
+          { status: 400 }
+        )
+      }
+
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating user profile:', profileError)
       return NextResponse.json(
         { error: 'Failed to update user profile', details: profileError.message },

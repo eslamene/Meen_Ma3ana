@@ -81,6 +81,27 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // Check if phone number is already in use by another user
+    if (phone && phone.trim()) {
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('phone', phone.trim())
+        .neq('id', user.id)
+        .maybeSingle()
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking phone uniqueness:', checkError)
+      }
+
+      if (existingUser) {
+        return NextResponse.json(
+          { error: 'Phone number is already in use by another account' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Update user profile
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
@@ -96,6 +117,14 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (updateError) {
+      // Check if error is due to duplicate phone number
+      if (updateError.code === '23505' && updateError.message.includes('phone')) {
+        return NextResponse.json(
+          { error: 'Phone number is already in use by another account' },
+          { status: 400 }
+        )
+      }
+
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating user profile:', updateError)
       return NextResponse.json(
         { error: 'Failed to update user profile' },

@@ -61,15 +61,31 @@ export function sanitizeEmail(email: string): string {
 /**
  * Sanitizes error messages to prevent information leakage
  * Returns generic error messages that don't reveal if email exists
+ * 
+ * @param error - The error object from Supabase or other auth operations
+ * @param isRegistration - Whether this is a registration attempt (allows showing "email already exists")
  */
-export function sanitizeAuthError(error: Error | unknown): string {
+export function sanitizeAuthError(error: Error | unknown, isRegistration: boolean = false): string {
   if (!(error instanceof Error)) {
     return 'authErrorGeneric'
   }
 
   const errorMessage = error.message.toLowerCase()
 
-  // Don't reveal if email exists or not
+  // For registration, show specific "email already exists" error
+  if (isRegistration) {
+    if (
+      errorMessage.includes('already registered') ||
+      errorMessage.includes('user already registered') ||
+      errorMessage.includes('email already exists') ||
+      errorMessage.includes('already been registered') ||
+      errorMessage.includes('user already exists')
+    ) {
+      return 'authErrorEmailAlreadyExists'
+    }
+  }
+
+  // Don't reveal if email exists or not (for login)
   if (
     errorMessage.includes('invalid login') ||
     errorMessage.includes('invalid credentials') ||

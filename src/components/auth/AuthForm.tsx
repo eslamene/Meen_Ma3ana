@@ -135,6 +135,37 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         setLoading(false)
         return
       }
+
+      // Check if phone number is provided and validate uniqueness
+      if (phone.trim()) {
+        // Validate phone format
+        if (!/^[\+]?[1-9][\d]{0,15}$/.test(phone.trim())) {
+          setError(t('phoneInvalid'))
+          setSuccess(false)
+          setLoading(false)
+          return
+        }
+
+        // Check if phone number already exists
+        const { data: existingUser, error: checkError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('phone', phone.trim())
+          .maybeSingle()
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          // Error other than "not found" - log but continue
+          console.error('Error checking phone uniqueness:', checkError)
+        }
+
+        if (existingUser) {
+          setError(t('phoneAlreadyExists'))
+          setSuccess(false)
+          setLoading(false)
+          return
+        }
+      }
+
         if (password !== confirmPassword) {
           setError(t('passwordsDoNotMatch'))
           setSuccess(false)
@@ -191,7 +222,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         })
 
         if (error) {
-          const sanitizedError = sanitizeAuthError(error)
+          const sanitizedError = sanitizeAuthError(error, true) // true = isRegistration
           setError(t(sanitizedError))
           setSuccess(false)
           onError?.(t(sanitizedError))
@@ -216,6 +247,15 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             })
 
           if (userError) {
+            // Check if error is due to duplicate phone number
+            if (userError.code === '23505' && userError.message.includes('phone')) {
+              setError(t('phoneAlreadyExists'))
+              setSuccess(false)
+              onError?.(t('phoneAlreadyExists'))
+              setLoading(false)
+              return
+            }
+            
             console.error('Error creating user record:', userError)
             // Don't fail registration if user record creation fails - it might be handled by trigger
           }
@@ -266,7 +306,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         router.push(`/${localeParam}/dashboard`)
       }
     } catch (error) {
-      const sanitizedError = sanitizeAuthError(error)
+      const sanitizedError = sanitizeAuthError(error, mode === 'register')
       setError(t(sanitizedError))
       setSuccess(false) // Ensure success is cleared on error
       onError?.(t(sanitizedError))
