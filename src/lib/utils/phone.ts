@@ -41,7 +41,7 @@ export function extractCountryCode(phone: string): { countryCode: string; number
   if (!phone) return { countryCode: '+20', number: '' }
   
   // Remove all spaces, dashes, and parentheses
-  let cleaned = phone.replace(/[\s\-\(\)]/g, '')
+  const cleaned = phone.replace(/[\s\-\(\)]/g, '')
   
   // Check for +20 format
   if (cleaned.startsWith('+20')) {

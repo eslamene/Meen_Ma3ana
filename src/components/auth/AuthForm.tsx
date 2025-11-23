@@ -688,7 +688,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           <div className="space-y-3">
             {/* Resend button */}
             <button
-              onClick={handleResendVerification}
+              onClick={() => handleResendVerification()}
               disabled={resending || resendSuccess}
               className="w-full inline-flex items-center justify-center px-6 py-3 bg-white border-2 border-[#6B8E7E] text-[#6B8E7E] font-semibold rounded-xl hover:bg-[#6B8E7E] hover:text-white transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
