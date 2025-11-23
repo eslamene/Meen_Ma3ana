@@ -15,9 +15,10 @@ import {
   clearRateLimit,
   validateEmail
 } from '@/lib/security/auth-utils'
+import { normalizePhoneNumber, validateMobileNumber, extractCountryCode } from '@/lib/utils/phone'
 import { getAuthSettings, getDefaultAuthSettings, type AuthSettings } from '@/lib/utils/authSettings'
 import { getAppUrl } from '@/lib/utils/app-url'
-import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface AuthFormProps {
@@ -34,6 +35,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
+  const [countryCode, setCountryCode] = useState('+20')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -48,8 +50,18 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
   const [success, setSuccess] = useState(false)
   const [successEmail, setSuccessEmail] = useState('')
   
+  // Inline validation errors
+  const [emailError, setEmailError] = useState('')
+  const [phoneError, setPhoneError] = useState('')
+  const [validatingEmail, setValidatingEmail] = useState(false)
+  const [validatingPhone, setValidatingPhone] = useState(false)
+  
   // Honeypot field for bot protection
   const honeypotRef = useRef<HTMLInputElement>(null)
+  
+  // Debounce timers
+  const emailDebounceTimer = useRef<NodeJS.Timeout | null>(null)
+  const phoneDebounceTimer = useRef<NodeJS.Timeout | null>(null)
   
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -89,6 +101,149 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
     }
   }, [password, mode, authSettings])
 
+  // Inline email validation with debouncing
+  useEffect(() => {
+    if (emailDebounceTimer.current) {
+      clearTimeout(emailDebounceTimer.current)
+    }
+
+    // Clear error when field is empty
+    if (!email.trim()) {
+      setEmailError('')
+      return
+    }
+
+    emailDebounceTimer.current = setTimeout(async () => {
+      const sanitizedEmail = sanitizeEmail(email)
+      const settings = authSettings || getDefaultAuthSettings()
+
+      // Validate email format
+      if (!validateEmail(sanitizedEmail, settings)) {
+        setEmailError(t('invalidEmail'))
+        return
+      }
+
+      // Only check for duplicates during registration
+      if (mode === 'register') {
+        setValidatingEmail(true)
+        try {
+          // Check if email already exists
+          const { data: existingUser, error: checkError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', sanitizedEmail)
+            .maybeSingle()
+
+          if (checkError && checkError.code !== 'PGRST116') {
+            // Error other than "not found" - don't show error, just log
+            console.error('Error checking email:', checkError)
+            setEmailError('')
+          } else if (existingUser) {
+            setEmailError(t('authErrorEmailAlreadyExists'))
+          } else {
+            setEmailError('')
+          }
+        } catch (err) {
+          console.error('Error validating email:', err)
+          setEmailError('')
+        } finally {
+          setValidatingEmail(false)
+        }
+      } else {
+        setEmailError('')
+      }
+    }, 500) // 500ms debounce
+
+    return () => {
+      if (emailDebounceTimer.current) {
+        clearTimeout(emailDebounceTimer.current)
+      }
+    }
+  }, [email, mode, authSettings, t])
+
+  // Extract country code from phone input if user types it (only extract, don't change country code field)
+  const phoneInputRef = useRef<string>('')
+  useEffect(() => {
+    if (phone.trim() && mode === 'register' && phone !== phoneInputRef.current) {
+      // Check if user typed country code in the phone field
+      const cleaned = phone.replace(/[\s\-\(\)]/g, '')
+      
+      // If phone starts with country code patterns, extract the number part only
+      if (cleaned.startsWith('+20') || cleaned.startsWith('0020') || (cleaned.startsWith('20') && cleaned.length > 10)) {
+        const extracted = extractCountryCode(cleaned)
+        // Update phone to only contain the mobile number part (country code stays fixed)
+        if (extracted.number && phone !== extracted.number) {
+          phoneInputRef.current = extracted.number
+          setPhone(extracted.number)
+          return
+        }
+      }
+      phoneInputRef.current = phone
+    }
+  }, [phone, mode])
+
+  // Inline phone validation with debouncing
+  useEffect(() => {
+    if (phoneDebounceTimer.current) {
+      clearTimeout(phoneDebounceTimer.current)
+    }
+
+    // Clear error when field is empty (phone is optional)
+    if (!phone.trim()) {
+      setPhoneError('')
+      return
+    }
+
+    phoneDebounceTimer.current = setTimeout(async () => {
+      const trimmedPhone = phone.trim()
+
+      // Validate mobile number format (without country code)
+      if (!validateMobileNumber(trimmedPhone)) {
+        setPhoneError(t('phoneInvalid'))
+        return
+      }
+
+      // Only check for duplicates during registration
+      if (mode === 'register') {
+        setValidatingPhone(true)
+        try {
+          // Normalize phone number with country code for database check
+          const normalizedPhone = normalizePhoneNumber(trimmedPhone, countryCode)
+          
+          // Check if phone already exists
+          const { data: existingUser, error: checkError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('phone', normalizedPhone)
+            .maybeSingle()
+
+          if (checkError && checkError.code !== 'PGRST116') {
+            // Error other than "not found" - don't show error, just log
+            console.error('Error checking phone:', checkError)
+            setPhoneError('')
+          } else if (existingUser) {
+            setPhoneError(t('phoneAlreadyExists'))
+          } else {
+            setPhoneError('')
+          }
+        } catch (err) {
+          console.error('Error validating phone:', err)
+          setPhoneError('')
+        } finally {
+          setValidatingPhone(false)
+        }
+      } else {
+        setPhoneError('')
+      }
+    }, 500) // 500ms debounce
+
+    return () => {
+      if (phoneDebounceTimer.current) {
+        clearTimeout(phoneDebounceTimer.current)
+      }
+    }
+  }, [phone, countryCode, mode, t])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -107,7 +262,22 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
     // Validate email format
     if (!validateEmail(sanitizedEmail, settings)) {
-      setError(t('invalidEmail'))
+      setError(emailError || t('invalidEmail'))
+      setSuccess(false)
+      setLoading(false)
+      return
+    }
+
+    // Check inline validation errors
+    if (mode === 'register' && emailError) {
+      setError(emailError)
+      setSuccess(false)
+      setLoading(false)
+      return
+    }
+
+    if (mode === 'register' && phoneError) {
+      setError(phoneError)
       setSuccess(false)
       setLoading(false)
       return
@@ -123,6 +293,21 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
     // Validate registration fields
       if (mode === 'register') {
+      // Check inline validation errors first
+      if (emailError) {
+        setError(emailError)
+        setSuccess(false)
+        setLoading(false)
+        return
+      }
+
+      if (phoneError) {
+        setError(phoneError)
+        setSuccess(false)
+        setLoading(false)
+        return
+      }
+
       if (!firstName.trim()) {
         setError(t('firstNameRequired'))
         setSuccess(false)
@@ -134,36 +319,6 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         setSuccess(false)
         setLoading(false)
         return
-      }
-
-      // Check if phone number is provided and validate uniqueness
-      if (phone.trim()) {
-        // Validate phone format
-        if (!/^[\+]?[1-9][\d]{0,15}$/.test(phone.trim())) {
-          setError(t('phoneInvalid'))
-          setSuccess(false)
-          setLoading(false)
-          return
-        }
-
-        // Check if phone number already exists
-        const { data: existingUser, error: checkError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('phone', phone.trim())
-          .maybeSingle()
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          // Error other than "not found" - log but continue
-          console.error('Error checking phone uniqueness:', checkError)
-        }
-
-        if (existingUser) {
-          setError(t('phoneAlreadyExists'))
-          setSuccess(false)
-          setLoading(false)
-          return
-        }
       }
 
         if (password !== confirmPassword) {
@@ -232,6 +387,11 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
         // Create user record in users table
         if (data?.user) {
+          // Normalize phone number with country code
+          const normalizedPhone = phone.trim() 
+            ? normalizePhoneNumber(phone.trim(), countryCode)
+            : null
+
           const { error: userError } = await supabase
             .from('users')
             .upsert({
@@ -239,7 +399,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
               email: sanitizedEmail,
               first_name: firstName.trim(),
               last_name: lastName.trim(),
-              phone: phone.trim() || null,
+              phone: normalizedPhone,
               role: 'donor',
               language: localeParam
             }, {
@@ -366,7 +526,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
   // Helper function to get right icon button classes
   const getRightIconButtonClasses = () => {
-    return `absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors`
+    return `absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors z-10 cursor-pointer`
   }
 
   return (
@@ -439,21 +599,71 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             <label htmlFor="phone" className="block text-sm sm:text-base font-semibold text-gray-800 mb-2">
               {t('phone')} <span className="text-gray-500 text-xs sm:text-sm font-normal">({t('optional')})</span>
             </label>
-            <div className="relative">
-              <div className={getIconContainerClasses()}>
-                <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500" />
+            <div className="flex gap-2">
+              {/* Country Code Field - Read Only */}
+              <div className="relative w-28 flex-shrink-0">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+                  <span className="text-gray-500 text-base font-medium">+</span>
+                </div>
+                <input
+                  id="countryCode"
+                  type="text"
+                  value={countryCode.replace('+', '')}
+                  readOnly
+                  disabled
+                  className="w-full pl-7 pr-3 py-3 sm:py-3.5 text-sm sm:text-base border border-gray-300/70 bg-gray-100/80 backdrop-blur-sm rounded-xl shadow-sm cursor-not-allowed opacity-70 transition-all"
+                  placeholder="20"
+                  maxLength={3}
+                  tabIndex={-1}
+                  aria-label="Country code (read-only)"
+                />
               </div>
-              <input
-                id="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                autoComplete="tel"
-                disabled={loading}
-                className={getInputClasses()}
-                placeholder={t('phonePlaceholder')}
-              />
+              {/* Phone Number Field */}
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500" />
+                </div>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    // Only allow digits, remove any non-digit characters
+                    const value = e.target.value.replace(/\D/g, '')
+                    // Remove leading zeros
+                    let cleaned = value.replace(/^0+/, '')
+                    // If user types country code digits (20) at start, remove them
+                    // Only if the number is long enough to be a full number with country code
+                    if (cleaned.startsWith('20') && cleaned.length > 10) {
+                      cleaned = cleaned.substring(2)
+                    }
+                    // Limit to 10 digits (Egyptian mobile number length)
+                    if (cleaned.length > 10) {
+                      cleaned = cleaned.substring(0, 10)
+                    }
+                    phoneInputRef.current = cleaned
+                    setPhone(cleaned)
+                    setPhoneError('') // Clear error when user starts typing
+                  }}
+                  autoComplete="tel"
+                  disabled={loading}
+                  className={`block w-full pl-11 sm:pl-12 ${validatingPhone ? 'pr-12' : 'pr-4'} py-3 sm:py-3.5 text-sm sm:text-base border border-gray-300/70 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#6B8E7E]/50 focus:border-[#6B8E7E] focus:bg-white/80 disabled:bg-gray-100/60 disabled:cursor-not-allowed transition-all placeholder:text-gray-400 ${phoneError ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : ''}`}
+                  placeholder={t('phoneNumberPlaceholder') || '01XX XXX XXXX'}
+                  maxLength={10}
+                />
+                {validatingPhone && (
+                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                  </div>
+                )}
+              </div>
             </div>
+            {phoneError && (
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {phoneError}
+              </p>
+            )}
           </div>
         </>
       )}
@@ -471,17 +681,31 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           id="email"
           type="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value)
+            setEmailError('') // Clear error when user starts typing
+          }}
           required
-            autoComplete="email"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck="false"
-            disabled={isLockedOut || loading}
-            className={getInputClasses()}
+          autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck="false"
+          disabled={isLockedOut || loading}
+          className={`${getInputClasses()} ${emailError ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : ''} ${validatingEmail ? 'pr-12' : ''}`}
           placeholder={t('emailPlaceholder')}
         />
+        {validatingEmail && (
+          <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+          </div>
+        )}
         </div>
+        {emailError && (
+          <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+            <AlertCircle className="h-4 w-4" />
+            {emailError}
+          </p>
+        )}
       </div>
 
       {/* Password field */}
@@ -507,9 +731,15 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         />
           <button
             type="button"
-            onClick={() => setShowPassword(!showPassword)}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setShowPassword(prev => !prev)
+            }}
+            onMouseDown={(e) => e.preventDefault()}
             className={getRightIconButtonClasses()}
             tabIndex={-1}
+            disabled={isLockedOut || loading}
             aria-label={showPassword ? t('hidePassword') : t('showPassword')}
           >
             {showPassword ? (
@@ -574,9 +804,15 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           />
             <button
               type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowConfirmPassword(prev => !prev)
+              }}
+              onMouseDown={(e) => e.preventDefault()}
               className={getRightIconButtonClasses()}
               tabIndex={-1}
+              disabled={loading}
               aria-label={showConfirmPassword ? t('hidePassword') : t('showPassword')}
             >
               {showConfirmPassword ? (
