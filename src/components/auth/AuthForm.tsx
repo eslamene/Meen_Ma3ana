@@ -17,6 +17,7 @@ import {
 import { getAuthSettings, getDefaultAuthSettings, type AuthSettings } from '@/lib/utils/authSettings'
 import { getAppUrl } from '@/lib/utils/app-url'
 import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface AuthFormProps {
   mode: 'login' | 'register'
@@ -156,12 +157,21 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
     try {
       if (mode === 'register') {
+        // Get the app URL for email redirect
+        const appUrl = getAppUrl()
+        const redirectUrl = `${appUrl}/${localeParam}/auth/callback`
+        
+        // Log warning in development if using localhost
+        if (process.env.NODE_ENV === 'development' && appUrl.includes('localhost')) {
+          console.warn('⚠️ Using localhost for email redirect. Set NEXT_PUBLIC_APP_URL in production.')
+        }
+        
         // Sign up with user metadata
         const { data, error } = await supabase.auth.signUp({
           email: sanitizedEmail,
           password,
           options: {
-            emailRedirectTo: `${getAppUrl()}/${localeParam}/auth/callback`,
+            emailRedirectTo: redirectUrl,
             data: {
               first_name: firstName.trim(),
               last_name: lastName.trim(),
@@ -200,6 +210,13 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         }
 
         clearRateLimit(sanitizedEmail)
+        
+        // Show success message with email verification notice
+        toast.success('Account Created', {
+          description: t('signUpSuccess'),
+          duration: 8000
+        })
+        
         onSuccess?.()
       } else {
         // Add artificial delay to prevent timing attacks
