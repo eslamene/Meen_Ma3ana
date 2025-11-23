@@ -85,7 +85,11 @@ export async function GET(
       }
       
       // Regular sign in, redirect to the intended destination
-      return NextResponse.redirect(`${requestUrl.origin}${next}`)
+      // Ensure locale is included in the redirect path
+      const redirectPath = next.startsWith(`/${validLocale}/`) 
+        ? next 
+        : `/${validLocale}${next.startsWith('/') ? next : `/${next}`}`
+      return NextResponse.redirect(`${requestUrl.origin}${redirectPath}`)
     }
   }
 
