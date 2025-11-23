@@ -327,41 +327,26 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
   if (mode === 'register' && success) {
     return (
       <div className="space-y-6">
-        <div className="bg-green-50/90 backdrop-blur-sm border-2 border-green-200 rounded-2xl p-6 sm:p-8 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-green-100 rounded-full p-3">
-              <CheckCircle2 className="h-12 w-12 text-green-600" />
+        <div className="bg-green-50/90 backdrop-blur-sm border-2 border-green-200 rounded-2xl p-8 sm:p-10 text-center">
+          <div className="flex justify-center mb-6">
+            <div className="bg-green-100 rounded-full p-4">
+              <CheckCircle2 className="h-16 w-16 text-green-600" />
             </div>
           </div>
-          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
             {t('accountCreated') || 'Account Created'}
           </h3>
-          <p className="text-sm sm:text-base text-gray-700 mb-2">
-            {t('signUpSuccess')}
+          <p className="text-base sm:text-lg text-gray-700 mb-8">
+            {t('signUpSuccessSimple') || 'Please check your email to verify your account.'}
           </p>
-          {successEmail && (
-            <p className="text-sm text-gray-600 mb-6">
-              {t('checkEmailForVerification') || 'Please check your email inbox for'} <strong>{successEmail}</strong> {t('toVerifyAccount') || 'to verify your account.'}
-            </p>
-          )}
-          <div className="bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-xl p-4 mt-4">
-            <p className="text-xs sm:text-sm text-blue-800">
-              <strong>{t('nextSteps') || 'Next Steps:'}</strong>
-            </p>
-            <ul className="text-xs sm:text-sm text-blue-700 mt-2 space-y-1 text-left list-disc list-inside">
-              <li>{t('checkEmailInbox') || 'Check your email inbox (and spam folder)'}</li>
-              <li>{t('clickVerificationLink') || 'Click the verification link in the email'}</li>
-              <li>{t('returnToLogin') || 'Return here to sign in once verified'}</li>
-            </ul>
+          <div className="text-center">
+            <Link 
+              href={`/${localeParam}/auth/login`}
+              className="inline-flex items-center justify-center px-6 py-3 bg-[#6B8E7E] text-white font-semibold rounded-xl hover:bg-[#5a7a6b] transition-colors shadow-lg"
+            >
+              {t('goToLogin') || 'Go to Login'} <ArrowRight className="ml-2 h-5 w-5" />
+            </Link>
           </div>
-        </div>
-        <div className="text-center">
-          <Link 
-            href={`/${localeParam}/auth/login`}
-            className="inline-flex items-center text-sm sm:text-base font-semibold text-[#6B8E7E] hover:text-[#5a7a6b] transition-colors"
-          >
-            {t('goToLogin') || 'Go to Login'} <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
         </div>
       </div>
     )

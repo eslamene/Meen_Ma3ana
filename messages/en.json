@@ -433,6 +433,7 @@
     "signUp": "Sign Up",
     "signUpForAccount": "Create a new account",
     "signUpSuccess": "Account created successfully. Please check your email to verify your account.",
+    "signUpSuccessSimple": "Please check your email to verify your account.",
     "accountCreated": "Account Created",
     "checkEmailForVerification": "Please check your email inbox for",
     "toVerifyAccount": "to verify your account.",

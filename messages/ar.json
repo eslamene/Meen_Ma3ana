@@ -258,6 +258,7 @@
     "signUp": "إنشاء حساب",
     "signUpForAccount": "إنشاء حساب جديد",
     "signUpSuccess": "تم إنشاء الحساب بنجاح. يرجى التحقق من بريدك الإلكتروني لتأكيد حسابك.",
+    "signUpSuccessSimple": "يرجى التحقق من بريدك الإلكتروني لتأكيد حسابك.",
     "accountCreated": "تم إنشاء الحساب",
     "checkEmailForVerification": "يرجى التحقق من صندوق الوارد في بريدك الإلكتروني لـ",
     "toVerifyAccount": "للتحقق من حسابك.",
