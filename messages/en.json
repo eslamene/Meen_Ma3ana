@@ -498,7 +498,21 @@
     "signInWithGoogle": "Continue with Google",
     "signInWithApple": "Continue with Apple",
     "signInWithFacebook": "Continue with Facebook",
-    "socialSignInError": "Error signing in with social provider. Please try again."
+    "socialSignInError": "Error signing in with social provider. Please try again.",
+    "verifyEmailTitle": "Verify Your Email",
+    "verifyEmailDescription": "Please verify your email address to continue",
+    "verifyEmailInstructions": "We sent a verification email to:",
+    "checkSpamFolder": "Check your spam folder",
+    "spamFolderMessage": "If you don't see the email, check your spam or junk folder.",
+    "resendVerificationEmail": "Resend Verification Email",
+    "checkVerificationStatus": "Check Verification Status",
+    "emailVerified": "Email Verified!",
+    "emailVerifiedMessage": "Your email has been successfully verified. Redirecting to dashboard...",
+    "sending": "Sending...",
+    "emailSent": "Email Sent!",
+    "checking": "Checking...",
+    "backToLogin": "Back to Login",
+    "loading": "Loading..."
   },
   "cases": {
     "addUpdate": "Add Update",

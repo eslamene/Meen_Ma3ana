@@ -17,9 +17,18 @@ export async function GET(
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error) {
+    if (!error && data?.user) {
+      // If this is an email confirmation (not password reset), sync email_verified
+      if (type !== 'recovery' && data.user.email_confirmed_at) {
+        // Sync email_verified in users table when email is confirmed
+        await supabase
+          .from('users')
+          .update({ email_verified: true })
+          .eq('id', data.user.id)
+      }
+
       // Check if this is a password reset flow by checking the 'type' parameter
       // Supabase includes type=recovery in password reset links
       if (type === 'recovery') {

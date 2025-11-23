@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
-import { Loader2, User, Mail, Phone, MapPin, Globe } from 'lucide-react'
+import { Loader2, User, Mail, Phone, MapPin, Globe, Trash2, AlertTriangle } from 'lucide-react'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 
 interface UserProfile {
   id: string
@@ -33,6 +34,8 @@ interface UserProfileEditModalProps {
 export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserProfileEditModalProps) {
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [user, setUser] = useState<UserProfile | null>(null)
   const [formData, setFormData] = useState({
     first_name: '',
@@ -111,8 +114,8 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
           phone: formData.phone.trim() || null,
           address: formData.address.trim() || null,
           language: formData.language,
-          is_active: formData.is_active,
-          email_verified: formData.email_verified
+          is_active: formData.is_active
+          // email_verified is read-only and synced from auth.users.email_confirmed_at
         })
       })
 
@@ -134,6 +137,38 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!userId || deleting) return
+
+    try {
+      setDeleting(true)
+
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || error.error || 'Failed to delete user')
+      }
+
+      toast.success('Success', {
+        description: 'User deleted successfully'
+      })
+
+      setShowDeleteDialog(false)
+      onSuccess()
+      onClose()
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      toast.error('Error', {
+        description: error instanceof Error ? error.message : 'Failed to delete user',
+      })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -266,6 +301,8 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                   id="email_verified"
                   checked={formData.email_verified}
                   onCheckedChange={(checked) => setFormData({ ...formData, email_verified: checked })}
+                  disabled
+                  className="opacity-50 cursor-not-allowed"
                 />
               </div>
             </div>
@@ -276,21 +313,69 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                 <p className="text-sm text-muted-foreground">
                   Total Contributions: <span className="font-medium">{user.contribution_count}</span>
                 </p>
+                {user.contribution_count > 0 && (
+                  <div className="mt-2 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-800">
+                      This user has contributions and cannot be deleted.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
-              </Button>
+            <DialogFooter className="flex justify-between items-center">
+              <div>
+                {(!user.contribution_count || user.contribution_count === 0) && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                    disabled={loading || deleting}
+                    className="mr-auto"
+                  >
+                    {deleting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete User
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={onClose} disabled={loading || deleting}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading || deleting}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         ) : null}
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleDelete}
+        title="Delete User"
+        description={`Are you sure you want to delete ${user?.email}? This action cannot be undone. The user account will be permanently removed from the system.${user && (!user.contribution_count || user.contribution_count === 0) ? ' This user has no contributions and can be safely deleted.' : ''}`}
+        confirmText={deleting ? 'Deleting...' : 'Delete User'}
+        cancelText="Cancel"
+        variant="destructive"
+        icon={<AlertTriangle className="h-5 w-5 text-destructive" />}
+        disabled={deleting}
+        autoClose={false}
+      />
     </Dialog>
   )
 }

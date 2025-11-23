@@ -99,6 +99,9 @@ export async function GET(
       } : null
     }).filter(Boolean)
 
+    // Use email_confirmed_at from auth.users as source of truth for email_verified
+    const emailVerified = authUser.user.email_confirmed_at !== null
+
     return NextResponse.json({
       success: true,
       user: {
@@ -118,7 +121,7 @@ export async function GET(
         role: profile?.role || 'donor',
         language: profile?.language || 'ar',
         is_active: profile?.is_active ?? true,
-        email_verified: profile?.email_verified ?? false,
+        email_verified: emailVerified, // Use auth.users.email_confirmed_at as source of truth
         // Additional data
         roles,
         contribution_count: contributionCount || 0
@@ -202,7 +205,8 @@ export async function PUT(
     if (body.address !== undefined) profileUpdates.address = body.address || null
     if (body.language !== undefined) profileUpdates.language = body.language
     if (body.is_active !== undefined) profileUpdates.is_active = body.is_active
-    if (body.email_verified !== undefined) profileUpdates.email_verified = body.email_verified
+    // email_verified is read-only and synced from auth.users.email_confirmed_at
+    // Do not allow manual updates to email_verified field
 
     // Update profile in users table
     const { data: updatedProfile, error: profileError } = await supabase
@@ -250,6 +254,133 @@ export async function PUT(
     logger.logStableError('INTERNAL_SERVER_ERROR', 'User update API error:', error)
     return NextResponse.json({
       error: 'Failed to update user',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
+/**
+ * DELETE /api/admin/users/[userId]
+ * Delete user (only if they have no contributions)
+ */
+export async function DELETE(
+  request: NextRequest,
+  context: RouteContext<{ userId: string }>
+) {
+  const correlationId = getCorrelationId(request)
+  const logger = new Logger(correlationId)
+
+  try {
+    const { userId } = await context.params
+    
+    // Require admin permission
+    const authResult = await requireAdminPermission(request)
+    if (authResult instanceof NextResponse) {
+      return authResult
+    }
+
+    const { user: adminUser, supabase } = authResult
+
+    // Create service role client for admin operations
+    const serviceRoleClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+
+    // Verify user exists
+    const { data: authUser, error: authError } = await serviceRoleClient.auth.admin.getUserById(userId)
+    
+    if (authError || !authUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    // Check for contributions - user cannot be deleted if they have any contributions
+    const { count: contributionCount } = await supabase
+      .from('contributions')
+      .select('*', { count: 'exact', head: true })
+      .eq('donor_id', userId)
+
+    if (contributionCount && contributionCount > 0) {
+      return NextResponse.json(
+        { 
+          error: 'Cannot delete user with contributions',
+          message: `User has ${contributionCount} contribution(s). Users with contributions cannot be deleted.`
+        },
+        { status: 400 }
+      )
+    }
+
+    // Check for recurring contributions
+    const { count: recurringContributionCount } = await supabase
+      .from('recurring_contributions')
+      .select('*', { count: 'exact', head: true })
+      .eq('donor_id', userId)
+
+    if (recurringContributionCount && recurringContributionCount > 0) {
+      return NextResponse.json(
+        { 
+          error: 'Cannot delete user with recurring contributions',
+          message: `User has ${recurringContributionCount} recurring contribution(s). Users with recurring contributions cannot be deleted.`
+        },
+        { status: 400 }
+      )
+    }
+
+    // Log the admin action before deletion
+    const { ipAddress, userAgent } = extractRequestInfo(request)
+    await AuditService.logAdminAction(
+      adminUser.id,
+      'admin_user_delete',
+      'user',
+      userId,
+      { 
+        deleted_user_email: authUser.user.email,
+        deleted_user_id: userId
+      },
+      ipAddress,
+      userAgent
+    )
+
+    // Delete from users table first (if exists)
+    const { error: profileDeleteError } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId)
+
+    if (profileDeleteError) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting user profile:', profileDeleteError)
+      // Continue with auth deletion even if profile deletion fails
+    }
+
+    // Delete from auth.users
+    const { error: authDeleteError } = await serviceRoleClient.auth.admin.deleteUser(userId)
+
+    if (authDeleteError) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting auth user:', authDeleteError)
+      return NextResponse.json(
+        { error: 'Failed to delete user', details: authDeleteError.message },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'User deleted successfully'
+    })
+
+  } catch (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'User delete API error:', error)
+    return NextResponse.json({
+      error: 'Failed to delete user',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

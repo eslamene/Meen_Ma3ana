@@ -323,7 +323,21 @@
     "signInWithGoogle": "المتابعة مع جوجل",
     "signInWithApple": "المتابعة مع أبل",
     "signInWithFacebook": "المتابعة مع فيسبوك",
-    "socialSignInError": "خطأ في تسجيل الدخول باستخدام مزود التواصل الاجتماعي. يرجى المحاولة مرة أخرى."
+    "socialSignInError": "خطأ في تسجيل الدخول باستخدام مزود التواصل الاجتماعي. يرجى المحاولة مرة أخرى.",
+    "verifyEmailTitle": "تحقق من بريدك الإلكتروني",
+    "verifyEmailDescription": "يرجى التحقق من عنوان بريدك الإلكتروني للمتابعة",
+    "verifyEmailInstructions": "أرسلنا بريداً إلكترونياً للتحقق إلى:",
+    "checkSpamFolder": "تحقق من مجلد الرسائل غير المرغوب فيها",
+    "spamFolderMessage": "إذا لم تر البريد الإلكتروني، تحقق من مجلد الرسائل غير المرغوب فيها أو البريد المزعج.",
+    "resendVerificationEmail": "إعادة إرسال بريد التحقق",
+    "checkVerificationStatus": "التحقق من حالة التحقق",
+    "emailVerified": "تم التحقق من البريد الإلكتروني!",
+    "emailVerifiedMessage": "تم التحقق من بريدك الإلكتروني بنجاح. جاري إعادة التوجيه إلى لوحة التحكم...",
+    "sending": "جاري الإرسال...",
+    "emailSent": "تم إرسال البريد!",
+    "checking": "جاري التحقق...",
+    "backToLogin": "العودة إلى تسجيل الدخول",
+    "loading": "جاري التحميل..."
   },
   "beneficiaries": {
     "active": "نشط",
