@@ -361,6 +361,12 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         const appUrl = getAppUrl()
         const redirectUrl = `${appUrl}/${localeParam}/auth/callback`
         
+        // Log the URL being used for debugging
+        console.log('📧 Email redirect URL:', redirectUrl)
+        console.log('📧 App URL:', appUrl)
+        console.log('📧 Environment:', process.env.NODE_ENV)
+        console.log('📧 NEXT_PUBLIC_APP_URL:', process.env.NEXT_PUBLIC_APP_URL)
+        
         // Log warning in development if using localhost
         if (process.env.NODE_ENV === 'development' && appUrl.includes('localhost')) {
           console.warn('⚠️ Using localhost for email redirect. Set NEXT_PUBLIC_APP_URL in production.')
@@ -495,9 +501,19 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       setResendSuccess(false)
       setError('')
 
+      // Get the app URL for email redirect (same as registration)
+      const appUrl = getAppUrl()
+      const redirectUrl = `${appUrl}/${localeParam}/auth/callback`
+      
+      console.log('📧 Resend - Email redirect URL:', redirectUrl)
+      console.log('📧 Resend - App URL:', appUrl)
+
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
-        email: successEmail
+        email: successEmail,
+        options: {
+          emailRedirectTo: redirectUrl
+        }
       })
 
       if (resendError) {
