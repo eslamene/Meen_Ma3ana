@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import {
   validatePasswordStrength,
   validatePasswordLength,
@@ -16,7 +17,7 @@ import {
 } from '@/lib/security/auth-utils'
 import { getAuthSettings, getDefaultAuthSettings, type AuthSettings } from '@/lib/utils/authSettings'
 import { getAppUrl } from '@/lib/utils/app-url'
-import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface AuthFormProps {
@@ -44,6 +45,8 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
     lockoutUntil: number | null
   } | null>(null)
   const [authSettings, setAuthSettings] = useState<AuthSettings | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [successEmail, setSuccessEmail] = useState('')
   
   // Honeypot field for bot protection
   const honeypotRef = useRef<HTMLInputElement>(null)
@@ -105,6 +108,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
     // Validate email format
     if (!validateEmail(sanitizedEmail, settings)) {
       setError(t('invalidEmail'))
+      setSuccess(false)
       setLoading(false)
       return
     }
@@ -112,6 +116,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
     // Validate password length for both login and registration
     if (!validatePasswordLength(password, settings)) {
       setError(t('passwordMinLength'))
+      setSuccess(false)
       setLoading(false)
       return
     }
@@ -120,16 +125,19 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       if (mode === 'register') {
       if (!firstName.trim()) {
         setError(t('firstNameRequired'))
+        setSuccess(false)
         setLoading(false)
         return
       }
       if (!lastName.trim()) {
         setError(t('lastNameRequired'))
+        setSuccess(false)
         setLoading(false)
         return
       }
         if (password !== confirmPassword) {
           setError(t('passwordsDoNotMatch'))
+          setSuccess(false)
         setLoading(false)
         return
       }
@@ -137,6 +145,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       const passwordValidation = validatePasswordStrength(password, settings)
       if (!passwordValidation.isValid) {
         setError(t('passwordWeak'))
+        setSuccess(false)
         setLoading(false)
         return
       }
@@ -150,6 +159,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           ? Math.ceil((rateLimit.lockoutUntil - Date.now()) / 60000)
           : 15
         setError(t('authErrorAccountLocked', { minutes: lockoutMinutes }))
+        setSuccess(false)
         setLoading(false)
         return
       }
@@ -183,7 +193,9 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         if (error) {
           const sanitizedError = sanitizeAuthError(error)
           setError(t(sanitizedError))
+          setSuccess(false)
           onError?.(t(sanitizedError))
+          setLoading(false)
           return
         }
 
@@ -211,10 +223,15 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
         clearRateLimit(sanitizedEmail)
         
-        // Show success message with email verification notice
+        // Set success state to replace form with success message
+        setSuccess(true)
+        setSuccessEmail(sanitizedEmail)
+        setError('')
+        
+        // Show toast notification
         toast.success('Account Created', {
           description: t('signUpSuccess'),
-          duration: 8000
+          duration: 5000
         })
         
         onSuccess?.()
@@ -251,6 +268,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
     } catch (error) {
       const sanitizedError = sanitizeAuthError(error)
       setError(t(sanitizedError))
+      setSuccess(false) // Ensure success is cleared on error
       onError?.(t(sanitizedError))
       
       if (mode === 'login') {
@@ -264,6 +282,50 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
   }
 
   const isLockedOut = rateLimitState ? !rateLimitState.allowed : false
+
+  // Show success message instead of form for registration
+  if (mode === 'register' && success) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-green-50/90 backdrop-blur-sm border-2 border-green-200 rounded-2xl p-6 sm:p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="bg-green-100 rounded-full p-3">
+              <CheckCircle2 className="h-12 w-12 text-green-600" />
+            </div>
+          </div>
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
+            {t('accountCreated') || 'Account Created'}
+          </h3>
+          <p className="text-sm sm:text-base text-gray-700 mb-2">
+            {t('signUpSuccess')}
+          </p>
+          {successEmail && (
+            <p className="text-sm text-gray-600 mb-6">
+              {t('checkEmailForVerification') || 'Please check your email inbox for'} <strong>{successEmail}</strong> {t('toVerifyAccount') || 'to verify your account.'}
+            </p>
+          )}
+          <div className="bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-xl p-4 mt-4">
+            <p className="text-xs sm:text-sm text-blue-800">
+              <strong>{t('nextSteps') || 'Next Steps:'}</strong>
+            </p>
+            <ul className="text-xs sm:text-sm text-blue-700 mt-2 space-y-1 text-left list-disc list-inside">
+              <li>{t('checkEmailInbox') || 'Check your email inbox (and spam folder)'}</li>
+              <li>{t('clickVerificationLink') || 'Click the verification link in the email'}</li>
+              <li>{t('returnToLogin') || 'Return here to sign in once verified'}</li>
+            </ul>
+          </div>
+        </div>
+        <div className="text-center">
+          <Link 
+            href={`/${localeParam}/auth/login`}
+            className="inline-flex items-center text-sm sm:text-base font-semibold text-[#6B8E7E] hover:text-[#5a7a6b] transition-colors"
+          >
+            {t('goToLogin') || 'Go to Login'} <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   // Helper function to get input classes
   const getInputClasses = (hasRightIcon = false) => {
