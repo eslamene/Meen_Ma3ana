@@ -54,24 +54,31 @@ export async function GET(
   if (code) {
     const supabase = await createClient()
     
-    // Log the code exchange attempt
-    console.log('Attempting to exchange code for session:', {
+    // Log the code exchange attempt with full context
+    console.log('🔐 Attempting to exchange code for session:', {
       hasCode: !!code,
       codeLength: code?.length,
+      codePrefix: code?.substring(0, 10) + '...', // First 10 chars for debugging
       type,
-      redirectUrl: requestUrl.toString()
+      redirectUrl: requestUrl.toString(),
+      origin: requestUrl.origin,
+      pathname: requestUrl.pathname,
+      searchParams: Object.fromEntries(requestUrl.searchParams.entries()),
+      hash: requestUrl.hash || '(none)'
     })
     
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (error) {
       // Log detailed error information
-      console.error('Email confirmation error:', {
+      console.error('❌ Email confirmation error:', {
         message: error.message,
         status: error.status,
         name: error.name,
         code: error.code,
-        fullError: JSON.stringify(error, null, 2)
+        fullError: JSON.stringify(error, null, 2),
+        timestamp: new Date().toISOString(),
+        requestUrl: requestUrl.toString()
       })
       
       // Handle specific error cases
@@ -91,29 +98,44 @@ export async function GET(
     }
     
     if (data?.user) {
+      console.log('✅ Code exchange successful:', {
+        userId: data.user.id,
+        email: data.user.email,
+        emailConfirmedAt: data.user.email_confirmed_at,
+        type
+      })
+      
       // If this is an email confirmation (not password reset), sync email_verified
       if (type !== 'recovery' && data.user.email_confirmed_at) {
         // Ensure user exists in users table, then sync email_verified
         // Use upsert to handle case where user record doesn't exist yet
-        const { error: userError } = await supabase
-          .from('users')
-          .upsert(
-            {
-              id: data.user.id,
-              email: data.user.email || `${data.user.id}@placeholder.local`,
-              email_verified: true,
-              role: 'donor'
-            },
-            {
-              onConflict: 'id',
-              ignoreDuplicates: false
-            }
-          )
-        
-        if (userError) {
-          console.error('Error syncing email_verified:', userError)
-          // Don't fail the confirmation if this update fails - the trigger should handle it
-          // But log it for debugging
+        // Wrap in try-catch to prevent callback failure if this update fails
+        try {
+          const { error: userError } = await supabase
+            .from('users')
+            .upsert(
+              {
+                id: data.user.id,
+                email: data.user.email || `${data.user.id}@placeholder.local`,
+                email_verified: true,
+                role: 'donor'
+              },
+              {
+                onConflict: 'id',
+                ignoreDuplicates: false
+              }
+            )
+          
+          if (userError) {
+            console.error('Error syncing email_verified:', userError)
+            // Don't fail the confirmation if this update fails - the trigger should handle it
+            // But log it for debugging
+            // Continue with redirect even if this fails
+          }
+        } catch (upsertError) {
+          // Catch any unexpected errors during upsert
+          console.error('Unexpected error during user upsert:', upsertError)
+          // Continue with redirect - don't fail the email confirmation
         }
       }
 

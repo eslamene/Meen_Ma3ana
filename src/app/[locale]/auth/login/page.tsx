@@ -173,7 +173,7 @@ export default function LoginPage() {
                   </div>
                 </div>
               )}
-
+        
               {/* Form */}
               <div className="space-y-5 sm:space-y-6">
           <AuthForm mode="login" />

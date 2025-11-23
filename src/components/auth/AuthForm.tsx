@@ -53,6 +53,8 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
   const [successEmail, setSuccessEmail] = useState('')
   const [resending, setResending] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
+  const [showResendVerification, setShowResendVerification] = useState(false)
+  const [unverifiedEmail, setUnverifiedEmail] = useState('')
   
   // Inline validation errors
   const [emailError, setEmailError] = useState('')
@@ -387,6 +389,75 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         })
 
         if (error) {
+          // Check if error is due to email already existing
+          const isEmailExistsError = error.message?.toLowerCase().includes('already registered') ||
+            error.message?.toLowerCase().includes('user already registered') ||
+            error.message?.toLowerCase().includes('email already exists') ||
+            error.message?.toLowerCase().includes('already been registered') ||
+            error.message?.toLowerCase().includes('user already exists')
+          
+          if (isEmailExistsError) {
+            // Check if user exists and is unverified
+            try {
+              // Try to get the user from auth (we can't directly query auth.users, so we'll try to resend)
+              // If resend works, user exists but is unverified
+              const { error: resendError } = await supabase.auth.resend({
+                type: 'signup',
+                email: sanitizedEmail,
+                options: {
+                  emailRedirectTo: redirectUrl
+                }
+              })
+              
+              if (!resendError) {
+                // User exists but is unverified - resend was successful
+                setSuccess(true)
+                setSuccessEmail(sanitizedEmail)
+                setError('')
+                toast.success(t('verificationEmailResent') || 'Verification email sent!', {
+                  description: t('emailExistsUnverified') || 'This email is already registered but not verified. We\'ve sent a new verification email.',
+                  duration: 7000
+                })
+                onSuccess?.()
+                setLoading(false)
+                return
+              } else {
+                // Resend failed - user might be verified or there's another issue
+                // Check if it's a rate limit error
+                if (resendError.message?.includes('For security purposes, you can only request this after')) {
+                  const waitMatch = resendError.message.match(/(\d+)\s+seconds?/i)
+                  const waitSeconds = waitMatch ? parseInt(waitMatch[1], 10) : 30
+                  const waitMinutes = Math.ceil(waitSeconds / 60)
+                  
+                  const rateLimitMessage = waitMinutes > 1
+                    ? t('resendRateLimitMinutes', { minutes: waitMinutes }) || `Please wait ${waitMinutes} minutes before requesting another verification email.`
+                    : t('resendRateLimitSeconds', { seconds: waitSeconds }) || `Please wait ${waitSeconds} seconds before requesting another verification email.`
+                  
+                  setError(rateLimitMessage)
+                  toast.error(t('resendRateLimit') || 'Please wait before resending', {
+                    description: rateLimitMessage,
+                    duration: 7000
+                  })
+                  setLoading(false)
+                  return
+                }
+                
+                // User might be verified - suggest login instead
+                setError(t('emailExistsVerified') || 'This email is already registered and verified. Please sign in instead.')
+                toast.error(t('emailExistsVerified') || 'Email already verified', {
+                  description: t('pleaseSignIn') || 'Please sign in with your existing account.',
+                  duration: 5000
+                })
+                setLoading(false)
+                return
+              }
+            } catch (resendErr) {
+              // If resend fails, fall through to show generic error
+              console.error('Error checking/resending verification:', resendErr)
+            }
+          }
+          
+          // For other errors, show the sanitized error message
           const sanitizedError = sanitizeAuthError(error, true) // true = isRegistration
           setError(t(sanitizedError))
           setSuccess(false)
@@ -466,6 +537,25 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           const rateLimit = checkRateLimit(sanitizedEmail)
           setRateLimitState(rateLimit)
           
+          // Check if error is due to unverified email
+          const isUnverifiedError = error.message?.toLowerCase().includes('email not confirmed') ||
+            error.message?.toLowerCase().includes('email not verified') ||
+            error.message?.toLowerCase().includes('confirm your email')
+          
+          if (isUnverifiedError) {
+            // Show resend verification option
+            setShowResendVerification(true)
+            setUnverifiedEmail(sanitizedEmail)
+            setError(t('emailNotVerified') || 'Your email address has not been verified. Please check your email for a verification link.')
+            onError?.(t('emailNotVerified') || 'Email not verified')
+            // Clear resend success state when showing new error
+            setResendSuccess(false)
+            return
+          } else {
+            // Hide resend option for other errors
+            setShowResendVerification(false)
+          }
+          
           const sanitizedError = sanitizeAuthError(error)
           setError(t(sanitizedError))
           onError?.(t(sanitizedError))
@@ -493,8 +583,9 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
   const isLockedOut = rateLimitState ? !rateLimitState.allowed : false
 
-  const handleResendVerification = async () => {
-    if (!successEmail) return
+  const handleResendVerification = async (emailToResend?: string) => {
+    const email = emailToResend || successEmail
+    if (!email) return
 
     try {
       setResending(true)
@@ -510,7 +601,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
-        email: successEmail,
+        email: email,
         options: {
           emailRedirectTo: redirectUrl
         }
@@ -539,6 +630,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       }
 
       setResendSuccess(true)
+      setShowResendVerification(false) // Hide the resend option after successful send
       toast.success(t('verificationEmailSent') || 'Verification email sent!', {
         description: t('checkEmailInbox') || 'Please check your email inbox.',
         duration: 5000
@@ -803,6 +895,11 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           onChange={(e) => {
             setEmail(e.target.value)
             setEmailError('') // Clear error when user starts typing
+            // Clear resend verification state when email changes
+            if (mode === 'login') {
+              setShowResendVerification(false)
+              setResendSuccess(false)
+            }
           }}
           required
           autoComplete="email"
@@ -1013,9 +1110,48 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
       {/* Error message */}
       {error && (
-        <div className="text-red-700 text-sm sm:text-base bg-red-50/80 backdrop-blur-sm p-3.5 sm:p-4 rounded-xl border border-red-200/70 flex items-start" role="alert">
-          <span className="mr-2 mt-0.5">⚠</span>
-          <span>{error}</span>
+        <div className="space-y-3">
+          <div className="text-red-700 text-sm sm:text-base bg-red-50/80 backdrop-blur-sm p-3.5 sm:p-4 rounded-xl border border-red-200/70 flex items-start" role="alert">
+            <span className="mr-2 mt-0.5">⚠</span>
+            <span className="flex-1">{error}</span>
+          </div>
+          
+          {/* Resend verification button for unverified users (login mode only) */}
+          {mode === 'login' && showResendVerification && unverifiedEmail && (
+            <div className="bg-blue-50/80 backdrop-blur-sm p-3.5 sm:p-4 rounded-xl border border-blue-200/70">
+              <p className="text-sm sm:text-base text-blue-800 mb-3">
+                {t('resendVerificationPrompt') || 'Need a new verification email?'}
+              </p>
+              <button
+                type="button"
+                onClick={() => handleResendVerification(unverifiedEmail)}
+                disabled={resending || resendSuccess}
+                className="w-full inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+              >
+                {resending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('sending') || 'Sending...'}
+                  </>
+                ) : resendSuccess ? (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {t('emailSent') || 'Email Sent!'}
+                  </>
+                ) : (
+                  <>
+                    <Mail className="mr-2 h-4 w-4" />
+                    {t('resendVerificationEmail') || 'Resend Verification Email'}
+                  </>
+                )}
+              </button>
+              {resendSuccess && (
+                <p className="mt-2 text-xs sm:text-sm text-blue-700">
+                  {t('checkEmailInbox') || 'Please check your email inbox for the verification link.'}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
