@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { theme, brandColors } from '@/lib/theme'
 import { 
@@ -27,7 +28,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Shield
+  Shield,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
 
 // Types
@@ -80,6 +83,8 @@ export default function AdminUsersPage() {
   const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string; description: string; is_system: boolean }>>([])
   const [userCurrentRoles, setUserCurrentRoles] = useState<string[]>([])
   const [loadingUserRoles, setLoadingUserRoles] = useState(false)
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId: string | null; userEmail: string | null }>({ open: false, userId: null, userEmail: null })
+  const [deleting, setDeleting] = useState(false)
   const { user: currentUser } = useAdmin()
 
   // Fetch users with pagination, search, and filtering
@@ -211,6 +216,38 @@ export default function AdminUsersPage() {
   useEffect(() => {
     fetchRoles()
   }, [fetchRoles])
+
+  // Handle user deletion
+  const handleDeleteUser = async () => {
+    if (!deleteDialog.userId || deleting) return
+
+    try {
+      setDeleting(true)
+
+      const response = await fetch(`/api/admin/users/${deleteDialog.userId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || error.error || 'Failed to delete user')
+      }
+
+      toast.success('Success', {
+        description: 'User deleted successfully'
+      })
+
+      setDeleteDialog({ open: false, userId: null, userEmail: null })
+      await fetchUsers()
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      toast.error('Error', {
+        description: error instanceof Error ? error.message : 'Failed to delete user',
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const handlePageChange = (newPage: number) => {
     setPagination(prev => ({ ...prev, page: newPage }))
@@ -383,6 +420,15 @@ export default function AdminUsersPage() {
                         >
                           <GitMerge className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeleteDialog({ open: true, userId: user.id, userEmail: user.email })}
+                          title="Delete User"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -495,6 +541,48 @@ export default function AdminUsersPage() {
             }}
           />
         )}
+
+        {/* Delete User Confirmation Dialog */}
+        <Dialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, userId: null, userEmail: null })}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Delete User
+              </DialogTitle>
+              <DialogDescription>
+                <div className="space-y-2">
+                  <p>
+                    Are you sure you want to delete <strong>{deleteDialog.userEmail}</strong>?
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    This action will permanently delete the user account. Users can only be deleted if they have no related activities (contributions, cases, projects, messages, etc.).
+                  </p>
+                  <p className="text-sm font-medium text-red-600 mt-2">
+                    This action cannot be undone!
+                  </p>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialog({ open: false, userId: null, userEmail: null })}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteUser}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deleting ? 'Deleting...' : 'Delete User'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         </Container>
       </div>
     </PermissionGuard>

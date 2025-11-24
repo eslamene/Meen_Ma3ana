@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { locales, defaultLocale } from '@/i18n/request'
+import { adminService } from '@/lib/admin/service'
+import { defaultLogger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
@@ -161,7 +163,7 @@ export async function GET(
         type
       })
       
-      // If this is an email confirmation (not password reset), sync email_verified
+      // If this is an email confirmation (not password reset), sync email_verified and assign donor role
       if (type !== 'recovery' && data.user.email_confirmed_at) {
         // Ensure user exists in users table, then sync email_verified
         // Use upsert to handle case where user record doesn't exist yet
@@ -184,9 +186,31 @@ export async function GET(
           
           if (userError) {
             console.error('Error syncing email_verified:', userError)
-            // Don't fail the confirmation if this update fails - the trigger should handle it
+            // Don't fail the confirmation if this update fails
             // But log it for debugging
-            // Continue with redirect even if this fails
+          } else {
+            // User record created/updated successfully, now assign donor role
+            try {
+              // Get donor role ID
+              const donorRole = await adminService.getRoleByName('donor')
+              if (donorRole) {
+                const roleAssigned = await adminService.assignRoleToUser(
+                  data.user.id,
+                  donorRole.id,
+                  data.user.id // assigned by themselves (system)
+                )
+                if (roleAssigned) {
+                  console.log('✅ Donor role assigned to user:', data.user.id)
+                } else {
+                  defaultLogger.warn('Failed to assign donor role to user:', data.user.id)
+                }
+              } else {
+                defaultLogger.warn('Donor role not found - cannot assign role to user:', data.user.id)
+              }
+            } catch (roleError) {
+              // Log but don't fail - role assignment is important but shouldn't block verification
+              defaultLogger.error('Error assigning donor role:', roleError)
+            }
           }
         } catch (upsertError) {
           // Catch any unexpected errors during upsert

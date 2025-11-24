@@ -290,7 +290,8 @@ export async function PUT(
 
 /**
  * DELETE /api/admin/users/[userId]
- * Delete user (only if they have no contributions)
+ * Delete user (only if they have no related activities)
+ * Checks all tables that reference the user to prevent deletion if any activities exist
  */
 export async function DELETE(
   request: NextRequest,
@@ -332,33 +333,99 @@ export async function DELETE(
       )
     }
 
-    // Check for contributions - user cannot be deleted if they have any contributions
-    const { count: contributionCount } = await supabase
-      .from('contributions')
-      .select('*', { count: 'exact', head: true })
-      .eq('donor_id', userId)
+    // Comprehensive check for all user-related activities
+    // This ensures we don't delete users who have any historical or future activities
+    const activityChecks = await Promise.all([
+      // Contributions
+      supabase.from('contributions').select('*', { count: 'exact', head: true }).eq('donor_id', userId),
+      // Recurring contributions
+      supabase.from('recurring_contributions').select('*', { count: 'exact', head: true }).eq('donor_id', userId),
+      // Cases - created by
+      supabase.from('cases').select('*', { count: 'exact', head: true }).eq('created_by', userId),
+      // Cases - assigned to
+      supabase.from('cases').select('*', { count: 'exact', head: true }).eq('assigned_to', userId),
+      // Cases - sponsored by
+      supabase.from('cases').select('*', { count: 'exact', head: true }).eq('sponsored_by', userId),
+      // Case updates
+      supabase.from('case_updates').select('*', { count: 'exact', head: true }).eq('created_by', userId),
+      // Case status history
+      supabase.from('case_status_history').select('*', { count: 'exact', head: true }).eq('changed_by', userId),
+      // Projects - created by
+      supabase.from('projects').select('*', { count: 'exact', head: true }).eq('created_by', userId),
+      // Projects - assigned to
+      supabase.from('projects').select('*', { count: 'exact', head: true }).eq('assigned_to', userId),
+      // Sponsorships
+      supabase.from('sponsorships').select('*', { count: 'exact', head: true }).eq('sponsor_id', userId),
+      // Communications - sender
+      supabase.from('communications').select('*', { count: 'exact', head: true }).eq('sender_id', userId),
+      // Communications - recipient
+      supabase.from('communications').select('*', { count: 'exact', head: true }).eq('recipient_id', userId),
+      // Notifications
+      supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('recipient_id', userId),
+      // Beneficiaries - created by
+      supabase.from('beneficiaries').select('*', { count: 'exact', head: true }).eq('created_by', userId),
+      // Beneficiary documents - uploaded by
+      supabase.from('beneficiary_documents').select('*', { count: 'exact', head: true }).eq('uploaded_by', userId),
+      // Category detection rules - created by
+      supabase.from('category_detection_rules').select('*', { count: 'exact', head: true }).eq('created_by', userId),
+      // Category detection rules - updated by
+      supabase.from('category_detection_rules').select('*', { count: 'exact', head: true }).eq('updated_by', userId),
+      // Landing stats - updated by
+      supabase.from('landing_stats').select('*', { count: 'exact', head: true }).eq('updated_by', userId),
+      // System config - updated by
+      supabase.from('system_config').select('*', { count: 'exact', head: true }).eq('updated_by', userId),
+      // System content - updated by
+      supabase.from('system_content').select('*', { count: 'exact', head: true }).eq('updated_by', userId),
+      // Contribution approval status - admin_id
+      supabase.from('contribution_approval_status').select('*', { count: 'exact', head: true }).eq('admin_id', userId),
+      // Admin user roles - assigned_by
+      supabase.from('admin_user_roles').select('*', { count: 'exact', head: true }).eq('assigned_by', userId),
+    ])
 
-    if (contributionCount && contributionCount > 0) {
+    // Map activity types to user-friendly names
+    const activityTypes = [
+      { name: 'contributions', field: 'donor_id' },
+      { name: 'recurring contributions', field: 'donor_id' },
+      { name: 'cases created', field: 'created_by' },
+      { name: 'cases assigned', field: 'assigned_to' },
+      { name: 'cases sponsored', field: 'sponsored_by' },
+      { name: 'case updates', field: 'created_by' },
+      { name: 'case status changes', field: 'changed_by' },
+      { name: 'projects created', field: 'created_by' },
+      { name: 'projects assigned', field: 'assigned_to' },
+      { name: 'sponsorships', field: 'sponsor_id' },
+      { name: 'messages sent', field: 'sender_id' },
+      { name: 'messages received', field: 'recipient_id' },
+      { name: 'notifications', field: 'recipient_id' },
+      { name: 'beneficiaries created', field: 'created_by' },
+      { name: 'beneficiary documents', field: 'uploaded_by' },
+      { name: 'category rules created', field: 'created_by' },
+      { name: 'category rules updated', field: 'updated_by' },
+      { name: 'landing stats updated', field: 'updated_by' },
+      { name: 'system config updated', field: 'updated_by' },
+      { name: 'system content updated', field: 'updated_by' },
+      { name: 'contribution approvals', field: 'admin_id' },
+      { name: 'role assignments', field: 'assigned_by' },
+    ]
+
+    // Check for any activities
+    const activities = activityChecks
+      .map((result, index) => ({
+        type: activityTypes[index].name,
+        count: result.count || 0
+      }))
+      .filter(activity => activity.count > 0)
+
+    if (activities.length > 0) {
+      const activitySummary = activities
+        .map(a => `${a.count} ${a.type}`)
+        .join(', ')
+      
       return NextResponse.json(
         { 
-          error: 'Cannot delete user with contributions',
-          message: `User has ${contributionCount} contribution(s). Users with contributions cannot be deleted.`
-        },
-        { status: 400 }
-      )
-    }
-
-    // Check for recurring contributions
-    const { count: recurringContributionCount } = await supabase
-      .from('recurring_contributions')
-      .select('*', { count: 'exact', head: true })
-      .eq('donor_id', userId)
-
-    if (recurringContributionCount && recurringContributionCount > 0) {
-      return NextResponse.json(
-        { 
-          error: 'Cannot delete user with recurring contributions',
-          message: `User has ${recurringContributionCount} recurring contribution(s). Users with recurring contributions cannot be deleted.`
+          error: 'Cannot delete user with related activities',
+          message: `User has related activities: ${activitySummary}. Users with activities cannot be deleted to maintain data integrity.`,
+          activities: activities
         },
         { status: 400 }
       )

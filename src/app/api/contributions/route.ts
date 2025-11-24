@@ -359,7 +359,7 @@ async function getContributionsDirectQuery(
       
       return {
         ...c,
-        cases: caseData ? { title: caseData.title } : null,
+        cases: caseData ? { title_en: caseData.title_en, title_ar: caseData.title_ar } : null,
         users: userData,
         approval_status: latestApproval ? [latestApproval] : []
       }
@@ -654,7 +654,7 @@ export async function POST(request: NextRequest) {
           type: 'contribution_pending',
           recipient_id: admin.user_id,
           title: 'New Contribution Submitted',
-          message: `A new contribution of ${amount} EGP has been submitted for case: ${caseData.title}`,
+          message: `A new contribution of ${amount} EGP has been submitted for case: ${caseData.title_en || caseData.title_ar || 'Unknown Case'}`,
           data: {
             contribution_id: contribution.id,
             case_id: caseId,

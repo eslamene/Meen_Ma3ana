@@ -674,7 +674,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center space-x-2">
               <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
               <p className="text-sm text-red-800">{error}</p>
-            </div>
+          </div>
           )}
 
           {/* Success message for resend */}
@@ -682,7 +682,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-center space-x-2">
               <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
               <p className="text-sm text-green-800">{t('verificationEmailSent') || 'Verification email sent!'}</p>
-            </div>
+        </div>
           )}
 
           <div className="space-y-3">
@@ -711,12 +711,12 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             </button>
 
             {/* Go to Login button */}
-            <Link 
-              href={`/${localeParam}/auth/login`}
+          <Link 
+            href={`/${localeParam}/auth/login`}
               className="block w-full inline-flex items-center justify-center px-6 py-3 bg-[#6B8E7E] text-white font-semibold rounded-xl hover:bg-[#5a7a6b] transition-colors shadow-lg"
-            >
+          >
               {t('goToLogin') || 'Go to Login'} <ArrowRight className="ml-2 h-5 w-5" />
-            </Link>
+          </Link>
           </div>
         </div>
       </div>
@@ -832,12 +832,12 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
               {/* Phone Number Field */}
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500" />
-                </div>
-                <input
-                  id="phone"
-                  type="tel"
-                  value={phone}
+                <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500" />
+              </div>
+              <input
+                id="phone"
+                type="tel"
+                value={phone}
                   onChange={(e) => {
                     // Only allow digits, remove any non-digit characters
                     const value = e.target.value.replace(/\D/g, '')
@@ -856,16 +856,16 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
                     setPhone(cleaned)
                     setPhoneError('') // Clear error when user starts typing
                   }}
-                  autoComplete="tel"
-                  disabled={loading}
+                autoComplete="tel"
+                disabled={loading}
                   className={`block w-full pl-11 sm:pl-12 ${validatingPhone ? 'pr-12' : 'pr-4'} py-3 sm:py-3.5 text-sm sm:text-base border border-gray-300/70 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#6B8E7E]/50 focus:border-[#6B8E7E] focus:bg-white/80 disabled:bg-gray-100/60 disabled:cursor-not-allowed transition-all placeholder:text-gray-400 ${phoneError ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : ''}`}
                   placeholder={t('phoneNumberPlaceholder') || '01XX XXX XXXX'}
                   maxLength={10}
-                />
+              />
                 {validatingPhone && (
                   <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
                     <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                  </div>
+            </div>
                 )}
               </div>
             </div>
@@ -902,18 +902,18 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             }
           }}
           required
-          autoComplete="email"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck="false"
-          disabled={isLockedOut || loading}
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck="false"
+            disabled={isLockedOut || loading}
           className={`${getInputClasses()} ${emailError ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : ''} ${validatingEmail ? 'pr-12' : ''}`}
           placeholder={t('emailPlaceholder')}
         />
         {validatingEmail && (
           <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
             <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-          </div>
+        </div>
         )}
         </div>
         {emailError && (
@@ -936,14 +936,14 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         <input
           ref={passwordInputRef}
           id="password"
-          type={showPassword ? 'text' : 'password'}
+            type={showPassword ? 'text' : 'password'}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          minLength={authSettings?.passwordMinLength || 8}
-          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          disabled={isLockedOut || loading}
-          className={getInputClasses(true)}
+            minLength={authSettings?.passwordMinLength || 8}
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            disabled={isLockedOut || loading}
+            className={getInputClasses(true)}
           placeholder={t('passwordPlaceholder')}
         />
           <button
@@ -1036,14 +1036,14 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
           <input
             ref={confirmPasswordInputRef}
             id="confirmPassword"
-            type={showConfirmPassword ? 'text' : 'password'}
+              type={showConfirmPassword ? 'text' : 'password'}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            minLength={authSettings?.passwordMinLength || 8}
-            autoComplete="new-password"
-            disabled={loading}
-            className={getInputClasses(true)}
+              minLength={authSettings?.passwordMinLength || 8}
+              autoComplete="new-password"
+              disabled={loading}
+              className={getInputClasses(true)}
             placeholder={t('confirmPasswordPlaceholder')}
           />
             <button
@@ -1111,8 +1111,8 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       {/* Error message */}
       {error && (
         <div className="space-y-3">
-          <div className="text-red-700 text-sm sm:text-base bg-red-50/80 backdrop-blur-sm p-3.5 sm:p-4 rounded-xl border border-red-200/70 flex items-start" role="alert">
-            <span className="mr-2 mt-0.5">⚠</span>
+        <div className="text-red-700 text-sm sm:text-base bg-red-50/80 backdrop-blur-sm p-3.5 sm:p-4 rounded-xl border border-red-200/70 flex items-start" role="alert">
+          <span className="mr-2 mt-0.5">⚠</span>
             <span className="flex-1">{error}</span>
           </div>
           
