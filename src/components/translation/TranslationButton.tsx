@@ -30,7 +30,7 @@ interface TranslationButtonProps {
   /**
    * Optional: Button size
    */
-  size?: 'sm' | 'md' | 'lg' | 'icon'
+  size?: 'default' | 'sm' | 'lg' | 'icon'
   
   /**
    * Optional: Button variant
@@ -73,7 +73,7 @@ export default function TranslationButton({
   direction,
   onTranslate,
   label,
-  size = 'sm',
+  size = 'default',
   variant = 'outline',
   disabled = false,
   iconOnly = false,
