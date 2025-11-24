@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const search = searchParams.get('search')
 
-    // Fetch all cases with beneficiary information
+    // Fetch all cases with beneficiary and category information
     let query = supabase
       .from('cases')
       .select(`
@@ -61,6 +61,14 @@ export async function GET(request: NextRequest) {
           is_verified,
           total_cases,
           active_cases
+        ),
+        case_categories (
+          id,
+          name,
+          name_en,
+          name_ar,
+          icon,
+          color
         )
       `)
       .order('created_at', { ascending: false })

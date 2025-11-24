@@ -59,6 +59,7 @@ import {
   Zap,
   Gift
 } from 'lucide-react'
+import TranslationButton from '@/components/translation/TranslationButton'
 
 type CaseType = 'one-time' | 'recurring'
 
@@ -895,6 +896,254 @@ export default function CreateCasePage() {
             </Card>
           )}
 
+          {/* Quick Admin Controls - Status, Category, Priority - Only show when case type is selected */}
+          {caseType && (
+            <Card className="mb-6 border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 shadow-sm">
+              <CardHeader className="border-b border-indigo-200/50 pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                  <div className="p-1.5 rounded-lg bg-indigo-100">
+                    <Tag className="h-4 w-4 text-indigo-600" />
+                  </div>
+                  Quick Admin Controls
+                </CardTitle>
+                <CardDescription className="text-gray-600 text-sm mt-1">
+                  Manage case status, category, and priority level
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Status */}
+                  <div className="space-y-2">
+                    <Label htmlFor="status" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <div className="p-1 rounded bg-blue-50">
+                        <Info className="h-3.5 w-3.5 text-blue-600" />
+                      </div>
+                      {t('status')}
+                      {formData.status && (
+                        <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                      )}
+                    </Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) => handleInputChange('status', value)}
+                    >
+                      <SelectTrigger id="status" className="h-10 bg-white hover:bg-gray-50 transition-colors">
+                        <SelectValue>
+                          {formData.status && (
+                            <Badge 
+                              variant="outline" 
+                              className={
+                                formData.status === 'published' ? 'bg-green-100 text-green-700 border-green-300' :
+                                formData.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                formData.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                formData.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300' :
+                                'bg-gray-100 text-gray-700 border-gray-300'
+                              }
+                            >
+                              {formData.status.charAt(0).toUpperCase() + formData.status.slice(1)}
+                            </Badge>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                            Draft
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="published">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            Published
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="active">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            Active
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="completed">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                            Completed
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="cancelled">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                            Cancelled
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Category */}
+                  <div className="space-y-2">
+                    <Label htmlFor="category" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <div className="p-1 rounded bg-purple-50">
+                        <Tag className="h-3.5 w-3.5 text-purple-600" />
+                      </div>
+                      {t('category')}
+                      <span className="text-red-500">*</span>
+                      {formData.category && formData.category !== '__none__' && (
+                        <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                      )}
+                    </Label>
+                    <Select
+                      value={formData.category || '__none__'}
+                      onValueChange={(value) => {
+                        if (value === '__none__') {
+                          handleInputChange('category', null)
+                          handleInputChange('category_id', null)
+                          handleInputChange('category_icon', null)
+                          handleInputChange('category_color', null)
+                          // Clear category error when user interacts
+                          if (errors.category) {
+                            const newErrors = { ...errors }
+                            delete newErrors.category
+                            setErrors(newErrors)
+                          }
+                        } else {
+                          // Find category by name, name_en, or name_ar
+                          const selectedCategory = categories.find(cat => 
+                            cat.name === value || 
+                            (cat as any).name_en === value ||
+                            (cat as any).name_ar === value
+                          )
+                          // Use name_en if available, otherwise use name
+                          const categoryName = selectedCategory ? ((selectedCategory as any).name_en || selectedCategory.name) : value
+                          handleInputChange('category', categoryName)
+                          handleInputChange('category_id', selectedCategory?.id || null)
+                          handleInputChange('category_icon', selectedCategory?.icon || null)
+                          handleInputChange('category_color', selectedCategory?.color || null)
+                          // Clear category error when user selects a category
+                          if (errors.category) {
+                            const newErrors = { ...errors }
+                            delete newErrors.category
+                            setErrors(newErrors)
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="category" className={`h-10 bg-white hover:bg-gray-50 transition-colors ${errors.category ? 'border-red-500 focus-visible:ring-red-500' : ''}`}>
+                        <SelectValue placeholder={t('notSpecified')}>
+                          {formData.category ? (() => {
+                            // Try to find category by name, name_en, or name_ar
+                            const selectedCategory = categories.find(cat => 
+                              cat.name === formData.category || 
+                              (cat as any).name_en === formData.category ||
+                              (cat as any).name_ar === formData.category
+                            )
+                            // Always prefer the matched category's icon and color from the API
+                            const iconValue = selectedCategory?.icon || formData.category_icon || null
+                            const categoryColor = selectedCategory?.color || formData.category_color || null
+                            return (
+                              <Badge variant="outline" className={getCategoryBadgeClass(formData.category, categoryColor)}>
+                                <div className="flex items-center gap-1.5">
+                                  {iconValue ? (
+                                    <DynamicIcon name={iconValue} className="h-3 w-3" fallback="tag" />
+                                  ) : (
+                                    <Tag className="h-3 w-3" />
+                                  )}
+                                  {formData.category}
+                                </div>
+                              </Badge>
+                            )
+                          })() : (
+                            <span className="text-gray-500">{t('notSpecified')}</span>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-gray-500">{t('notSpecified')}</span>
+                        </SelectItem>
+                        {categories.map((category) => {
+                          const iconValue = category.icon
+                          // Use name_en if available, otherwise use name
+                          const displayName = (category as any).name_en || category.name
+                          const categoryValue = (category as any).name_en || category.name
+                          return (
+                            <SelectItem key={category.id} value={categoryValue}>
+                              <div className="flex items-center gap-2">
+                                {iconValue ? (
+                                  <DynamicIcon name={iconValue} className="h-4 w-4" />
+                                ) : null}
+                                <span>{displayName}</span>
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {errors.category && (
+                      <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.category}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Priority */}
+                  <div className="space-y-2">
+                    <Label htmlFor="priority" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <div className="p-1 rounded bg-orange-50">
+                        <Flag className="h-3.5 w-3.5 text-orange-600" />
+                      </div>
+                      {t('priorityLevel')}
+                      {formData.priority && (
+                        <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                      )}
+                    </Label>
+                    <Select
+                      value={formData.priority}
+                      onValueChange={(value) => handleInputChange('priority', value)}
+                    >
+                      <SelectTrigger id="priority" className="h-10 bg-white hover:bg-gray-50 transition-colors">
+                        <SelectValue>
+                          {formData.priority && (
+                            <Badge variant="outline" className={getPriorityBadgeClass(formData.priority)}>
+                              {formData.priority.charAt(0).toUpperCase() + formData.priority.slice(1)}
+                            </Badge>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            Low
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="medium">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                            Medium
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="high">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                            High
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="critical">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                            Critical
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Case Type Selection - Compact when selected, full when not */}
           {!caseType ? (
             <Card className="mb-6 shadow-lg">
@@ -1106,11 +1355,22 @@ export default function CreateCasePage() {
                                 onChange={(e) => handleInputChange('title_en', e.target.value)}
                                 placeholder="Enter case title in English"
                                 dir="ltr"
-                                className={`h-11 ${errors.title_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                                className={`h-11 pr-24 ${errors.title_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                                 maxLength={validationSettings?.caseTitleMaxLength || 100}
                                 />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                                  {formData.title_en.length}/{validationSettings?.caseTitleMaxLength || 100}
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                  <TranslationButton
+                                    sourceText={formData.title_ar}
+                                    direction="ar-to-en"
+                                    onTranslate={(translated) => handleInputChange('title_en', translated)}
+                                    size="sm"
+                                    variant="ghost"
+                                    iconOnly
+                                    className="h-6 w-6 p-0"
+                                  />
+                                  <span className="text-xs text-gray-400">
+                                    {formData.title_en.length}/{validationSettings?.caseTitleMaxLength || 100}
+                                  </span>
                                 </div>
                               </div>
                               {errors.title_en && (
@@ -1132,11 +1392,22 @@ export default function CreateCasePage() {
                                 onChange={(e) => handleInputChange('title_ar', e.target.value)}
                                 placeholder="أدخل عنوان الحالة بالعربية"
                                 dir="rtl"
-                                className={`h-11 ${errors.title_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                                className={`h-11 pl-24 ${errors.title_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                                 maxLength={validationSettings?.caseTitleMaxLength || 100}
                               />
-                                <div className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                                  {formData.title_ar.length}/{validationSettings?.caseTitleMaxLength || 100}
+                                <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                  <span className="text-xs text-gray-400">
+                                    {formData.title_ar.length}/{validationSettings?.caseTitleMaxLength || 100}
+                                  </span>
+                                  <TranslationButton
+                                    sourceText={formData.title_en}
+                                    direction="en-to-ar"
+                                    onTranslate={(translated) => handleInputChange('title_ar', translated)}
+                                    size="sm"
+                                    variant="ghost"
+                                    iconOnly
+                                    className="h-6 w-6 p-0"
+                                  />
                                 </div>
                           </div>
                               {errors.title_ar && (
@@ -1169,11 +1440,22 @@ export default function CreateCasePage() {
                                 placeholder="Enter case description in English"
                                 rows={5}
                                 dir="ltr"
-                                  className={`resize-none ${errors.description_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                                  className={`resize-none pb-10 ${errors.description_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                                   maxLength={validationSettings?.caseDescriptionMaxLength || 2000}
                                 />
-                                <div className="absolute bottom-2 right-2 text-xs text-gray-400 bg-white px-1 rounded">
-                                  {formData.description_en.length}/{validationSettings?.caseDescriptionMaxLength || 2000}
+                                <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                                  <TranslationButton
+                                    sourceText={formData.description_ar}
+                                    direction="ar-to-en"
+                                    onTranslate={(translated) => handleInputChange('description_en', translated)}
+                                    size="sm"
+                                    variant="ghost"
+                                    iconOnly
+                                    className="h-6 w-6 p-0 bg-white"
+                                  />
+                                  <span className="text-xs text-gray-400 bg-white px-1 rounded">
+                                    {formData.description_en.length}/{validationSettings?.caseDescriptionMaxLength || 2000}
+                                  </span>
                                 </div>
                               </div>
                               {errors.description_en && (
@@ -1196,11 +1478,22 @@ export default function CreateCasePage() {
                                 placeholder="أدخل وصف الحالة بالعربية"
                                 rows={5}
                                 dir="rtl"
-                                  className={`resize-none ${errors.description_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                                  className={`resize-none pb-10 ${errors.description_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                                   maxLength={validationSettings?.caseDescriptionMaxLength || 2000}
                               />
-                                <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white px-1 rounded">
-                                  {formData.description_ar.length}/{validationSettings?.caseDescriptionMaxLength || 2000}
+                                <div className="absolute bottom-2 left-2 flex items-center gap-2">
+                                  <span className="text-xs text-gray-400 bg-white px-1 rounded">
+                                    {formData.description_ar.length}/{validationSettings?.caseDescriptionMaxLength || 2000}
+                                  </span>
+                                  <TranslationButton
+                                    sourceText={formData.description_en}
+                                    direction="en-to-ar"
+                                    onTranslate={(translated) => handleInputChange('description_ar', translated)}
+                                    size="sm"
+                                    variant="ghost"
+                                    iconOnly
+                                    className="h-6 w-6 p-0 bg-white"
+                                  />
                                 </div>
                           </div>
                               {errors.description_ar && (
@@ -1269,269 +1562,7 @@ export default function CreateCasePage() {
                           </CardHeader>
                           <CardContent className="pt-6 pb-6">
                             <div className="space-y-6">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="space-y-2">
-                                  <Label htmlFor="status" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                    <div className="p-1 rounded bg-blue-50">
-                                      <Info className="h-3.5 w-3.5 text-blue-600" />
-                                    </div>
-                                    {t('status')}
-                                    {formData.status && (
-                                      <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
-                                    )}
-                                  </Label>
-                                  <Select
-                                    value={formData.status}
-                                    onValueChange={(value) => handleInputChange('status', value)}
-                                  >
-                                    <SelectTrigger id="status" className="h-10 bg-white hover:bg-gray-50 transition-colors">
-                                      <SelectValue>
-                                        {formData.status && (
-                                          <Badge 
-                                            variant="outline" 
-                                            className={
-                                              formData.status === 'published' ? 'bg-green-100 text-green-700 border-green-300' :
-                                              formData.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                                              formData.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                                              formData.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300' :
-                                              'bg-gray-100 text-gray-700 border-gray-300'
-                                            }
-                                          >
-                                            {formData.status.charAt(0).toUpperCase() + formData.status.slice(1)}
-                                          </Badge>
-                                        )}
-                                      </SelectValue>
-                                    </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="draft">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                                        Draft
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="published">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                        Published
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="active">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                        Active
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="completed">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                                        Completed
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="cancelled">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                        Cancelled
-                                      </div>
-                                    </SelectItem>
-                                  </SelectContent>
-                                  </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                  <Label htmlFor="category" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                    <div className="p-1 rounded bg-purple-50">
-                                      <Tag className="h-3.5 w-3.5 text-purple-600" />
-                                    </div>
-                                    {t('category')}
-                                    <span className="text-red-500">*</span>
-                                    {formData.category && formData.category !== '__none__' && (
-                                      <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
-                                    )}
-                                  </Label>
-                                  <Select
-                                  value={formData.category || '__none__'}
-                                  onValueChange={(value) => {
-                                    if (value === '__none__') {
-                                      handleInputChange('category', null)
-                                      handleInputChange('category_id', null)
-                                      handleInputChange('category_icon', null)
-                                      handleInputChange('category_color', null)
-                                      // Clear category error when user interacts
-                                      if (errors.category) {
-                                        const newErrors = { ...errors }
-                                        delete newErrors.category
-                                        setErrors(newErrors)
-                                      }
-                                    } else {
-                                      // Find category by name, name_en, or name_ar
-                                      const selectedCategory = categories.find(cat => 
-                                        cat.name === value || 
-                                        (cat as any).name_en === value ||
-                                        (cat as any).name_ar === value
-                                      )
-                                      // Use name_en if available, otherwise use name
-                                      const categoryName = selectedCategory ? ((selectedCategory as any).name_en || selectedCategory.name) : value
-                                      handleInputChange('category', categoryName)
-                                      handleInputChange('category_id', selectedCategory?.id || null)
-                                      handleInputChange('category_icon', selectedCategory?.icon || null)
-                                      handleInputChange('category_color', selectedCategory?.color || null)
-                                      // Clear category error when user selects a category
-                                      if (errors.category) {
-                                        const newErrors = { ...errors }
-                                        delete newErrors.category
-                                        setErrors(newErrors)
-                                      }
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger id="category" className={`h-10 bg-white hover:bg-gray-50 transition-colors ${errors.category ? 'border-red-500 focus-visible:ring-red-500' : ''}`}>
-                                    <SelectValue placeholder={t('notSpecified')}>
-                                      {formData.category ? (() => {
-                                        // Try to find category by name, name_en, or name_ar
-                                        const selectedCategory = categories.find(cat => 
-                                          cat.name === formData.category || 
-                                          (cat as any).name_en === formData.category ||
-                                          (cat as any).name_ar === formData.category
-                                        )
-                                        // Always prefer the matched category's icon and color from the API
-                                        const iconValue = selectedCategory?.icon || formData.category_icon || null
-                                        const categoryColor = selectedCategory?.color || formData.category_color || null
-                                        return (
-                                          <Badge variant="outline" className={getCategoryBadgeClass(formData.category, categoryColor)}>
-                                            <div className="flex items-center gap-1.5">
-                                              {iconValue ? (
-                                                <DynamicIcon name={iconValue} className="h-3 w-3" fallback="tag" />
-                                              ) : (
-                                                <Tag className="h-3 w-3" />
-                                              )}
-                                              {formData.category}
-                                            </div>
-                                          </Badge>
-                                        )
-                                      })() : (
-                                        <span className="text-gray-500">{t('notSpecified')}</span>
-                                      )}
-                                    </SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__none__">
-                                      <span className="text-gray-500">{t('notSpecified')}</span>
-                                    </SelectItem>
-                                    {categories.map((category) => {
-                                      const iconValue = category.icon
-                                      // Use name_en if available, otherwise use name
-                                      const displayName = (category as any).name_en || category.name
-                                      const categoryValue = (category as any).name_en || category.name
-                                      return (
-                                        <SelectItem key={category.id} value={categoryValue}>
-                                          <div className="flex items-center gap-2">
-                                            {iconValue ? (
-                                              <DynamicIcon name={iconValue} className="h-4 w-4" />
-                                            ) : null}
-                                            <span>{displayName}</span>
-                                          </div>
-                                        </SelectItem>
-                                      )
-                                    })}
-                                  </SelectContent>
-                                  </Select>
-                                  {errors.category && (
-                                    <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
-                                      <AlertCircle className="h-3 w-3" />
-                                      {errors.category}
-                                    </p>
-                                  )}
-                                  {formData.category && formData.category !== '__none__' && (() => {
-                                    // Try to find category by name, name_en, or name_ar
-                                    const selectedCategory = categories.find(cat => 
-                                      cat.name === formData.category || 
-                                      (cat as any).name_en === formData.category ||
-                                      (cat as any).name_ar === formData.category
-                                    )
-                                    // Always prefer the matched category's icon and color from the API
-                                    const iconValue = selectedCategory?.icon || formData.category_icon || null
-                                    const categoryColor = selectedCategory?.color || formData.category_color || null
-                                    return (
-                                      <div className="mt-2">
-                                        <Badge variant="outline" className={getCategoryBadgeClass(formData.category, categoryColor)}>
-                                          <div className="flex items-center gap-1.5">
-                                            {iconValue ? (
-                                              <DynamicIcon name={iconValue} className="h-3 w-3" fallback="tag" />
-                                            ) : (
-                                              <Tag className="h-3 w-3" />
-                                            )}
-                                            {formData.category}
-                                          </div>
-                                        </Badge>
-                                      </div>
-                                    )
-                                  })()}
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="priority" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                  <div className="p-1 rounded bg-orange-50">
-                                    <Flag className="h-3.5 w-3.5 text-orange-600" />
-                                  </div>
-                                  {t('priorityLevel')}
-                                  {formData.priority && (
-                                    <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
-                                  )}
-                                </Label>
-                                <Select
-                                  value={formData.priority}
-                                  onValueChange={(value) => handleInputChange('priority', value)}
-                                >
-                                  <SelectTrigger id="priority" className="h-10 bg-white hover:bg-gray-50 transition-colors">
-                                    <SelectValue>
-                                      {formData.priority && (
-                                        <Badge variant="outline" className={getPriorityBadgeClass(formData.priority)}>
-                                          {formData.priority.charAt(0).toUpperCase() + formData.priority.slice(1)}
-                                        </Badge>
-                                      )}
-                                    </SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="low">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                        Low
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="medium">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                                        Medium
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="high">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                                        High
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="critical">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                        Critical
-                                      </div>
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {formData.priority && (
-                                  <div className="mt-2">
-                                    <Badge 
-                                      variant="outline" 
-                                      className={getPriorityBadgeClass(formData.priority)}
-                                    >
-                                      {formData.priority.charAt(0).toUpperCase() + formData.priority.slice(1)}
-                                    </Badge>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="pt-2 border-t border-gray-100">
+                              <div className="pt-2">
                                 <div className="space-y-2">
                                   <Label htmlFor="location" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                                     <div className="p-1 rounded bg-indigo-50">

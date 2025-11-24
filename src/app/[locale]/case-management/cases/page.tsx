@@ -8,8 +8,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import DynamicIcon from '@/components/ui/dynamic-icon'
 import { toast } from 'sonner'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
@@ -32,7 +34,12 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  Users
+  Users,
+  Zap,
+  Tag,
+  Flag,
+  Info,
+  Save
 } from 'lucide-react'
 
 interface Beneficiary {
@@ -69,6 +76,23 @@ interface Case {
   beneficiary_name?: string
   beneficiary_contact?: string
   beneficiaries?: Beneficiary | null
+  category_id?: string | null
+  priority?: string
+  case_categories?: {
+    id: string
+    name: string
+    name_en?: string
+    name_ar?: string
+    icon?: string | null
+    color?: string | null
+  } | {
+    id: string
+    name: string
+    name_en?: string
+    name_ar?: string
+    icon?: string | null
+    color?: string | null
+  }[] | null
   // Calculated fields
   approved_amount?: number
   total_contributions?: number
@@ -104,6 +128,31 @@ export default function AdminCasesPage() {
   })
   const [deleting, setDeleting] = useState(false)
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('')
+  const [quickUpdateDialog, setQuickUpdateDialog] = useState<{
+    isOpen: boolean
+    caseId: string | null
+    caseTitle: string
+    currentStatus: string
+    currentCategory: string | null
+    currentCategoryId: string | null
+    currentPriority: string
+  }>({
+    isOpen: false,
+    caseId: null,
+    caseTitle: '',
+    currentStatus: 'draft',
+    currentCategory: null,
+    currentCategoryId: null,
+    currentPriority: 'medium'
+  })
+  const [categories, setCategories] = useState<Array<{id: string, name: string, name_en?: string, name_ar?: string, icon: string | null, color: string | null}>>([])
+  const [updating, setUpdating] = useState(false)
+  const [updateFormData, setUpdateFormData] = useState({
+    status: 'draft',
+    category: null as string | null,
+    category_id: null as string | null,
+    priority: 'medium'
+  })
 
   const fetchCases = useCallback(async () => {
     try {
@@ -426,6 +475,192 @@ export default function AdminCasesPage() {
       step: 'confirm'
     })
     setDeleteConfirmationText('') // Reset confirmation text
+  }
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await fetch('/api/categories')
+      if (!response.ok) {
+        console.error('Error fetching categories:', response.statusText)
+        return
+      }
+      const result = await response.json()
+      setCategories(result.categories || [])
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCategories()
+  }, [fetchCategories])
+
+  const handleQuickUpdateClick = (case_: Case) => {
+    // Extract category data from case_categories relation
+    const caseCategories = (case_ as any).case_categories
+    let caseCategory: string | null = null
+    let caseCategoryId: string | null = (case_ as any).category_id || null
+    
+    if (caseCategories) {
+      // Handle array or single object
+      const categoryData = Array.isArray(caseCategories) ? caseCategories[0] : caseCategories
+      if (categoryData) {
+        // Prefer name_en, fallback to name
+        caseCategory = categoryData.name_en || categoryData.name || null
+        caseCategoryId = categoryData.id || caseCategoryId
+      }
+    }
+    
+    setQuickUpdateDialog({
+      isOpen: true,
+      caseId: case_.id,
+      caseTitle: case_.title || case_.title_en || case_.title_ar || 'Untitled Case',
+      currentStatus: case_.status || 'draft',
+      currentCategory: caseCategory,
+      currentCategoryId: caseCategoryId,
+      currentPriority: (case_ as any).priority || 'medium'
+    })
+    setUpdateFormData({
+      status: case_.status || 'draft',
+      category: caseCategory,
+      category_id: caseCategoryId,
+      priority: (case_ as any).priority || 'medium'
+    })
+  }
+
+  const handleQuickUpdateCancel = () => {
+    setQuickUpdateDialog({
+      isOpen: false,
+      caseId: null,
+      caseTitle: '',
+      currentStatus: 'draft',
+      currentCategory: null,
+      currentCategoryId: null,
+      currentPriority: 'medium'
+    })
+    setUpdateFormData({
+      status: 'draft',
+      category: null,
+      category_id: null,
+      priority: 'medium'
+    })
+  }
+
+  const handleQuickUpdateSave = async () => {
+    if (!quickUpdateDialog.caseId) return
+
+    try {
+      setUpdating(true)
+
+      // Get category ID if category name is provided
+      let categoryId = updateFormData.category_id
+      if (updateFormData.category && !categoryId) {
+        const selectedCategory = categories.find(cat => 
+          cat.name === updateFormData.category || 
+          (cat as any).name_en === updateFormData.category ||
+          (cat as any).name_ar === updateFormData.category
+        )
+        if (selectedCategory) {
+          categoryId = selectedCategory.id
+        }
+      }
+
+      const response = await fetch(`/api/cases/${quickUpdateDialog.caseId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: updateFormData.status,
+          priority: updateFormData.priority,
+          category_id: categoryId || null,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update case')
+      }
+
+      // Update local state
+      setCases(prev => prev.map(c => 
+        c.id === quickUpdateDialog.caseId 
+          ? { 
+              ...c, 
+              status: updateFormData.status as any,
+              priority: updateFormData.priority as any,
+              category_id: categoryId || undefined
+            }
+          : c
+      ))
+
+      // Refresh cases to get updated data
+      await fetchCases()
+
+      toast.success('Case Updated', {
+        description: `Case "${quickUpdateDialog.caseTitle}" has been updated successfully.`
+      })
+
+      handleQuickUpdateCancel()
+    } catch (error) {
+      console.error('Error updating case:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update case'
+      toast.error('Update Failed', { description: errorMessage })
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const getCategoryBadgeClass = (category: string | null, categoryColor: string | null) => {
+    if (!category) return 'bg-gray-100 text-gray-700 border-gray-300'
+    
+    if (categoryColor) {
+      if (categoryColor.startsWith('bg-')) {
+        return categoryColor
+      }
+      
+      const colorMap: Record<string, string> = {
+        'purple': 'bg-purple-100 text-purple-700 border-purple-300',
+        'blue': 'bg-blue-100 text-blue-700 border-blue-300',
+        'green': 'bg-green-100 text-green-700 border-green-300',
+        'red': 'bg-red-100 text-red-700 border-red-300',
+        'orange': 'bg-orange-100 text-orange-700 border-orange-300',
+        'yellow': 'bg-yellow-100 text-yellow-700 border-yellow-300',
+        'pink': 'bg-pink-100 text-pink-700 border-pink-300',
+        'indigo': 'bg-indigo-100 text-indigo-700 border-indigo-300',
+        'teal': 'bg-teal-100 text-teal-700 border-teal-300',
+        'cyan': 'bg-cyan-100 text-cyan-700 border-cyan-300',
+        'amber': 'bg-amber-100 text-amber-700 border-amber-300',
+        'violet': 'bg-violet-100 text-violet-700 border-violet-300',
+        'fuchsia': 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300',
+        'rose': 'bg-rose-100 text-rose-700 border-rose-300',
+        'slate': 'bg-slate-100 text-slate-700 border-slate-300',
+        'gray': 'bg-gray-100 text-gray-700 border-gray-300',
+        'zinc': 'bg-zinc-100 text-zinc-700 border-zinc-300',
+        'neutral': 'bg-neutral-100 text-neutral-700 border-neutral-300',
+        'stone': 'bg-stone-100 text-stone-700 border-stone-300',
+      }
+      
+      const lowerColor = categoryColor.toLowerCase().trim()
+      if (colorMap[lowerColor]) {
+        return colorMap[lowerColor]
+      }
+      
+      if (categoryColor.startsWith('#')) {
+        return 'bg-purple-100 text-purple-700 border-purple-300'
+      }
+    }
+    
+    return 'bg-purple-100 text-purple-700 border-purple-300'
+  }
+
+  const getPriorityBadgeClass = (priority: string | null) => {
+    if (!priority) return 'bg-gray-100 text-gray-700 border-gray-300'
+    if (priority === 'critical') return 'bg-red-100 text-red-700 border-red-300'
+    if (priority === 'high') return 'bg-orange-100 text-orange-700 border-orange-300'
+    if (priority === 'medium') return 'bg-yellow-100 text-yellow-700 border-yellow-300'
+    return 'bg-gray-100 text-gray-700 border-gray-300'
   }
 
   return (
@@ -857,6 +1092,27 @@ export default function AdminCasesPage() {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => handleQuickUpdateClick(case_)}
+                              className="flex-1 md:flex-none w-full md:w-auto border-2 text-xs sm:text-sm"
+                              style={{
+                                borderColor: brandColors.meen[300],
+                                color: brandColors.meen[700]
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = brandColors.meen[500]
+                                e.currentTarget.style.backgroundColor = brandColors.meen[50]
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = brandColors.meen[300]
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                              }}
+                            >
+                              <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                              Quick Update
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleDeleteClick(case_.id, case_.title || case_.title_en || case_.title_ar || 'Untitled Case')}
                               className="flex-1 md:flex-none w-full md:w-auto border-2 text-xs sm:text-sm"
                               style={{
@@ -1133,6 +1389,188 @@ export default function AdminCasesPage() {
                 className="bg-red-600 hover:bg-red-700"
               >
                 {deleting ? 'Deleting...' : deleteDialog.step === 'confirm' ? 'Continue' : 'Delete Forever'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Quick Update Dialog */}
+        <Dialog open={quickUpdateDialog.isOpen} onOpenChange={handleQuickUpdateCancel}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-indigo-600" />
+                Quick Update Case
+              </DialogTitle>
+              <DialogDescription>
+                Update status, category, and priority for: <strong>{quickUpdateDialog.caseTitle}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Status */}
+              <div className="space-y-2">
+                <Label htmlFor="quick-status" className="flex items-center gap-2 text-sm font-semibold">
+                  <Info className="h-4 w-4 text-blue-600" />
+                  Status
+                </Label>
+                <Select
+                  value={updateFormData.status}
+                  onValueChange={(value) => setUpdateFormData(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger id="quick-status" className="h-10">
+                    <SelectValue>
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          updateFormData.status === 'published' ? 'bg-green-100 text-green-700 border-green-300' :
+                          updateFormData.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                          updateFormData.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                          updateFormData.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300' :
+                          'bg-gray-100 text-gray-700 border-gray-300'
+                        }
+                      >
+                        {updateFormData.status.charAt(0).toUpperCase() + updateFormData.status.slice(1)}
+                      </Badge>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Category */}
+              <div className="space-y-2">
+                <Label htmlFor="quick-category" className="flex items-center gap-2 text-sm font-semibold">
+                  <Tag className="h-4 w-4 text-purple-600" />
+                  Category
+                </Label>
+                <Select
+                  value={updateFormData.category || '__none__'}
+                  onValueChange={(value) => {
+                    if (value === '__none__') {
+                      setUpdateFormData(prev => ({ ...prev, category: null, category_id: null }))
+                    } else {
+                      const selectedCategory = categories.find(cat => 
+                        cat.name === value || 
+                        (cat as any).name_en === value ||
+                        (cat as any).name_ar === value
+                      )
+                      const categoryName = selectedCategory ? ((selectedCategory as any).name_en || selectedCategory.name) : value
+                      setUpdateFormData(prev => ({
+                        ...prev,
+                        category: categoryName,
+                        category_id: selectedCategory?.id || null
+                      }))
+                    }
+                  }}
+                >
+                  <SelectTrigger id="quick-category" className="h-10">
+                    <SelectValue placeholder="Not specified">
+                      {updateFormData.category ? (() => {
+                        const selectedCategory = categories.find(cat => 
+                          cat.name === updateFormData.category || 
+                          (cat as any).name_en === updateFormData.category ||
+                          (cat as any).name_ar === updateFormData.category
+                        )
+                        const iconValue = selectedCategory?.icon || null
+                        const categoryColor = selectedCategory?.color || null
+                        return (
+                          <Badge variant="outline" className={getCategoryBadgeClass(updateFormData.category, categoryColor)}>
+                            <div className="flex items-center gap-1.5">
+                              {iconValue ? (
+                                <DynamicIcon name={iconValue} className="h-3 w-3" fallback="tag" />
+                              ) : (
+                                <Tag className="h-3 w-3" />
+                              )}
+                              {updateFormData.category}
+                            </div>
+                          </Badge>
+                        )
+                      })() : (
+                        <span className="text-gray-500">Not specified</span>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-gray-500">Not specified</span>
+                    </SelectItem>
+                    {categories.map((category) => {
+                      const iconValue = category.icon
+                      const displayName = (category as any).name_en || category.name
+                      const categoryValue = (category as any).name_en || category.name
+                      return (
+                        <SelectItem key={category.id} value={categoryValue}>
+                          <div className="flex items-center gap-2">
+                            {iconValue ? (
+                              <DynamicIcon name={iconValue} className="h-4 w-4" />
+                            ) : null}
+                            <span>{displayName}</span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Priority */}
+              <div className="space-y-2">
+                <Label htmlFor="quick-priority" className="flex items-center gap-2 text-sm font-semibold">
+                  <Flag className="h-4 w-4 text-orange-600" />
+                  Priority Level
+                </Label>
+                <Select
+                  value={updateFormData.priority}
+                  onValueChange={(value) => setUpdateFormData(prev => ({ ...prev, priority: value }))}
+                >
+                  <SelectTrigger id="quick-priority" className="h-10">
+                    <SelectValue>
+                      <Badge variant="outline" className={getPriorityBadgeClass(updateFormData.priority)}>
+                        {updateFormData.priority.charAt(0).toUpperCase() + updateFormData.priority.slice(1)}
+                      </Badge>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleQuickUpdateCancel}
+                disabled={updating}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleQuickUpdateSave}
+                disabled={updating}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                {updating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

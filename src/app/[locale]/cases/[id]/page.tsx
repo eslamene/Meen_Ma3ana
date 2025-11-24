@@ -969,6 +969,17 @@ export default function CaseDetailPage() {
             <span className="sm:hidden">Back</span>
           </Button>
           <div className="flex items-center gap-1 sm:gap-2">
+            {(hasPermission('cases:update') || hasPermission('admin:cases')) && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => router.push(`/${locale}/case-management/cases/${caseId}/edit`)} 
+                className="h-8 w-8 sm:h-9 sm:w-9 p-0"
+                title={t('edit') || 'Edit Case'}
+              >
+                <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={handleFavorite} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
               <Heart className={`h-3 w-3 sm:h-4 sm:w-4 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
             </Button>
