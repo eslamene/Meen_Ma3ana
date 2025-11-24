@@ -1,8 +1,8 @@
--- Comprehensive solution for contributions API search and filtering
--- This migration creates a database function that efficiently handles
--- search across contributions with joined tables (cases, users)
+-- Fix search_contributions function to use correct column names
+-- Fixes:
+-- 1. Remove reference to non-existent c.payment_method column (use payment_method_id instead)
+-- 2. Replace cs.title with cs.title_en and cs.title_ar for bilingual support
 
--- Create a function to search contributions with proper filtering
 CREATE OR REPLACE FUNCTION search_contributions(
     p_user_id UUID DEFAULT NULL,
     p_is_admin BOOLEAN DEFAULT FALSE,
@@ -60,7 +60,7 @@ BEGIN
         c.proof_url,
         c.created_at,
         c.updated_at,
-        -- Joined case data
+        -- Joined case data - use COALESCE to return title_en or title_ar
         COALESCE(cs.title_en, cs.title_ar) as case_title,
         -- Joined user data
         u.email as donor_email,
@@ -105,6 +105,7 @@ BEGIN
         AND (p_date_from IS NULL OR c.created_at >= p_date_from)
         AND (p_date_to IS NULL OR c.created_at <= p_date_to)
         -- Search filtering (across case title, donor name, donor email)
+        -- Search both title_en and title_ar for bilingual support
         AND (
             p_search IS NULL 
             OR p_search = ''
@@ -139,7 +140,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create a function to count contributions (for pagination)
+-- Also fix the count_contributions function
 CREATE OR REPLACE FUNCTION count_contributions(
     p_user_id UUID DEFAULT NULL,
     p_is_admin BOOLEAN DEFAULT FALSE,
@@ -179,6 +180,7 @@ BEGIN
         )
         AND (p_date_from IS NULL OR c.created_at >= p_date_from)
         AND (p_date_to IS NULL OR c.created_at <= p_date_to)
+        -- Search both title_en and title_ar for bilingual support
         AND (
             p_search IS NULL 
             OR p_search = ''
@@ -196,11 +198,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Grant execute permissions to authenticated users
+-- Grant execute permissions (in case they were dropped)
 GRANT EXECUTE ON FUNCTION search_contributions TO authenticated;
 GRANT EXECUTE ON FUNCTION count_contributions TO authenticated;
 
--- Add comment for documentation
-COMMENT ON FUNCTION search_contributions IS 'Efficiently search and filter contributions with joined case and user data. Supports search across case titles and donor information.';
+-- Update comments
+COMMENT ON FUNCTION search_contributions IS 'Efficiently search and filter contributions with joined case and user data. Supports search across case titles (title_en and title_ar) and donor information.';
 COMMENT ON FUNCTION count_contributions IS 'Count contributions matching the same filters as search_contributions for pagination support.';
 

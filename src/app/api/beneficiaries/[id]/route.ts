@@ -311,7 +311,7 @@ export async function DELETE(
     // Check cases linked via beneficiary_id
     const { data: casesById, error: casesByIdError, count: countById } = await serviceRoleClient
       .from('cases')
-      .select('id, title, title_en, title_ar', { count: 'exact' })
+      .select('id, title_en, title_ar', { count: 'exact' })
       .eq('beneficiary_id', id)
     
     if (casesByIdError) {
@@ -337,7 +337,7 @@ export async function DELETE(
     if (orConditions.length > 0) {
       const { data: casesByName, error: casesByNameError, count: countByName } = await serviceRoleClient
         .from('cases')
-        .select('id, title, title_en, title_ar', { count: 'exact' })
+        .select('id, title_en, title_ar', { count: 'exact' })
         .or(orConditions.join(','))
       
       if (casesByNameError) {
@@ -370,7 +370,7 @@ export async function DELETE(
           assignedCasesCount: totalCount,
           assignedCases: allCases.map(c => ({
             id: c.id,
-            title: c.title || c.title_en || c.title_ar || 'Untitled Case'
+            title: c.title_en || c.title_ar || 'Untitled Case'
           }))
         },
         { status: 400 }

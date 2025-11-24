@@ -268,7 +268,9 @@ async function getContributionsDirectQuery(
   if (filters.search && filters.search.trim()) {
     const searchLower = filters.search.toLowerCase()
     filteredContributions = filteredContributions.filter((c: any) => {
-      const caseTitle = c.cases?.title?.toLowerCase() || ''
+      const caseTitleEn = c.cases?.title_en?.toLowerCase() || ''
+      const caseTitleAr = c.cases?.title_ar?.toLowerCase() || ''
+      const caseTitle = caseTitleEn || caseTitleAr
       const donorEmail = c.users?.email?.toLowerCase() || ''
       const donorFirstName = c.users?.first_name?.toLowerCase() || ''
       const donorLastName = c.users?.last_name?.toLowerCase() || ''
@@ -305,7 +307,7 @@ async function getContributionsDirectQuery(
       createdAt: c.created_at || null,
       updatedAt: c.updated_at || null,
       caseId: c.case_id || null,
-      caseTitle: c.cases?.title || '',
+      caseTitle: c.cases?.title_en || c.cases?.title_ar || '',
       donorName,
       donorId: c.users?.id || null,
       donorEmail: c.users?.email || null,
@@ -434,7 +436,7 @@ export async function POST(request: NextRequest) {
 
     const { data: caseData, error: caseError } = await supabase
       .from('cases')
-      .select('id, title, status')
+      .select('id, title_en, title_ar, status')
       .eq('id', caseId)
       .single()
 

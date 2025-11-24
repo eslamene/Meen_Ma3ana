@@ -56,7 +56,7 @@ export async function POST(
     // Verify the original contribution belongs to the current user
     const { data: originalContribution, error: contributionError } = await supabase
       .from('contributions')
-      .select('id, donor_id, case_id, amount, case:cases(title)')
+      .select('id, donor_id, case_id, amount, case:cases(title_en, title_ar)')
       .eq('id', id)
       .single()
 

@@ -63,8 +63,10 @@ export async function GET(request: NextRequest) {
         amount,
         status,
         case:cases(
-          title,
-          description
+          title_en,
+          title_ar,
+          description_en,
+          description_ar
         )
       `)
       .eq('sponsor_id', user.id)
@@ -121,8 +123,8 @@ export async function GET(request: NextRequest) {
         amount: parseFloat(String(item.amount)),
         status: item.status,
         case: {
-          title: caseData?.title || '',
-          description: caseData?.description || ''
+          title: caseData?.title_en || caseData?.title_ar || '',
+          description: caseData?.description_en || caseData?.description_ar || ''
         }
       }
     })

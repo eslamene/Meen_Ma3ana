@@ -31,8 +31,10 @@ export async function GET(request: NextRequest) {
         end_date,
         created_at,
         case:cases(
-          title,
-          description,
+          title_en,
+          title_ar,
+          description_en,
+          description_ar,
           target_amount,
           current_amount,
           status
@@ -65,8 +67,8 @@ export async function GET(request: NextRequest) {
         end_date: item.end_date,
         created_at: item.created_at,
         case: {
-          title: caseData?.title || '',
-          description: caseData?.description || '',
+          title: caseData?.title_en || caseData?.title_ar || '',
+          description: caseData?.description_en || caseData?.description_ar || '',
           target_amount: parseFloat(String(caseData?.target_amount || '0')),
           current_amount: parseFloat(String(caseData?.current_amount || '0')),
           status: caseData?.status || ''

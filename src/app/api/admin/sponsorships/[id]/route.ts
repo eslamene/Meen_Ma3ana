@@ -54,7 +54,7 @@ export async function PUT(
     // Get sponsorship details first
     const { data: sponsorship, error: fetchError } = await supabase
       .from('sponsorships')
-      .select('sponsor_id, case_id, amount, case:cases(title)')
+      .select('sponsor_id, case_id, amount, case:cases(title_en, title_ar)')
       .eq('id', params.id)
       .single()
 
@@ -91,9 +91,10 @@ export async function PUT(
     const notificationTitle = action === 'approve' 
       ? 'Sponsorship Request Approved'
       : 'Sponsorship Request Rejected'
+    const caseTitle = caseData?.title_en || caseData?.title_ar || 'Unknown Case'
     const notificationMessage = action === 'approve'
-      ? `Your sponsorship request for "${caseData?.title || 'Unknown Case'}" has been approved.`
-      : `Your sponsorship request for "${caseData?.title || 'Unknown Case'}" has been rejected.`
+      ? `Your sponsorship request for "${caseTitle}" has been approved.`
+      : `Your sponsorship request for "${caseTitle}" has been rejected.`
 
     await supabase
       .from('notifications')

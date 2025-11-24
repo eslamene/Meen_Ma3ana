@@ -208,32 +208,34 @@ export async function POST(
           .select(`
             donor_id,
             amount,
-            cases!inner(title)
+            cases!inner(title_en, title_ar)
           `)
           .eq('id', id)
           .single()
 
         if (contribution) {
           const notificationService = createContributionNotificationService(supabase)
-          type CaseJoin = { title?: string } | Array<{ title?: string }> | null | undefined
+          type CaseJoin = { title_en?: string; title_ar?: string } | Array<{ title_en?: string; title_ar?: string }> | null | undefined
           
           if (status === 'approved') {
             const casesData = contribution.cases as CaseJoin
-            const caseTitle = Array.isArray(casesData) ? casesData[0]?.title : casesData?.title
+            const caseObj = Array.isArray(casesData) ? casesData[0] : casesData
+            const caseTitle = caseObj?.title_en || caseObj?.title_ar || 'Unknown Case'
             await notificationService.sendApprovalNotification(
               id,
               contribution.donor_id,
               contribution.amount,
-              caseTitle || 'Unknown Case'
+              caseTitle
             )
           } else if (status === 'rejected' && rejection_reason) {
             const casesData = contribution.cases as CaseJoin
-            const caseTitle = Array.isArray(casesData) ? casesData[0]?.title : casesData?.title
+            const caseObj = Array.isArray(casesData) ? casesData[0] : casesData
+            const caseTitle = caseObj?.title_en || caseObj?.title_ar || 'Unknown Case'
             await notificationService.sendRejectionNotification(
               id,
               contribution.donor_id,
               contribution.amount,
-              caseTitle || 'Unknown Case',
+              caseTitle,
               rejection_reason
             )
           }

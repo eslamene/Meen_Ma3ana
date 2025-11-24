@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // Fetch contribution history with case information (left join to include contributions without cases)
     const { data: contributions, error: contributionsError } = await supabase
       .from('contributions')
-      .select('id, amount, created_at, case_id, status, cases(title, title_en, title_ar, status)')
+      .select('id, amount, created_at, case_id, status, cases(title_en, title_ar, status)')
       .eq('donor_id', user.id)
       .in('status', ['pending', 'approved', 'rejected'])
       .order('created_at', { ascending: false })

@@ -55,8 +55,10 @@ export async function GET(request: NextRequest) {
           email
         ),
         case:cases(
-          title,
-          description,
+          title_en,
+          title_ar,
+          description_en,
+          description_ar,
           target_amount,
           current_amount,
           status
@@ -93,8 +95,8 @@ export async function GET(request: NextRequest) {
           company_name: sponsor?.company_name || ''
         },
         case: {
-          title: caseData?.title || '',
-          description: caseData?.description || '',
+          title: caseData?.title_en || caseData?.title_ar || '',
+          description: caseData?.description_en || caseData?.description_ar || '',
           target_amount: parseFloat(caseData?.target_amount || '0'),
           current_amount: parseFloat(caseData?.current_amount || '0'),
           status: caseData?.status || ''

@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       .from('recurring_contributions')
       .select(`
         *,
-        cases(title),
+        cases(title_en, title_ar),
         projects(name)
       `)
       .eq('donor_id', user.id)
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         project_id: contrib.project_id,
         created_at: contrib.created_at,
         // Include resolved metadata
-        case_title: caseData?.title || null,
+        case_title: caseData?.title_en || caseData?.title_ar || null,
         project_name: projectData?.name || null
       }
     })

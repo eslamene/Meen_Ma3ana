@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         amount,
         donor_id,
         case_id,
-        cases(title)
+        cases(title_en, title_ar)
       `)
       .in('id', ids)
 
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         const caseData = Array.isArray(contribution.cases) 
           ? contribution.cases[0] 
           : contribution.cases
-        const caseTitle = caseData?.title || 'Unknown Case'
+        const caseTitle = caseData?.title_en || caseData?.title_ar || 'Unknown Case'
 
         if (action === 'approve') {
           // Update contribution status
