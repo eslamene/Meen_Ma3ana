@@ -8,12 +8,68 @@ export async function GET(
 ) {
   const { locale } = await params
   const requestUrl = new URL(request.url)
+  
+  // Log ALL incoming parameters at the very start for debugging
+  console.log('🚀 Callback route hit:', {
+    fullUrl: requestUrl.toString(),
+    pathname: requestUrl.pathname,
+    search: requestUrl.search,
+    hash: requestUrl.hash || '(none)',
+    allSearchParams: Object.fromEntries(requestUrl.searchParams.entries()),
+    locale,
+    timestamp: new Date().toISOString()
+  })
+  
   const code = requestUrl.searchParams.get('code')
   const type = requestUrl.searchParams.get('type') // 'recovery' for password reset
   const next = requestUrl.searchParams.get('next') ?? '/dashboard'
 
   // Validate locale
   const validLocale = locales.includes(locale as typeof locales[number]) ? locale : defaultLocale
+
+  // Check for Supabase error in query parameters first (most common)
+  const errorParam = requestUrl.searchParams.get('error')
+  const errorCodeParam = requestUrl.searchParams.get('error_code')
+  const errorDescParam = requestUrl.searchParams.get('error_description')
+  
+  if (errorParam || errorCodeParam) {
+    // Supabase sent error as query parameters
+    // This means Supabase failed BEFORE our code could run
+    const supabaseError = errorParam || 'server_error'
+    const errorCode = errorCodeParam || 'unknown'
+    const errorDesc = errorDescParam ? decodeURIComponent(errorDescParam.replace(/\+/g, ' ')) : 'Error confirming user'
+    
+    console.error('❌ Supabase auth error from query params (Supabase failed before our code ran):', {
+      error: supabaseError,
+      errorCode,
+      errorDescription: errorDesc,
+      hasCode: !!code,
+      codeLength: code?.length,
+      fullUrl: requestUrl.toString(),
+      allParams: Object.fromEntries(requestUrl.searchParams.entries()),
+      timestamp: new Date().toISOString()
+    })
+    
+    // If there's a code, try to exchange it anyway (might be a false positive)
+    if (code) {
+      console.log('⚠️ Error params present BUT code also exists - attempting exchange anyway...')
+    }
+    
+    // Map Supabase errors to our error types
+    let errorParamValue = 'auth-code-error'
+    if (errorCode === 'unexpected_failure' || supabaseError === 'server_error') {
+      errorParamValue = 'auth-code-error'
+    } else if (errorDesc.toLowerCase().includes('expired') || errorDesc.toLowerCase().includes('invalid')) {
+      errorParamValue = 'auth-code-expired'
+    } else if (errorDesc.toLowerCase().includes('already been used') || errorDesc.toLowerCase().includes('already used')) {
+      errorParamValue = 'auth-code-used'
+    }
+    
+    // Clean redirect without error params
+    return NextResponse.redirect(
+      `${requestUrl.origin}/${validLocale}/auth/login?error=${errorParamValue}&error_description=${encodeURIComponent(errorDesc)}`
+    )
+  }
 
   // Check for Supabase error in URL fragment (from Supabase redirect)
   const urlFragment = requestUrl.hash
