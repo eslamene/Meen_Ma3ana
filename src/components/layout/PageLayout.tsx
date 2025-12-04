@@ -51,7 +51,7 @@ export default function PageLayout({
     <ConditionalLayout>
       <div className={className}>
         {shouldShowBreadcrumbs && (
-          <div className="bg-white border-b border-gray-200">
+          <div className="hidden sm:block bg-white border-b border-gray-200">
             <Container variant={variant} className="py-4">
               <Breadcrumbs />
             </Container>

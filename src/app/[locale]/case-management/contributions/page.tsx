@@ -8,12 +8,14 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Heart, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Heart, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import ContributionsList from '@/components/contributions/ContributionsList'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
+import DetailPageHeader from '@/components/crud/DetailPageHeader'
+import { theme, brandColors } from '@/lib/theme'
 
 interface Contribution {
   id: string
@@ -63,6 +65,8 @@ interface Filters {
 }
 
 export default function AdminContributionsPage() {
+  const t = useTranslations('admin.contributions')
+  const tNav = useTranslations('navigation')
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -214,112 +218,107 @@ export default function AdminContributionsPage() {
   return (
     <ProtectedRoute>
       <PermissionGuard permission="contributions:manage">
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-          <Container variant={containerVariant}>
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
-                <Button
-                  variant="ghost"
-                  onClick={() => router.push(`/${params.locale}/case-management`)}
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Dashboard
-                </Button>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Contribution Management</h1>
-                  <p className="text-gray-600 mt-2">Review and manage all contributions</p>
-                </div>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-lg px-4 py-2">
-                  {pagination.total} contributions
-                </Badge>
-              </div>
-            </div>
+        <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
+          <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
+            {/* Enhanced Header */}
+            <DetailPageHeader
+              backUrl={`/${params.locale}/case-management`}
+              icon={Heart}
+              title={t('title') || 'Contribution Management'}
+              description={t('description') || 'Review and manage all contributions'}
+              backLabel="Back to Dashboard"
+              badge={{
+                label: `${pagination.total} ${pagination.total === 1 ? 'contribution' : 'contributions'}`,
+                variant: 'secondary',
+                className: 'bg-blue-100 text-blue-800 text-sm font-semibold'
+              }}
+            />
 
             {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
               <Card 
-                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-105 group ${
+                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-[1.02] sm:hover:scale-105 group ${
                   filters.status === 'all' 
                     ? 'border-2 border-blue-300 bg-blue-50/50' 
                     : 'hover:border-2 hover:border-blue-200'
                 }`}
+                style={{ boxShadow: filters.status === 'all' ? theme.shadows.primary : theme.shadows.primary }}
                 onClick={() => handleFilterChange('status', 'all')}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
                     </div>
-                    <div className="p-3 bg-blue-100 rounded-full group-hover:bg-blue-200 transition-colors">
-                      <Heart className="h-6 w-6 text-blue-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 bg-blue-100 group-hover:bg-blue-200 transition-colors">
+                      <Heart className="h-4 w-4 sm:h-6 sm:w-6 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card 
-                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-105 group ${
+                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-[1.02] sm:hover:scale-105 group ${
                   filters.status === 'pending' 
                     ? 'border-2 border-yellow-300 bg-yellow-50/50' 
                     : 'hover:border-2 hover:border-yellow-200'
                 }`}
+                style={{ boxShadow: filters.status === 'pending' ? theme.shadows.primary : theme.shadows.primary }}
                 onClick={() => handleFilterChange('status', 'pending')}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Pending</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Pending</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.pending}</p>
                     </div>
-                    <div className="p-3 bg-yellow-100 rounded-full group-hover:bg-yellow-200 transition-colors">
-                      <Clock className="h-6 w-6 text-yellow-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 bg-yellow-100 group-hover:bg-yellow-200 transition-colors">
+                      <Clock className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card 
-                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-105 group ${
+                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-[1.02] sm:hover:scale-105 group ${
                   filters.status === 'approved' 
                     ? 'border-2 border-green-300 bg-green-50/50' 
                     : 'hover:border-2 hover:border-green-200'
                 }`}
+                style={{ boxShadow: filters.status === 'approved' ? theme.shadows.primary : theme.shadows.primary }}
                 onClick={() => handleFilterChange('status', 'approved')}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Approved</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.approved}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Approved</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.approved}</p>
                     </div>
-                    <div className="p-3 bg-green-100 rounded-full group-hover:bg-green-200 transition-colors">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 bg-green-100 group-hover:bg-green-200 transition-colors">
+                      <CheckCircle className="h-4 w-4 sm:h-6 sm:w-6 text-green-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card 
-                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-105 group ${
+                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-[1.02] sm:hover:scale-105 group ${
                   filters.status === 'rejected' 
                     ? 'border-2 border-red-300 bg-red-50/50' 
                     : 'hover:border-2 hover:border-red-200'
                 }`}
+                style={{ boxShadow: filters.status === 'rejected' ? theme.shadows.primary : theme.shadows.primary }}
                 onClick={() => handleFilterChange('status', 'rejected')}
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Rejected</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.rejected}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Rejected</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.rejected}</p>
                     </div>
-                    <div className="p-3 bg-red-100 rounded-full group-hover:bg-red-200 transition-colors">
-                      <XCircle className="h-6 w-6 text-red-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 bg-red-100 group-hover:bg-red-200 transition-colors">
+                      <XCircle className="h-4 w-4 sm:h-6 sm:w-6 text-red-600" />
                     </div>
                   </div>
                 </CardContent>

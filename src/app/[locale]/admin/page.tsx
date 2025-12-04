@@ -26,8 +26,10 @@ import {
   XCircle,
   UserCheck,
   Shield,
-  ArrowRight
+  ArrowRight,
+  LayoutDashboard
 } from 'lucide-react'
+import { theme, brandColors } from '@/lib/theme'
 
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {
@@ -46,7 +48,8 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       title: 'Manage Cases',
       description: 'Create, edit, and monitor donation cases',
       icon: Target,
-      color: 'from-blue-500 to-indigo-600',
+      color: theme.gradients.primary,
+      hoverColor: `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`,
       permission: 'cases:update',
       action: () => router.push(`/${params.locale}/case-management/cases`),
       buttonText: 'View Cases'
@@ -56,7 +59,8 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       title: 'Review Contributions',
       description: 'Approve, reject, and manage donations',
       icon: Heart,
-      color: 'from-green-500 to-emerald-600',
+      color: theme.gradients.brand,
+      hoverColor: `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.ma3ana[600]} 100%)`,
       permission: 'contributions:approve',
       action: () => router.push(`/${params.locale}/case-management/contributions`),
       buttonText: 'View Contributions'
@@ -66,7 +70,8 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       title: 'View Analytics',
       description: 'Track performance and insights',
       icon: BarChart3,
-      color: 'from-purple-500 to-violet-600',
+      color: theme.gradients.secondary,
+      hoverColor: `linear-gradient(135deg, ${brandColors.ma3ana[600]} 0%, ${brandColors.ma3ana[700]} 100%)`,
       permission: 'admin:analytics',
       action: () => router.push(`/${params.locale}/case-management/analytics`),
       buttonText: 'View Reports'
@@ -76,7 +81,8 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
       title: 'Manage Sponsorships',
       description: 'Handle sponsorship requests and approvals',
       icon: UserCheck,
-      color: 'from-red-500 to-rose-600',
+      color: theme.gradients.brandReverse,
+      hoverColor: `linear-gradient(135deg, ${brandColors.ma3ana[600]} 0%, ${brandColors.meen[600]} 100%)`,
       permission: 'admin:dashboard', // Using general admin permission for sponsorships
       action: () => router.push(`/${params.locale}/case-management/sponsorships`),
       buttonText: 'View Sponsorships'
@@ -94,33 +100,45 @@ function AdminQuickActionsSection({ router, params }: AdminQuickActionsSectionPr
   }
   
   return (
-    <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-6">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-          <Settings className="h-4 w-4 text-blue-600" />
+    <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-6" style={{ boxShadow: theme.shadows.primary }}>
+      <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
+          <Settings className="h-4 w-4 text-meen" />
           Quick Actions
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="space-y-3">
+      <CardContent className="pt-0 px-4 sm:px-6 pb-4 sm:pb-6">
+        <div className="space-y-2 sm:space-y-3">
           {visibleActions.map((action) => (
             <button
               key={action.id}
               onClick={action.action}
-              className={`group w-full flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r ${action.color} text-white transition-all duration-200 hover:shadow-md hover:scale-[1.02]`}
+              style={{
+                background: action.color,
+                boxShadow: theme.shadows.primary
+              }}
+              className="group w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:scale-[1.01] sm:hover:scale-[1.02]"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = action.hoverColor || action.color
+                e.currentTarget.style.boxShadow = theme.shadows.primary
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = action.color
+                e.currentTarget.style.boxShadow = theme.shadows.primary
+              }}
             >
               <div className="flex-shrink-0">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                  <action.icon className="h-5 w-5" />
+                <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+                  <action.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
               </div>
-              <div className="flex-1 text-left">
-                <h3 className="font-medium text-base mb-1">{action.title}</h3>
-                <p className="text-sm opacity-90 leading-tight">{action.description}</p>
+              <div className="flex-1 text-left min-w-0">
+                <h3 className="font-medium text-sm sm:text-base mb-0.5 sm:mb-1 truncate">{action.title}</h3>
+                <p className="text-xs sm:text-sm opacity-90 leading-tight line-clamp-2">{action.description}</p>
               </div>
-              <div className="flex-shrink-0 flex items-center gap-2">
-                <span className="text-sm font-medium">{action.buttonText}</span>
-                <ArrowRight className="h-4 w-4 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <div className="flex-shrink-0 flex items-center gap-2 hidden sm:flex">
+                <span className="text-xs sm:text-sm font-medium">{action.buttonText}</span>
+                <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
               </div>
             </button>
           ))}
@@ -151,6 +169,7 @@ interface SystemStats {
 
 export default function AdminPage() {
   const t = useTranslations('admin')
+  const tNav = useTranslations('navigation')
   const router = useRouter()
   const params = useParams()
   const { roles } = useAdmin()
@@ -262,89 +281,102 @@ export default function AdminPage() {
   return (
     <ProtectedRoute>
       <PermissionGuard permission="admin:dashboard">
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-          <Container variant={containerVariant} className="py-8">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                    System Administration
-                  </h1>
-                  <p className="text-lg text-gray-600">
-                    Welcome back, Administrator. Here&apos;s your system overview.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                    <Shield className="h-3 w-3 mr-1" />
-                    {userRoleDisplayName}
-                  </Badge>
+        <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
+          <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
+            {/* Enhanced Header */}
+            <div className="mb-6 sm:mb-8">
+              <div className="bg-gradient-to-r from-white via-indigo-50/30 to-white rounded-xl border border-gray-200/60 shadow-sm p-4 sm:p-6">
+                <div className="flex items-start gap-4">
+                  {/* Icon */}
+                  <div className="relative shrink-0">
+                    <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
+                      <LayoutDashboard className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-400 rounded-full border-2 border-white"></div>
+                  </div>
+
+                  {/* Title and Description */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-4 mb-2 flex-wrap">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                          {t('title') || 'System Administration'}
+                        </h1>
+                        <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200 text-xs font-semibold">
+                          <Shield className="h-3 w-3 mr-1" />
+                          {userRoleDisplayName}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-sm sm:text-base text-gray-600">
+                      Welcome back, Administrator. Here&apos;s your system overview.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* System Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Users</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Users</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                         {loading ? '...' : stats.totalUsers}
                       </p>
                     </div>
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <Users className="h-6 w-6 text-blue-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.meen[100] }}>
+                      <Users className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Contributions</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Contributions</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                         {loading ? '...' : stats.totalContributions}
                       </p>
                     </div>
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <Heart className="h-6 w-6 text-green-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <Heart className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Amount</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 truncate">
                         {loading ? '...' : formatAmount(stats.totalAmount)}
                       </p>
                     </div>
-                    <div className="p-3 bg-emerald-100 rounded-full">
-                      <DollarSign className="h-6 w-6 text-emerald-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ background: theme.gradients.brandSubtle }}>
+                      <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Active Cases</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Cases</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                         {loading ? '...' : stats.activeCases}
                       </p>
                     </div>
-                    <div className="p-3 bg-yellow-100 rounded-full">
-                      <Activity className="h-6 w-6 text-yellow-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ background: theme.gradients.brandSubtle }}>
+                      <Activity className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
@@ -352,66 +384,66 @@ export default function AdminPage() {
             </div>
 
             {/* Additional Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.secondary }}>
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Completed Cases</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Completed Cases</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                         {loading ? '...' : stats.completedCases}
                       </p>
                     </div>
-                    <div className="p-3 bg-purple-100 rounded-full">
-                      <Target className="h-6 w-6 text-purple-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <Target className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Pending Reviews</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Pending Reviews</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                         {loading ? '...' : stats.pendingContributions}
                       </p>
                     </div>
-                    <div className="p-3 bg-orange-100 rounded-full">
-                      <Clock className="h-6 w-6 text-orange-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <Clock className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Approved</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Approved</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                         {loading ? '...' : stats.approvedContributions}
                       </p>
                     </div>
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.meen[100] }}>
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.secondary }}>
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Rejected</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Rejected</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                         {loading ? '...' : stats.rejectedContributions}
                       </p>
                     </div>
-                    <div className="p-3 bg-red-100 rounded-full">
-                      <XCircle className="h-6 w-6 text-red-600" />
+                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
                     </div>
                   </div>
                 </CardContent>
@@ -426,46 +458,46 @@ export default function AdminPage() {
             />
 
             {/* Recent Activity */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-blue-600" />
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
+              <CardHeader className="px-4 sm:px-6 pt-4 sm:pt-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-meen" />
                   Recent Activity
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
                 {loading ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-gray-600 mt-2">Loading recent activity...</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto" style={{ borderColor: brandColors.meen[600] }}></div>
+                    <p className="text-gray-600 mt-2 text-sm sm:text-base">Loading recent activity...</p>
                   </div>
                 ) : stats.recentActivity.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {stats.recentActivity.map((activity) => (
-                      <div key={activity.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 rounded-full">
-                            <Heart className="h-4 w-4 text-blue-600" />
+                      <div key={activity.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="p-2 rounded-full flex-shrink-0" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                            <Heart className="h-4 w-4" style={{ color: brandColors.ma3ana[600] }} />
                           </div>
-                          <div>
-                            <p className="font-medium text-gray-900">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
                               New contribution: {formatAmount(activity.amount)}
                             </p>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-xs sm:text-sm text-gray-600">
                               {formatDate(activity.date)}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           {getStatusBadge(activity.status)}
                           <Button 
                             variant="outline" 
                             size="sm"
                             onClick={() => router.push(`/${params.locale}/case-management/contributions?contribution=${activity.id}`)}
-                            className="border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200"
+                            className="border-2 border-gray-200 hover:border-meen hover:bg-meen-50 transition-all duration-200"
                           >
                             <Eye className="h-3 w-3 mr-1" />
-                            View
+                            <span className="hidden sm:inline">View</span>
                           </Button>
                         </div>
                       </div>
@@ -473,8 +505,8 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No recent activity</p>
+                    <Activity className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 text-sm sm:text-base">No recent activity</p>
                   </div>
                 )}
               </CardContent>

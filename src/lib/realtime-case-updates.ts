@@ -80,11 +80,32 @@ export class RealtimeCaseUpdates {
       )
 
     this.channels.set(channelKey, channel)
-    channel.subscribe((status) => {
+    channel.subscribe((status, err) => {
       if (status === 'CHANNEL_ERROR') {
-        const err = new Error('Realtime channel error')
-        defaultLogger.error('Realtime case progress error:', err)
-        onError?.(err)
+        // Handle connection errors gracefully - these are often temporary
+        const errorMessage = err?.message || 'Realtime channel connection error'
+        const error = err instanceof Error ? err : new Error(errorMessage)
+        
+        // Only log if we have meaningful error information
+        if (err && (err instanceof Error || (typeof err === 'object' && Object.keys(err).length > 0))) {
+          defaultLogger.error('Realtime case progress error:', error, { 
+            channelKey,
+            status,
+            errorDetails: err instanceof Error ? {
+              name: err.name,
+              message: err.message,
+              stack: err.stack
+            } : err
+          })
+        } else {
+          // For empty errors, just log a warning (connection issues are often temporary)
+          defaultLogger.warn('Realtime case progress connection issue', { channelKey, status })
+        }
+        onError?.(error)
+      } else if (status === 'SUBSCRIBED') {
+        // Successfully subscribed - no need to log
+      } else if (status === 'CLOSED') {
+        // Channel closed - this is normal when unsubscribing
       }
     })
 
@@ -150,11 +171,32 @@ export class RealtimeCaseUpdates {
       )
 
     this.channels.set(channelKey, channel)
-    channel.subscribe((status) => {
+    channel.subscribe((status, err) => {
       if (status === 'CHANNEL_ERROR') {
-        const err = new Error('Realtime channel error')
-        defaultLogger.error('Realtime case updates error:', err)
-        onError?.(err)
+        // Handle connection errors gracefully - these are often temporary
+        const errorMessage = err?.message || 'Realtime channel connection error'
+        const error = err instanceof Error ? err : new Error(errorMessage)
+        
+        // Only log if we have meaningful error information
+        if (err && (err instanceof Error || (typeof err === 'object' && Object.keys(err).length > 0))) {
+          defaultLogger.error('Realtime case updates error:', error, { 
+            channelKey,
+            status,
+            errorDetails: err instanceof Error ? {
+              name: err.name,
+              message: err.message,
+              stack: err.stack
+            } : err
+          })
+        } else {
+          // For empty errors, just log a warning (connection issues are often temporary)
+          defaultLogger.warn('Realtime case updates connection issue', { channelKey, status })
+        }
+        onError?.(error)
+      } else if (status === 'SUBSCRIBED') {
+        // Successfully subscribed - no need to log
+      } else if (status === 'CLOSED') {
+        // Channel closed - this is normal when unsubscribing
       }
     })
 
@@ -204,11 +246,32 @@ export class RealtimeCaseUpdates {
       )
 
     this.channels.set(channelKey, channel)
-    channel.subscribe((status) => {
+    channel.subscribe((status, err) => {
       if (status === 'CHANNEL_ERROR') {
-        const err = new Error('Realtime case update changes error')
-        defaultLogger.error('Realtime case update changes error:', err)
-        onError?.(err)
+        // Handle connection errors gracefully - these are often temporary
+        const errorMessage = err?.message || 'Realtime channel connection error'
+        const error = err instanceof Error ? err : new Error(errorMessage)
+        
+        // Only log if we have meaningful error information
+        if (err && (err instanceof Error || (typeof err === 'object' && Object.keys(err).length > 0))) {
+          defaultLogger.error('Realtime case contributions error:', error, { 
+            channelKey,
+            status,
+            errorDetails: err instanceof Error ? {
+              name: err.name,
+              message: err.message,
+              stack: err.stack
+            } : err
+          })
+        } else {
+          // For empty errors, just log a warning (connection issues are often temporary)
+          defaultLogger.warn('Realtime case contributions connection issue', { channelKey, status })
+        }
+        onError?.(error)
+      } else if (status === 'SUBSCRIBED') {
+        // Successfully subscribed - no need to log
+      } else if (status === 'CLOSED') {
+        // Channel closed - this is normal when unsubscribing
       }
     })
 

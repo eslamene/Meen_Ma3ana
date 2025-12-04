@@ -26,7 +26,8 @@ import {
   XCircle,
   UserCheck,
   Shield,
-  ArrowRight
+  ArrowRight,
+  LayoutDashboard
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { theme, brandColors } from '@/lib/theme'
@@ -169,6 +170,7 @@ interface SystemStats {
 
 export default function AdminPage() {
   const t = useTranslations('admin')
+  const tNav = useTranslations('navigation')
   const router = useRouter()
   const params = useParams()
   const { roles } = useAdmin()
@@ -282,22 +284,35 @@ export default function AdminPage() {
       <PermissionGuard permission="admin:dashboard">
         <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
           <Container variant={containerVariant} className="py-8">
-            {/* Header */}
+            {/* Enhanced Header */}
             <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                    Case Management Dashboard
-                  </h1>
-                  <p className="text-lg text-gray-600">
-                    Welcome back, Administrator. Here&apos;s your system overview.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200">
-                    <Shield className="h-3 w-3 mr-1" />
-                    {userRoleDisplayName}
-                  </Badge>
+              <div className="bg-gradient-to-r from-white via-indigo-50/30 to-white rounded-xl border border-gray-200/60 shadow-sm p-6">
+                <div className="flex items-start gap-4">
+                  {/* Icon */}
+                  <div className="relative shrink-0">
+                    <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
+                      <LayoutDashboard className="h-7 w-7 text-white" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-400 rounded-full border-2 border-white"></div>
+                  </div>
+
+                  {/* Title and Description */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-4 mb-2 flex-wrap">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                          {tNav('caseManagement') || 'Case Management Dashboard'}
+                        </h1>
+                        <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200 text-xs font-semibold">
+                          <Shield className="h-3 w-3 mr-1" />
+                          {userRoleDisplayName}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-sm sm:text-base text-gray-600">
+                      Welcome back, Administrator. Here&apos;s your system overview.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

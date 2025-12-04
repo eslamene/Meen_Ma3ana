@@ -47,14 +47,13 @@ const TabsList = React.forwardRef<
     return (
       <div className={cn(
         'mb-4 sm:mb-6 md:mb-8 rounded-lg sm:rounded-xl bg-gradient-brand-subtle p-0.5 sm:p-1 md:p-1.5 border border-meen/20 shadow-sm',
-        'overflow-x-auto -mx-1 sm:mx-0 px-1 sm:px-0',
-        'scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent',
+        'w-full',
         className
       )}>
         <TabsPrimitive.List
           ref={ref}
           className={cn(
-            "inline-flex h-auto p-0 bg-transparent min-w-max sm:min-w-0 sm:w-full justify-start gap-1 sm:gap-1.5 md:gap-2 flex-nowrap",
+            "flex h-auto p-0 bg-transparent w-full justify-start gap-1 sm:gap-1.5 md:gap-2 flex-wrap sm:flex-nowrap",
             className
           )}
           {...props}
@@ -142,11 +141,11 @@ const TabsTrigger = React.forwardRef<
         ref={combinedRef}
         className={cn(
           'group relative flex items-center justify-center gap-1 sm:gap-1.5 md:gap-2.5',
-          'px-2.5 sm:px-4 md:px-6 lg:px-7',
+          'px-2 sm:px-3 md:px-6 lg:px-7',
           'py-2 sm:py-2.5 md:py-3 lg:py-3.5',
-          'text-[11px] sm:text-xs md:text-sm font-bold',
+          'text-[10px] sm:text-xs md:text-sm font-bold',
           'rounded-md sm:rounded-lg border-2',
-          'min-w-[60px] sm:min-w-[80px] md:min-w-0 flex-shrink-0',
+          'flex-1 sm:flex-initial min-w-0 sm:min-w-[80px] md:min-w-0',
           'touch-manipulation',
           'data-[state=active]:text-white data-[state=active]:border-transparent data-[state=active]:shadow-lg',
           'data-[state=inactive]:border-white/40 data-[state=inactive]:bg-white/10 data-[state=inactive]:backdrop-blur-md',
@@ -172,9 +171,9 @@ const TabsTrigger = React.forwardRef<
         {...props}
       >
         {Icon && (
-          <Icon className="h-3.5 w-3.5 sm:h-4 md:h-4.5 sm:w-4 md:w-4.5 flex-shrink-0 transition-all duration-300 group-data-[state=active]:scale-110 sm:group-data-[state=active]:scale-125 group-data-[state=active]:rotate-3" />
+          <Icon className="h-4 w-4 sm:h-4 md:h-4.5 sm:w-4 md:w-4.5 flex-shrink-0 transition-all duration-300 group-data-[state=active]:scale-110 sm:group-data-[state=active]:scale-125 group-data-[state=active]:rotate-3" />
         )}
-        <span className="relative z-10 hidden min-[360px]:inline truncate max-w-[70px] sm:max-w-none">{props.children}</span>
+        <span className="relative z-10 hidden md:inline truncate text-sm">{props.children}</span>
         {badge !== undefined && badge !== null && (
           <Badge
             variant={badgeVariant || 'secondary'}

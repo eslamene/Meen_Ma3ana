@@ -1,13 +1,15 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import NavigationBar from '@/components/navigation/NavigationBar'
 import SimpleSidebar from '@/components/navigation/SimpleSidebar'
 import { Button } from '@/components/ui/button'
-import { Menu } from 'lucide-react'
+import { Menu, X, Home, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
 interface ConditionalLayoutProps {
   children: React.ReactNode
@@ -15,6 +17,9 @@ interface ConditionalLayoutProps {
 
 export default function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname()
+  const params = useParams()
+  const locale = params.locale as string
+  const t = useTranslations('navigation')
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false) // Start closed on mobile
@@ -134,18 +139,100 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   // Show sidebar navigation for authenticated users (not in recovery mode)
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile menu button */}
-      {!sidebarOpen && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setSidebarOpen(true)}
-          className="lg:hidden fixed top-4 left-4 z-50 bg-white shadow-md"
-          aria-label="Open menu"
-        >
-          <Menu className="h-4 w-4" />
-        </Button>
-      )}
+      {/* Fixed Top Header Bar - Mobile Only */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center gap-2 h-14 px-3">
+          {/* Menu Toggle Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={sidebarOpen}
+          >
+            {sidebarOpen ? (
+              <X className="h-5 w-5 text-gray-700" />
+            ) : (
+              <Menu className="h-5 w-5 text-gray-700" />
+            )}
+          </Button>
+          
+          {/* Breadcrumbs - Integrated into header */}
+          <nav className="flex items-center gap-1 flex-1 min-w-0 text-xs text-gray-600">
+            <Link 
+              href={`/${locale}`}
+              className="flex items-center gap-0.5 hover:text-meen transition-colors duration-200 flex-shrink-0"
+            >
+              <Home className="h-3 w-3" />
+            </Link>
+            {(() => {
+              const pathSegments = pathname?.split('/').filter(Boolean) || []
+              const breadcrumbs: string[] = []
+              
+              // Build breadcrumb path, skipping locale
+              for (let i = 1; i < pathSegments.length; i++) {
+                const segment = pathSegments[i]
+                if (segment === locale) continue
+                breadcrumbs.push(segment)
+              }
+              
+              if (breadcrumbs.length === 0) {
+                return null
+              }
+              
+              // Map segments to readable labels (same logic as Breadcrumbs component)
+              const getSegmentLabel = (segment: string): string => {
+                switch (segment) {
+                  case 'cases':
+                    return t('cases') || 'Cases'
+                  case 'dashboard':
+                    return t('dashboard') || 'Dashboard'
+                  case 'profile':
+                    return t('profile') || 'Profile'
+                  case 'notifications':
+                    return t('notifications') || 'Notifications'
+                  case 'admin':
+                    return t('admin') || 'Admin'
+                  case 'case-management':
+                    return t('caseManagement') || 'Case Management'
+                  case 'beneficiaries':
+                    return t('beneficiaries') || 'Beneficiaries'
+                  case 'contributions':
+                    return t('contributions') || 'Contributions'
+                  case 'create':
+                    return t('createCase') || 'Create'
+                  case 'edit':
+                    return t('edit') || 'Edit'
+                  case 'donate':
+                    return t('donate') || 'Donate'
+                  case 'details':
+                    return t('details') || 'Details'
+                  default:
+                    // For dynamic segments like IDs, show a generic label
+                    if (segment.length > 20) {
+                      return t('item') || 'Item'
+                    }
+                    return segment.charAt(0).toUpperCase() + segment.slice(1)
+                }
+              }
+              
+              // Show the last breadcrumb (current page)
+              const currentSegment = breadcrumbs[breadcrumbs.length - 1]
+              const currentLabel = getSegmentLabel(currentSegment)
+              
+              return (
+                <>
+                  <ChevronRight className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                  <span className="text-gray-900 font-medium truncate">
+                    {currentLabel}
+                  </span>
+                </>
+              )
+            })()}
+          </nav>
+        </div>
+      </header>
       
       {/* Sidebar - Always fixed, never scrolls with page */}
       <SimpleSidebar 
@@ -157,7 +244,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
       
       {/* Main Content - Accounts for fixed sidebar width on desktop, full width on mobile */}
       <div 
-        className="min-h-screen transition-all duration-300"
+        className={`min-h-screen transition-all duration-300 ${isDesktop ? '' : 'pt-14'}`}
         style={{
           marginLeft: sidebarOpen && isDesktop 
             ? (sidebarCollapsed ? '80px' : '256px') 

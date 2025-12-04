@@ -36,7 +36,8 @@ import {
   CheckCircle2,
   XCircle,
   Edit,
-  Bell
+  Bell,
+  LayoutDashboard
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -358,43 +359,60 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
         <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
-          {/* Header */}
+          {/* Enhanced Header */}
           <div className="mb-6 sm:mb-8">
-            <div className="flex flex-col gap-4">
-              <div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
-                  {t('welcome')}
-                </h1>
-                <p className="text-base sm:text-lg text-gray-600 break-words">
-                  Welcome back, {user?.email}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <Badge variant="outline" className={`${getRoleColor(userRole || '')} text-xs sm:text-sm`}>
-                  <Shield className="h-3 w-3 mr-1" />
-                  <span className="hidden min-[375px]:inline">{getRoleDisplayName(userRole || '')}</span>
-                  <span className="min-[375px]:hidden">{getRoleDisplayName(userRole || '').split(' ')[0]}</span>
-                </Badge>
-                <Button
-                  variant="outline"
-                  onClick={refreshUserRole}
-                  disabled={refreshingRole}
-                  className="border-meen-300 text-meen-700 hover:bg-meen-50 px-2 sm:px-3"
-                  title="Refresh role from database"
-                >
-                  <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${refreshingRole ? 'animate-spin' : ''}`} />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    await signOut()
-                    router.push(`/${params.locale}/landing`)
-                  }}
-                  className="border-ma3ana-300 text-ma3ana-700 hover:bg-ma3ana-50 px-2 sm:px-3"
-                  title={t('signOut')}
-                >
-                  <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
-                </Button>
+            <div className="bg-gradient-to-r from-white via-indigo-50/30 to-white rounded-xl border border-gray-200/60 shadow-sm p-4 sm:p-6">
+              <div className="flex items-start gap-4">
+                {/* Icon */}
+                <div className="relative shrink-0">
+                  <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
+                    <LayoutDashboard className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-400 rounded-full border-2 border-white"></div>
+                </div>
+
+                {/* Title and Description */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-4 mb-2 flex-wrap">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                        {t('welcome')}
+                      </h1>
+                      <Badge variant="outline" className={`${getRoleColor(userRole || '')} text-xs sm:text-sm font-semibold`}>
+                        <Shield className="h-3 w-3 mr-1" />
+                        <span className="hidden min-[375px]:inline">{getRoleDisplayName(userRole || '')}</span>
+                        <span className="min-[375px]:hidden">{getRoleDisplayName(userRole || '').split(' ')[0]}</span>
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={refreshUserRole}
+                        disabled={refreshingRole}
+                        className="border-meen-300 text-meen-700 hover:bg-meen-50 px-2 sm:px-3"
+                        title="Refresh role from database"
+                      >
+                        <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${refreshingRole ? 'animate-spin' : ''}`} />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          await signOut()
+                          router.push(`/${params.locale}/landing`)
+                        }}
+                        className="border-ma3ana-300 text-ma3ana-700 hover:bg-ma3ana-50 px-2 sm:px-3"
+                        title={t('signOut')}
+                      >
+                        <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-sm sm:text-base text-gray-600 break-words">
+                    Welcome back, {user?.email}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

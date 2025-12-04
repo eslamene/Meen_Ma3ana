@@ -21,8 +21,6 @@ import {
   Users,
   AlertCircle,
   Filter,
-  Home,
-  ChevronRight,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
@@ -343,21 +341,8 @@ export default function CasesPage() {
     }>
       <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
         <Container variant={containerVariant} className="py-3 sm:py-6 lg:py-10">
-        {/* Enhanced Header with Breadcrumbs - Compact on Mobile */}
+        {/* Enhanced Header - Breadcrumbs are now in the fixed header bar */}
         <div className="mb-3 sm:mb-6 lg:mb-10 w-full">
-          {/* Breadcrumbs - Smaller on Mobile */}
-          <nav className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4 text-xs sm:text-sm text-gray-600">
-            <Link 
-              href={`/${locale}`}
-              className="flex items-center gap-1 hover:text-meen transition-colors duration-200"
-            >
-              <Home className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">{tNav('home') || 'Home'}</span>
-            </Link>
-            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
-            <span className="text-gray-900 font-medium">{tNav('cases') || t('cases') || 'Cases'}</span>
-          </nav>
-
           {/* Title Section with Enhanced Design - Compact on Mobile */}
           <div className="mb-2 sm:mb-4 lg:mb-8">
             <div className="flex flex-col md:flex-row justify-between items-start gap-1.5 sm:gap-3 lg:gap-6 mb-2 sm:mb-4 lg:mb-8">
