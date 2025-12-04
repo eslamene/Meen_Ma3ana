@@ -467,40 +467,51 @@ export default function FilterSidebar({
 
       {/* Desktop Filter Sidebar - Show only on screens >= 1600px */}
       <div className={`hidden 2xl:block transition-all duration-300 ease-in-out ${isOpen ? 'block opacity-100' : 'opacity-100'}`}>
-        <Card className="mb-6 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-          <CardHeader className="pb-4 border-b border-gray-100">
-            <div className="flex items-center justify-between">
+        <Card className="mb-6 bg-white/95 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-shadow duration-300">
+          <CardHeader className="pb-5 border-b border-gray-200 bg-gradient-to-r from-gray-50/50 to-white">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg">
+                <div className="p-2.5 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-xl shadow-lg">
                   <Filter className="h-5 w-5 text-white" />
                 </div>
-                <CardTitle className="text-xl font-bold text-gray-900">{t('filters')}</CardTitle>
+                <div>
+                  <CardTitle className="text-xl font-bold text-gray-900">{t('filters')}</CardTitle>
+                  <CardDescription className="text-sm text-gray-600 mt-0.5">
+                    {t('filterDescription')}
+                  </CardDescription>
+                </div>
               </div>
               {hasActiveFilters && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onClearFilters}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200 font-medium"
                 >
-                  <X className="h-4 w-4 mr-1" />
+                  <X className="h-4 w-4 mr-1.5" />
                   {t('clearAll')}
                 </Button>
               )}
             </div>
-            <CardDescription className="text-gray-600 font-medium mt-2">
-              {t('filterDescription')}
-            </CardDescription>
+            {hasActiveFilters && (
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 px-2.5 py-1">
+                  {activeFiltersCount} {activeFiltersCount === 1 ? 'filter' : 'filters'} active
+                </Badge>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
             {/* Enhanced Case Type Filter */}
-            <div>
+            <div className="group">
               <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Target className="h-4 w-4 text-blue-600" />
+                <div className="p-1.5 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                  <Target className="h-4 w-4 text-blue-600" />
+                </div>
                 {t('caseType')}
               </label>
               <Select value={filters.type} onValueChange={(value) => onFilterChange('type', value)}>
-                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 h-11 rounded-lg transition-all duration-200 hover:border-gray-300">
                   <SelectValue placeholder={t('allTypes')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -512,13 +523,15 @@ export default function FilterSidebar({
             </div>
 
             {/* Enhanced Status Filter */}
-            <div>
+            <div className="group">
               <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Eye className="h-4 w-4 text-green-600" />
+                <div className="p-1.5 bg-green-50 rounded-lg group-hover:bg-green-100 transition-colors">
+                  <Eye className="h-4 w-4 text-green-600" />
+                </div>
                 {t('status')}
               </label>
               <Select value={filters.status} onValueChange={(value) => onFilterChange('status', value)}>
-                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                <SelectTrigger className="border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 h-11 rounded-lg transition-all duration-200 hover:border-gray-300">
                   <SelectValue placeholder={t('allStatuses')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -531,9 +544,11 @@ export default function FilterSidebar({
             </div>
 
             {/* Enhanced Category Filter - Assigned Categories */}
-            <div>
+            <div className="group">
               <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Gift className="h-4 w-4 text-purple-600" />
+                <div className="p-1.5 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition-colors">
+                  <Gift className="h-4 w-4 text-purple-600" />
+                </div>
                 {t('category')}
               </label>
               <Select 
@@ -541,7 +556,7 @@ export default function FilterSidebar({
                 onValueChange={(value) => onFilterChange('category', value)}
                 disabled={categoriesLoading}
               >
-                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                <SelectTrigger className="border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 h-11 rounded-lg transition-all duration-200 hover:border-gray-300 disabled:opacity-50">
                   <SelectValue placeholder={categoriesLoading ? t('loading') || 'Loading...' : t('allCategories')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -559,13 +574,15 @@ export default function FilterSidebar({
             </div>
 
             {/* Auto-Detected Category Filter - Detection Rules */}
-            <div>
+            <div className="group">
               <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-600" />
+                <div className="p-1.5 bg-indigo-50 rounded-lg group-hover:bg-indigo-100 transition-colors">
+                  <Sparkles className="h-4 w-4 text-indigo-600" />
+                </div>
                 {t('autoDetectedCategory')}
               </label>
               <Select value={filters.detectedCategory} onValueChange={(value) => onFilterChange('detectedCategory', value)}>
-                <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 h-11">
+                <SelectTrigger className="border-2 border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 h-11 rounded-lg transition-all duration-200 hover:border-gray-300">
                   <SelectValue placeholder={t('allCategories')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -742,9 +759,9 @@ export default function FilterSidebar({
             {/* Enhanced Apply Filters Button */}
             <Button 
               onClick={onApplyFilters} 
-              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 h-12"
+              className="w-full bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 hover:from-blue-600 hover:via-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-12 rounded-xl font-semibold text-base transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-5 w-5 mr-2" />
               {t('applyFilters')}
             </Button>
           </CardContent>

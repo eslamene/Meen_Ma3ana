@@ -619,6 +619,8 @@
     "descriptionPlaceholder": "صف الحالة بالتفصيل",
     "donate": "تبرع",
     "donateNow": "تبرع الآن",
+    "loginRequired": "تسجيل الدخول مطلوب",
+    "pleaseLogInToDonate": "يرجى تسجيل الدخول أو إنشاء حساب لتقديم تبرع.",
     "donating": "جاري التبرع...",
     "donationAmount": "مبلغ التبرع",
     "donationDescription": "قدم تبرعاً آمناً لمساعدة هذه الحالة",

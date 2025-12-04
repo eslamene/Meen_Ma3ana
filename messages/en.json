@@ -740,6 +740,8 @@
     "showMore": "Show More",
     "showLess": "Show Less",
     "donateNow": "Donate Now",
+    "loginRequired": "Login Required",
+    "pleaseLogInToDonate": "Please log in or sign up to make a donation.",
     "contactBeneficiary": "Contact Beneficiary",
     "updates": "Updates",
     "activeCases": "Active Cases",

@@ -58,6 +58,7 @@ import { theme, brandColors } from '@/lib/theme'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import type { Beneficiary } from '@/types/beneficiary'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 interface Case {
   id: string
@@ -142,6 +143,7 @@ export default function CaseDetailPage() {
   )
   const [apiProgress, setApiProgress] = useState<{ approvedTotal: number; progressPercentage: number; contributorCount: number } | null>(null)
   const { hasPermission } = useAdmin()
+  const { user, loading: authLoading } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [activeTab, setActiveTab] = useState<'files' | 'contributions' | 'updates'>('files')
@@ -606,6 +608,27 @@ export default function CaseDetailPage() {
   }
 
   const handleDonate = () => {
+    // Wait for auth to finish loading
+    if (authLoading) {
+      return
+    }
+    
+    // Check if user is authenticated
+    if (!user) {
+      // User is not logged in - show notification and redirect to login
+      toast.error(t('loginRequired') || 'Login Required', {
+        description: t('pleaseLogInToDonate') || 'Please log in or sign up to make a donation.',
+        action: {
+          label: 'Login',
+          onClick: () => router.push(`/${locale}/auth/login?redirect=/${locale}/cases/${caseId}/donate`)
+        }
+      })
+      // Redirect to login page with return URL
+      router.push(`/${locale}/auth/login?redirect=/${locale}/cases/${caseId}/donate`)
+      return
+    }
+    
+    // User is authenticated - proceed to donation page
     router.push(`/${locale}/cases/${caseId}/donate`)
   }
 

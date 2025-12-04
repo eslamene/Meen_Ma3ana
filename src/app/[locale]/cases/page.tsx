@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import { 
@@ -19,8 +20,13 @@ import {
   DollarSign,
   Users,
   AlertCircle,
-  Filter
+  Filter,
+  Home,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
+import Link from 'next/link'
 import CaseCard from '@/components/cases/CaseCard'
 import FilterSidebar from '@/components/cases/FilterSidebar'
 import PermissionGuard from '@/components/auth/PermissionGuard'
@@ -63,6 +69,7 @@ interface CaseFilters {
 
 export default function CasesPage() {
   const t = useTranslations('cases')
+  const tNav = useTranslations('navigation')
   const params = useParams()
   const router = useRouter()
   const locale = params.locale as string
@@ -87,6 +94,7 @@ export default function CasesPage() {
   })
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showFilters, setShowFilters] = useState(false)
+  const [statsExpanded, setStatsExpanded] = useState(false) // Collapsed by default on mobile
   const [serverPagination, setServerPagination] = useState({
     total: 0,
     totalPages: 0
@@ -334,92 +342,253 @@ export default function CasesPage() {
       </div>
     }>
       <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
-        <Container variant={containerVariant} className="py-8">
-        {/* Enhanced Header */}
-        <div className="mb-6 sm:mb-8 w-full">
-          {/* Title and Create Case Button Row */}
-          <div className="flex flex-col md:flex-row justify-between items-start gap-4 sm:gap-6 mb-6 w-full">
-            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              <div className="p-2 rounded-lg flex-shrink-0" style={{ background: theme.gradients.primary }}>
-                <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+        <Container variant={containerVariant} className="py-3 sm:py-6 lg:py-10">
+        {/* Enhanced Header with Breadcrumbs - Compact on Mobile */}
+        <div className="mb-3 sm:mb-6 lg:mb-10 w-full">
+          {/* Breadcrumbs - Smaller on Mobile */}
+          <nav className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4 text-xs sm:text-sm text-gray-600">
+            <Link 
+              href={`/${locale}`}
+              className="flex items-center gap-1 hover:text-meen transition-colors duration-200"
+            >
+              <Home className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">{tNav('home') || 'Home'}</span>
+            </Link>
+            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+            <span className="text-gray-900 font-medium">{tNav('cases') || t('cases') || 'Cases'}</span>
+          </nav>
+
+          {/* Title Section with Enhanced Design - Compact on Mobile */}
+          <div className="mb-2 sm:mb-4 lg:mb-8">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-1.5 sm:gap-3 lg:gap-6 mb-2 sm:mb-4 lg:mb-8">
+              <div className="flex items-start gap-2 sm:gap-3 lg:gap-5 flex-1 min-w-0">
+                {/* Enhanced Icon Container - Smaller on Mobile */}
+                <div className="relative flex-shrink-0">
+                  <div 
+                    className="p-1.5 sm:p-2.5 lg:p-4 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-md sm:shadow-lg flex items-center justify-center"
+                    style={{ 
+                      background: theme.gradients.primary,
+                      boxShadow: theme.shadows.primary
+                    }}
+                  >
+                    <Target className="h-3.5 w-3.5 sm:h-5 sm:w-5 lg:h-8 lg:w-8 text-white" />
+                  </div>
+                  <div 
+                    className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full animate-pulse"
+                    style={{ backgroundColor: brandColors.ma3ana[500] }}
+                  />
+                </div>
+                
+                {/* Title and Description - Compact on Mobile */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-0.5 sm:mb-1.5 lg:mb-3">
+                    <h1 className="text-lg sm:text-2xl lg:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent break-words leading-tight flex-1">
+                      {t('browseCases')}
+                    </h1>
+                    {/* Statistics Button - Inline with Title on Mobile */}
+                    <Collapsible 
+                      open={statsExpanded} 
+                      onOpenChange={setStatsExpanded}
+                      className="sm:hidden"
+                    >
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-1 h-7 px-2 border border-gray-200 hover:border-meen hover:bg-meen-50 rounded-md font-medium transition-all duration-200 text-[10px] flex-shrink-0"
+                        >
+                          <TrendingUp className="h-3 w-3 text-meen-600" />
+                          <Badge variant="secondary" className="bg-meen-100 text-meen-800 border-meen-200 text-[9px] px-0.5 py-0 h-3.5">
+                            3
+                          </Badge>
+                          {statsExpanded ? (
+                            <ChevronUp className="h-2.5 w-2.5 text-gray-500 ml-0.5" />
+                          ) : (
+                            <ChevronDown className="h-2.5 w-2.5 text-gray-500 ml-0.5" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                    </Collapsible>
+                  </div>
+                  <p className="text-[10px] sm:text-sm lg:text-xl text-gray-600 break-words leading-relaxed max-w-2xl hidden sm:block">
+                    {t('browseCasesDescription')}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent break-words">
-                  {t('browseCases')}
-                </h1>
-                <p className="text-sm sm:text-base lg:text-lg text-gray-600 mt-1 break-words">
-                  {t('browseCasesDescription')}
-                </p>
-              </div>
+              
+              {/* Create Case button - Desktop */}
+              {canCreateCase && (
+                <div className="hidden md:block flex-shrink-0">
+                  <Button 
+                    onClick={handleCreateCase} 
+                    style={{ background: theme.gradients.primary, boxShadow: theme.shadows.primary }}
+                    className="flex items-center gap-2 text-white hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-xl text-base font-semibold h-auto"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = theme.gradients.primary
+                      e.currentTarget.style.transform = 'translateY(0)'
+                    }}
+                  >
+                    <Plus className="h-5 w-5" />
+                    {t('createCase')}
+                  </Button>
+                </div>
+              )}
             </div>
             
-            {/* Create Case button moved to second row on mobile */}
-            {canCreateCase && (
-              <div className="hidden md:block flex-shrink-0">
-                <Button 
-                  onClick={handleCreateCase} 
-                  style={{ background: theme.gradients.primary, boxShadow: theme.shadows.primary }}
-                  className="flex items-center gap-2 text-white hover:shadow-xl transition-all duration-200 px-6 py-3 rounded-lg"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = theme.gradients.primary
-                  }}
-                >
-                  <Plus className="h-5 w-5" />
-                  {t('createCase')}
-                </Button>
-              </div>
-            )}
-          </div>
-          
-          {/* Stats Cards - Full width row, not constrained by flex container */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-3 sm:gap-4 w-full">
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg w-full min-w-0">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: brandColors.meen[100] }}>
-                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: brandColors.meen[600] }} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm text-gray-600 truncate">{t('activeCases')}</p>
-                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{getActiveCases()}</p>
-                  </div>
+            {/* Collapsible Statistics Content - Mobile Only - Below title row */}
+            <Collapsible 
+              open={statsExpanded} 
+              onOpenChange={setStatsExpanded}
+              className="sm:hidden w-full"
+            >
+              <CollapsibleContent className="w-full">
+                <div className="grid grid-cols-1 gap-2 w-full">
+                  {/* Active Cases Card - Ultra Compact Mobile */}
+                  <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-br from-white via-white to-meen-50/30">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-meen-100/20 rounded-full -mr-10 -mt-10" />
+                    <CardContent className="p-2 relative">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div 
+                          className="p-1.5 rounded shadow-sm"
+                          style={{ backgroundColor: brandColors.meen[100] }}
+                        >
+                          <TrendingUp className="h-3.5 w-3.5" style={{ color: brandColors.meen[600] }} />
+                        </div>
+                        <div className="text-[10px] font-semibold text-meen-600 bg-meen-50 px-1 py-0.5 rounded-full">
+                          Active
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-600 mb-0.5 font-medium">{t('activeCases')}</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {getActiveCases()}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Total Cases Card - Ultra Compact Mobile */}
+                  <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-br from-white via-white to-purple-50/30">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-purple-100/20 rounded-full -mr-10 -mt-10" />
+                    <CardContent className="p-2 relative">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="p-1.5 bg-purple-100 rounded shadow-sm">
+                          <Users className="h-3.5 w-3.5 text-purple-600" />
+                        </div>
+                        <div className="text-[10px] font-semibold text-purple-600 bg-purple-50 px-1 py-0.5 rounded-full">
+                          Total
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-600 mb-0.5 font-medium">{t('totalCases')}</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {getTotalCases()}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Total Raised Card - Ultra Compact Mobile */}
+                  <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-br from-white via-white to-ma3ana-50/30">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-ma3ana-100/20 rounded-full -mr-10 -mt-10" />
+                    <CardContent className="p-2 relative">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div 
+                          className="p-1.5 rounded shadow-sm"
+                          style={{ backgroundColor: brandColors.ma3ana[100] }}
+                        >
+                          <DollarSign className="h-3.5 w-3.5" style={{ color: brandColors.ma3ana[600] }} />
+                        </div>
+                        <div className="text-[10px] font-semibold text-ma3ana-600 bg-ma3ana-50 px-1 py-0.5 rounded-full">
+                          Raised
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-600 mb-0.5 font-medium">{t('totalRaised')}</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          EGP {getTotalRaised().toLocaleString()}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg w-full min-w-0">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
-                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Enhanced Stats Cards with Gradients - Desktop/Tablet (Always Visible) */}
+            <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 w-full">
+              {/* Active Cases Card */}
+              <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white via-white to-meen-50/30">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-meen-100/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
+                <CardContent className="p-5 sm:p-6 relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <div 
+                      className="p-3 rounded-xl shadow-md"
+                      style={{ backgroundColor: brandColors.meen[100] }}
+                    >
+                      <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
+                    </div>
+                    <div className="text-xs font-semibold text-meen-600 bg-meen-50 px-2 py-1 rounded-full">
+                      Active
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm text-gray-600 truncate">{t('totalCases')}</p>
-                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{getTotalCases()}</p>
+                  <div>
+                    <p className="text-sm sm:text-base text-gray-600 mb-1 font-medium">{t('activeCases')}</p>
+                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
+                      {getActiveCases()}
+                    </p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg w-full min-w-0 sm:col-span-2 lg:col-span-1">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: brandColors.ma3ana[100] }}>
-                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: brandColors.ma3ana[600] }} />
+                </CardContent>
+              </Card>
+              
+              {/* Total Cases Card */}
+              <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white via-white to-purple-50/30">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-100/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
+                <CardContent className="p-5 sm:p-6 relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-purple-100 rounded-xl shadow-md">
+                      <Users className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
+                    </div>
+                    <div className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                      Total
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm text-gray-600 truncate">{t('totalRaised')}</p>
-                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">
+                  <div>
+                    <p className="text-sm sm:text-base text-gray-600 mb-1 font-medium">{t('totalCases')}</p>
+                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
+                      {getTotalCases()}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Total Raised Card */}
+              <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white via-white to-ma3ana-50/30 sm:col-span-2 lg:col-span-1">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-ma3ana-100/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
+                <CardContent className="p-5 sm:p-6 relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <div 
+                      className="p-3 rounded-xl shadow-md"
+                      style={{ backgroundColor: brandColors.ma3ana[100] }}
+                    >
+                      <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
+                    </div>
+                    <div className="text-xs font-semibold text-ma3ana-600 bg-ma3ana-50 px-2 py-1 rounded-full">
+                      Raised
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm sm:text-base text-gray-600 mb-1 font-medium">{t('totalRaised')}</p>
+                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
                       EGP {getTotalRaised().toLocaleString()}
                     </p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
 
@@ -452,96 +621,98 @@ export default function CasesPage() {
 
           {/* Enhanced Main Content */}
           <div className="flex-1 min-w-0">
-            {/* Search and Filter Row */}
-            <Card className="mb-3 sm:mb-4 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                  {/* Search Bar */}
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
+            {/* Combined Search, Filter, Create, View Toggle - Single Row on Mobile */}
+            <Card className="mb-2 sm:mb-4 lg:mb-6 bg-white/95 backdrop-blur-sm border-0 shadow-lg sm:shadow-xl hover:shadow-xl sm:hover:shadow-2xl transition-shadow duration-300">
+              <CardContent className="p-2 sm:p-3 lg:p-6 relative">
+                {/* Single Row Layout - Search and Filter side by side on all screens */}
+                <div className="flex flex-row gap-2 sm:gap-3 lg:gap-4">
+                  {/* Search Bar - Takes available space */}
+                  <div className="flex-1 min-w-0">
+                    <div className="relative group">
+                      <Search className="absolute left-2.5 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-3.5 w-3.5 sm:h-5 sm:w-5 group-focus-within:text-meen transition-colors" />
                       <Input
                         placeholder={t('searchCases')}
                         value={filters.search}
                         onChange={(e) => handleSearch(e.target.value)}
-                        className="pl-10 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base border-2 border-gray-200 focus:border-meen focus:ring-2 rounded-lg sm:rounded-xl"
+                        className="pl-8 sm:pl-12 lg:pl-14 h-9 sm:h-10 lg:h-14 text-xs sm:text-sm border-2 border-gray-200 focus:border-meen focus:ring-2 focus:ring-meen-200 rounded-lg sm:rounded-xl transition-all duration-200 bg-white/50 hover:bg-white"
                         style={{ '--tw-ring-color': brandColors.meen[200] } as React.CSSProperties}
                       />
                     </div>
                   </div>
 
-                  {/* Filter Button - Hidden on desktop (>= 1600px) where sidebar is visible */}
+                  {/* Filter Button - Icon only on mobile, full text on larger screens */}
                   <Button
                     variant="outline"
                     size="lg"
                     onClick={() => setShowFilters(!showFilters)}
-                    className="2xl:hidden h-10 sm:h-12 px-4 sm:px-6 border-2 border-gray-200 hover:border-meen hover:bg-meen-50 rounded-lg sm:rounded-xl whitespace-nowrap"
+                    className="flex 2xl:hidden h-9 sm:h-10 lg:h-14 px-2 sm:px-3 lg:px-6 border-2 border-gray-200 hover:border-meen hover:bg-meen-50 rounded-lg sm:rounded-xl whitespace-nowrap font-medium transition-all duration-200 shadow-sm hover:shadow-md text-xs sm:text-sm flex-shrink-0"
                   >
-                    <Filter className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                    <span className="text-sm sm:text-base">{t('filters')}</span>
+                    <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">{t('filters')}</span>
                     {getActiveFiltersCount() > 0 && (
-                      <Badge variant="secondary" className="ml-2 bg-meen-100 text-meen-800 px-2 py-0.5 text-xs">
+                      <Badge 
+                        variant="secondary" 
+                        className="ml-1 sm:ml-1.5 bg-meen-500 text-white px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs font-semibold shadow-sm"
+                        style={{ backgroundColor: brandColors.meen[500] }}
+                      >
                         {getActiveFiltersCount()}
                       </Badge>
                     )}
                   </Button>
+
+                  {/* Action Buttons Row - Create Case and View Toggle */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+
+                    {/* Create Case Button - Mobile only, Compact */}
+                    {canCreateCase && (
+                      <Button 
+                        onClick={handleCreateCase}
+                        style={{ background: theme.gradients.primary, boxShadow: theme.shadows.primary }}
+                        className="md:hidden flex items-center gap-1 text-white shadow-md hover:shadow-lg transition-all duration-200 px-2 py-0 h-9 rounded-lg text-xs flex-shrink-0"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = theme.gradients.primary
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span className="hidden xs:inline">Create</span>
+                      </Button>
+                    )}
+                    
+                    {/* View Mode Toggle - Hidden on Mobile */}
+                    <div className="hidden sm:flex border-2 border-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                      <Button
+                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                        size="lg"
+                        onClick={() => setViewMode('grid')}
+                        style={viewMode === 'grid' ? { background: theme.gradients.primary } : {}}
+                        className={`rounded-r-none px-2 sm:px-3 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'grid' ? 'text-white' : 'hover:bg-gray-50'}`}
+                      >
+                        <Grid className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+                      </Button>
+                      <Button
+                        variant={viewMode === 'list' ? 'default' : 'ghost'}
+                        size="lg"
+                        onClick={() => setViewMode('list')}
+                        style={viewMode === 'list' ? { background: theme.gradients.primary } : {}}
+                        className={`rounded-l-none px-2 sm:px-3 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'list' ? 'text-white' : 'hover:bg-gray-50'}`}
+                      >
+                        <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Results Count - Below search bar on all screen sizes */}
+                <div className="flex items-center justify-end mt-2 sm:mt-3">
+                  <div className="text-[10px] sm:text-xs lg:text-sm text-gray-600 bg-white/80 backdrop-blur-sm px-2 sm:px-2.5 lg:px-4 py-0.5 sm:py-1 lg:py-2 rounded-md sm:rounded-lg shadow-sm whitespace-nowrap">
+                    {loading ? t('loading') : t('showingResults', { count: pagination.state.isMobile ? allLoadedCases.length : cases.length, total: serverPagination.total })}
+                  </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Create Case + View Toggle + Results Count Row */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-              {/* Left side: Create Case (mobile) + View Toggle */}
-              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                {/* Create Case Button - Mobile only */}
-                {canCreateCase && (
-                  <Button 
-                    onClick={handleCreateCase}
-                    style={{ background: theme.gradients.primary, boxShadow: theme.shadows.primary }}
-                    className="md:hidden flex items-center gap-1.5 sm:gap-2 text-white shadow-md hover:shadow-lg transition-all duration-200 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm flex-shrink-0"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = theme.gradients.primary
-                    }}
-                  >
-                    <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline">{t('createCase')}</span>
-                    <span className="sm:hidden">Create</span>
-                  </Button>
-                )}
-                
-                {/* View Mode Toggle */}
-                <div className="flex border-2 border-gray-200 rounded-lg sm:rounded-xl overflow-hidden flex-shrink-0">
-                  <Button
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                    size="lg"
-                    onClick={() => setViewMode('grid')}
-                    style={viewMode === 'grid' ? { background: theme.gradients.primary } : {}}
-                    className={`rounded-r-none px-3 sm:px-4 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'grid' ? 'text-white' : 'hover:bg-gray-50'}`}
-                  >
-                    <Grid className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'list' ? 'default' : 'ghost'}
-                    size="lg"
-                    onClick={() => setViewMode('list')}
-                    style={viewMode === 'list' ? { background: theme.gradients.primary } : {}}
-                    className={`rounded-l-none px-3 sm:px-4 md:px-6 h-9 sm:h-10 md:h-12 ${viewMode === 'list' ? 'text-white' : 'hover:bg-gray-50'}`}
-                  >
-                    <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Right side: Results Count */}
-              <div className="flex items-center gap-3 w-full sm:w-auto justify-end sm:justify-start">
-                <div className="text-xs sm:text-sm text-gray-600 bg-white/80 backdrop-blur-sm px-2.5 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 rounded-lg shadow-sm whitespace-nowrap">
-                  {loading ? t('loading') : t('showingResults', { count: pagination.state.isMobile ? allLoadedCases.length : cases.length, total: serverPagination.total })}
-                </div>
-              </div>
-            </div>
 
             {/* Enhanced Cases Grid/List */}
             {loading ? (
