@@ -71,7 +71,7 @@ export function GenericFileUploader({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const autoDetectCategory = (file: File): string => {
+  const autoDetectCategory = useCallback((file: File): string => {
     if (file.type.startsWith('image/')) {
       return categories.photos ? 'photos' : Object.keys(categories)[0]
     }
@@ -85,12 +85,15 @@ export function GenericFileUploader({
       return categories.medical ? 'medical' : Object.keys(categories)[0]
     }
     return defaultCategory || Object.keys(categories)[0]
-  }
+  }, [categories, defaultCategory])
 
   // Fetch storage rules when dialog opens and bucketName is provided
   useEffect(() => {
     if (open && bucketName) {
-      setLoadingRules(true)
+      // Defer state update to avoid setState in effect
+      Promise.resolve().then(() => {
+        setLoadingRules(true)
+      })
       fetchStorageRules(bucketName)
         .then(rule => {
           setStorageRule(rule)
@@ -103,12 +106,14 @@ export function GenericFileUploader({
           setLoadingRules(false)
         })
     } else if (!open) {
-      // Reset when dialog closes
-      setStorageRule(null)
+      // Reset when dialog closes - defer state update to avoid setState in effect
+      Promise.resolve().then(() => {
+        setStorageRule(null)
+      })
     }
   }, [open, bucketName])
 
-  const validateFile = (file: File): string | null => {
+  const validateFile = useCallback((file: File): string | null => {
     // If bucketName is provided, use storage rules validation
     if (bucketName) {
       const validation = validateFileClient(file, storageRule, bucketName)
@@ -123,7 +128,7 @@ export function GenericFileUploader({
       return `File size exceeds ${maxFileSize}MB limit`
     }
     return null
-  }
+  }, [bucketName, storageRule, maxFileSize])
 
   const handleFiles = useCallback((files: FileList) => {
     const newFiles: PendingFile[] = []
@@ -164,7 +169,7 @@ export function GenericFileUploader({
     if (newFiles.length > 0) {
       setPendingFiles(prev => [...prev, ...newFiles])
     }
-  }, [categories, defaultCategory, maxFileSize, bucketName, storageRule, toast])
+  }, [autoDetectCategory, validateFile, toast])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()

@@ -195,27 +195,36 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 
 ## Documentation
 
-All project documentation is organized in the `docs/` directory:
+All project documentation is organized in the `docs/` directory. See **[docs/README.md](./docs/README.md)** for a complete index.
 
-### Setup & Configuration
+### Quick Links
+
+**Getting Started:**
 - **[Quick Setup Guide](./docs/setup/QUICK_SETUP.md)** - Get started quickly
+- **[Tech Stack Overview](./docs/architecture/TECH_STACK_OVERVIEW.md)** - Technology stack and architecture
+- **[Business Requirements Document](./docs/architecture/Meen-Ma3ana_BRD.md)** - Project requirements
+
+**Setup & Configuration:**
 - **[Database Setup](./docs/setup/DATABASE_SETUP.md)** - Database configuration and migrations
 - **[Storage Setup](./docs/setup/STORAGE_SETUP.md)** - Supabase Storage configuration
 - **[Landing Page Setup](./docs/setup/LANDING_PAGE_SETUP.md)** - Marketing page configuration
 
-### Deployment
+**Deployment:**
 - **[Vercel Deployment](./docs/deployment/VERCEL_DEPLOYMENT.md)** - Complete deployment guide
 
-### System Documentation
-- **[Tech Stack Overview](./docs/TECH_STACK_OVERVIEW.md)** - Technology stack and architecture
-- **[Business Requirements Document](./docs/Meen-Ma3ana_BRD.md)** - Project requirements and specifications
-- **[RBAC System](./docs/RBAC_SYSTEM.md)** - Role-Based Access Control documentation
-- **[RBAC User Guide](./docs/RBAC_USER_GUIDE.md)** - User guide for RBAC features
-- **[Performance Optimization](./docs/PERFORMANCE_OPTIMIZATION.md)** - Performance best practices
+**Development:**
+- **[Integration Guide](./docs/development/integration-guide.md)** - Third-party integrations
+- **[Server Menu System](./docs/development/server-menu-system.md)** - Navigation system documentation
 
-### Development & Integration
-- **[Integration Guide](./docs/integration-guide.md)** - Third-party integrations
-- **[Server Menu System](./docs/server-menu-system.md)** - Navigation system documentation
+**Features:**
+- **[Activity Logging](./docs/features/ACTIVITY_LOGGING_SYSTEM.md)** - Activity logging system
+- **[Storage System](./docs/features/STORAGE_CONFIGURATION_MODULE.md)** - Storage configuration
+- **[Performance Optimization](./docs/features/PERFORMANCE_OPTIMIZATION.md)** - Performance best practices
+
+**Data Import:**
+- **[Cases Import Guide](./docs/cases/IMPORT_GUIDE.md)** - Import contribution data
+
+For complete documentation, see **[docs/README.md](./docs/README.md)**.
 
 ## Deployment to Vercel
 
@@ -264,7 +273,7 @@ This project is optimized for Vercel deployment and includes specific configurat
 - PRELAUNCH mode configuration:
   - Set `PRELAUNCH=true` to enable landing-page-only mode
   - Set `PRELAUNCH=false` or omit to enable full application
-  - Reference `middleware.ts` for implementation details
+  - Reference `proxy.ts` for implementation details
 
 ### Build Configuration
 

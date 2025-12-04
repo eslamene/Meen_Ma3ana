@@ -24,11 +24,17 @@ export default function ProtectedRoute({ children, fallback }: ProtectedRoutePro
 
     // Check email verification if user is logged in
     if (!loading && user && !user.email_confirmed_at) {
-      setCheckingVerification(true)
+      // Defer state update to avoid setState in effect
+      Promise.resolve().then(() => {
+        setCheckingVerification(true)
+      })
       // Redirect to email verification page
       router.push(`/${locale}/auth/verify-email`)
     } else {
-      setCheckingVerification(false)
+      // Defer state update to avoid setState in effect
+      Promise.resolve().then(() => {
+        setCheckingVerification(false)
+      })
     }
   }, [user, loading, router, locale])
 

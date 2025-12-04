@@ -74,13 +74,16 @@ export function GenericFilePreviewModal({
 
   // Reset edit data when file changes
   useEffect(() => {
-    setEditData({
-      originalName: file.originalName,
-      description: file.description || '',
-      category: file.category,
-      isPublic: file.isPublic ?? false
+    // Defer state updates to avoid setState in effect
+    Promise.resolve().then(() => {
+      setEditData({
+        originalName: file.originalName,
+        description: file.description || '',
+        category: file.category,
+        isPublic: file.isPublic ?? false
+      })
+      setEditMode(false)
     })
-    setEditMode(false)
   }, [file.id, file.originalName, file.description, file.category, file.isPublic])
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)

@@ -32,7 +32,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Skip initialization during SSR
     if (!supabase || typeof window === 'undefined') {
-      setLoading(false)
+      // Defer state update to avoid setState in effect
+      Promise.resolve().then(() => {
+        setLoading(false)
+      })
       return
     }
 

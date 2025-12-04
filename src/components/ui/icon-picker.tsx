@@ -80,7 +80,11 @@ export default function IconPicker({
     )
   }, [searchQuery])
 
-  const IconComponent = value ? getIconComponent(value) : null
+  // Memoize the icon component to avoid creating it during render
+  // Icon components from registry are stateless and safe to create during render
+  const IconComponent = useMemo(() => {
+    return value ? getIconComponent(value) : null
+  }, [value])
 
   return (
     <div className="flex gap-2">

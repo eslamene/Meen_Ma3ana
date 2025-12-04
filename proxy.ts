@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit, shouldRateLimit, getRateLimitConfig } from '@/lib/middleware/rateLimit';
 import { createServerClient } from '@supabase/ssr';
 
-// Pin middleware to Node.js runtime for Supabase SSR compatibility
+// Pin proxy to Node.js runtime for Supabase SSR compatibility
 export const runtime = 'nodejs';
 
 /**
@@ -63,11 +63,11 @@ const intlMiddleware = createMiddleware({
   localePrefix: 'always',
   
   // Enable automatic locale detection from Accept-Language header
-  // The middleware will use our custom detection logic via manual handling
+  // The proxy will use our custom detection logic via manual handling
   localeDetection: true
 });
 
-export default async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   // Add correlation ID to all requests
   const requestWithCorrelationId = addCorrelationId(request);
   
@@ -211,7 +211,7 @@ export default async function middleware(request: NextRequest) {
         import('@/lib/middleware/activityLogger').then(({ logPageView }) => {
           logPageView(requestWithCorrelationId, pathname).catch((error) => {
             // Log error but don't break the request
-            console.error('Failed to log page view in middleware:', error)
+            console.error('Failed to log page view in proxy:', error)
           })
         }).catch((error) => {
           // Silently fail if import fails
@@ -235,4 +235,5 @@ export const config = {
     // - all root files inside /public (e.g. favicon.ico)
     '/((?!_next|_static|.*\\..*).*)'
   ]
-}; 
+};
+

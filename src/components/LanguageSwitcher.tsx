@@ -3,8 +3,17 @@
 import { useLocale } from 'next-intl'
 import { useRouter, usePathname } from 'next/navigation'
 import { locales } from '@/i18n/request'
+import { Button } from '@/components/ui/button'
+import { Globe } from 'lucide-react'
 
-export default function LanguageSwitcher() {
+interface LanguageSwitcherProps {
+  /**
+   * Compact mode - shows only icon, toggles between languages on click
+   */
+  compact?: boolean
+}
+
+export default function LanguageSwitcher({ compact = false }: LanguageSwitcherProps) {
   const locale = useLocale()
   const router = useRouter()
   const pathname = usePathname()
@@ -27,9 +36,30 @@ export default function LanguageSwitcher() {
     
     // Force a full page reload to ensure Next.js re-renders server components
     // with the new locale. This is necessary for route groups with nested layouts
+    // eslint-disable-next-line react-hooks/immutability
     window.location.href = newPath
   }
 
+  // Compact mode - single icon that toggles
+  if (compact) {
+    const currentLoc = currentLocaleFromPath || locale || 'en'
+    const nextLocale = currentLoc === 'en' ? 'ar' : 'en'
+    
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => switchLanguage(nextLocale)}
+        className="p-2 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-all duration-200 rounded-lg"
+        title={`Switch to ${nextLocale === 'en' ? 'English' : 'Arabic'}`}
+        aria-label={`Switch to ${nextLocale === 'en' ? 'English' : 'Arabic'}`}
+      >
+        <Globe className="h-5 w-5" />
+      </Button>
+    )
+  }
+
+  // Full mode - shows both languages
   return (
     <div className="relative group flex items-center">
       {/* Language Toggle Button */}

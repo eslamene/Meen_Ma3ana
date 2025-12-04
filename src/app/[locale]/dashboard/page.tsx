@@ -173,19 +173,10 @@ export default function DashboardPage() {
   const router = useRouter()
   const params = useParams()
   const { user, signOut } = useAuth()
-  const { roles, loading: rolesLoading, refresh: refreshAdminData } = useAdmin()
+  const { roles, permissions, loading: rolesLoading, refresh: refreshAdminData } = useAdmin()
   const { containerVariant } = useLayout()
   
-  // Debug: Log roles to help diagnose issues
-  useEffect(() => {
-    if (!rolesLoading && roles.length > 0) {
-      console.log('User roles:', roles.map(r => ({ name: r.name, level: r.level, display_name: r.display_name })))
-      console.log('Primary role (highest level):', roles.sort((a, b) => (b.level || 0) - (a.level || 0))[0]?.name)
-    } else if (!rolesLoading && roles.length === 0) {
-      console.warn('No roles found for user. User ID:', user?.id)
-      console.warn('This might indicate the user needs roles assigned in /rbac/users')
-    }
-  }, [roles, rolesLoading, user?.id])
+  // Removed debug console logs to reduce log noise
   
   // Get primary role (highest level role, or first if levels are equal)
   const userRole = roles.length > 0 
@@ -295,7 +286,6 @@ export default function DashboardPage() {
       setRefreshingRole(true)
       // Refresh admin data from the hook
       await refreshAdminData()
-      console.log('Roles refreshed. Current roles:', roles.map(r => ({ name: r.name, level: r.level })))
     } catch (error) {
       console.error('Error refreshing role:', error)
     } finally {
@@ -321,6 +311,9 @@ export default function DashboardPage() {
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
+
+  // Use consistent color for all permissions
+  const permissionColor = brandColors.meen[600]
 
   const quickActions = [
     {
@@ -619,27 +612,34 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <h4 className="font-medium text-sm sm:text-base text-gray-900">Permissions:</h4>
-                        <div className="space-y-1">
-                          <PermissionGuard permissions={["contributions:create"]}>
-                            <div className="flex items-center gap-2 text-xs sm:text-sm text-meen">
-                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: brandColors.meen[500] }}></div>
-                              <span>Create contributions</span>
-                            </div>
-                          </PermissionGuard>
-                          <PermissionGuard permissions={["cases:create"]}>
-                            <div className="flex items-center gap-2 text-xs sm:text-sm text-meen">
-                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: brandColors.meen[500] }}></div>
-                              <span>Create cases</span>
-                            </div>
-                          </PermissionGuard>
-                          <PermissionGuard permissions={["admin:dashboard"]}>
-                            <div className="flex items-center gap-2 text-xs sm:text-sm text-ma3ana">
-                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: brandColors.ma3ana[500] }}></div>
-                              <span>Admin access</span>
-                            </div>
-                          </PermissionGuard>
-                        </div>
+                        <h4 className="font-medium text-sm sm:text-base text-gray-900">
+                          Permissions ({permissions.length}):
+                        </h4>
+                        {permissions.length > 0 ? (
+                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                            {permissions.map((permission) => {
+                              const displayName = permission.display_name || permission.name || 'Unknown Permission'
+                              
+                              return (
+                                <div 
+                                  key={permission.id} 
+                                  className="flex items-center gap-2 text-xs sm:text-sm"
+                                  style={{ color: permissionColor }}
+                                >
+                                  <div 
+                                    className="w-2 h-2 rounded-full flex-shrink-0" 
+                                    style={{ backgroundColor: permissionColor }}
+                                  ></div>
+                                  <span className="truncate">{displayName}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-xs sm:text-sm text-gray-500 italic">
+                            No permissions assigned
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>

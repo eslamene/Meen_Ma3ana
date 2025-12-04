@@ -282,7 +282,7 @@ export default function AdminActivitiesPage() {
 
   return (
     <ProtectedRoute>
-      <PermissionGuard permissions={['admin:dashboard']} fallback={
+      <PermissionGuard permissions={['admin:activities']} fallback={
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <Card className="max-w-md w-full">
             <CardContent className="p-6 text-center">
@@ -295,22 +295,22 @@ export default function AdminActivitiesPage() {
       }>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
           <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <DetailPageHeader
-                backUrl={`/${locale}/admin`}
-                icon={Activity}
-                title="Activity Logs"
-                description="Monitor all site activities including page views, API calls, user actions, and system events"
-              />
-              <Button
-                onClick={() => fetchActivities()}
-                variant="outline"
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
+            <DetailPageHeader
+              backUrl={`/${locale}/admin`}
+              icon={Activity}
+              title="Activity Logs"
+              description="Monitor all site activities including page views, API calls, user actions, and system events"
+              actions={
+                <Button
+                  onClick={() => fetchActivities()}
+                  variant="outline"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              }
+            />
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

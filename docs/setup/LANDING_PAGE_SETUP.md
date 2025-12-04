@@ -202,6 +202,6 @@ http://localhost:3000/ar/landing
 ### PRELAUNCH Not Blocking Routes
 - Verify `PRELAUNCH=true` in environment
 - Restart development server
-- Check middleware.ts logic
+- Check proxy.ts logic
 - Verify route matching logic
 

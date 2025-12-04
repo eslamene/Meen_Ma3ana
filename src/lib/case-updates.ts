@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 import { caseUpdates, users, contributions, contributionApprovalStatus } from '@/drizzle/schema'
 import { eq, desc, and, or, like, sql } from 'drizzle-orm'
 
@@ -325,7 +325,7 @@ export class CaseUpdateService {
    */
   private async generateContributionUpdates(caseId: string): Promise<CaseUpdate[]> {
     try {
-      // Use Supabase client instead of Drizzle ORM
+      // Use Supabase server client (this method is only called from server-side API routes)
       const supabase = await createClient()
       
       // Get all approved contributions for this case

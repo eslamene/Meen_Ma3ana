@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 
 export function useMenuState() {
@@ -8,6 +8,7 @@ export function useMenuState() {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const pathname = usePathname()
+  const prevPathnameRef = useRef(pathname)
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen)
@@ -44,9 +45,18 @@ export function useMenuState() {
   }, [pathname])
 
   // Close sidebar on mobile when route changes
+  // Track pathname changes and close sidebar if needed
   useEffect(() => {
-    if (sidebarOpen && window.innerWidth < 1024) {
-      setSidebarOpen(false)
+    const pathnameChanged = prevPathnameRef.current !== pathname
+    const wasOpen = sidebarOpen
+    prevPathnameRef.current = pathname
+
+    // Only close if pathname changed, we're on mobile, and sidebar was open
+    if (pathnameChanged && window.innerWidth < 1024 && wasOpen) {
+      // Schedule the state update outside the effect using a microtask
+      Promise.resolve().then(() => {
+        setSidebarOpen(false)
+      })
     }
   }, [pathname, sidebarOpen])
 

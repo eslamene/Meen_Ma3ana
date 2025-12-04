@@ -105,7 +105,7 @@ Meen_Ma3ana/
 │   │   ├── auth/                     # Auth callback handlers
 │   │   ├── layout.tsx                # Root layout
 │   │   ├── page.tsx                  # Home page
-│   │   └── middleware.ts             # Request middleware
+│   │   └── proxy.ts                  # Request proxy (Next.js 16)
 │   │
 │   ├── components/                   # React components
 │   │   ├── admin/                    # Admin-specific components
@@ -161,7 +161,7 @@ Meen_Ma3ana/
 │   ├── migrations/                   # SQL migrations
 │   └── *.sql                         # Storage policies, RLS fixes
 │
-├── middleware.ts                     # Next.js middleware (root)
+├── proxy.ts                          # Next.js proxy (root, Next.js 16)
 ├── drizzle.config.ts                 # Drizzle configuration
 ├── next.config.ts                    # Next.js configuration
 ├── vercel.json                       # Vercel deployment config
@@ -174,7 +174,7 @@ Meen_Ma3ana/
 
 ### Authentication Flow
 1. **Supabase Auth** handles user authentication
-2. **Middleware** (`middleware.ts`) refreshes auth sessions for Server Components
+2. **Proxy** (`proxy.ts`) refreshes auth sessions for Server Components
 3. **Session cookies** managed via Supabase SSR client
 4. **Correlation IDs** added to all requests for tracing
 
@@ -299,7 +299,7 @@ return <h1>{t('title')}</h1>
 
 ## 🔄 Request Flow & Middleware
 
-### Middleware Pipeline (`middleware.ts`)
+### Proxy Pipeline (`proxy.ts`)
 
 1. **Correlation ID Injection**
    - Adds `x-correlation-id` header to all requests

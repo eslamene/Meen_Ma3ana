@@ -47,7 +47,8 @@ import {
   Percent,
   Copy,
   Check,
-  Clock
+  Clock,
+  X
 } from 'lucide-react'
 import TranslationButton from '@/components/translation/TranslationButton'
 
@@ -1768,9 +1769,10 @@ export default function CaseEditPage() {
             }}
             secondaryActions={[
               {
-                label: t('cancel') || 'Cancel',
+                label: t('close') || 'Close',
                 onClick: handleBack,
-                variant: 'outline'
+                variant: 'outline',
+                icon: <X className="h-4 w-4 mr-2" />
               },
               {
                 label: t('delete') || 'Delete',

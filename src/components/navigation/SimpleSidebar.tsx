@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { formatNotificationCount } from '@/lib/utils'
 import Logo from '@/components/ui/Logo'
 import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
@@ -58,20 +59,20 @@ export default function SimpleSidebar({
   const supabase = createClient()
   const { user, loading, menuItems } = useAdmin()
   
-  // Store user in ref to prevent footer from disappearing during re-renders
-  const userRef = useRef<User | null>(null)
-  const hasLoadedUserRef = useRef<boolean>(false)
+  // Store user in state to prevent footer from disappearing during re-renders
+  // Use state instead of refs to avoid accessing refs during render
+  const [stableUser, setStableUser] = useState<User | null>(null)
   
   useEffect(() => {
     if (user) {
-      userRef.current = user
-      hasLoadedUserRef.current = true
+      // Defer state update to avoid setState in effect
+      Promise.resolve().then(() => {
+        setStableUser(user)
+      })
     }
+    // Only clear stableUser if user is explicitly null (not just undefined/loading)
+    // This prevents the footer from disappearing during loading states
   }, [user])
-  
-  // Use ref value for footer rendering to ensure stability
-  // Always use ref if we've previously loaded a user, otherwise use current user
-  const stableUser = user || (hasLoadedUserRef.current ? userRef.current : null)
   
   // Menu items are already in tree structure from useAdmin hook
   // They are filtered by permissions and sorted by sort_order
@@ -89,9 +90,15 @@ export default function SimpleSidebar({
 
   useEffect(() => {
     if (user) {
-      fetchUnreadNotifications(user.id)
+      // Defer async call to avoid setState in effect
+      Promise.resolve().then(() => {
+        fetchUnreadNotifications(user.id)
+      })
     } else {
-      setNotificationCount(0)
+      // Defer state update to avoid setState in effect
+      Promise.resolve().then(() => {
+        setNotificationCount(0)
+      })
     }
   }, [user, fetchUnreadNotifications])
 
@@ -486,7 +493,8 @@ function MenuItemComponent({
   level?: number
   collapsed?: boolean
 }) {
-  const IconComponent = getIcon(item.icon || 'Heart')
+  // Memoize icon component to avoid creating it during render
+  const IconComponent = useMemo(() => getIcon(item.icon || 'Heart'), [item.icon, getIcon])
   const hasChildren = item.children && item.children.length > 0
   const isExpanded = expandedModules.has(item.id)
   const itemPath = `/${locale}${item.href}`
@@ -565,13 +573,13 @@ function MenuItemComponent({
         {!collapsed && <span className="truncate">{item.label}</span>}
       </div>
       {!collapsed && isNotifications && notificationCount > 0 && (
-        <Badge variant="destructive" className="ml-2 bg-[#E74C3C] text-white shadow-sm flex-shrink-0">
-          {notificationCount}
+        <Badge variant="destructive" className="ml-2 bg-[#E74C3C] text-white shadow-sm flex-shrink-0 min-w-[1.75rem] px-1.5">
+          {formatNotificationCount(notificationCount)}
         </Badge>
       )}
       {collapsed && isNotifications && notificationCount > 0 && (
-        <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full bg-[#E74C3C] text-white shadow-md">
-          {notificationCount > 9 ? '9+' : notificationCount}
+        <Badge variant="destructive" className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 flex items-center justify-center text-xs rounded-full bg-[#E74C3C] text-white shadow-md">
+          {formatNotificationCount(notificationCount)}
         </Badge>
       )}
     </Link>

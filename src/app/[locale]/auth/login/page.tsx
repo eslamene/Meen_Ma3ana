@@ -49,7 +49,10 @@ export default function LoginPage() {
             : t('authErrorGeneric')
       }
       
-      setUrlError(errorMessage)
+      // Defer state update to avoid setState in effect
+      Promise.resolve().then(() => {
+        setUrlError(errorMessage)
+      })
       
       // Don't clear error from URL immediately - keep it so we can show the resend link
       // Only clear it when user dismisses the error

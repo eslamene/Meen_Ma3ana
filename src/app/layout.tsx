@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 import { Toaster } from 'sonner'
-import { HeroUIProvider } from '@heroui/react'
+import HeroUIProviderWrapper from '@/components/providers/HeroUIProviderWrapper'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -20,11 +20,11 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
-        <HeroUIProvider>
+        <HeroUIProviderWrapper>
         {children}
         <Toaster position="top-center" richColors />
         <SpeedInsights />
-        </HeroUIProvider>
+        </HeroUIProviderWrapper>
       </body>
     </html>
   )

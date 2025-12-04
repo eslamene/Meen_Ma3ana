@@ -40,6 +40,7 @@ export default function DynamicIcon({
   ...props
 }: DynamicIconProps) {
   // Get the icon component from the registry
+  // These are stateless icon components from a registry, safe to create during render
   const IconComponent = name ? getIconComponent(name) : null
   const FallbackIcon = getIconComponent(fallback) || FileText
   

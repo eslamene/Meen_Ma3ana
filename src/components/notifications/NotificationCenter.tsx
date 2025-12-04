@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { formatNotificationCount } from '@/lib/utils'
 import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CaseNotification } from '@/lib/notifications/case-notifications'
@@ -150,8 +151,8 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
             <CardTitle className="text-lg font-semibold">
               {t('notifications')}
               {unreadCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {unreadCount}
+                <Badge variant="secondary" className="ml-2 min-w-[1.75rem] px-1.5">
+                  {formatNotificationCount(unreadCount)}
                 </Badge>
               )}
             </CardTitle>

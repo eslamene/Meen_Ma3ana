@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { formatNotificationCount } from '@/lib/utils'
 import Logo from '@/components/ui/Logo'
 import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
@@ -16,6 +17,44 @@ import { useAdmin } from '@/lib/admin/hooks'
 import GuestPermissionGuard from '@/components/auth/GuestPermissionGuard'
 import { getPublicNavItems } from '@/lib/navigation/public-nav-config'
 import { getIcon } from '@/lib/icons/registry'
+import type { AdminMenuItem } from '@/lib/admin/types'
+
+/**
+ * Helper function to check if a menu item is an admin module
+ * Admin modules are identified by:
+ * 1. Being the admin parent menu itself (href === '/admin')
+ * 2. Having a parent_id that points to an admin parent menu
+ * 3. Being a descendant of an admin parent menu in the hierarchy
+ */
+function isAdminModule(item: AdminMenuItem, allItems: AdminMenuItem[]): boolean {
+  // Check if item is the admin parent menu itself
+  if (item.href === '/admin' && !item.parent_id) {
+    return true
+  }
+  
+  // Build a map of all items for efficient lookup
+  const itemMap = new Map(allItems.map(i => [i.id, i]))
+  
+  // Check if item has admin parent in its hierarchy
+  let currentItem: AdminMenuItem | undefined = item
+  const visited = new Set<string>()
+  
+  while (currentItem?.parent_id && !visited.has(currentItem.id)) {
+    visited.add(currentItem.id)
+    const parent = itemMap.get(currentItem.parent_id)
+    if (parent) {
+      // If parent is admin menu, this is an admin module
+      if (parent.href === '/admin' && !parent.parent_id) {
+        return true
+      }
+      currentItem = parent
+    } else {
+      break
+    }
+  }
+  
+  return false
+}
 
 export default function NavigationBar() {
   const t = useTranslations('navigation')
@@ -35,7 +74,7 @@ export default function NavigationBar() {
   // Check if we're on the reset password page
   const isResetPasswordPage = pathname?.includes('/auth/reset-password') || false
   
-  // Check for recovery mode
+  // Check for recovery mode - optimized to check less frequently
   useEffect(() => {
     const checkRecoveryMode = () => {
       if (typeof window !== 'undefined') {
@@ -43,52 +82,114 @@ export default function NavigationBar() {
           .split('; ')
           .find(row => row.startsWith('recovery_mode='))
           ?.split('=')[1] === 'true'
-        setIsRecoveryMode(recoveryMode || false)
+        setIsRecoveryMode(prev => {
+          // Only update state if it changed to prevent unnecessary re-renders
+          if (prev !== recoveryMode) {
+            return recoveryMode
+          }
+          return prev
+        })
       }
     }
     
     checkRecoveryMode()
     
-    // Check periodically in case cookie changes
-    const interval = setInterval(checkRecoveryMode, 1000)
+    // Check periodically in case cookie changes (reduced frequency for better performance)
+    const interval = setInterval(checkRecoveryMode, 5000) // Changed from 1000ms to 5000ms
     return () => clearInterval(interval)
   }, [])
   
   // Use the new admin hook
-  const { menuItems, loading: modulesLoading, hasPermission } = useAdmin()
+  const { menuItems, loading: modulesLoading } = useAdmin()
   
-  // Filter menu items for top navigation
-  // Strategy: Include all top-level items (no parent) except admin modules and notifications
-  // Admin modules should only appear in sidebar, not top nav
-  // Notifications are handled separately in the right side with badge
-  const topNavItems = menuItems.filter(item => {
-    // Only include top-level items (items without parent_id)
-    if (item.parent_id) {
-      return false
+  // Memoize filtered menu items for top navigation with smart prioritization
+  const { topNavItems, overflowItems } = useMemo(() => {
+    const filtered = menuItems.filter(item => {
+      // Only include top-level items (items without parent_id)
+      if (item.parent_id) {
+        return false
+      }
+      
+      // Exclude notifications - handled separately in right side with badge
+      if (item.href === '/notifications') {
+        return false
+      }
+      
+      // Exclude profile - Dashboard and My Contributions will be in user profile dropdown
+      if (item.href === '/profile') {
+        return false
+      }
+      
+      // Exclude admin-specific modules that should only be in sidebar
+      // Use dynamic system operation instead of hardcoded list
+      if (isAdminModule(item, menuItems)) {
+        return false
+      }
+      
+      return true
+    })
+    
+    // Sort by sort_order
+    const sorted = [...filtered].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    
+    // Define priority items that should always be visible (Home, Cases)
+    const priorityHrefs = ['/', '/cases']
+    const priorityItems = sorted.filter(item => priorityHrefs.includes(item.href))
+    const otherItems = sorted.filter(item => !priorityHrefs.includes(item.href))
+    
+    // Combine: priority items first, then others
+    const allItems = [...priorityItems, ...otherItems]
+    
+    // For responsive design: show first 3-4 items, rest go to "More" dropdown
+    // Priority items always show, then up to 2 more items
+    const visibleItems = allItems.slice(0, Math.max(priorityItems.length, 4))
+    const overflow = allItems.slice(visibleItems.length)
+    
+    return {
+      topNavItems: visibleItems,
+      overflowItems: overflow
+    }
+  }, [menuItems])
+  
+  // Memoize Dashboard and My Contributions lookups to prevent unnecessary re-renders
+  const { dashboardItemFallback, contributionsItemFallback } = useMemo(() => {
+    // Find Dashboard and My Contributions from menuItems to add to user profile dropdown
+    // Check top-level items first, then check children of any parent items
+    let dashboardItem = menuItems.find(item => item.href === '/dashboard' && !item.parent_id)
+    let contributionsItem = menuItems.find(item => item.href === '/contributions' && !item.parent_id)
+    
+    // If not found, check children of Profile or other parent items
+    if (!dashboardItem) {
+      const profileItem = menuItems.find(item => item.href === '/profile')
+      dashboardItem = profileItem?.children?.find(child => child.href === '/dashboard')
     }
     
-    // Exclude notifications - handled separately in right side with badge
-    if (item.href === '/notifications') {
-      return false
+    if (!contributionsItem) {
+      const profileItem = menuItems.find(item => item.href === '/profile')
+      contributionsItem = profileItem?.children?.find(child => child.href === '/contributions')
     }
     
-    // Exclude admin-specific modules that should only be in sidebar
-    const adminModuleHrefs = [
-      '/case-management',
-      '/access-control',
-      '/admin',
-      '/settings',
-      '/rbac',
-      '/storage'
-    ]
-    const isAdminModule = adminModuleHrefs.some(href => item.href.startsWith(href))
+    // Fallback: Create items if not found in menuItems (always show in profile dropdown)
+    const dashboardItemFallback = dashboardItem || {
+      id: 'dashboard-fallback',
+      label: 'Dashboard',
+      label_ar: 'لوحة التحكم',
+      href: '/dashboard',
+      icon: 'BarChart3',
+      sort_order: 1
+    }
     
-    // Exclude if it's an admin module
-    return !isAdminModule
-  })
-  
-  // Sort by sort_order
-  topNavItems.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    const contributionsItemFallback = contributionsItem || {
+      id: 'contributions-fallback',
+      label: 'My Contributions',
+      label_ar: 'مساهماتي',
+      href: '/contributions',
+      icon: 'DollarSign',
+      sort_order: 2
+    }
+    
+    return { dashboardItemFallback, contributionsItemFallback }
+  }, [menuItems])
 
   const fetchUnreadNotifications = useCallback(async (userId: string) => {
     try {
@@ -115,7 +216,10 @@ export default function NavigationBar() {
   }, [supabase.auth, fetchUnreadNotifications])
 
   useEffect(() => {
-    fetchUserAndNotifications()
+    // Defer async call to avoid setState in effect
+    Promise.resolve().then(() => {
+      fetchUserAndNotifications()
+    })
     
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -132,14 +236,18 @@ export default function NavigationBar() {
     return () => subscription.unsubscribe()
   }, [supabase.auth, fetchUserAndNotifications, fetchUnreadNotifications])
 
+  // Memoize conditions to prevent unnecessary re-renders
+  const isLandingPage = useMemo(() => pathname?.includes('/landing') || false, [pathname])
+  const shouldShowPublicNav = useMemo(() => 
+    !user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode),
+    [user, isRecoveryMode, isResetPasswordPage]
+  )
+
   // Fetch public navigation items from database
   useEffect(() => {
     const fetchNavItems = async () => {
-      // Show public nav if no user, in recovery mode, or on reset password page without recovery mode
-      const shouldShowPublicNav = !user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode)
-      
       if (shouldShowPublicNav) {
-        const items = await getPublicNavItems(pathname?.includes('/landing') || false, locale)
+        const items = await getPublicNavItems(isLandingPage, locale)
         setPublicNavItems(items)
       } else {
         // Clear nav items when user is authenticated (and not in recovery)
@@ -147,7 +255,7 @@ export default function NavigationBar() {
       }
     }
     fetchNavItems()
-  }, [pathname, locale, user, isRecoveryMode, isResetPasswordPage])
+  }, [shouldShowPublicNav, isLandingPage, locale])
 
   // Note: useAdmin handles permission refresh automatically
 
@@ -156,22 +264,22 @@ export default function NavigationBar() {
   // Note: useAdmin handles admin system update events automatically
 
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       await supabase.auth.signOut()
       router.push(`/${locale}/landing`)
     } catch (error) {
       console.error('Error signing out:', error)
     }
-  }
+  }, [supabase.auth, router, locale])
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen)
-  }
+  const toggleMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(prev => !prev)
+  }, [])
 
-  const closeMobileMenu = () => {
+  const closeMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(false)
-  }
+  }, [])
 
   // Memoize navigation link class calculation to prevent unnecessary re-renders
   const getNavLinkClass = useCallback((href: string) => {
@@ -203,11 +311,11 @@ export default function NavigationBar() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-3xl mx-4 overflow-visible">
+          <div className="hidden lg:flex items-center space-x-0.5 xl:space-x-1 flex-1 justify-center max-w-5xl mx-2 xl:mx-4 overflow-visible">
             {!user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode) ? (
               // Public user navigation - uses database with config fallback
               <>
-                {publicNavItems.map((item) => {
+                {publicNavItems.slice(0, 4).map((item) => {
                   const Icon = item.icon
                   const isHashLink = item.isHashLink
                   const hasChildren = item.children && item.children.length > 0
@@ -217,17 +325,18 @@ export default function NavigationBar() {
                     return (
                       <div key={item.key} className="relative group overflow-visible">
                         <button
-                          className={`${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1 flex items-center gap-1.5`}
+                          className={`${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 flex items-center gap-1.5 whitespace-nowrap`}
                         >
-                          {Icon && <Icon className="h-4 w-4" />}
-                          {t(item.labelKey)}
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+                          <span className="hidden xl:inline">{t(item.labelKey)}</span>
+                          <span className="xl:hidden">{t(item.labelKey).length > 10 ? t(item.labelKey).substring(0, 10) + '...' : t(item.labelKey)}</span>
+                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
                         </button>
                         {item.children && item.children.length > 0 && (
-                          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
-                            <div className="py-1">
+                          <div className="absolute top-full left-0 pt-1 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
+                            <div className="bg-white rounded-md shadow-lg border border-gray-200 py-1">
                               {item.children.map((child) => {
                                 const ChildIcon = child.icon
                                 const childIsHashLink = child.isHashLink
@@ -281,8 +390,8 @@ export default function NavigationBar() {
                   
                   // Regular item without children
                   const linkClass = isHashLink
-                    ? 'px-4 py-2 text-sm font-medium rounded-lg mx-1 text-gray-800 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200'
-                    : `${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1`
+                    ? 'px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 text-gray-800 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200 whitespace-nowrap'
+                    : `${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 whitespace-nowrap`
                   
                   const linkContent = (
                     <Link
@@ -333,70 +442,135 @@ export default function NavigationBar() {
             ) : (
               // Authenticated user navigation - uses menuItems from useAdmin()
               <>
-                {!modulesLoading && topNavItems.map((item) => {
-                  const Icon = item.icon ? getIcon(item.icon) : undefined
-                  const hasChildren = item.children && item.children.length > 0
-                  const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
-                  
-                  // Render parent item with dropdown if it has children
-                  if (hasChildren) {
-                    return (
-                      <div key={item.id} className="relative group overflow-visible">
-                        <button
-                          className={`${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1 flex items-center gap-1.5`}
+                {!modulesLoading && (
+                  <>
+                    {/* Visible navigation items */}
+                    {topNavItems.map((item) => {
+                      const Icon = item.icon ? getIcon(item.icon) : undefined
+                      const hasChildren = item.children && item.children.length > 0
+                      const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
+                      
+                      // Render parent item with dropdown if it has children
+                      if (hasChildren) {
+                        return (
+                          <div key={item.id} className="relative group overflow-visible">
+                            <button
+                              className={`${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 flex items-center gap-1.5 whitespace-nowrap`}
+                            >
+                              {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+                              <span className="hidden xl:inline">{labelText}</span>
+                              <span className="xl:hidden">{labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText}</span>
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {item.children && item.children.length > 0 && (
+                              <div className="absolute top-full left-0 pt-1 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
+                                <div className="bg-white rounded-md shadow-lg border border-gray-200 py-1">
+                                  {item.children.map((child) => {
+                                    const ChildIcon = child.icon ? getIcon(child.icon) : undefined
+                                    const childLabelText = locale === 'ar' && child.label_ar ? child.label_ar : child.label
+                                    return (
+                                      <Link
+                                        key={child.id}
+                                        href={`/${locale}${child.href}`}
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                      >
+                                        {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                        {childLabelText}
+                                      </Link>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }
+                      
+                      // Regular item without children
+                      const linkContent = (
+                        <Link
+                          key={item.id}
+                          href={`/${locale}${item.href}`}
+                          className={`${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 whitespace-nowrap ${Icon ? 'flex items-center gap-1.5' : ''}`}
                         >
-                          {Icon && <Icon className="h-4 w-4" />}
-                          {labelText}
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+                          <span className="hidden xl:inline">{labelText}</span>
+                          <span className="xl:hidden">{labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText}</span>
+                        </Link>
+                      )
+                      
+                      // Wrap with permission guard if item has permission requirement
+                      if (item.permission_id) {
+                        // We need to check permission - but we don't have permission name here
+                        // The useAdmin hook already filters by permissions, so items here should be accessible
+                        // But we can add an extra check if needed
+                        return linkContent
+                      }
+                      
+                      return linkContent
+                    })}
+                    
+                    {/* More dropdown for overflow items */}
+                    {overflowItems.length > 0 && (
+                      <div className="relative group overflow-visible">
+                        <button
+                          className={`${getNavLinkClass('')} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 flex items-center gap-1.5 whitespace-nowrap`}
+                        >
+                          <span>{locale === 'ar' ? 'المزيد' : 'More'}</span>
+                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
                         </button>
-                        {item.children && item.children.length > 0 && (
-                          <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
-                            <div className="py-1">
-                              {item.children.map((child) => {
-                                const ChildIcon = child.icon ? getIcon(child.icon) : undefined
-                                const childLabelText = locale === 'ar' && child.label_ar ? child.label_ar : child.label
+                        <div className="absolute top-full right-0 pt-1 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
+                          <div className="bg-white rounded-md shadow-lg border border-gray-200 py-1">
+                            {overflowItems.map((item) => {
+                              const Icon = item.icon ? getIcon(item.icon) : undefined
+                              const hasChildren = item.children && item.children.length > 0
+                              const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
+                              
+                              if (hasChildren) {
                                 return (
-                                  <Link
-                                    key={child.id}
-                                    href={`/${locale}${child.href}`}
-                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                  >
-                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                    {childLabelText}
-                                  </Link>
+                                  <div key={item.id} className="px-2 py-1">
+                                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                      {labelText}
+                                    </div>
+                                    {item.children?.map((child) => {
+                                      const ChildIcon = child.icon ? getIcon(child.icon) : undefined
+                                      const childLabelText = locale === 'ar' && child.label_ar ? child.label_ar : child.label
+                                      return (
+                                        <Link
+                                          key={child.id}
+                                          href={`/${locale}${child.href}`}
+                                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                        >
+                                          {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                          {childLabelText}
+                                        </Link>
+                                      )
+                                    })}
+                                  </div>
                                 )
-                              })}
-                            </div>
+                              }
+                              
+                              return (
+                                <Link
+                                  key={item.id}
+                                  href={`/${locale}${item.href}`}
+                                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                >
+                                  {Icon && <Icon className="h-4 w-4" />}
+                                  {labelText}
+                                </Link>
+                              )
+                            })}
                           </div>
-                        )}
+                        </div>
                       </div>
-                    )
-                  }
-                  
-                  // Regular item without children
-                  const linkContent = (
-                    <Link
-                      key={item.id}
-                      href={`/${locale}${item.href}`}
-                      className={`${getNavLinkClass(item.href)} px-4 py-2 text-sm font-medium rounded-lg mx-1 ${Icon ? 'flex items-center gap-1.5' : ''}`}
-                    >
-                      {Icon && <Icon className="h-4 w-4" />}
-                      {labelText}
-                    </Link>
-                  )
-                  
-                  // Wrap with permission guard if item has permission requirement
-                  if (item.permission_id) {
-                    // We need to check permission - but we don't have permission name here
-                    // The useAdmin hook already filters by permissions, so items here should be accessible
-                    // But we can add an extra check if needed
-                    return linkContent
-                  }
-                  
-                  return linkContent
-                })}
+                    )}
+                  </>
+                )}
               </>
             )}
           </div>
@@ -417,8 +591,8 @@ export default function NavigationBar() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                     {unreadNotifications > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-6 w-6 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-white shadow-lg">
-                        {unreadNotifications}
+                      <Badge className="absolute -top-1 -right-1 min-w-[1.5rem] h-6 px-1.5 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-white shadow-lg">
+                        {formatNotificationCount(unreadNotifications)}
                       </Badge>
                     )}
                   </Button>
@@ -441,7 +615,42 @@ export default function NavigationBar() {
                   </Button>
 
                   {/* Dropdown Menu */}
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl py-2 z-[100] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-100 pointer-events-none group-hover:pointer-events-auto">
+                  <div className="absolute right-0 pt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
+                    <div className="bg-white rounded-xl shadow-xl py-2 border border-gray-100">
+                    {/* Dashboard */}
+                    <Link 
+                      href={`/${locale}${dashboardItemFallback.href}`}
+                      className="block px-4 py-3 text-sm text-gray-800 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors mx-2 rounded-lg"
+                      onClick={closeMobileMenu}
+                    >
+                      <div className="flex items-center space-x-3">
+                        {dashboardItemFallback.icon && (() => {
+                          const DashboardIcon = getIcon(dashboardItemFallback.icon)
+                          return DashboardIcon ? <DashboardIcon className="w-4 h-4" /> : null
+                        })()}
+                        <span>{locale === 'ar' && dashboardItemFallback.label_ar ? dashboardItemFallback.label_ar : dashboardItemFallback.label}</span>
+                      </div>
+                    </Link>
+                    
+                    {/* My Contributions */}
+                    <Link 
+                      href={`/${locale}${contributionsItemFallback.href}`}
+                      className="block px-4 py-3 text-sm text-gray-800 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors mx-2 rounded-lg"
+                      onClick={closeMobileMenu}
+                    >
+                      <div className="flex items-center space-x-3">
+                        {contributionsItemFallback.icon && (() => {
+                          const ContributionsIcon = getIcon(contributionsItemFallback.icon)
+                          return ContributionsIcon ? <ContributionsIcon className="w-4 h-4" /> : null
+                        })()}
+                        <span>{locale === 'ar' && contributionsItemFallback.label_ar ? contributionsItemFallback.label_ar : contributionsItemFallback.label}</span>
+                      </div>
+                    </Link>
+                    
+                    {/* Divider */}
+                    <div className="border-t border-gray-200 my-2"></div>
+                    
+                    {/* Profile */}
                     <Link 
                       href={`/${locale}/profile`}
                       className="block px-4 py-3 text-sm text-gray-800 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors mx-2 rounded-lg"
@@ -454,6 +663,8 @@ export default function NavigationBar() {
                         <span>{t('profile')}</span>
                       </div>
                     </Link>
+                    
+                    {/* Logout */}
                     <button
                       onClick={handleSignOut}
                       className="block w-full text-left px-4 py-3 text-sm text-gray-800 hover:bg-red-50 hover:text-red-700 transition-colors mx-2 rounded-lg"
@@ -465,6 +676,7 @@ export default function NavigationBar() {
                         <span>{t('logout')}</span>
                       </div>
                     </button>
+                    </div>
                   </div>
                 </div>
               </>
@@ -491,13 +703,17 @@ export default function NavigationBar() {
             )}
           </div>
 
-          {/* Mobile menu button - Login/Register moved to menu */}
-          <div className="lg:hidden flex-shrink-0">
+          {/* Mobile: Language Switcher and Menu button */}
+          <div className="lg:hidden flex items-center space-x-2 flex-shrink-0">
+            {/* Compact Language Switcher for Mobile */}
+            <LanguageSwitcher compact />
+            
+            {/* Mobile menu button */}
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleMobileMenu}
-              className="p-2"
+              className="p-2 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7C] transition-all duration-200 rounded-lg"
               aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={isMobileMenuOpen}
             >
@@ -725,8 +941,8 @@ export default function NavigationBar() {
                       <div className="flex items-center justify-between w-full">
                         <span>{t('notifications')}</span>
                         {unreadNotifications > 0 && (
-                          <Badge className="ml-2 bg-red-500 text-white">
-                            {unreadNotifications}
+                          <Badge className="ml-2 bg-red-500 text-white min-w-[1.75rem] px-1.5">
+                            {formatNotificationCount(unreadNotifications)}
                           </Badge>
                         )}
                       </div>
@@ -737,6 +953,37 @@ export default function NavigationBar() {
                     <div className="px-4 py-2 text-sm text-gray-500">
                       {user.email}
                     </div>
+                    
+                    {/* Dashboard */}
+                    <Link 
+                      href={`/${locale}${dashboardItemFallback.href}`}
+                      className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 rounded-lg transition-colors flex items-center gap-2"
+                      onClick={closeMobileMenu}
+                    >
+                      {dashboardItemFallback.icon && (() => {
+                        const DashboardIcon = getIcon(dashboardItemFallback.icon)
+                        return DashboardIcon ? <DashboardIcon className="h-4 w-4" /> : null
+                      })()}
+                      <span>{locale === 'ar' && dashboardItemFallback.label_ar ? dashboardItemFallback.label_ar : dashboardItemFallback.label}</span>
+                    </Link>
+                    
+                    {/* My Contributions */}
+                    <Link 
+                      href={`/${locale}${contributionsItemFallback.href}`}
+                      className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 rounded-lg transition-colors flex items-center gap-2"
+                      onClick={closeMobileMenu}
+                    >
+                      {contributionsItemFallback.icon && (() => {
+                        const ContributionsIcon = getIcon(contributionsItemFallback.icon)
+                        return ContributionsIcon ? <ContributionsIcon className="h-4 w-4" /> : null
+                      })()}
+                      <span>{locale === 'ar' && contributionsItemFallback.label_ar ? contributionsItemFallback.label_ar : contributionsItemFallback.label}</span>
+                    </Link>
+                    
+                    {/* Divider */}
+                    <div className="border-t border-gray-200 my-2"></div>
+                    
+                    {/* Profile */}
                     <Link 
                       href={`/${locale}/profile`}
                       className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 rounded-lg transition-colors"
@@ -744,6 +991,8 @@ export default function NavigationBar() {
                     >
                       {t('profile')}
                     </Link>
+                    
+                    {/* Logout */}
                     <button
                       onClick={() => {
                         handleSignOut()
@@ -757,12 +1006,6 @@ export default function NavigationBar() {
                 </>
               )}
 
-              {/* Language Switcher for Mobile - Always shown in menu for all users */}
-              <div className="border-t border-gray-200 pt-4 mt-4">
-                <div className="px-4 py-2 flex items-center justify-center">
-                  <LanguageSwitcher />
-                </div>
-              </div>
             </div>
           </div>
         )}

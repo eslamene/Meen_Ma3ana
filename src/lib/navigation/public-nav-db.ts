@@ -95,9 +95,18 @@ export async function getPublicNavItemsFromDB(
         // Regular links - add locale if not present
         if (!href.startsWith('/')) href = `/${href}`
         
-        // Normalize landing page hrefs using utility function
+        // Only normalize landing page hrefs using utility function
         // This handles cases like /, /landing, /landing/landing, /en/landing/landing, etc.
-        href = normalizeLandingPath(href, locale)
+        if (href.includes('/landing') || href === '/' || href === '') {
+          href = normalizeLandingPath(href, locale)
+        } else {
+          // For other paths (like /cases), ensure locale is prepended if not already present
+          if (locale && !href.startsWith(`/${locale}/`)) {
+            // Remove any existing locale prefix first
+            const pathWithoutLocale = href.replace(/^\/[a-z]{2}\//, '/')
+            href = `/${locale}${pathWithoutLocale}`
+          }
+        }
       }
 
       // Use label based on locale - convert to translation key

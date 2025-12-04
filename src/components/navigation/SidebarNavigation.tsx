@@ -6,6 +6,7 @@ import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { formatNotificationCount } from '@/lib/utils'
 import Logo from '@/components/ui/Logo'
 import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
@@ -464,8 +465,8 @@ function MenuItemComponent({
         <span className="truncate">{item.label}</span>
       </div>
       {isNotifications && unreadNotifications > 0 && (
-        <Badge variant="destructive" className="ml-2 flex-shrink-0">
-          {unreadNotifications}
+        <Badge variant="destructive" className="ml-2 flex-shrink-0 min-w-[1.75rem] px-1.5">
+          {formatNotificationCount(unreadNotifications)}
         </Badge>
       )}
     </Link>

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Menu, Edit2, Save, X, Trash2, AlertTriangle, Plus, Copy } from 'lucide-react'
+import { Menu, Edit2, Save, X, Trash2, AlertTriangle, Plus, Copy, Search } from 'lucide-react'
 import { EditPageHeader, EditPageFooter } from '@/components/crud'
 import { useParams } from 'next/navigation'
 import {
@@ -21,6 +21,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -169,6 +174,8 @@ export default function AdminMenuPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [deletingItem, setDeletingItem] = useState<MenuItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [permissionSearchTerm, setPermissionSearchTerm] = useState('')
+  const [permissionPopoverOpen, setPermissionPopoverOpen] = useState(false)
   const { permissions, refresh: refreshAdmin } = useAdmin()
   const hasShownUnsavedToast = useRef(false)
 
@@ -214,10 +221,11 @@ export default function AdminMenuPage() {
       return items
         .filter(item => {
           const menuItem = item as MenuItem
+          const searchLower = searchTerm.toLowerCase()
           return (
-            menuItem.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            menuItem.label_ar?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            menuItem.href.toLowerCase().includes(searchTerm.toLowerCase())
+            (menuItem.label?.toLowerCase() || '').includes(searchLower) ||
+            (menuItem.label_ar?.toLowerCase() || '').includes(searchLower) ||
+            (menuItem.href?.toLowerCase() || '').includes(searchLower)
           )
         })
         .map(item => ({
@@ -354,6 +362,7 @@ export default function AdminMenuPage() {
   const handleAdd = useCallback(() => {
     setIsAdding(true)
     setEditingItem(null)
+    setPermissionSearchTerm('')
     setEditForm({
       label: '',
       label_ar: '',
@@ -390,6 +399,7 @@ export default function AdminMenuPage() {
   const handleEdit = useCallback((item: MenuItem) => {
     setIsAdding(false)
     setEditingItem(item)
+    setPermissionSearchTerm('')
     setEditForm({
       label: item.label,
       label_ar: item.label_ar || '',
@@ -681,6 +691,8 @@ export default function AdminMenuPage() {
               if (!open) {
                 setEditingItem(null)
                 setIsAdding(false)
+                setPermissionSearchTerm('')
+                setPermissionPopoverOpen(false)
               }
             }}>
               <DialogContent className="sm:max-w-md">
@@ -734,24 +746,85 @@ export default function AdminMenuPage() {
                   </div>
                   <div>
                     <Label htmlFor="permission">Permission</Label>
-                    <Select
-                      value={editForm.permission_id || 'none'}
-                      onValueChange={(value) =>
-                        setEditForm({ ...editForm, permission_id: value === 'none' ? undefined : value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select permission" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Permission Required</SelectItem>
-                        {permissions.map((perm) => (
-                          <SelectItem key={perm.id} value={perm.id}>
-                            {perm.display_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={permissionPopoverOpen} onOpenChange={setPermissionPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between"
+                        >
+                          {editForm.permission_id
+                            ? permissions.find((p) => p.id === editForm.permission_id)?.display_name || 'Select permission'
+                            : 'No Permission Required'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                        <div className="p-2 border-b">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search permissions..."
+                              value={permissionSearchTerm}
+                              onChange={(e) => setPermissionSearchTerm(e.target.value)}
+                              className="pl-10"
+                              autoFocus
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto">
+                          <div
+                            className="px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-100 rounded-sm"
+                            onClick={() => {
+                              setEditForm({ ...editForm, permission_id: undefined })
+                              setPermissionSearchTerm('')
+                              setPermissionPopoverOpen(false)
+                            }}
+                          >
+                            <div className={`flex items-center ${!editForm.permission_id ? 'font-semibold' : ''}`}>
+                              <span className="mr-2">{!editForm.permission_id ? '✓' : ''}</span>
+                              No Permission Required
+                            </div>
+                          </div>
+                          {permissions
+                            .filter((perm) => {
+                              if (!permissionSearchTerm.trim()) return true
+                              const searchLower = permissionSearchTerm.toLowerCase().trim()
+                              return (
+                                perm.display_name.toLowerCase().includes(searchLower) ||
+                                perm.name.toLowerCase().includes(searchLower)
+                              )
+                            })
+                            .map((perm) => (
+                              <div
+                                key={perm.id}
+                                className="px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-100 rounded-sm"
+                                onClick={() => {
+                                  setEditForm({ ...editForm, permission_id: perm.id })
+                                  setPermissionSearchTerm('')
+                                  setPermissionPopoverOpen(false)
+                                }}
+                              >
+                                <div className={`flex items-center ${editForm.permission_id === perm.id ? 'font-semibold' : ''}`}>
+                                  <span className="mr-2">{editForm.permission_id === perm.id ? '✓' : ''}</span>
+                                  {perm.display_name}
+                                </div>
+                              </div>
+                            ))}
+                          {permissions.filter((perm) => {
+                            if (!permissionSearchTerm.trim()) return false
+                            const searchLower = permissionSearchTerm.toLowerCase().trim()
+                            return (
+                              perm.display_name.toLowerCase().includes(searchLower) ||
+                              perm.name.toLowerCase().includes(searchLower)
+                            )
+                          }).length === 0 && permissionSearchTerm.trim() && (
+                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                              No permissions found matching &quot;{permissionSearchTerm}&quot;
+                            </div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="flex items-center space-x-2">
                     <input
