@@ -25,3 +25,6 @@ END $$;
 -- Add comment to document the column
 COMMENT ON COLUMN public.users.email_verified IS 'Indicates whether the user has verified their email address. Synced from auth.users.email_confirmed_at via trigger.';
 
+
+
+

@@ -80,3 +80,6 @@ END $$;
 -- Add comment to document the trigger
 COMMENT ON FUNCTION ensure_donor_role_on_email_verification() IS 'Ensures donor role is assigned when user verifies their email. This is a backup to the INSERT trigger.';
 
+
+
+

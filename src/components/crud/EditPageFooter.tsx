@@ -175,7 +175,7 @@ export default function EditPageFooter({
             <Button
               onClick={primaryAction.onClick}
               disabled={primaryAction.disabled || primaryAction.loading}
-              className="min-w-[180px] w-full sm:w-auto bg-gradient-to-r from-[#6B8E7E] to-[#5A7A6B] hover:from-[#5A7A6B] hover:to-[#496658] text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold"
+              className="min-w-[140px] sm:min-w-[180px] w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold text-sm sm:text-base"
               size="lg"
             >
               {primaryAction.loading ? (

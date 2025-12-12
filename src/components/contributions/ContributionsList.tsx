@@ -195,7 +195,9 @@ const ContributionItem = ({
     const config = statusConfig[status] || statusConfig.pending
     return (
       <Badge className={`flex items-center gap-1 sm:gap-1.5 ${config.bg} ${config.color} border-0 text-[10px] sm:text-xs`}>
-        {React.cloneElement(config.icon, { className: 'w-3 h-3 sm:w-4 sm:h-4' })}
+        {React.isValidElement(config.icon) 
+          ? React.cloneElement(config.icon as React.ReactElement<{ className?: string }>, { className: 'w-3 h-3 sm:w-4 sm:h-4' })
+          : config.icon}
         <span className="font-medium">{status.charAt(0).toUpperCase() + status.slice(1)}</span>
       </Badge>
     )

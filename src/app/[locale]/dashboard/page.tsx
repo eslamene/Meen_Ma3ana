@@ -55,9 +55,10 @@ interface QuickActionsSectionProps {
     action: () => void
   }>
   t: (key: string) => string
+  isRTL: boolean
 }
 
-function QuickActionsSection({ quickActions, t }: QuickActionsSectionProps) {
+function QuickActionsSection({ quickActions, t, isRTL }: QuickActionsSectionProps) {
   const { hasPermission } = useAdmin()
   
   // Filter actions based on permissions
@@ -104,12 +105,16 @@ function QuickActionsSection({ quickActions, t }: QuickActionsSectionProps) {
                   return <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 })()}
               </div>
-              <div className="flex-1 text-left min-w-0">
+              <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
                 <h3 className="font-medium text-sm sm:text-base mb-0.5 sm:mb-1 truncate">{action.title}</h3>
                 <p className="text-xs sm:text-sm opacity-90 leading-tight line-clamp-2">{action.description}</p>
               </div>
               <div className="flex-shrink-0">
-                <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                {isRTL ? (
+                  <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 opacity-60 group-hover:opacity-100 group-hover:-translate-x-1 transition-all rotate-180" />
+                ) : (
+                  <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                )}
               </div>
             </button>
           ))}
@@ -173,6 +178,8 @@ export default function DashboardPage() {
   const t = useTranslations('dashboard')
   const router = useRouter()
   const params = useParams()
+  const locale = params.locale as string
+  const isRTL = locale === 'ar'
   const { user, signOut } = useAuth()
   const { roles, permissions, loading: rolesLoading, refresh: refreshAdminData } = useAdmin()
   const { containerVariant } = useLayout()
@@ -319,7 +326,7 @@ export default function DashboardPage() {
   const quickActions = [
     {
       title: t('makeContribution'),
-      description: 'Support a case with your contribution',
+      description: t('supportCaseWithContribution'),
       icon: Heart,
       color: theme.gradients.primary,
       hoverColor: `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`,
@@ -328,7 +335,7 @@ export default function DashboardPage() {
     },
     {
       title: t('sponsorCase'),
-      description: 'Become a sponsor for a case',
+      description: t('becomeSponsorForCase'),
       icon: Target,
       color: theme.gradients.brand,
       hoverColor: `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.ma3ana[600]} 100%)`,
@@ -337,7 +344,7 @@ export default function DashboardPage() {
     },
     {
       title: t('createCase'),
-      description: 'Create a new case for support',
+      description: t('createNewCaseForSupport'),
       icon: Plus,
       color: theme.gradients.secondary,
       hoverColor: `linear-gradient(135deg, ${brandColors.ma3ana[600]} 0%, ${brandColors.ma3ana[700]} 100%)`,
@@ -346,7 +353,7 @@ export default function DashboardPage() {
     },
     {
       title: t('adminPanel'),
-      description: 'Access administrative tools',
+      description: t('accessAdministrativeTools'),
       icon: Settings,
       color: theme.gradients.brandReverse,
       hoverColor: `linear-gradient(135deg, ${brandColors.ma3ana[600]} 0%, ${brandColors.meen[600]} 100%)`,
@@ -376,41 +383,41 @@ export default function DashboardPage() {
                   <div className="flex items-start justify-between gap-4 mb-2 flex-wrap">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
-                        {t('welcome')}
-                      </h1>
+                  {t('welcome')}
+                </h1>
                       <Badge variant="outline" className={`${getRoleColor(userRole || '')} text-xs sm:text-sm font-semibold`}>
-                        <Shield className="h-3 w-3 mr-1" />
-                        <span className="hidden min-[375px]:inline">{getRoleDisplayName(userRole || '')}</span>
-                        <span className="min-[375px]:hidden">{getRoleDisplayName(userRole || '').split(' ')[0]}</span>
-                      </Badge>
+                  <Shield className={`h-3 w-3 ${isRTL ? 'ml-1' : 'mr-1'}`} />
+                  <span className="hidden min-[375px]:inline">{getRoleDisplayName(userRole || '')}</span>
+                  <span className="min-[375px]:hidden">{getRoleDisplayName(userRole || '').split(' ')[0]}</span>
+                </Badge>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        variant="outline"
+                <Button
+                  variant="outline"
                         size="sm"
-                        onClick={refreshUserRole}
-                        disabled={refreshingRole}
-                        className="border-meen-300 text-meen-700 hover:bg-meen-50 px-2 sm:px-3"
-                        title="Refresh role from database"
-                      >
-                        <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${refreshingRole ? 'animate-spin' : ''}`} />
-                      </Button>
-                      <Button
-                        variant="outline"
+                  onClick={refreshUserRole}
+                  disabled={refreshingRole}
+                  className="border-meen-300 text-meen-700 hover:bg-meen-50 px-2 sm:px-3"
+                  title="Refresh role from database"
+                >
+                  <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${refreshingRole ? 'animate-spin' : ''}`} />
+                </Button>
+                <Button
+                  variant="outline"
                         size="sm"
-                        onClick={async () => {
-                          await signOut()
-                          router.push(`/${params.locale}/landing`)
-                        }}
-                        className="border-ma3ana-300 text-ma3ana-700 hover:bg-ma3ana-50 px-2 sm:px-3"
-                        title={t('signOut')}
-                      >
-                        <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
-                      </Button>
+                  onClick={async () => {
+                    await signOut()
+                    router.push(`/${params.locale}/landing`)
+                  }}
+                  className="border-ma3ana-300 text-ma3ana-700 hover:bg-ma3ana-50 px-2 sm:px-3"
+                  title={t('signOut')}
+                >
+                  <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
                     </div>
                   </div>
                   <p className="text-sm sm:text-base text-gray-600 break-words">
-                    Welcome back, {user?.email}
+                    {t('welcomeBack')}, {user?.email}
                   </p>
                 </div>
               </div>
@@ -418,22 +425,22 @@ export default function DashboardPage() {
           </div>
 
           {/* Tabbed Interface */}
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList variant="branded" className="w-full justify-start">
-              <TabsTrigger value="overview" icon={BarChart3} tabIndex={0}>
-                Overview
+          <Tabs defaultValue="overview" className="w-full" dir={isRTL ? 'rtl' : 'ltr'}>
+            <TabsList variant="branded" className="w-full" dir={isRTL ? 'rtl' : 'ltr'}>
+              <TabsTrigger value="overview" icon={BarChart3} tabIndex={0} dir={isRTL ? 'rtl' : 'ltr'}>
+                {t('overview')}
               </TabsTrigger>
-              <TabsTrigger value="user-info" icon={User} tabIndex={1}>
-                User Info
+              <TabsTrigger value="user-info" icon={User} tabIndex={1} dir={isRTL ? 'rtl' : 'ltr'}>
+                {t('userInfo')}
               </TabsTrigger>
-              <TabsTrigger value="security" icon={Lock} tabIndex={0}>
-                Security
+              <TabsTrigger value="security" icon={Lock} tabIndex={0} dir={isRTL ? 'rtl' : 'ltr'}>
+                {t('security')}
               </TabsTrigger>
-              <TabsTrigger value="history" icon={History} tabIndex={1}>
-                History
+              <TabsTrigger value="history" icon={History} tabIndex={1} dir={isRTL ? 'rtl' : 'ltr'}>
+                {t('history')}
               </TabsTrigger>
-              <TabsTrigger value="settings" icon={Settings} tabIndex={0}>
-                Settings
+              <TabsTrigger value="settings" icon={Settings} tabIndex={0} dir={isRTL ? 'rtl' : 'ltr'}>
+                {t('settings')}
               </TabsTrigger>
             </TabsList>
 
@@ -445,12 +452,12 @@ export default function DashboardPage() {
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Contributions</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{t('totalContributions')}</p>
                         <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                           {loading ? '...' : stats.totalContributions}
                         </p>
                       </div>
-                      <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ${isRTL ? 'mr-2' : 'ml-2'}`} style={{ backgroundColor: brandColors.ma3ana[100] }}>
                         <Heart className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
                       </div>
                     </div>
@@ -461,12 +468,12 @@ export default function DashboardPage() {
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Amount</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{t('totalAmount')}</p>
                         <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                           {loading ? '...' : formatAmount(stats.totalAmount)}
                         </p>
                       </div>
-                      <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.meen[100] }}>
+                      <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ${isRTL ? 'mr-2' : 'ml-2'}`} style={{ backgroundColor: brandColors.meen[100] }}>
                         <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                       </div>
                     </div>
@@ -477,12 +484,12 @@ export default function DashboardPage() {
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Cases</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{t('activeCases')}</p>
                         <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                           {loading ? '...' : stats.activeCases}
                         </p>
                       </div>
-                      <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ background: theme.gradients.brandSubtle }}>
+                      <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ${isRTL ? 'mr-2' : 'ml-2'}`} style={{ background: theme.gradients.brandSubtle }}>
                         <Activity className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                       </div>
                     </div>
@@ -493,12 +500,12 @@ export default function DashboardPage() {
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Completed Cases</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{t('completedCases')}</p>
                         <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
                           {loading ? '...' : stats.completedCases}
                         </p>
                       </div>
-                      <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
+                      <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ${isRTL ? 'mr-2' : 'ml-2'}`} style={{ backgroundColor: brandColors.ma3ana[100] }}>
                         <Target className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
                       </div>
                     </div>
@@ -510,43 +517,44 @@ export default function DashboardPage() {
               <QuickActionsSection 
                 quickActions={quickActions}
                 t={t}
+                isRTL={isRTL}
               />
 
               {/* Recent Activity Summary */}
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-meen" />
-                    Recent Activity
+                    <Calendar className={`h-4 w-4 sm:h-5 sm:w-5 text-meen ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                    {t('recentActivity')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 sm:space-y-3">
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg" style={{ backgroundColor: brandColors.ma3ana[50] }}>
+                    <div className={`flex items-center p-2 sm:p-3 rounded-lg ${isRTL ? 'gap-2 sm:gap-3 flex-row-reverse' : 'gap-2 sm:gap-3'}`} style={{ backgroundColor: brandColors.ma3ana[50] }}>
                       <div className="p-1.5 sm:p-2 rounded-full flex-shrink-0" style={{ backgroundColor: brandColors.ma3ana[100] }}>
                         <Heart className="h-3 w-3 sm:h-4 sm:w-4" style={{ color: brandColors.ma3ana[600] }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">Contribution made</p>
-                        <p className="text-xs text-gray-500">2 hours ago</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{t('contributionMade')}</p>
+                        <p className="text-xs text-gray-500">2 {t('hoursAgo')}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg" style={{ background: theme.gradients.brandSubtle }}>
+                    <div className={`flex items-center p-2 sm:p-3 rounded-lg ${isRTL ? 'gap-2 sm:gap-3 flex-row-reverse' : 'gap-2 sm:gap-3'}`} style={{ background: theme.gradients.brandSubtle }}>
                       <div className="p-1.5 sm:p-2 rounded-full flex-shrink-0" style={{ backgroundColor: brandColors.meen[100] }}>
                         <Target className="h-3 w-3 sm:h-4 sm:w-4" style={{ color: brandColors.meen[600] }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">Case sponsored</p>
-                        <p className="text-xs text-gray-500">1 day ago</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{t('caseSponsored')}</p>
+                        <p className="text-xs text-gray-500">1 {t('daysAgo')}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg" style={{ backgroundColor: brandColors.meen[50] }}>
+                    <div className={`flex items-center p-2 sm:p-3 rounded-lg ${isRTL ? 'gap-2 sm:gap-3 flex-row-reverse' : 'gap-2 sm:gap-3'}`} style={{ backgroundColor: brandColors.meen[50] }}>
                       <div className="p-1.5 sm:p-2 rounded-full flex-shrink-0" style={{ backgroundColor: brandColors.meen[100] }}>
                         <Eye className="h-3 w-3 sm:h-4 sm:w-4" style={{ color: brandColors.meen[600] }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">Profile updated</p>
-                        <p className="text-xs text-gray-500">3 days ago</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{t('profileUpdated')}</p>
+                        <p className="text-xs text-gray-500">3 {t('daysAgo')}</p>
                       </div>
                     </div>
                   </div>
@@ -566,34 +574,34 @@ export default function DashboardPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 sm:space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                      <span className="text-xs sm:text-sm font-medium text-gray-600">Email</span>
-                      <span className="text-xs sm:text-sm text-gray-900 font-mono break-all sm:break-normal sm:text-right">{user?.email}</span>
+                    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+                      <span className="text-xs sm:text-sm font-medium text-gray-600">{t('email')}</span>
+                      <span className={`text-xs sm:text-sm text-gray-900 font-mono break-all sm:break-normal ${isRTL ? 'sm:text-left' : 'sm:text-right'}`}>{user?.email}</span>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                      <span className="text-xs sm:text-sm font-medium text-gray-600">User ID</span>
-                      <span className="text-xs text-gray-500 font-mono truncate max-w-full sm:max-w-32 text-right">
+                    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+                      <span className="text-xs sm:text-sm font-medium text-gray-600">{t('userId')}</span>
+                      <span className={`text-xs text-gray-500 font-mono truncate max-w-full sm:max-w-32 ${isRTL ? 'sm:text-left' : 'sm:text-right'}`}>
                         {user?.id}
                       </span>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                      <span className="text-xs sm:text-sm font-medium text-gray-600">Role</span>
+                    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+                      <span className="text-xs sm:text-sm font-medium text-gray-600">{t('role')}</span>
                       <Badge variant="outline" className={`${getRoleColor(userRole || '')} text-xs w-fit sm:w-auto`}>
                         {getRoleDisplayName(userRole || '')}
                       </Badge>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                      <span className="text-xs sm:text-sm font-medium text-gray-600">Last Sign In</span>
-                      <span className="text-xs sm:text-sm text-gray-900 text-right">
+                    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+                      <span className="text-xs sm:text-sm font-medium text-gray-600">{t('lastSignIn')}</span>
+                      <span className={`text-xs sm:text-sm text-gray-900 ${isRTL ? 'sm:text-left' : 'sm:text-right'}`}>
                         {user?.last_sign_in_at 
                           ? new Date(user.last_sign_in_at).toLocaleDateString()
                           : t('unknown')
                         }
                       </span>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                      <span className="text-xs sm:text-sm font-medium text-gray-600">Account Created</span>
-                      <span className="text-xs sm:text-sm text-gray-900 text-right">
+                    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 p-2 sm:p-3 bg-gray-50 rounded-lg ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+                      <span className="text-xs sm:text-sm font-medium text-gray-600">{t('accountCreated')}</span>
+                      <span className={`text-xs sm:text-sm text-gray-900 ${isRTL ? 'sm:text-left' : 'sm:text-right'}`}>
                         {user?.created_at 
                           ? new Date(user.created_at).toLocaleDateString()
                           : t('unknown')
@@ -605,8 +613,8 @@ export default function DashboardPage() {
                       onClick={() => router.push(`/${params.locale}/profile/edit`)}
                       className="w-full border-meen-300 text-meen-700 hover:bg-meen-50"
                     >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Profile
+                      <Edit className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('editProfile')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -631,7 +639,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="space-y-2">
                         <h4 className="font-medium text-sm sm:text-base text-gray-900">
-                          Permissions ({permissions.length}):
+                          {t('permissions')} ({permissions.length}):
                         </h4>
                         {permissions.length > 0 ? (
                           <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -641,7 +649,7 @@ export default function DashboardPage() {
                               return (
                                 <div 
                                   key={permission.id} 
-                                  className="flex items-center gap-2 text-xs sm:text-sm"
+                                  className={`flex items-center text-xs sm:text-sm ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}
                                   style={{ color: permissionColor }}
                                 >
                                   <div 
@@ -655,7 +663,7 @@ export default function DashboardPage() {
                           </div>
                         ) : (
                           <div className="text-xs sm:text-sm text-gray-500 italic">
-                            No permissions assigned
+                            {t('noPermissionsAssigned')}
                           </div>
                         )}
                       </div>
@@ -671,22 +679,22 @@ export default function DashboardPage() {
                 {/* Password Management */}
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                      <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-meen" />
-                      Password Security
+                    <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                      <Lock className={`h-4 w-4 sm:h-5 sm:w-5 text-meen ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('passwordSecurity')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="p-3 bg-meen-50 rounded-lg border border-meen-200">
+                    <div className={`p-3 bg-meen-50 rounded-lg border border-meen-200 ${isRTL ? 'text-right' : 'text-left'}`}>
                       <p className="text-sm text-meen-800 mb-2">
-                        <strong>Password Requirements:</strong>
+                        <strong>{t('passwordRequirements')}:</strong>
                       </p>
-                      <ul className="text-xs text-meen-700 space-y-1 list-disc list-inside">
-                        <li>Minimum 8 characters</li>
-                        <li>At least one uppercase letter</li>
-                        <li>At least one lowercase letter</li>
-                        <li>At least one number</li>
-                        <li>At least one special character</li>
+                      <ul className={`text-xs text-meen-700 space-y-1 ${isRTL ? 'list-disc list-inside' : 'list-disc list-inside'}`}>
+                        <li>{t('minimumCharacters')}</li>
+                        <li>{t('uppercaseLetter')}</li>
+                        <li>{t('lowercaseLetter')}</li>
+                        <li>{t('oneNumber')}</li>
+                        <li>{t('specialCharacter')}</li>
                       </ul>
                     </div>
                     <Button
@@ -694,8 +702,8 @@ export default function DashboardPage() {
                       onClick={() => router.push(`/${params.locale}/auth/forgot-password`)}
                       className="w-full border-meen-300 text-meen-700 hover:bg-meen-50"
                     >
-                      <Lock className="h-4 w-4 mr-2" />
-                      Change Password
+                      <Lock className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('changePassword')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -703,21 +711,21 @@ export default function DashboardPage() {
                 {/* Session Management */}
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                      <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-ma3ana" />
-                      Active Sessions
+                    <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                      <Activity className={`h-4 w-4 sm:h-5 sm:w-5 text-ma3ana ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('activeSessions')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-gray-900">Current Session</p>
+                    <div className={`p-3 bg-gray-50 rounded-lg ${isRTL ? 'text-right' : 'text-left'}`}>
+                      <div className={`flex items-center justify-between mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <p className="text-sm font-medium text-gray-900">{t('currentSession')}</p>
                         <Badge variant="outline" className="bg-meen-100 text-meen-800 border-meen-200">
-                          Active
+                          {t('active')}
                         </Badge>
                       </div>
-                      <p className="text-xs text-gray-600">Device: {typeof window !== 'undefined' ? navigator.userAgent.split(' ')[0] : 'Unknown'}</p>
-                      <p className="text-xs text-gray-600">Last activity: Just now</p>
+                      <p className="text-xs text-gray-600">{t('device')}: {typeof window !== 'undefined' ? navigator.userAgent.split(' ')[0] : t('unknown')}</p>
+                      <p className="text-xs text-gray-600">{t('lastActivity')}: {t('justNow')}</p>
                     </div>
                     <Button
                       variant="outline"
@@ -727,8 +735,8 @@ export default function DashboardPage() {
                       }}
                       className="w-full border-ma3ana-300 text-ma3ana-700 hover:bg-ma3ana-50"
                     >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out All Sessions
+                      <LogOut className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('signOutAllSessions')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -736,16 +744,16 @@ export default function DashboardPage() {
                 {/* Security Settings */}
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg md:col-span-2" style={{ boxShadow: theme.shadows.primary }}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                      <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-ma3ana" />
-                      Security Settings
+                    <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                      <Shield className={`h-4 w-4 sm:h-5 sm:w-5 text-ma3ana ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('securitySettings')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-medium text-gray-900">Email Verified</p>
+                      <div className={`p-3 bg-gray-50 rounded-lg ${isRTL ? 'text-right' : 'text-left'}`}>
+                        <div className={`flex items-center justify-between mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <p className="text-sm font-medium text-gray-900">{t('emailVerified')}</p>
                           {user?.email_confirmed_at ? (
                             <CheckCircle2 className="h-5 w-5 text-meen" />
                           ) : (
@@ -754,19 +762,19 @@ export default function DashboardPage() {
                         </div>
                         <p className="text-xs text-gray-600">
                           {user?.email_confirmed_at 
-                            ? 'Your email has been verified'
-                            : 'Please verify your email address'
+                            ? t('emailHasBeenVerified')
+                            : t('pleaseVerifyEmail')
                           }
                         </p>
                       </div>
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-medium text-gray-900">Two-Factor Authentication</p>
+                      <div className={`p-3 bg-gray-50 rounded-lg ${isRTL ? 'text-right' : 'text-left'}`}>
+                        <div className={`flex items-center justify-between mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                          <p className="text-sm font-medium text-gray-900">{t('twoFactorAuthentication')}</p>
                           <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200">
-                            Not Enabled
+                            {t('notEnabled')}
                           </Badge>
                         </div>
-                        <p className="text-xs text-gray-600">Add an extra layer of security</p>
+                        <p className="text-xs text-gray-600">{t('addExtraSecurity')}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -779,8 +787,8 @@ export default function DashboardPage() {
               <PermissionGuard permissions={["contributions:read"]}>
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                      <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-ma3ana" />
+                    <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                      <CreditCard className={`h-4 w-4 sm:h-5 sm:w-5 text-ma3ana ${isRTL ? 'ml-2' : 'mr-2'}`} />
                       {t('myContributions')}
                     </CardTitle>
                   </CardHeader>
@@ -793,8 +801,8 @@ export default function DashboardPage() {
               <PermissionGuard permissions={["sponsorships:read"]}>
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                      <Target className="h-4 w-4 sm:h-5 sm:w-5 text-meen" />
+                    <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                      <Target className={`h-4 w-4 sm:h-5 sm:w-5 text-meen ${isRTL ? 'ml-2' : 'mr-2'}`} />
                       {t('mySponsorships')}
                     </CardTitle>
                   </CardHeader>
@@ -807,16 +815,16 @@ export default function DashboardPage() {
               {/* Activity History */}
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                    <History className="h-4 w-4 sm:h-5 sm:w-5 text-meen" />
-                    Recent Transactions
+                  <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                    <History className={`h-4 w-4 sm:h-5 sm:w-5 text-meen ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                    {t('recentTransactions')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {transactionsLoading ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto" style={{ borderColor: brandColors.meen[600] }}></div>
-                      <p className="text-gray-600 mt-2 text-sm">Loading transactions...</p>
+                      <p className="text-gray-600 mt-2 text-sm">{t('loadingTransactions')}</p>
                     </div>
                   ) : recentTransactions.length > 0 ? (
                     <div className="space-y-3">
@@ -838,17 +846,17 @@ export default function DashboardPage() {
                           const date = new Date(dateString)
                           const now = new Date()
                           const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-                          if (diffInHours < 1) return 'Just now'
-                          if (diffInHours < 24) return `${diffInHours} hours ago`
+                          if (diffInHours < 1) return t('justNow')
+                          if (diffInHours < 24) return `${diffInHours} ${t('hoursAgo')}`
                           const diffInDays = Math.floor(diffInHours / 24)
-                          if (diffInDays < 7) return `${diffInDays} days ago`
+                          if (diffInDays < 7) return `${diffInDays} ${t('daysAgo')}`
                           return date.toLocaleDateString()
                         }
 
                         return (
                           <div 
                             key={transaction.id} 
-                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                            className={`flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer ${isRTL ? 'gap-3 flex-row-reverse' : 'gap-3'}`}
                             onClick={() => router.push(`/${params.locale}/contributions/${transaction.id}`)}
                           >
                             <div className="p-2 rounded-full" style={{ backgroundColor: brandColors.ma3ana[100] }}>
@@ -856,7 +864,7 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{transaction.title}</p>
-                              <div className="flex items-center gap-2 mt-1">
+                              <div className={`flex items-center mt-1 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
                                 <p className="text-xs text-gray-500">{getTimeAgo(transaction.date)}</p>
                                 {transaction.amount && (
                                   <>
@@ -875,22 +883,22 @@ export default function DashboardPage() {
                         onClick={() => router.push(`/${params.locale}/contributions`)}
                         className="w-full border-meen-300 text-meen-700 hover:bg-meen-50 mt-4"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View All Transactions
+                        <Eye className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                        {t('viewAllTransactions')}
                       </Button>
                     </div>
                   ) : (
                     <div className="text-center py-8">
                       <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600 mb-2">No transactions yet</p>
-                      <p className="text-sm text-gray-500">Your transaction history will appear here</p>
+                      <p className="text-gray-600 mb-2">{t('noTransactionsYet')}</p>
+                      <p className="text-sm text-gray-500">{t('transactionHistory')}</p>
                       <Button
                         variant="outline"
                         onClick={() => router.push(`/${params.locale}/cases`)}
                         className="mt-4 border-meen-300 text-meen-700 hover:bg-meen-50"
                       >
-                        <Heart className="h-4 w-4 mr-2" />
-                        Make Your First Contribution
+                        <Heart className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                        {t('makeFirstContribution')}
                       </Button>
                     </div>
                   )}
@@ -904,29 +912,29 @@ export default function DashboardPage() {
                 {/* Notification Settings */}
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                      <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-meen" />
-                      Notifications
+                    <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                      <Bell className={`h-4 w-4 sm:h-5 sm:w-5 text-meen ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('notifications')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Email Notifications</p>
-                          <p className="text-xs text-gray-600">Receive updates via email</p>
+                      <div className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className={isRTL ? 'text-right' : 'text-left'}>
+                          <p className="text-sm font-medium text-gray-900">{t('emailNotifications')}</p>
+                          <p className="text-xs text-gray-600">{t('receiveUpdatesViaEmail')}</p>
                         </div>
                         <Badge variant="outline" className="bg-meen-100 text-meen-800 border-meen-200">
-                          Enabled
+                          {t('enabled')}
                         </Badge>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Contribution Updates</p>
-                          <p className="text-xs text-gray-600">Get notified about your contributions</p>
+                      <div className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className={isRTL ? 'text-right' : 'text-left'}>
+                          <p className="text-sm font-medium text-gray-900">{t('contributionUpdates')}</p>
+                          <p className="text-xs text-gray-600">{t('getNotifiedAboutContributions')}</p>
                         </div>
                         <Badge variant="outline" className="bg-meen-100 text-meen-800 border-meen-200">
-                          Enabled
+                          {t('enabled')}
                         </Badge>
                       </div>
                     </div>
@@ -935,8 +943,8 @@ export default function DashboardPage() {
                       onClick={() => router.push(`/${params.locale}/notifications`)}
                       className="w-full border-meen-300 text-meen-700 hover:bg-meen-50"
                     >
-                      <Bell className="h-4 w-4 mr-2" />
-                      Manage Notifications
+                      <Bell className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('manageNotifications')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -944,29 +952,29 @@ export default function DashboardPage() {
                 {/* Preferences */}
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                      <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-ma3ana" />
-                      Preferences
+                    <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                      <Settings className={`h-4 w-4 sm:h-5 sm:w-5 text-ma3ana ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('preferences')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Language</p>
-                          <p className="text-xs text-gray-600">Interface language</p>
+                      <div className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className={isRTL ? 'text-right' : 'text-left'}>
+                          <p className="text-sm font-medium text-gray-900">{t('language')}</p>
+                          <p className="text-xs text-gray-600">{t('interfaceLanguage')}</p>
                         </div>
                         <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200">
                           {params.locale?.toString().toUpperCase() || 'EN'}
                         </Badge>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Theme</p>
-                          <p className="text-xs text-gray-600">Display preferences</p>
+                      <div className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className={isRTL ? 'text-right' : 'text-left'}>
+                          <p className="text-sm font-medium text-gray-900">{t('theme')}</p>
+                          <p className="text-xs text-gray-600">{t('displayPreferences')}</p>
                         </div>
                         <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200">
-                          Light
+                          {t('light')}
                         </Badge>
                       </div>
                     </div>
@@ -975,8 +983,8 @@ export default function DashboardPage() {
                       onClick={() => router.push(`/${params.locale}/profile/edit`)}
                       className="w-full border-ma3ana-300 text-ma3ana-700 hover:bg-ma3ana-50"
                     >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Edit Preferences
+                      <Settings className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                      {t('editPreferences')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -986,8 +994,8 @@ export default function DashboardPage() {
               <PermissionGuard permissions={["admin:analytics"]}>
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.secondary }}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-800">
-                      <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-ma3ana" />
+                    <CardTitle className={`flex items-center text-base sm:text-lg font-semibold text-gray-800 ${isRTL ? 'gap-2 flex-row-reverse' : 'gap-2'}`}>
+                      <BarChart3 className={`h-4 w-4 sm:h-5 sm:w-5 text-ma3ana ${isRTL ? 'ml-2' : 'mr-2'}`} />
                       {t('adminReports')}
                     </CardTitle>
                   </CardHeader>
@@ -998,7 +1006,7 @@ export default function DashboardPage() {
                       onClick={() => router.push(`/${params.locale}/case-management/analytics`)}
                       className="border-ma3ana-300 text-ma3ana-700 hover:bg-ma3ana-50"
                     >
-                      <BarChart3 className="h-4 w-4 mr-2" />
+                      <BarChart3 className={`h-4 w-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
                       View Analytics
                     </Button>
                   </CardContent>

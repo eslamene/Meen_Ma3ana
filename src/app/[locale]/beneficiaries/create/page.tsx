@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
-import { User, FileText, FileEdit, Save } from 'lucide-react'
+import { User, FileText, FileEdit, Save, Users } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { EditPageHeader, EditPageFooter } from '@/components/crud'
 import BeneficiaryForm, { type BeneficiaryFormRef } from '@/components/beneficiaries/BeneficiaryForm'
@@ -349,9 +349,9 @@ export default function CreateBeneficiaryPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Container variant={containerVariant} className="py-8">
+        <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-indigo-600"></div>
           </div>
         </Container>
       </div>
@@ -360,30 +360,31 @@ export default function CreateBeneficiaryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Container variant={containerVariant} className="py-8">
+      <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
         <EditPageHeader
           backUrl={`/${locale}/beneficiaries`}
-          icon={User}
+          icon={Users}
           title={t('createBeneficiary') || 'Create Beneficiary'}
           description={t('createBeneficiaryDescription') || 'Add a new beneficiary to the system'}
           backLabel={t('back') || 'Back'}
         />
 
         {/* Form */}
-        <div className="rounded-lg border bg-white text-gray-900 shadow-lg">
-          <div className="w-full p-6">
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="w-full p-4 sm:p-6 lg:p-8">
             <Tabs
               value={activeTab}
               onValueChange={(value) => setActiveTab(value as 'data' | 'documents')}
             >
-              <TabsList variant="branded">
+              <TabsList variant="branded" className="mb-4 sm:mb-6">
                 <TabsTrigger 
                   value="data" 
                   variant="branded"
                   icon={FileEdit}
                   tabIndex={0}
                 >
-                  {t('beneficiaryInfo') || 'Beneficiary Information'}
+                  <span className="hidden sm:inline">{t('beneficiaryInfo') || 'Beneficiary Information'}</span>
+                  <span className="sm:hidden">Info</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="documents" 
@@ -395,7 +396,7 @@ export default function CreateBeneficiaryPage() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="data" className="mt-0">
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <BeneficiaryForm
                     mode="create"
                     onSubmit={handleSubmit}
@@ -411,13 +412,13 @@ export default function CreateBeneficiaryPage() {
               </TabsContent>
 
               <TabsContent value="documents" className="mt-0">
-                <div className="space-y-6">
-                  <div className="text-center py-12 px-4">
-                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="text-center py-8 sm:py-12 px-4">
+                    <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
                       {t('documentsWillBeAvailable') || 'Documents will be available after creation'}
                     </h3>
-                    <p className="text-sm text-gray-600 max-w-md mx-auto">
+                    <p className="text-xs sm:text-sm text-gray-600 max-w-md mx-auto">
                       {t('documentsAfterCreationMessage') || 'Once you create the beneficiary, you can upload and manage documents using the unified document manager on the beneficiary detail page.'}
                     </p>
                   </div>
@@ -443,6 +444,7 @@ export default function CreateBeneficiaryPage() {
               variant: 'outline'
             }
           ]}
+          className="mt-6 sm:mt-8"
         />
       </Container>
     </div>

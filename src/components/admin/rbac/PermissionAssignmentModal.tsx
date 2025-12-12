@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Search } from 'lucide-react'
+import { Search, Shield, Loader2 } from 'lucide-react'
+import StandardModal, { StandardFormField } from '@/components/ui/standard-modal'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface Permission {
   id: string
@@ -173,113 +174,133 @@ export function PermissionAssignmentModal({
     }
   }, [open, effectiveRole?.id])
 
+  const filteredPermissionsByResource = Object.entries(permissionsByResource)
+    .filter(([resource]) => 
+      filteredPermissions.some(p => p.resource === resource)
+    )
+    .map(([resource, perms]) => ({
+      resource,
+      permissions: perms.filter(perm => filteredPermissions.includes(perm))
+    }))
+    .filter(({ permissions }) => permissions.length > 0)
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Assign Permissions to {effectiveRole?.display_name || roleName || 'Role'}</DialogTitle>
-          <DialogDescription>
-            Select the permissions to assign to this role. Users with this role will have access to all selected permissions.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search permissions..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          {/* Select All */}
-          <div className="flex items-center justify-between p-2 border rounded-lg">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="select-all"
-                checked={filteredPermissions.length > 0 && selectedPermissions.length === filteredPermissions.length}
-                onCheckedChange={handleSelectAll}
-              />
-              <Label htmlFor="select-all" className="cursor-pointer font-medium">
-                Select All ({filteredPermissions.length} permissions)
-              </Label>
-            </div>
-            <Badge variant="outline">
-              {selectedPermissions.length} selected
-            </Badge>
-          </div>
-
-          {/* Permissions by Resource */}
-          <div className="space-y-4">
-            {Object.entries(permissionsByResource)
-              .filter(([resource]) => 
-                filteredPermissions.some(p => p.resource === resource)
-              )
-              .map(([resource, perms]) => (
-                <div key={resource} className="border rounded-lg p-4">
-                  <h4 className="font-semibold mb-3 capitalize">{resource}</h4>
-                  <div className="space-y-2">
-                    {perms
-                      .filter(perm => filteredPermissions.includes(perm))
-                      .map((perm) => {
-                        const isSelected = selectedPermissions.includes(perm.id)
-                        return (
-                          <div
-                            key={perm.id}
-                            className={`flex items-start space-x-3 p-2 rounded border transition-colors ${
-                              isSelected
-                                ? 'bg-blue-50 border-blue-200'
-                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                            }`}
-                          >
-                            <Checkbox
-                              id={`perm-${perm.id}`}
-                              checked={isSelected}
-                              onCheckedChange={() => handlePermissionToggle(perm.id)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <Label
-                                htmlFor={`perm-${perm.id}`}
-                                className="cursor-pointer flex items-center gap-2"
-                              >
-                                <span className="font-medium">{perm.display_name}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {perm.action}
-                                </Badge>
-                                {perm.is_system && (
-                                  <Badge variant="outline" className="text-xs">
-                                    System
-                                  </Badge>
-                                )}
-                              </Label>
-                              {perm.description && (
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {perm.description}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                  </div>
+    <StandardModal
+      open={open}
+      onOpenChange={onClose}
+      title={`Assign Permissions to ${effectiveRole?.display_name || roleName || 'Role'}`}
+      description="Select the permissions to assign to this role. Users with this role will have access to all selected permissions."
+      maxWidth="4xl"
+      sections={[
+        {
+          title: "Search & Selection",
+          children: (
+            <div className="space-y-3">
+              <StandardFormField label="Search Permissions" description="Search by name, resource, or action">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search permissions..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-10"
+                  />
                 </div>
-              ))}
-          </div>
-        </div>
+              </StandardFormField>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Permissions'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              {/* Select All */}
+              <Card className="border border-gray-200 bg-gray-50/50">
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="select-all"
+                        checked={filteredPermissions.length > 0 && selectedPermissions.length === filteredPermissions.length}
+                        onCheckedChange={handleSelectAll}
+                      />
+                      <Label htmlFor="select-all" className="cursor-pointer text-sm font-medium text-gray-900">
+                        Select All ({filteredPermissions.length} {filteredPermissions.length === 1 ? 'permission' : 'permissions'})
+                      </Label>
+                    </div>
+                    <Badge variant="secondary" className="text-xs font-semibold">
+                      {selectedPermissions.length} {selectedPermissions.length === 1 ? 'selected' : 'selected'}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )
+        },
+        ...filteredPermissionsByResource.map(({ resource, permissions }) => ({
+          title: resource.charAt(0).toUpperCase() + resource.slice(1),
+          children: (
+            <div className="space-y-2">
+              {permissions.map((perm) => {
+                const isSelected = selectedPermissions.includes(perm.id)
+                return (
+                  <Card
+                    key={perm.id}
+                    className={`border transition-all duration-200 cursor-pointer hover:shadow-sm ${
+                      isSelected
+                        ? 'bg-indigo-50/50 border-indigo-200 shadow-sm'
+                        : 'bg-white border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => handlePermissionToggle(perm.id)}
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="pt-0.5">
+                          <Checkbox
+                            id={`perm-${perm.id}`}
+                            checked={isSelected}
+                            onCheckedChange={() => handlePermissionToggle(perm.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <Label
+                              htmlFor={`perm-${perm.id}`}
+                              className="cursor-pointer font-medium text-sm text-gray-900"
+                            >
+                              {perm.display_name}
+                            </Label>
+                            <Badge variant="outline" className="text-xs font-medium">
+                              {perm.action}
+                            </Badge>
+                            {perm.is_system && (
+                              <Badge variant="default" className="text-xs font-medium bg-gray-600">
+                                System
+                              </Badge>
+                            )}
+                          </div>
+                          {perm.description && (
+                            <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                              {perm.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )
+        }))
+      ]}
+      primaryAction={{
+        label: "Save Permissions",
+        onClick: handleSave,
+        loading: saving,
+        disabled: saving
+      }}
+      secondaryAction={{
+        label: "Cancel",
+        onClick: onClose,
+        disabled: saving
+      }}
+    />
   )
 }
 

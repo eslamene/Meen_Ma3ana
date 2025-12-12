@@ -156,3 +156,6 @@ SELECT * FROM pg_policies WHERE tablename = 'users';
 3. **If user doesn't exist:** Ensure users table row is created during signup
 4. **If trigger is failing:** Make it more resilient with INSERT ... ON CONFLICT
 
+
+
+

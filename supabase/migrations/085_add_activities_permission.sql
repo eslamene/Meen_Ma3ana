@@ -27,3 +27,6 @@ SET permission_id = (SELECT id FROM admin_permissions WHERE name = 'admin:activi
 WHERE href = '/admin/activities'
 AND permission_id = (SELECT id FROM admin_permissions WHERE name = 'admin:dashboard' LIMIT 1);
 
+
+
+

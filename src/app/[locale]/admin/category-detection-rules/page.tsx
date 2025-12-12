@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
+import ActiveInactiveTabs from '@/components/ui/active-inactive-tabs'
 import {
   Select,
   SelectContent,
@@ -30,9 +30,13 @@ import {
   ChevronDown,
   ChevronUp,
   Tag,
+  Loader2,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import DynamicIcon from '@/components/ui/dynamic-icon'
+import DetailPageHeader from '@/components/crud/DetailPageHeader'
 
 interface Category {
   id: string
@@ -74,7 +78,7 @@ export default function CategoryDetectionRulesPage() {
   const [categoriesLoading, setCategoriesLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [showInactive, setShowInactive] = useState(false)
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active')
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   
   // Inline editing state
@@ -122,7 +126,7 @@ export default function CategoryDetectionRulesPage() {
       if (selectedCategory !== 'all') {
         params.append('category_id', selectedCategory)
       }
-      if (!showInactive) {
+      if (activeTab === 'active') {
         params.append('active_only', 'true')
       }
 
@@ -146,7 +150,7 @@ export default function CategoryDetectionRulesPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedCategory, showInactive, toast, expandedCategories.size])
+  }, [selectedCategory, activeTab, toast, expandedCategories.size])
 
   useEffect(() => {
     fetchRules()
@@ -214,6 +218,37 @@ export default function CategoryDetectionRulesPage() {
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update rule' })
     } finally {
       setSaving(prev => ({ ...prev, [editingRuleId]: false }))
+    }
+  }
+
+  const handleToggleActive = async (ruleId: string, currentStatus: boolean) => {
+    try {
+      setSaving(prev => ({ ...prev, [ruleId]: true }))
+      const response = await fetch(`/api/admin/category-detection-rules/${ruleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          is_active: !currentStatus,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update rule status')
+      }
+
+      toast.success('Success', { 
+        description: `Rule ${!currentStatus ? 'activated' : 'deactivated'} successfully` 
+      })
+
+      await fetchRules()
+    } catch (error) {
+      console.error('Error toggling rule status:', error)
+      toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update rule status' })
+    } finally {
+      setSaving(prev => ({ ...prev, [ruleId]: false }))
     }
   }
 
@@ -298,9 +333,15 @@ export default function CategoryDetectionRulesPage() {
   }
 
   const filteredRules = rules.filter((rule) => {
+    // Filter by active/inactive tab
+    if (activeTab === 'active' && !rule.is_active) return false
+    if (activeTab === 'inactive' && rule.is_active) return false
+    
+    // Filter by search
     const matchesSearch = searchTerm === '' || 
       rule.keyword.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rule.category?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    
     return matchesSearch
   })
 
@@ -317,45 +358,50 @@ export default function CategoryDetectionRulesPage() {
     return acc
   }, {} as Record<string, CategoryDetectionRule[]>)
 
+  const totalRules = rules.length
+  const activeRulesCount = rules.filter(r => r.is_active).length
+  const inactiveRulesCount = rules.filter(r => !r.is_active).length
+
   return (
     <PermissionGuard permission="admin:dashboard">
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-6">
-        <Container variant={containerVariant}>
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                  <Sparkles className="h-6 w-6 text-[#6B8E7E]" />
-                  Category Detection Rules
-                </h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Manage keywords used to automatically categorize cases
-                </p>
-              </div>
-            </div>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
+        <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
+          {/* Header */}
+          <DetailPageHeader
+            backUrl={`/${locale}/admin`}
+            icon={Sparkles}
+            title="Category Detection Rules"
+            description="Manage keywords used to automatically categorize cases"
+            showBackButton={false}
+            badge={{
+              label: `${totalRules} ${totalRules === 1 ? 'rule' : 'rules'}`,
+              variant: 'secondary'
+            }}
+          />
 
-          {/* Filters */}
-          <Card className="mb-4">
-            <CardContent className="pt-4 pb-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="relative md:col-span-2">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search keywords..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-9"
-                  />
-                </div>
+          {/* Tabs and Filters */}
+          <div className="mb-6 space-y-4">
+            <ActiveInactiveTabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              activeCount={activeRulesCount}
+              inactiveCount={inactiveRulesCount}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              searchPlaceholder="Search keywords..."
+            />
+
+            {/* Category Filter */}
+            <Card className="border border-gray-200 shadow-sm">
+              <CardContent className="p-4 sm:p-6">
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-10 text-sm w-full sm:w-[300px]">
                     <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
                     {categories
-                      .filter(c => c.is_active || showInactive)
+                      .filter(c => c.is_active || activeTab === 'inactive')
                       .map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           <div className="flex items-center gap-2">
@@ -366,37 +412,32 @@ export default function CategoryDetectionRulesPage() {
                       ))}
                   </SelectContent>
                 </Select>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="show-inactive"
-                    checked={showInactive}
-                    onCheckedChange={setShowInactive}
-                  />
-                  <Label htmlFor="show-inactive" className="cursor-pointer text-sm">
-                    Show Inactive
-                  </Label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* Rules List - Tag Editor Style */}
+          {/* Rules List */}
           {loading ? (
-            <Card>
+            <Card className="border border-gray-200 shadow-sm">
               <CardContent className="py-12 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#6B8E7E] mx-auto"></div>
-                <p className="mt-4 text-muted-foreground text-sm">Loading rules...</p>
+                <div className="inline-block">
+                  <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-sm text-gray-600">Loading rules...</p>
+                </div>
               </CardContent>
             </Card>
           ) : filteredRules.length === 0 && !Object.keys(groupedRules).length ? (
-            <Card>
+            <Card className="border border-gray-200 shadow-sm">
               <CardContent className="py-12 text-center">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No rules found</p>
+                <Sparkles className="h-12 w-12 text-gray-400 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Rules Found</h3>
+                <p className="text-sm text-gray-600">
+                  {searchTerm ? 'Try adjusting your search terms' : 'Get started by adding keywords to categories'}
+                </p>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {Object.entries(groupedRules).map(([categoryId, categoryRules]) => {
                 const firstRule = categoryRules[0]
                 const category = firstRule.category || getCategoryById(categoryId)
@@ -406,92 +447,102 @@ export default function CategoryDetectionRulesPage() {
                 const inactiveRules = categoryRules.filter(r => !r.is_active)
 
                 return (
-                  <Card key={categoryId} className="overflow-hidden">
+                  <Card key={categoryId} className="border border-gray-200 bg-white hover:shadow-md transition-all duration-200 overflow-hidden">
                     <CardHeader 
-                      className="py-3 px-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      className="py-3 sm:py-4 px-4 sm:px-5 cursor-pointer hover:bg-gray-50/50 transition-colors"
                       onClick={() => toggleCategory(categoryId)}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleCategory(categoryId)
-                            }}
-                            className="flex items-center gap-2 flex-1 min-w-0"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex items-center justify-between gap-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleCategory(categoryId)
+                          }}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 flex-shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 flex-shrink-0" />
+                          )}
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {category?.icon && (
+                              <div 
+                                className="p-1.5 sm:p-2 rounded-lg flex-shrink-0"
+                                style={category?.color ? { backgroundColor: category.color + '15' } : { backgroundColor: '#f3f4f6' }}
+                              >
+                                <DynamicIcon 
+                                  name={category.icon} 
+                                  className="h-4 w-4 sm:h-5 sm:w-5"
+                                  style={category?.color ? { color: category.color } : undefined}
+                                />
+                              </div>
                             )}
-                            <Badge 
-                              className={cn(
-                                "text-xs",
-                                category?.color ? '' : 'bg-gray-100 text-gray-800'
-                              )}
-                              style={category?.color ? { backgroundColor: category.color + '20', color: category.color } : undefined}
-                            >
-                              {category?.icon && <DynamicIcon name={category.icon} className="h-4 w-4 mr-1" />}
-                              {category?.name || 'Unknown Category'}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {categoryRules.length} {categoryRules.length === 1 ? 'rule' : 'rules'}
-                            </span>
-                          </button>
-                        </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">
+                                {category?.name || 'Unknown Category'}
+                              </h3>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {categoryRules.length} {categoryRules.length === 1 ? 'keyword' : 'keywords'}
+                                {activeRules.length > 0 && inactiveRules.length > 0 && (
+                                  <span className="ml-2">
+                                    ({activeRules.length} active, {inactiveRules.length} inactive)
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
                       </div>
                     </CardHeader>
                     {isExpanded && (
-                      <CardContent className="pt-4 pb-4 px-4">
-                        {/* Add New Tag Input */}
+                      <CardContent className="pt-0 pb-4 sm:pb-5 px-4 sm:px-5">
+                        {/* Add New Keyword */}
                         {isAdding ? (
-                          <div className="mb-4 p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border-2 border-dashed border-[#6B8E7E] shadow-lg">
-                            <div className="flex flex-col gap-2">
-                              <div className="flex gap-2">
-                                <Input
-                                  placeholder="Enter keyword..."
-                                  value={newKeyword}
-                                  onChange={(e) => setNewKeyword(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      saveAdd()
-                                    } else if (e.key === 'Escape') {
-                                      cancelAdd()
-                                    }
-                                  }}
-                                  className="flex-1 shadow-sm"
-                                  autoFocus
-                                />
-                                <Input
-                                  type="number"
-                                  placeholder="Priority"
-                                  value={newPriority}
-                                  onChange={(e) => setNewPriority(parseInt(e.target.value) || 0)}
-                                  className="w-24 shadow-sm"
-                                />
-                                <Button
-                                  size="sm"
-                                  onClick={saveAdd}
-                                  disabled={saving[`add-${categoryId}`] || !newKeyword.trim()}
-                                  className="bg-[#6B8E7E] hover:bg-[#6B8E7E]/90 shadow-md hover:shadow-lg transition-all"
-                                >
-                                  {saving[`add-${categoryId}`] ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                  ) : (
-                                    <Check className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={cancelAdd}
-                                  disabled={saving[`add-${categoryId}`]}
-                                  className="shadow-sm hover:shadow-md transition-all"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
+                          <div className="mb-4 p-3 sm:p-4 bg-gradient-to-br from-indigo-50/50 to-white rounded-lg border-2 border-dashed border-indigo-300 shadow-sm">
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <Input
+                                placeholder="Enter keyword..."
+                                value={newKeyword}
+                                onChange={(e) => setNewKeyword(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    saveAdd()
+                                  } else if (e.key === 'Escape') {
+                                    cancelAdd()
+                                  }
+                                }}
+                                className="flex-1 h-9 text-sm"
+                                autoFocus
+                              />
+                              <Input
+                                type="number"
+                                placeholder="Priority"
+                                value={newPriority}
+                                onChange={(e) => setNewPriority(parseInt(e.target.value) || 0)}
+                                className="w-20 sm:w-24 h-9 text-sm"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={saveAdd}
+                                disabled={saving[`add-${categoryId}`] || !newKeyword.trim()}
+                                className="h-9 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700"
+                              >
+                                {saving[`add-${categoryId}`] ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Check className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={cancelAdd}
+                                disabled={saving[`add-${categoryId}`]}
+                                className="h-9"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
                             </div>
                           </div>
                         ) : (
@@ -499,15 +550,15 @@ export default function CategoryDetectionRulesPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => startAdd(categoryId)}
-                            className="mb-4 w-full border-dashed border-2 border-gray-300 hover:border-[#6B8E7E] hover:bg-gradient-to-br hover:from-gray-50 hover:to-white transition-all shadow-sm hover:shadow-md"
+                            className="mb-4 w-full sm:w-auto border-dashed border-2 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/50 transition-all"
                           >
                             <Plus className="h-4 w-4 mr-2" />
                             Add New Keyword
                           </Button>
                         )}
 
-                        {/* Active Tags */}
-                        {activeRules.length > 0 && (
+                        {/* Active Keywords */}
+                        {activeTab === 'active' && activeRules.length > 0 && (
                           <div className="mb-4">
                             <div className="flex flex-wrap gap-2">
                               {activeRules
@@ -522,40 +573,17 @@ export default function CategoryDetectionRulesPage() {
                                     <div
                                       key={rule.id}
                                       className={cn(
-                                        "group inline-flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200",
+                                        "group inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all duration-200",
                                         isEditing 
-                                          ? "border-2 border-[#6B8E7E] shadow-lg ring-2 ring-[#6B8E7E]/20" 
-                                          : "border shadow-sm hover:shadow-md hover:scale-105",
-                                        !rule.is_active && "opacity-60",
-                                        !hasColor && !isEditing && "bg-gradient-to-br from-white to-gray-50 border-gray-200/60 hover:border-[#6B8E7E]/40"
+                                          ? "border-2 border-indigo-500 shadow-lg ring-2 ring-indigo-500/20 bg-white" 
+                                          : "border shadow-sm hover:shadow-md",
+                                        !hasColor && !isEditing && "bg-white border-gray-200 hover:border-indigo-300"
                                       )}
-                                      style={!isEditing ? {
-                                        ...(hasColor ? {
-                                          backgroundColor: categoryColor + '15',
-                                          borderColor: categoryColor + '40',
-                                          color: categoryColor,
-                                          boxShadow: `0 2px 8px ${categoryColor}20, 0 1px 3px rgba(0, 0, 0, 0.1)`
-                                        } : {
-                                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.1)'
-                                        }),
-                                        ...(hasColor && {
-                                          '--hover-border': categoryColor + '60'
-                                        } as React.CSSProperties)
-                                      } : {
-                                        backgroundColor: hasColor ? categoryColor + '10' : undefined
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (hasColor && !isEditing) {
-                                          e.currentTarget.style.borderColor = categoryColor + '60'
-                                          e.currentTarget.style.boxShadow = `0 4px 12px ${categoryColor}30, 0 2px 4px rgba(0, 0, 0, 0.1)`
-                                        }
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (hasColor && !isEditing) {
-                                          e.currentTarget.style.borderColor = categoryColor + '40'
-                                          e.currentTarget.style.boxShadow = `0 2px 8px ${categoryColor}20, 0 1px 3px rgba(0, 0, 0, 0.1)`
-                                        }
-                                      }}
+                                      style={!isEditing && hasColor ? {
+                                        backgroundColor: categoryColor + '15',
+                                        borderColor: categoryColor + '40',
+                                        color: categoryColor,
+                                      } : undefined}
                                     >
                                       {isEditing ? (
                                         <>
@@ -569,8 +597,8 @@ export default function CategoryDetectionRulesPage() {
                                                 cancelEdit()
                                               }
                                             }}
-                                            className="h-7 px-2 text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                                            style={{ width: `${Math.max(editingKeyword.length * 8 + 20, 80)}px` }}
+                                            className="h-7 px-2 text-xs sm:text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                                            style={{ width: `${Math.max(editingKeyword.length * 7 + 20, 80)}px` }}
                                             autoFocus
                                           />
                                           <Input
@@ -584,38 +612,38 @@ export default function CategoryDetectionRulesPage() {
                                                 cancelEdit()
                                               }
                                             }}
-                                            className="h-7 px-1.5 text-xs border-0 focus-visible:ring-0 focus-visible:ring-offset-0 w-16"
+                                            className="h-7 px-1.5 text-xs border-0 focus-visible:ring-0 focus-visible:ring-offset-0 w-14 bg-transparent"
                                             placeholder="P:0"
                                           />
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-6 w-6 p-0"
+                                            className="h-6 w-6 p-0 hover:bg-green-50 hover:text-green-600"
                                             onClick={saveEdit}
                                             disabled={isSaving}
                                           >
                                             {isSaving ? (
-                                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#6B8E7E]" />
+                                              <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />
                                             ) : (
-                                              <Check className="h-3 w-3 text-green-600" />
+                                              <Check className="h-3 w-3" />
                                             )}
                                           </Button>
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-6 w-6 p-0"
+                                            className="h-6 w-6 p-0 hover:bg-gray-100"
                                             onClick={cancelEdit}
                                             disabled={isSaving}
                                           >
-                                            <X className="h-3 w-3 text-gray-500" />
+                                            <X className="h-3 w-3" />
                                           </Button>
                                         </>
                                       ) : (
                                         <>
                                           <span 
                                             className={cn(
-                                              "text-sm font-semibold cursor-pointer transition-colors",
-                                              hasColor ? "" : "text-gray-700 hover:text-[#6B8E7E]"
+                                              "text-xs sm:text-sm font-medium cursor-pointer transition-colors",
+                                              hasColor ? "" : "text-gray-700 hover:text-indigo-600"
                                             )}
                                             style={hasColor ? {
                                               color: categoryColor
@@ -625,24 +653,42 @@ export default function CategoryDetectionRulesPage() {
                                             {rule.keyword}
                                           </span>
                                           {rule.priority > 0 && (
-                                            <span 
-                                              className="text-xs text-gray-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                            <Badge 
+                                              variant="outline" 
+                                              className="text-[10px] px-1.5 py-0 h-4 font-medium opacity-0 group-hover:opacity-100 transition-opacity"
                                               title={`Priority: ${rule.priority}`}
                                             >
                                               {rule.priority}
-                                            </span>
+                                            </Badge>
                                           )}
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-6 w-6 p-0 rounded-full hover:bg-red-100 hover:text-red-600 transition-all hover:scale-110"
-                                            onClick={() => handleDelete(rule.id)}
+                                            className="h-6 w-6 p-0 rounded-full hover:bg-amber-50 hover:text-amber-600 transition-all"
+                                            onClick={() => handleToggleActive(rule.id, rule.is_active)}
                                             disabled={isSaving}
+                                            title={rule.is_active ? 'Deactivate keyword' : 'Activate keyword'}
                                           >
                                             {isSaving ? (
-                                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600" />
+                                              <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
+                                            ) : rule.is_active ? (
+                                              <EyeOff className="h-3 w-3" />
                                             ) : (
-                                              <X className="h-3.5 w-3.5" />
+                                              <Eye className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0 rounded-full hover:bg-red-50 hover:text-red-600 transition-all"
+                                            onClick={() => handleDelete(rule.id)}
+                                            disabled={isSaving}
+                                            title="Delete keyword"
+                                          >
+                                            {isSaving ? (
+                                              <Loader2 className="h-3 w-3 animate-spin text-red-600" />
+                                            ) : (
+                                              <X className="h-3 w-3" />
                                             )}
                                           </Button>
                                         </>
@@ -654,10 +700,10 @@ export default function CategoryDetectionRulesPage() {
                           </div>
                         )}
 
-                        {/* Inactive Tags */}
-                        {inactiveRules.length > 0 && showInactive && (
-                          <div>
-                            <Label className="text-xs text-muted-foreground mb-2 block">Inactive</Label>
+                        {/* Inactive Keywords */}
+                        {inactiveRules.length > 0 && activeTab === 'inactive' && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <Label className="text-xs font-medium text-gray-500 mb-3 block">Inactive Keywords</Label>
                             <div className="flex flex-wrap gap-2">
                               {inactiveRules
                                 .sort((a, b) => b.priority - a.priority)
@@ -671,36 +717,17 @@ export default function CategoryDetectionRulesPage() {
                                     <div
                                       key={rule.id}
                                       className={cn(
-                                        "group inline-flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200",
+                                        "group inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all duration-200",
                                         isEditing 
-                                          ? "border-2 border-[#6B8E7E] shadow-lg ring-2 ring-[#6B8E7E]/20 opacity-100" 
-                                          : "border shadow-sm hover:shadow-md hover:scale-105 opacity-60",
-                                        !hasColor && !isEditing && "bg-gradient-to-br from-white to-gray-50 border-gray-200/60 hover:border-[#6B8E7E]/40"
+                                          ? "border-2 border-indigo-500 shadow-lg ring-2 ring-indigo-500/20 bg-white opacity-100" 
+                                          : "border shadow-sm hover:shadow-md opacity-60",
+                                        !hasColor && !isEditing && "bg-white border-gray-200 hover:border-indigo-300"
                                       )}
-                                      style={!isEditing ? {
-                                        ...(hasColor ? {
-                                          backgroundColor: categoryColor + '15',
-                                          borderColor: categoryColor + '40',
-                                          color: categoryColor,
-                                          boxShadow: `0 2px 8px ${categoryColor}20, 0 1px 3px rgba(0, 0, 0, 0.1)`
-                                        } : {
-                                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.1)'
-                                        })
-                                      } : {
-                                        backgroundColor: hasColor ? categoryColor + '10' : undefined
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (hasColor && !isEditing) {
-                                          e.currentTarget.style.borderColor = categoryColor + '60'
-                                          e.currentTarget.style.boxShadow = `0 4px 12px ${categoryColor}30, 0 2px 4px rgba(0, 0, 0, 0.1)`
-                                        }
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (hasColor && !isEditing) {
-                                          e.currentTarget.style.borderColor = categoryColor + '40'
-                                          e.currentTarget.style.boxShadow = `0 2px 8px ${categoryColor}20, 0 1px 3px rgba(0, 0, 0, 0.1)`
-                                        }
-                                      }}
+                                      style={!isEditing && hasColor ? {
+                                        backgroundColor: categoryColor + '15',
+                                        borderColor: categoryColor + '40',
+                                        color: categoryColor,
+                                      } : undefined}
                                     >
                                       {isEditing ? (
                                         <>
@@ -714,8 +741,8 @@ export default function CategoryDetectionRulesPage() {
                                                 cancelEdit()
                                               }
                                             }}
-                                            className="h-7 px-2 text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                                            style={{ width: `${Math.max(editingKeyword.length * 8 + 20, 80)}px` }}
+                                            className="h-7 px-2 text-xs sm:text-sm border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                                            style={{ width: `${Math.max(editingKeyword.length * 7 + 20, 80)}px` }}
                                             autoFocus
                                           />
                                           <Input
@@ -729,38 +756,38 @@ export default function CategoryDetectionRulesPage() {
                                                 cancelEdit()
                                               }
                                             }}
-                                            className="h-7 px-1.5 text-xs border-0 focus-visible:ring-0 focus-visible:ring-offset-0 w-16"
+                                            className="h-7 px-1.5 text-xs border-0 focus-visible:ring-0 focus-visible:ring-offset-0 w-14 bg-transparent"
                                             placeholder="P:0"
                                           />
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-6 w-6 p-0"
+                                            className="h-6 w-6 p-0 hover:bg-green-50 hover:text-green-600"
                                             onClick={saveEdit}
                                             disabled={isSaving}
                                           >
                                             {isSaving ? (
-                                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#6B8E7E]" />
+                                              <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />
                                             ) : (
-                                              <Check className="h-3 w-3 text-green-600" />
+                                              <Check className="h-3 w-3" />
                                             )}
                                           </Button>
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-6 w-6 p-0"
+                                            className="h-6 w-6 p-0 hover:bg-gray-100"
                                             onClick={cancelEdit}
                                             disabled={isSaving}
                                           >
-                                            <X className="h-3 w-3 text-gray-500" />
+                                            <X className="h-3 w-3" />
                                           </Button>
                                         </>
                                       ) : (
                                         <>
                                           <span 
                                             className={cn(
-                                              "text-sm font-semibold cursor-pointer transition-colors",
-                                              hasColor ? "" : "text-gray-700 hover:text-[#6B8E7E]"
+                                              "text-xs sm:text-sm font-medium cursor-pointer transition-colors",
+                                              hasColor ? "" : "text-gray-600 hover:text-indigo-600"
                                             )}
                                             style={hasColor ? {
                                               color: categoryColor
@@ -770,24 +797,42 @@ export default function CategoryDetectionRulesPage() {
                                             {rule.keyword}
                                           </span>
                                           {rule.priority > 0 && (
-                                            <span 
-                                              className="text-xs text-gray-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                            <Badge 
+                                              variant="outline" 
+                                              className="text-[10px] px-1.5 py-0 h-4 font-medium opacity-0 group-hover:opacity-100 transition-opacity"
                                               title={`Priority: ${rule.priority}`}
                                             >
                                               {rule.priority}
-                                            </span>
+                                            </Badge>
                                           )}
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-6 w-6 p-0 rounded-full hover:bg-red-100 hover:text-red-600 transition-all hover:scale-110"
-                                            onClick={() => handleDelete(rule.id)}
+                                            className="h-6 w-6 p-0 rounded-full hover:bg-amber-50 hover:text-amber-600 transition-all"
+                                            onClick={() => handleToggleActive(rule.id, rule.is_active)}
                                             disabled={isSaving}
+                                            title={rule.is_active ? 'Deactivate keyword' : 'Activate keyword'}
                                           >
                                             {isSaving ? (
-                                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600" />
+                                              <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
+                                            ) : rule.is_active ? (
+                                              <EyeOff className="h-3 w-3" />
                                             ) : (
-                                              <X className="h-3.5 w-3.5" />
+                                              <Eye className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0 rounded-full hover:bg-red-50 hover:text-red-600 transition-all"
+                                            onClick={() => handleDelete(rule.id)}
+                                            disabled={isSaving}
+                                            title="Delete keyword"
+                                          >
+                                            {isSaving ? (
+                                              <Loader2 className="h-3 w-3 animate-spin text-red-600" />
+                                            ) : (
+                                              <X className="h-3 w-3" />
                                             )}
                                           </Button>
                                         </>

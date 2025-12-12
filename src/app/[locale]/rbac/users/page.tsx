@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { theme, brandColors } from '@/lib/theme'
+import Pagination from '@/components/ui/pagination'
 import { 
   Users, 
   Search, 
@@ -30,7 +31,13 @@ import {
   ChevronRight,
   Shield,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  MoreVertical,
+  LayoutDashboard,
+  Mail,
+  Calendar,
+  Phone,
+  User
 } from 'lucide-react'
 
 // Types
@@ -38,6 +45,9 @@ interface User {
   id: string
   email: string
   display_name?: string
+  first_name?: string | null
+  last_name?: string | null
+  phone?: string | null
   roles: RoleAssignment[]
   created_at?: string
   last_sign_in_at?: string
@@ -85,6 +95,9 @@ export default function AdminUsersPage() {
   const [loadingUserRoles, setLoadingUserRoles] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId: string | null; userEmail: string | null }>({ open: false, userId: null, userEmail: null })
   const [deleting, setDeleting] = useState(false)
+  const [openMenuForId, setOpenMenuForId] = useState<string | null>(null)
+  const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
+  const [selectedUserForActions, setSelectedUserForActions] = useState<User | null>(null)
   const { user: currentUser } = useAdmin()
 
   // Fetch users with pagination, search, and filtering
@@ -217,6 +230,20 @@ export default function AdminUsersPage() {
     fetchRoles()
   }, [fetchRoles])
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openMenuForId) {
+        setOpenMenuForId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openMenuForId])
+
   // Handle user deletion
   const handleDeleteUser = async () => {
     if (!deleteDialog.userId || deleting) return
@@ -253,60 +280,42 @@ export default function AdminUsersPage() {
     setPagination(prev => ({ ...prev, page: newPage }))
   }
 
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = []
-    const totalPages = pagination.totalPages
-    const currentPage = pagination.page
-
-    if (totalPages <= 7) {
-      // Show all pages if 7 or fewer
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i)
-      }
-    } else {
-      // Always show first page
-      pages.push(1)
-
-      if (currentPage > 3) {
-        pages.push('...')
-      }
-
-      // Show pages around current page
-      const start = Math.max(2, currentPage - 1)
-      const end = Math.min(totalPages - 1, currentPage + 1)
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i)
-      }
-
-      if (currentPage < totalPages - 2) {
-        pages.push('...')
-      }
-
-      // Always show last page
-      pages.push(totalPages)
-    }
-
-    return pages
-  }
 
   return (
     <PermissionGuard permission="admin:users">
       <div className="min-h-screen bg-gray-50">
-        <Container variant={containerVariant} className="py-6">
-        <div>
-          <h1 className="text-3xl font-bold">User Management</h1>
-          <p className="text-muted-foreground">
+        <Container variant={containerVariant} className="py-4 sm:py-6">
+        {/* Enhanced Header */}
+        <div className="mb-6 sm:mb-8">
+          <div className="bg-gradient-to-r from-white via-indigo-50/30 to-white rounded-xl border border-gray-200/60 shadow-sm p-4 sm:p-6">
+            <div className="flex items-start gap-4">
+              {/* Icon */}
+              <div className="relative shrink-0">
+                <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
+                  <LayoutDashboard className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-400 rounded-full border-2 border-white"></div>
+              </div>
+
+              {/* Title and Description */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                  User Management
+                </h1>
+                <p className="text-sm sm:text-base text-gray-600 mt-1">
             Manage user profiles, reset passwords, and merge accounts
           </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Users</CardTitle>
-                <CardDescription>
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-lg sm:text-xl">Users</CardTitle>
+                <CardDescription className="text-xs sm:text-sm mt-1">
                   {pagination.total > 0 
                     ? `Showing ${((pagination.page - 1) * pagination.limit) + 1} to ${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total} users`
                     : 'Manage users and their accounts'
@@ -317,18 +326,18 @@ export default function AdminUsersPage() {
           </CardHeader>
           <CardContent>
             {/* Search and Filter */}
-            <div className="flex gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search users by email or name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 text-sm sm:text-base"
                 />
               </div>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-full sm:w-[200px]">
                   <SelectValue placeholder="Filter by role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -355,138 +364,206 @@ export default function AdminUsersPage() {
               </div>
             ) : (
               <>
-                <div className="space-y-2">
-                  {users.map(user => (
+                <div className="space-y-2 sm:space-y-3">
+                  {users.map(user => {
+                    const getInitials = (user: User) => {
+                      // Prefer first_name and last_name
+                      if (user.first_name || user.last_name) {
+                        const first = user.first_name?.charAt(0) || ''
+                        const last = user.last_name?.charAt(0) || ''
+                        if (first && last) {
+                          return (first + last).toUpperCase()
+                        }
+                        if (first) return first.toUpperCase()
+                        if (last) return last.toUpperCase()
+                      }
+                      // Fallback to display_name
+                      if (user.display_name && user.display_name !== user.email.split('@')[0]) {
+                        const nameParts = user.display_name.split(' ')
+                        if (nameParts.length >= 2) {
+                          return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+                        }
+                        return user.display_name.substring(0, 2).toUpperCase()
+                      }
+                      // Final fallback to email
+                      return user.email.charAt(0).toUpperCase()
+                    }
+
+                    const formatDate = (dateString?: string) => {
+                      if (!dateString) return null
+                      const date = new Date(dateString)
+                      const now = new Date()
+                      const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+                      
+                      if (diffInDays === 0) return 'Today'
+                      if (diffInDays === 1) return 'Yesterday'
+                      if (diffInDays < 7) return `${diffInDays} days ago`
+                      if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`
+                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    }
+
+                    return (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
+                        className="group relative bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-indigo-200/50 transition-all duration-200 overflow-hidden"
+                      >
+                        <div 
+                          className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 md:p-4 sm:cursor-default"
+                          onClick={(e) => {
+                            // Only open bottom sheet on mobile, and prevent if clicking action buttons
+                            if (window.innerWidth < 640 && !(e.target as HTMLElement).closest('button')) {
+                              setSelectedUserForActions(user)
+                              setBottomSheetOpen(true)
+                            }
+                          }}
                     >
-                      <div className="flex items-center gap-4">
-                        <Avatar>
-                          <AvatarFallback>
-                            {user.email.charAt(0).toUpperCase()}
+                          <div className="flex items-start gap-2.5 sm:gap-3 flex-1 min-w-0 w-full">
+                            {/* Enhanced Avatar */}
+                            <div className="relative flex-shrink-0">
+                              <Avatar className="h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11 ring-2 ring-gray-100 group-hover:ring-indigo-200 transition-all duration-200">
+                                <AvatarFallback className="text-xs sm:text-sm md:text-base font-bold bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
+                                  {getInitials(user)}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <div className="font-medium">{user.email}</div>
-                          {user.display_name && user.display_name !== user.email.split('@')[0] && (
-                            <div className="text-sm text-muted-foreground">{user.display_name}</div>
-                          )}
-                          <div className="text-sm text-muted-foreground mt-1">
-                            {user.roles.length > 0 ? (
-                              <div className="flex gap-2 flex-wrap">
-                                {user.roles.map(role => (
-                                  <Badge key={role.id} variant="outline">
-                                    {role.display_name}
-                                  </Badge>
-                                ))}
+                              {user.roles.some(r => r.name === 'administrator' || r.name === 'super_admin') && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-yellow-400 rounded-full border-2 border-white flex items-center justify-center">
+                                  <Shield className="h-1.5 w-1.5 sm:h-2 sm:w-2 text-yellow-900" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* User Info */}
+                            <div className="flex-1 min-w-0 w-full">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-xs sm:text-sm text-gray-900 truncate break-words">
+                                    {user.first_name || user.last_name
+                                      ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                                      : user.display_name && user.display_name !== user.email.split('@')[0]
+                                      ? user.display_name
+                                      : user.email.split('@')[0]}
+                                  </div>
+                                </div>
                               </div>
-                            ) : (
-                              <span className="text-orange-600">No roles assigned</span>
-                            )}
+                              <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-1.5 sm:gap-2 md:gap-3 text-[10px] sm:text-xs text-gray-500 mb-1">
+                                <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-initial">
+                                  <Mail className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate min-w-0">{user.email}</span>
+                                </div>
+                                {user.phone && (
+                                  <div className="flex items-center gap-1 min-w-0 flex-1 sm:flex-initial">
+                                    <Phone className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate min-w-0">{user.phone}</span>
+                                  </div>
+                          )}
+                              </div>
+                              {user.last_sign_in_at && (
+                                <div className="flex items-center gap-1 text-[9px] sm:text-[10px] md:text-xs text-gray-400 mb-1.5">
+                                  <Calendar className="h-2.5 w-2.5 flex-shrink-0" />
+                                  <span className="truncate">Last active: {formatDate(user.last_sign_in_at)}</span>
+                                </div>
+                              )}
+                              
+                              {/* Role Badges */}
+                              <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                            {user.roles.length > 0 ? (
+                                  user.roles.map(role => (
+                                    <Badge 
+                                      key={role.id} 
+                                      variant="outline" 
+                                      className={`text-[8px] sm:text-[9px] md:text-[10px] font-medium py-0 px-1 sm:px-1.5 ${
+                                        role.name === 'administrator' || role.name === 'super_admin'
+                                          ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                          : role.name === 'donor'
+                                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                          : 'bg-gray-50 text-gray-700 border-gray-200'
+                                      }`}
+                                    >
+                                      {role.name === 'administrator' || role.name === 'super_admin' ? (
+                                        <>
+                                          <Shield className="h-2 w-2 mr-0.5 hidden sm:inline" />
+                                          <span className="truncate">{role.display_name}</span>
+                                        </>
+                                      ) : (
+                                        <span className="truncate">{role.display_name}</span>
+                                      )}
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <Badge variant="outline" className="text-[8px] sm:text-[9px] md:text-[10px] bg-orange-50 text-orange-600 border-orange-200 py-0 px-1 sm:px-1.5">
+                                    No roles
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
+
+                          {/* Action Buttons - Desktop */}
+                          <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleOpenRoleAssignment(user.id, user.email)}
                           title="Assign Roles"
+                              className="h-8 w-8 md:h-9 md:w-9 p-0 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 transition-all"
                         >
-                          <Shield className="h-4 w-4" />
+                              <Shield className="h-3.5 w-3.5 md:h-4 md:w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setEditProfileModal({ open: true, userId: user.id })}
                           title="Edit Profile"
+                              className="h-8 w-8 md:h-9 md:w-9 p-0 border-gray-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all"
                         >
-                          <UserCog className="h-4 w-4" />
+                              <UserCog className="h-3.5 w-3.5 md:h-4 md:w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setPasswordResetModal({ open: true, userId: user.id, userEmail: user.email })}
                           title="Reset Password"
+                              className="h-8 w-8 md:h-9 md:w-9 p-0 border-gray-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-600 transition-all"
                         >
-                          <KeyRound className="h-4 w-4" />
+                              <KeyRound className="h-3.5 w-3.5 md:h-4 md:w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setMergeAccountModal({ open: true, userId: user.id })}
                           title="Merge Account"
+                              className="h-8 w-8 md:h-9 md:w-9 p-0 border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-600 transition-all"
                         >
-                          <GitMerge className="h-4 w-4" />
+                              <GitMerge className="h-3.5 w-3.5 md:h-4 md:w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setDeleteDialog({ open: true, userId: user.id, userEmail: user.email })}
                           title="Delete User"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 md:h-9 md:w-9 p-0 border-gray-200 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300 transition-all"
                         >
-                          <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                         </Button>
                       </div>
                     </div>
-                  ))}
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {/* Pagination Controls */}
                 {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-6 pt-4 border-t">
-                    <div className="text-sm text-muted-foreground">
-                      Page {pagination.page} of {pagination.totalPages}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(pagination.page - 1)}
-                        disabled={!pagination.hasPrevPage}
-                        className="flex items-center gap-1"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        Previous
-                      </Button>
-                      
-                      <div className="flex items-center gap-1">
-                        {getPageNumbers().map((pageNum, index) => (
-                          pageNum === '...' ? (
-                            <span key={`ellipsis-${index}`} className="px-2 text-gray-400">
-                              ...
-                            </span>
-                          ) : (
-                            <Button
-                              key={pageNum}
-                              variant={pagination.page === pageNum ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handlePageChange(pageNum as number)}
-                              className={`min-w-[40px] ${
-                                pagination.page === pageNum
-                                  ? 'text-white'
-                                  : ''
-                              }`}
-                            >
-                              {pageNum}
-                            </Button>
-                          )
-                        ))}
-                      </div>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(pagination.page + 1)}
-                        disabled={!pagination.hasNextPage}
-                        className="flex items-center gap-1"
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="mt-4 sm:mt-6 pt-4 border-t">
+                    <Pagination
+                      page={pagination.page}
+                      totalPages={pagination.totalPages}
+                      total={pagination.total}
+                      limit={pagination.limit}
+                      onPageChange={handlePageChange}
+                      showItemCount={true}
+                      itemName="users"
+                    />
                   </div>
                 )}
               </>
@@ -541,6 +618,145 @@ export default function AdminUsersPage() {
             }}
           />
         )}
+
+        {/* Mobile Bottom Sheet for Actions */}
+        <Dialog open={bottomSheetOpen} onOpenChange={(open) => {
+          setBottomSheetOpen(open)
+          if (!open) {
+            setSelectedUserForActions(null)
+          }
+        }}>
+          <DialogContent className="sm:hidden !fixed !bottom-0 !left-0 !right-0 !top-auto !translate-x-0 !translate-y-0 rounded-t-2xl rounded-b-none max-w-full w-full max-h-[80vh] p-0 gap-0 [&>button]:hidden">
+            <div className="w-full">
+              {/* Handle bar */}
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+              </div>
+              
+              {/* Header */}
+              <div className="px-4 pb-3 border-b border-gray-200">
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-semibold">
+                    {selectedUserForActions?.first_name || selectedUserForActions?.last_name
+                      ? `${selectedUserForActions.first_name || ''} ${selectedUserForActions.last_name || ''}`.trim()
+                      : selectedUserForActions?.display_name || selectedUserForActions?.email?.split('@')[0] || 'User'}
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-gray-500">
+                    {selectedUserForActions?.email}
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              {/* Action Items */}
+              <div className="px-4 py-2 max-h-[60vh] overflow-y-auto">
+                <div className="space-y-1">
+                  <button
+                    onClick={() => {
+                      if (selectedUserForActions) {
+                        setBottomSheetOpen(false)
+                        handleOpenRoleAssignment(selectedUserForActions.id, selectedUserForActions.email)
+                      }
+                    }}
+                    className="w-full px-4 py-3 text-left flex items-center gap-3 rounded-lg hover:bg-indigo-50 transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-indigo-100">
+                      <Shield className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">Assign Roles</div>
+                      <div className="text-xs text-gray-500">Manage user permissions</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (selectedUserForActions) {
+                        setBottomSheetOpen(false)
+                        setEditProfileModal({ open: true, userId: selectedUserForActions.id })
+                      }
+                    }}
+                    className="w-full px-4 py-3 text-left flex items-center gap-3 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-blue-100">
+                      <UserCog className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">Edit Profile</div>
+                      <div className="text-xs text-gray-500">Update user information</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (selectedUserForActions) {
+                        setBottomSheetOpen(false)
+                        setPasswordResetModal({ open: true, userId: selectedUserForActions.id, userEmail: selectedUserForActions.email })
+                      }
+                    }}
+                    className="w-full px-4 py-3 text-left flex items-center gap-3 rounded-lg hover:bg-purple-50 transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-purple-100">
+                      <KeyRound className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">Reset Password</div>
+                      <div className="text-xs text-gray-500">Send password reset email</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (selectedUserForActions) {
+                        setBottomSheetOpen(false)
+                        setMergeAccountModal({ open: true, userId: selectedUserForActions.id })
+                      }
+                    }}
+                    className="w-full px-4 py-3 text-left flex items-center gap-3 rounded-lg hover:bg-green-50 transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-green-100">
+                      <GitMerge className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">Merge Account</div>
+                      <div className="text-xs text-gray-500">Combine with another account</div>
+                    </div>
+                  </button>
+
+                  <div className="border-t border-gray-200 my-2"></div>
+
+                  <button
+                    onClick={() => {
+                      if (selectedUserForActions) {
+                        setBottomSheetOpen(false)
+                        setDeleteDialog({ open: true, userId: selectedUserForActions.id, userEmail: selectedUserForActions.email })
+                      }
+                    }}
+                    className="w-full px-4 py-3 text-left flex items-center gap-3 rounded-lg hover:bg-red-50 transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-red-100">
+                      <Trash2 className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-red-600">Delete User</div>
+                      <div className="text-xs text-gray-500">Permanently remove account</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Cancel Button */}
+              <div className="px-4 pb-4 pt-2 border-t border-gray-200">
+                <Button
+                  variant="outline"
+                  onClick={() => setBottomSheetOpen(false)}
+                  className="w-full"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Delete User Confirmation Dialog */}
         <Dialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, userId: null, userEmail: null })}>

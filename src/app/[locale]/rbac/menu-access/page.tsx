@@ -5,12 +5,14 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import { safeFetch } from '@/lib/utils/safe-fetch'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Menu } from 'lucide-react'
+import { Menu, ChevronDown, ChevronRight, Shield, Users } from 'lucide-react'
+import DetailPageHeader from '@/components/crud/DetailPageHeader'
+import { useParams } from 'next/navigation'
 
 // Types
 interface Permission {
@@ -51,6 +53,8 @@ interface MenuItem {
 
 export default function MenuAccessPage() {
   const { containerVariant } = useLayout()
+  const params = useParams()
+  const locale = params.locale as string
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
@@ -84,7 +88,7 @@ export default function MenuAccessPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => {
     fetchData()
@@ -158,62 +162,78 @@ export default function MenuAccessPage() {
     return filterMenu(menuTree)
   }, [menuTree, menuRoleFilter, roles])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
   return (
     <PermissionGuard permission="admin:menu">
-      <div className="min-h-screen bg-gray-50">
-        <Container variant={containerVariant} className="py-6">
-        <div>
-          <h1 className="text-3xl font-bold">Menu Access Management</h1>
-          <p className="text-muted-foreground">
-            Manage menu items and their visibility by role
-          </p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
+        <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
+          {/* Header */}
+          <DetailPageHeader
+            backUrl={`/${locale}/rbac`}
+            icon={Menu}
+            title="Menu Access Management"
+            description="Manage menu items and their visibility by role"
+            showBackButton={false}
+            badge={{
+              label: `${menuItems.length} ${menuItems.length === 1 ? 'item' : 'items'}`,
+              variant: 'secondary'
+            }}
+          />
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Menu Access</CardTitle>
-                <CardDescription>Manage menu items and their visibility by role</CardDescription>
+          {/* Filter and Menu Items */}
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="p-4 sm:p-6">
+              {/* Role Filter */}
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-1">Filter by Role</h3>
+                    <p className="text-xs text-gray-600">View menu items visible to a specific role</p>
+                  </div>
+                  <Select value={menuRoleFilter} onValueChange={setMenuRoleFilter}>
+                    <SelectTrigger className="w-full sm:w-[200px] h-10">
+                      <SelectValue placeholder="Filter by role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      {roles.map(role => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.display_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <Select value={menuRoleFilter} onValueChange={setMenuRoleFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {roles.map(role => (
-                    <SelectItem key={role.id} value={role.id}>
-                      {role.display_name}
-                    </SelectItem>
+
+              {/* Menu Items List */}
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block">
+                    <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-sm text-gray-600">Loading menu items...</p>
+                  </div>
+                </div>
+              ) : filteredMenuItems.length === 0 ? (
+                <div className="text-center py-12">
+                  <Menu className="h-12 w-12 mx-auto mb-4 text-gray-400 opacity-50" />
+                  <p className="text-sm text-gray-600">No menu items found</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredMenuItems.map(item => (
+                    <MenuItemComponent
+                      key={item.id}
+                      item={item}
+                      permissions={permissions}
+                      roles={roles}
+                      onUpdatePermission={handleUpdateMenuItemPermission}
+                      level={0}
+                    />
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {filteredMenuItems.map(item => (
-                <MenuItemComponent
-                  key={item.id}
-                  item={item}
-                  permissions={permissions}
-                  roles={roles}
-                  onUpdatePermission={handleUpdateMenuItemPermission}
-                  level={0}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </Container>
       </div>
     </PermissionGuard>
@@ -244,60 +264,107 @@ function MenuItemComponent({
     )
   }, [item.permission_id, roles])
 
+  const hasChildren = item.children && item.children.length > 0
+
   return (
-    <div className={`border rounded-lg ${level > 0 ? 'ml-6 mt-2' : ''}`}>
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3 flex-1">
-          {item.children && item.children.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              {isExpanded ? '▼' : '▶'}
-            </Button>
-          )}
-          <div className="flex-1">
-            <div className="font-medium">{item.label}</div>
-            <div className="text-sm text-muted-foreground">{item.href}</div>
-            {item.permission_id && (
-              <div className="mt-2">
-                <div className="text-xs text-muted-foreground mb-1">Visible to roles:</div>
-                <div className="flex gap-1 flex-wrap">
-                  {visibleRoles.map(role => (
-                    <Badge key={role.id} variant="outline" className="text-xs">
-                      {role.display_name}
+    <div className={`${level > 0 ? 'ml-4 sm:ml-6 mt-2' : ''}`}>
+      <Card className="border border-gray-200 bg-white hover:shadow-md transition-all duration-200">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            {/* Left: Menu Item Info */}
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              {hasChildren && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="h-7 w-7 p-0 shrink-0 hover:bg-indigo-50 hover:text-indigo-600"
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+              {!hasChildren && <div className="w-7" />}
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h4 className="font-semibold text-sm sm:text-base text-gray-900 truncate">
+                    {item.label}
+                  </h4>
+                  {item.is_active ? (
+                    <Badge variant="default" className="text-xs bg-green-500">
+                      Active
                     </Badge>
-                  ))}
+                  ) : (
+                    <Badge variant="outline" className="text-xs text-gray-500">
+                      Inactive
+                    </Badge>
+                  )}
                 </div>
+                <p className="text-xs text-gray-500 truncate mb-2">{item.href}</p>
+                
+                {item.permission_id && visibleRoles.length > 0 && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Users className="h-3 w-3 text-gray-400" />
+                      <span className="text-xs font-medium text-gray-600">Visible to roles:</span>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {visibleRoles.map(role => (
+                        <Badge key={role.id} variant="secondary" className="text-xs font-medium">
+                          {role.display_name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {!item.permission_id && (
+                  <div className="mt-2">
+                    <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600">
+                      <Shield className="h-3 w-3 mr-1" />
+                      Public Access
+                    </Badge>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Right: Permission Selector */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Select
+                value={item.permission_id || 'none'}
+                onValueChange={(value) => {
+                  onUpdatePermission(item.id, value === 'none' ? null : value)
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-[220px] h-9 text-xs sm:text-sm">
+                  <SelectValue placeholder="Select permission" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="none">No Permission (Public)</SelectItem>
+                  {permissions.map(perm => (
+                    <SelectItem key={perm.id} value={perm.id} className="text-xs sm:text-sm">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{perm.display_name}</span>
+                        <span className="text-xs text-gray-500">{perm.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select
-            value={item.permission_id || 'none'}
-            onValueChange={(value) => {
-              onUpdatePermission(item.id, value === 'none' ? null : value)
-            }}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select permission" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Permission (Public)</SelectItem>
-              {permissions.map(perm => (
-                <SelectItem key={perm.id} value={perm.id}>
-                  {perm.display_name} ({perm.name})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      {isExpanded && item.children && item.children.length > 0 && (
-        <div className="pl-4 pb-2">
-          {item.children.map(child => (
+        </CardContent>
+      </Card>
+
+      {/* Children */}
+      {isExpanded && hasChildren && (
+        <div className="mt-3 space-y-3">
+          {item.children!.map(child => (
             <MenuItemComponent
               key={child.id}
               item={child}

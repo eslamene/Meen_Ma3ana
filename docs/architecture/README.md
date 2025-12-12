@@ -17,3 +17,6 @@ New developers should start with:
 2. [Meen-Ma3ana_BRD.md](./Meen-Ma3ana_BRD.md) - Learn business requirements
 3. [APP_MAP_AND_MENU_STRUCTURE.md](./APP_MAP_AND_MENU_STRUCTURE.md) - Understand application structure
 
+
+
+

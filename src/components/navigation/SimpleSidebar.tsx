@@ -195,7 +195,11 @@ export default function SimpleSidebar({
                   className="hidden lg:flex"
                   aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
-                  <ChevronLeft className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+                  {locale === 'ar' ? (
+                    <ChevronRight className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+                  ) : (
+                    <ChevronLeft className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+                  )}
                 </Button>
               )}
               
@@ -296,9 +300,11 @@ export default function SimpleSidebar({
       )}
 
       {/* Sidebar - Always fixed, never scrolls with page */}
-      <div className={`fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-white via-gray-50/50 to-white shadow-xl border-r border-gray-200/80 transform transition-all duration-300 flex flex-col h-screen ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0 ${
+      <div className={`fixed inset-y-0 z-50 bg-gradient-to-b from-white via-gray-50/50 to-white shadow-xl transform transition-all duration-300 flex flex-col h-screen ${
+        locale === 'ar' 
+          ? `right-0 border-l border-gray-200/80 ${isOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0`
+          : `left-0 border-r border-gray-200/80 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`
+      } ${
         collapsed ? 'w-20' : 'w-64'
       }`}>
         
@@ -321,7 +327,11 @@ export default function SimpleSidebar({
                 className="hidden lg:flex hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors"
                 aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
-                <ChevronLeft className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+                {locale === 'ar' ? (
+                  <ChevronRight className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+                ) : (
+                  <ChevronLeft className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+                )}
               </Button>
             )}
             
@@ -370,7 +380,7 @@ export default function SimpleSidebar({
               }`}
               title={collapsed ? t('home') : undefined}
             >
-              <Home className={`${collapsed ? '' : 'mr-3'} h-4 w-4`} />
+              <Home className={`h-4 w-4 ${collapsed ? '' : locale === 'ar' ? 'ml-3' : 'mr-3'}`} />
               {!collapsed && <span>{t('home')}</span>}
             </Link>
             <Link
@@ -382,7 +392,7 @@ export default function SimpleSidebar({
               }`}
               title={collapsed ? t('dashboard') : undefined}
             >
-              <BarChart3 className={`${collapsed ? '' : 'mr-3'} h-4 w-4`} />
+              <BarChart3 className={`h-4 w-4 ${collapsed ? '' : locale === 'ar' ? 'ml-3' : 'mr-3'}`} />
               {!collapsed && <span>{t('dashboard')}</span>}
             </Link>
               </>
@@ -458,7 +468,7 @@ export default function SimpleSidebar({
             className={`w-full ${collapsed ? 'px-2 h-10' : 'h-11'} bg-white/80 backdrop-blur-sm border-red-200/60 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-50/50 hover:border-red-300 hover:text-[#E74C3C] transition-all duration-200 shadow-sm font-medium`}
             title={collapsed ? t('signOut') : undefined}
           >
-            <LogOut className={`${collapsed ? '' : 'mr-2'} h-4 w-4`} />
+            <LogOut className={`h-4 w-4 ${collapsed ? '' : locale === 'ar' ? 'ml-2' : 'mr-2'}`} />
             {!collapsed && <span>{t('signOut')}</span>}
           </Button>
         </div>
@@ -505,6 +515,8 @@ function MenuItemComponent({
     ? (isActive(item.href, true) && !childIsActive)
     : isActive(item.href, false)
   const isNotifications = item.href === '/notifications'
+  // Use Arabic label if available and locale is Arabic
+  const displayLabel = locale === 'ar' && item.label_ar ? item.label_ar : item.label
 
   if (hasChildren) {
     // When collapsed, don't show expandable items with children
@@ -521,21 +533,21 @@ function MenuItemComponent({
               ? 'bg-gradient-to-r from-[#6B8E7E] to-[#6B8E7E]/90 text-white shadow-md shadow-[#6B8E7E]/20'
               : 'text-gray-700 hover:bg-gradient-to-r hover:from-[#6B8E7E]/10 hover:to-[#6B8E7E]/5 hover:text-[#6B8E7E] hover:shadow-sm'
           }`}
-          title={item.label}
+          title={displayLabel}
         >
           <div className="flex items-center min-w-0 flex-1">
-            <IconComponent className="mr-3 h-4 w-4 flex-shrink-0" />
-            <span className="truncate">{item.label}</span>
+            <IconComponent className={`h-4 w-4 flex-shrink-0 ${locale === 'ar' ? 'ml-3' : 'mr-3'}`} />
+            <span className="truncate">{displayLabel}</span>
           </div>
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 flex-shrink-0 ml-2" />
+            <ChevronDown className={`h-4 w-4 flex-shrink-0 ${locale === 'ar' ? 'mr-2' : 'ml-2'}`} />
           ) : (
-            <ChevronRight className="h-4 w-4 flex-shrink-0 ml-2" />
+            <ChevronRight className={`h-4 w-4 flex-shrink-0 ${locale === 'ar' ? 'mr-2' : 'ml-2'}`} />
           )}
         </button>
 
         {isExpanded && (
-          <div className="ml-6 space-y-1">
+          <div className={`space-y-1 ${locale === 'ar' ? 'mr-6' : 'ml-6'}`}>
             {item.children!.map((child) => (
               <MenuItemComponent
                 key={child.id}
@@ -566,19 +578,19 @@ function MenuItemComponent({
           ? 'bg-gradient-to-r from-[#6B8E7E] to-[#6B8E7E]/90 text-white shadow-md shadow-[#6B8E7E]/20'
           : 'text-gray-700 hover:bg-gradient-to-r hover:from-[#6B8E7E]/10 hover:to-[#6B8E7E]/5 hover:text-[#6B8E7E] hover:shadow-sm'
       }`}
-      title={item.label}
+      title={displayLabel}
     >
       <div className={`flex items-center ${collapsed ? '' : 'flex-1 min-w-0'}`}>
-        <IconComponent className={`${collapsed ? '' : 'mr-3'} h-4 w-4 flex-shrink-0`} />
-        {!collapsed && <span className="truncate">{item.label}</span>}
+        <IconComponent className={`h-4 w-4 flex-shrink-0 ${collapsed ? '' : locale === 'ar' ? 'ml-3' : 'mr-3'}`} />
+        {!collapsed && <span className="truncate">{displayLabel}</span>}
       </div>
       {!collapsed && isNotifications && notificationCount > 0 && (
-        <Badge variant="destructive" className="ml-2 bg-[#E74C3C] text-white shadow-sm flex-shrink-0 min-w-[1.75rem] px-1.5">
+        <Badge variant="destructive" className={`bg-[#E74C3C] text-white shadow-sm flex-shrink-0 min-w-[1.75rem] px-1.5 ${locale === 'ar' ? 'mr-2' : 'ml-2'}`}>
           {formatNotificationCount(notificationCount)}
         </Badge>
       )}
       {collapsed && isNotifications && notificationCount > 0 && (
-        <Badge variant="destructive" className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 flex items-center justify-center text-xs rounded-full bg-[#E74C3C] text-white shadow-md">
+        <Badge variant="destructive" className={`absolute -top-1 min-w-[1.25rem] h-5 px-1 flex items-center justify-center text-xs rounded-full bg-[#E74C3C] text-white shadow-md ${locale === 'ar' ? '-left-1' : '-right-1'}`}>
           {formatNotificationCount(notificationCount)}
         </Badge>
       )}

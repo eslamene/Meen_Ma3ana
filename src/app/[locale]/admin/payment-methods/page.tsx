@@ -15,6 +15,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
+import DetailPageHeader from '@/components/crud/DetailPageHeader'
+import StandardModal, { StandardFormField, StandardStatusToggle } from '@/components/ui/standard-modal'
+import ActiveInactiveTabs from '@/components/ui/active-inactive-tabs'
 import { 
   CreditCard, 
   Plus, 
@@ -35,6 +38,7 @@ import {
   FileCheck,
   type LucideIcon
 } from 'lucide-react'
+import TranslationButton from '@/components/translation/TranslationButton'
 
 interface PaymentMethod {
   id: string
@@ -62,7 +66,7 @@ export default function AdminPaymentMethodsPage() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showInactive, setShowInactive] = useState(false)
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active')
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -84,7 +88,7 @@ export default function AdminPaymentMethodsPage() {
   const fetchPaymentMethods = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/payment-methods?includeInactive=${showInactive}`)
+      const response = await fetch(`/api/payment-methods?includeInactive=true`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch payment methods')
@@ -98,8 +102,7 @@ export default function AdminPaymentMethodsPage() {
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showInactive])
+  }, [])
 
   useEffect(() => {
     fetchPaymentMethods()
@@ -310,20 +313,31 @@ export default function AdminPaymentMethodsPage() {
   }
 
   const filteredMethods = paymentMethods.filter(method => {
-    if (!showInactive && !method.is_active) return false
+    // Filter by active/inactive tab
+    if (activeTab === 'active' && !method.is_active) return false
+    if (activeTab === 'inactive' && method.is_active) return false
     
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      method.code.toLowerCase().includes(searchLower) ||
-      (method.name_en?.toLowerCase().includes(searchLower)) ||
-      (method.name_ar?.toLowerCase().includes(searchLower)) ||
-      (method.name?.toLowerCase().includes(searchLower)) ||
-      (method.description_en?.toLowerCase().includes(searchLower)) ||
-      (method.description_ar?.toLowerCase().includes(searchLower))
-    )
+    // Filter by search term
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      return (
+        method.code.toLowerCase().includes(searchLower) ||
+        (method.name_en?.toLowerCase().includes(searchLower)) ||
+        (method.name_ar?.toLowerCase().includes(searchLower)) ||
+        (method.name?.toLowerCase().includes(searchLower)) ||
+        (method.description_en?.toLowerCase().includes(searchLower)) ||
+        (method.description_ar?.toLowerCase().includes(searchLower))
+      )
+    }
+    
+    return true
   })
 
   const sortedMethods = [...filteredMethods].sort((a, b) => a.sort_order - b.sort_order)
+  
+  // Count active and inactive methods
+  const activeCount = paymentMethods.filter(m => m.is_active).length
+  const inactiveCount = paymentMethods.filter(m => !m.is_active).length
 
   // Map icon names to Lucide icon components
   const getPaymentMethodIcon = (iconName: string | null | undefined): LucideIcon => {
@@ -346,6 +360,7 @@ export default function AdminPaymentMethodsPage() {
     return iconMap[iconName] || CreditCard
   }
 
+
   return (
     <PermissionGuard permissions={["payment_methods:manage", "admin:dashboard", "cases:manage"]} fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -361,209 +376,185 @@ export default function AdminPaymentMethodsPage() {
         </Card>
       </div>
     }>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-        <Container variant={containerVariant}>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
+        <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  onClick={() => router.push(`/${locale}/admin`)}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Admin
-                </Button>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg">
-                    <CreditCard className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                      Manage Payment Methods
-                    </h1>
-                    <p className="text-gray-600 text-lg mt-1">
-                      Add, edit, delete, and manage payment methods
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <Button
-                onClick={handleCreate}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
-              >
-                <Plus className="h-5 w-5" />
-                Add Payment Method
-              </Button>
-            </div>
-          </div>
+          <DetailPageHeader
+            backUrl={`/${locale}/admin`}
+            icon={CreditCard}
+            title="Manage Payment Methods"
+            description="Add, edit, delete, and manage payment methods"
+            badge={{
+              label: `${paymentMethods.length} ${paymentMethods.length === 1 ? 'method' : 'methods'}`,
+              variant: 'secondary'
+            }}
+            menuActions={[
+              {
+                label: 'Add Payment Method',
+                icon: Plus,
+                onClick: handleCreate,
+              },
+            ]}
+          />
 
-          {/* Filters */}
-          <Card className="mb-6 bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                    <Input
-                      placeholder="Search payment methods..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={showInactive}
-                    onCheckedChange={setShowInactive}
-                    id="show-inactive"
-                  />
-                  <Label htmlFor="show-inactive" className="cursor-pointer">
-                    Show Inactive
-                  </Label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Tabs and Search */}
+          <ActiveInactiveTabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            activeCount={activeCount}
+            inactiveCount={inactiveCount}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder="Search payment methods..."
+          />
 
           {/* Payment Methods List */}
           {loading ? (
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <Card key={i} className="animate-pulse bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="h-4 bg-gray-200 rounded mb-3"></div>
-                    <div className="h-3 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded"></div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="text-center py-12">
+              <div className="inline-block">
+                <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-sm text-gray-600">Loading payment methods...</p>
+              </div>
             </div>
           ) : sortedMethods.length === 0 ? (
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="border border-gray-200 shadow-sm">
               <CardContent className="p-12 text-center">
-                <CreditCard className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   No Payment Methods Found
                 </h3>
-                <p className="text-gray-600 mb-6">
-                  {searchTerm ? 'Try adjusting your search terms' : 'Get started by creating your first payment method'}
+                <p className="text-sm text-gray-600 mb-6">
+                  {searchTerm ? 'Try adjusting your search terms' : `Get started by creating your first ${activeTab === 'active' ? 'active' : 'inactive'} payment method`}
                 </p>
-                <Button onClick={handleCreate} className="bg-gradient-to-r from-blue-500 to-indigo-600">
+                <Button onClick={handleCreate} className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Payment Method
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {sortedMethods.map((method, index) => {
                 const IconComponent = method.icon ? getPaymentMethodIcon(method.icon) : CreditCard
                 return (
                 <Card
                   key={method.id}
-                  className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg transition-all hover:shadow-xl ${
-                    !method.is_active ? 'opacity-60' : ''
+                  className={`border border-gray-200 bg-white hover:shadow-md transition-all duration-200 ${
+                    !method.is_active ? 'opacity-75' : ''
                   }`}
                 >
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {method.code}
-                          </Badge>
-                          <IconComponent className="h-5 w-5 text-gray-600" />
-                          <CardTitle className="text-lg font-semibold text-gray-900">
-                            {method.name_en || method.name}
-                          </CardTitle>
+                  <CardContent className="p-4 sm:p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                      {/* Left: Icon and Info */}
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow-sm shrink-0">
+                          <IconComponent className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                         </div>
-                        {method.name_ar && (
-                          <p className="text-sm text-gray-600 mb-2" dir="rtl">
-                            {method.name_ar}
-                          </p>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">
+                              {method.name_en || method.name}
+                            </h3>
+                            <Badge variant="outline" className="text-xs font-mono shrink-0">
+                              {method.code}
+                            </Badge>
+                            <Badge
+                              variant={method.is_active ? 'default' : 'secondary'}
+                              className={`text-xs shrink-0 ${
+                                method.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-600 border-gray-200'
+                              }`}
+                            >
+                              {method.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </div>
+                          {method.name_ar && (
+                            <p className="text-xs sm:text-sm text-gray-600 mb-2" dir="rtl">
+                              {method.name_ar}
+                            </p>
+                          )}
+                          {(method.description_en || method.description) && (
+                            <p className="text-xs sm:text-sm text-gray-600 mb-1 line-clamp-2">
+                              {method.description_en || method.description}
+                            </p>
+                          )}
+                          {method.description_ar && (
+                            <p className="text-xs sm:text-sm text-gray-600 mb-2 line-clamp-2" dir="rtl">
+                              {method.description_ar}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <Badge
-                        variant={method.is_active ? 'default' : 'secondary'}
-                        className={method.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
-                      >
-                        {method.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {(method.description_en || method.description) && (
-                      <p className="text-sm text-gray-600 mb-2">
-                        {method.description_en || method.description}
-                      </p>
-                    )}
-                    {method.description_ar && (
-                      <p className="text-sm text-gray-600 mb-4" dir="rtl">
-                        {method.description_ar}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleMoveOrder(method, 'up')}
-                          disabled={index === 0 || saving}
-                          className="h-8 w-8 p-0"
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleMoveOrder(method, 'down')}
-                          disabled={index === sortedMethods.length - 1 || saving}
-                          className="h-8 w-8 p-0"
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </Button>
-                        <span className="text-xs text-gray-500 ml-2">Order: {method.sort_order}</span>
+
+                      {/* Right: Actions */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 shrink-0">
+                        {/* Order Controls */}
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleMoveOrder(method, 'up')}
+                            disabled={index === 0 || saving}
+                            className="h-7 w-7 p-0 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300"
+                            title="Move up"
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleMoveOrder(method, 'down')}
+                            disabled={index === sortedMethods.length - 1 || saving}
+                            className="h-7 w-7 p-0 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300"
+                            title="Move down"
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
+                          <span className="text-xs text-gray-500 ml-1 hidden sm:inline">#{method.sort_order}</span>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(method)}
+                            className="h-8 text-xs sm:text-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300"
+                          >
+                            <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                            <span className="hidden sm:inline">Edit</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleActive(method)}
+                            disabled={saving}
+                            className="h-8 text-xs sm:text-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300"
+                          >
+                            {method.is_active ? (
+                              <>
+                                <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                                <span className="hidden sm:inline">Deactivate</span>
+                                <span className="sm:hidden">Off</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                                <span className="hidden sm:inline">Activate</span>
+                                <span className="sm:hidden">On</span>
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(method.id)}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex-1"></div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(method)}
-                        className="flex-1"
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleActive(method)}
-                        disabled={saving}
-                        className="flex-1"
-                      >
-                        {method.is_active ? (
-                          <>
-                            <EyeOff className="h-4 w-4 mr-2" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Activate
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(method.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -573,221 +564,342 @@ export default function AdminPaymentMethodsPage() {
           )}
 
           {/* Create Dialog */}
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Payment Method</DialogTitle>
-                <DialogDescription>
-                  Add a new payment method with bilingual support
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="code">Code *</Label>
-                  <Input
-                    id="code"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                    placeholder="bank_transfer"
-                    className="font-mono"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Unique identifier (e.g., bank_transfer, mobile_wallet)</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="name_en">Name (English) *</Label>
-                    <Input
-                      id="name_en"
-                      value={formData.name_en}
-                      onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
-                      placeholder="Bank Transfer"
-                    />
+          <StandardModal
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+            title="Create New Payment Method"
+            description="Add a new payment method with bilingual support"
+            sections={[
+              {
+                title: "Basic Information",
+                children: (
+                  <div className="space-y-4">
+                    <StandardFormField label="Code" required description="Unique identifier (e.g., bank_transfer, mobile_wallet)">
+                      <Input
+                        id="create_code"
+                        value={formData.code}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                        placeholder="bank_transfer"
+                        className="font-mono"
+                      />
+                    </StandardFormField>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <StandardFormField label="Name (English)" required>
+                        <div className="relative">
+                          <Input
+                            id="create_name_en"
+                            value={formData.name_en}
+                            onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+                            placeholder="Bank Transfer"
+                            className="pr-24"
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            <TranslationButton
+                              sourceText={formData.name_ar || ''}
+                              direction="ar-to-en"
+                              onTranslate={(translated) => setFormData({ ...formData, name_en: translated })}
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              className="h-6 w-6 p-0"
+                            />
+                          </div>
+                        </div>
+                      </StandardFormField>
+                      <StandardFormField label="Name (Arabic)">
+                        <div className="relative">
+                          <Input
+                            id="create_name_ar"
+                            value={formData.name_ar}
+                            onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+                            placeholder="تحويل بنكي"
+                            dir="rtl"
+                            className="pl-24"
+                          />
+                          <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            <TranslationButton
+                              sourceText={formData.name_en || ''}
+                              direction="en-to-ar"
+                              onTranslate={(translated) => setFormData({ ...formData, name_ar: translated })}
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              className="h-6 w-6 p-0"
+                            />
+                          </div>
+                        </div>
+                      </StandardFormField>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <StandardFormField label="Description (English)">
+                        <div className="relative">
+                          <Textarea
+                            id="create_description_en"
+                            value={formData.description_en}
+                            onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
+                            placeholder="Direct bank transfer to our account"
+                            rows={3}
+                            className="pr-24"
+                          />
+                          <div className="absolute right-2 top-2 flex items-center gap-2">
+                            <TranslationButton
+                              sourceText={formData.description_ar || ''}
+                              direction="ar-to-en"
+                              onTranslate={(translated) => setFormData({ ...formData, description_en: translated })}
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              className="h-6 w-6 p-0"
+                            />
+                          </div>
+                        </div>
+                      </StandardFormField>
+                      <StandardFormField label="Description (Arabic)">
+                        <div className="relative">
+                          <Textarea
+                            id="create_description_ar"
+                            value={formData.description_ar}
+                            onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
+                            placeholder="تحويل مباشر إلى حسابنا البنكي"
+                            rows={3}
+                            dir="rtl"
+                            className="pl-24"
+                          />
+                          <div className="absolute left-2 top-2 flex items-center gap-2">
+                            <TranslationButton
+                              sourceText={formData.description_en || ''}
+                              direction="en-to-ar"
+                              onTranslate={(translated) => setFormData({ ...formData, description_ar: translated })}
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              className="h-6 w-6 p-0"
+                            />
+                          </div>
+                        </div>
+                      </StandardFormField>
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="name_ar">Name (Arabic)</Label>
-                    <Input
-                      id="name_ar"
-                      value={formData.name_ar}
-                      onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
-                      placeholder="تحويل بنكي"
-                      dir="rtl"
-                    />
+                )
+              },
+              {
+                title: "Display Settings",
+                children: (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <StandardFormField label="Icon" description="Icon name from lucide-react (e.g., Building2, Smartphone)">
+                      <Input
+                        id="create_icon"
+                        value={formData.icon}
+                        onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                        placeholder="Building2"
+                      />
+                    </StandardFormField>
+                    <StandardFormField label="Sort Order" description="Lower numbers appear first">
+                      <Input
+                        id="create_sort_order"
+                        type="number"
+                        value={formData.sort_order}
+                        onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                        placeholder="0"
+                      />
+                    </StandardFormField>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="description_en">Description (English)</Label>
-                    <Textarea
-                      id="description_en"
-                      value={formData.description_en}
-                      onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
-                      placeholder="Direct bank transfer to our account"
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="description_ar">Description (Arabic)</Label>
-                    <Textarea
-                      id="description_ar"
-                      value={formData.description_ar}
-                      onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                      placeholder="تحويل مباشر إلى حسابنا البنكي"
-                      rows={3}
-                      dir="rtl"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="icon">Icon (Lucide icon name)</Label>
-                    <Input
-                      id="icon"
-                      value={formData.icon}
-                      onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                      placeholder="Building2"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Icon name from lucide-react (e.g., Building2, Smartphone)</p>
-                  </div>
-                  <div>
-                    <Label htmlFor="sort_order">Sort Order</Label>
-                    <Input
-                      id="sort_order"
-                      type="number"
-                      value={formData.sort_order}
-                      onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-                      placeholder="0"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Lower numbers appear first</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
+                )
+              },
+              {
+                title: "Status",
+                children: (
+                  <StandardStatusToggle
+                    label="Payment Method Status"
+                    description="This payment method is active and visible to users"
                     checked={formData.is_active}
                     onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                    id="is_active_create"
+                    id="create_is_active"
                   />
-                  <Label htmlFor="is_active_create" className="cursor-pointer">
-                    Active
-                  </Label>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveCreate} disabled={saving}>
-                  {saving ? 'Creating...' : 'Create Payment Method'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                )
+              }
+            ]}
+            primaryAction={{
+              label: "Create Payment Method",
+              onClick: handleSaveCreate,
+              loading: saving,
+              disabled: saving
+            }}
+            secondaryAction={{
+              label: "Cancel",
+              onClick: () => setIsCreateDialogOpen(false),
+              disabled: saving
+            }}
+          />
 
           {/* Edit Dialog */}
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Edit Payment Method</DialogTitle>
-                <DialogDescription>
-                  Update payment method information
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="edit_code">Code *</Label>
-                  <Input
-                    id="edit_code"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                    placeholder="bank_transfer"
-                    className="font-mono"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit_name_en">Name (English) *</Label>
-                    <Input
-                      id="edit_name_en"
-                      value={formData.name_en}
-                      onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
-                      placeholder="Bank Transfer"
-                    />
+          <StandardModal
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            title="Edit Payment Method"
+            description="Update payment method information"
+            sections={[
+              {
+                title: "Basic Information",
+                children: (
+                  <div className="space-y-4">
+                    <StandardFormField label="Code" required description="Unique identifier">
+                      <Input
+                        id="edit_code"
+                        value={formData.code}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                        placeholder="bank_transfer"
+                        className="font-mono"
+                      />
+                    </StandardFormField>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <StandardFormField label="Name (English)" required>
+                        <div className="relative">
+                          <Input
+                            id="edit_name_en"
+                            value={formData.name_en}
+                            onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+                            placeholder="Bank Transfer"
+                            className="pr-24"
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            <TranslationButton
+                              sourceText={formData.name_ar || ''}
+                              direction="ar-to-en"
+                              onTranslate={(translated) => setFormData({ ...formData, name_en: translated })}
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              className="h-6 w-6 p-0"
+                            />
+                          </div>
+                        </div>
+                      </StandardFormField>
+                      <StandardFormField label="Name (Arabic)">
+                        <div className="relative">
+                          <Input
+                            id="edit_name_ar"
+                            value={formData.name_ar}
+                            onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+                            placeholder="تحويل بنكي"
+                            dir="rtl"
+                            className="pl-24"
+                          />
+                          <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            <TranslationButton
+                              sourceText={formData.name_en || ''}
+                              direction="en-to-ar"
+                              onTranslate={(translated) => setFormData({ ...formData, name_ar: translated })}
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              className="h-6 w-6 p-0"
+                            />
+                          </div>
+                        </div>
+                      </StandardFormField>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <StandardFormField label="Description (English)">
+                        <div className="relative">
+                          <Textarea
+                            id="edit_description_en"
+                            value={formData.description_en}
+                            onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
+                            placeholder="Direct bank transfer to our account"
+                            rows={3}
+                            className="pr-24"
+                          />
+                          <div className="absolute right-2 top-2 flex items-center gap-2">
+                            <TranslationButton
+                              sourceText={formData.description_ar || ''}
+                              direction="ar-to-en"
+                              onTranslate={(translated) => setFormData({ ...formData, description_en: translated })}
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              className="h-6 w-6 p-0"
+                            />
+                          </div>
+                        </div>
+                      </StandardFormField>
+                      <StandardFormField label="Description (Arabic)">
+                        <div className="relative">
+                          <Textarea
+                            id="edit_description_ar"
+                            value={formData.description_ar}
+                            onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
+                            placeholder="تحويل مباشر إلى حسابنا البنكي"
+                            rows={3}
+                            dir="rtl"
+                            className="pl-24"
+                          />
+                          <div className="absolute left-2 top-2 flex items-center gap-2">
+                            <TranslationButton
+                              sourceText={formData.description_en || ''}
+                              direction="en-to-ar"
+                              onTranslate={(translated) => setFormData({ ...formData, description_ar: translated })}
+                              size="sm"
+                              variant="ghost"
+                              iconOnly
+                              className="h-6 w-6 p-0"
+                            />
+                          </div>
+                        </div>
+                      </StandardFormField>
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="edit_name_ar">Name (Arabic)</Label>
-                    <Input
-                      id="edit_name_ar"
-                      value={formData.name_ar}
-                      onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
-                      placeholder="تحويل بنكي"
-                      dir="rtl"
-                    />
+                )
+              },
+              {
+                title: "Display Settings",
+                children: (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <StandardFormField label="Icon" description="Icon name from lucide-react">
+                      <Input
+                        id="edit_icon"
+                        value={formData.icon}
+                        onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                        placeholder="Building2"
+                      />
+                    </StandardFormField>
+                    <StandardFormField label="Sort Order" description="Lower numbers appear first">
+                      <Input
+                        id="edit_sort_order"
+                        type="number"
+                        value={formData.sort_order}
+                        onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                        placeholder="0"
+                      />
+                    </StandardFormField>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit_description_en">Description (English)</Label>
-                    <Textarea
-                      id="edit_description_en"
-                      value={formData.description_en}
-                      onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
-                      placeholder="Direct bank transfer to our account"
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit_description_ar">Description (Arabic)</Label>
-                    <Textarea
-                      id="edit_description_ar"
-                      value={formData.description_ar}
-                      onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                      placeholder="تحويل مباشر إلى حسابنا البنكي"
-                      rows={3}
-                      dir="rtl"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit_icon">Icon (Lucide icon name)</Label>
-                    <Input
-                      id="edit_icon"
-                      value={formData.icon}
-                      onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                      placeholder="Building2"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit_sort_order">Sort Order</Label>
-                    <Input
-                      id="edit_sort_order"
-                      type="number"
-                      value={formData.sort_order}
-                      onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
+                )
+              },
+              {
+                title: "Status",
+                children: (
+                  <StandardStatusToggle
+                    label="Payment Method Status"
+                    description="This payment method is active and visible to users"
                     checked={formData.is_active}
                     onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                    id="is_active_edit"
+                    id="edit_is_active"
                   />
-                  <Label htmlFor="is_active_edit" className="cursor-pointer">
-                    Active
-                  </Label>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveEdit} disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                )
+              }
+            ]}
+            primaryAction={{
+              label: "Save Changes",
+              onClick: handleSaveEdit,
+              loading: saving,
+              disabled: saving
+            }}
+            secondaryAction={{
+              label: "Cancel",
+              onClick: () => setIsEditDialogOpen(false),
+              disabled: saving
+            }}
+          />
 
           {/* Delete Dialog */}
           <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

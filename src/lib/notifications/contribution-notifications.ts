@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { defaultLogger } from '@/lib/logger'
+import { createBilingualNotification, NOTIFICATION_TEMPLATES } from './bilingual-helpers'
 
 export interface ContributionNotification {
   id: string
@@ -17,18 +18,30 @@ export class ContributionNotificationService {
 
   async sendApprovalNotification(contributionId: string, donorId: string, amount: number, caseTitle: string) {
     try {
+      const content = createBilingualNotification(
+        NOTIFICATION_TEMPLATES.contributionApproved.title_en,
+        NOTIFICATION_TEMPLATES.contributionApproved.title_ar,
+        NOTIFICATION_TEMPLATES.contributionApproved.message_en,
+        NOTIFICATION_TEMPLATES.contributionApproved.message_ar,
+        { amount, caseTitle }
+      )
+
       const notification = {
         type: 'contribution_approved' as const,
         recipient_id: donorId,
-        title: 'Contribution Approved',
-        message: `Your contribution of $${amount} for "${caseTitle}" has been approved. Thank you for your generosity!`,
+        title_en: content.title_en,
+        title_ar: content.title_ar,
+        message_en: content.message_en,
+        message_ar: content.message_ar,
+        // Legacy fields for backward compatibility
+        title: content.title_en,
+        message: content.message_en,
         data: {
           contribution_id: contributionId,
           amount,
           case_title: caseTitle
         },
         read: false
-        // Remove created_at to let database set the timestamp
       }
 
       const { error } = await this.supabase.from('notifications')
@@ -48,11 +61,24 @@ export class ContributionNotificationService {
 
   async sendRejectionNotification(contributionId: string, donorId: string, amount: number, caseTitle: string, reason: string) {
     try {
+      const content = createBilingualNotification(
+        NOTIFICATION_TEMPLATES.contributionRejected.title_en,
+        NOTIFICATION_TEMPLATES.contributionRejected.title_ar,
+        NOTIFICATION_TEMPLATES.contributionRejected.message_en,
+        NOTIFICATION_TEMPLATES.contributionRejected.message_ar,
+        { amount, caseTitle, reason }
+      )
+
       const notification = {
         type: 'contribution_rejected' as const,
         recipient_id: donorId,
-        title: 'Contribution Rejected',
-        message: `Your contribution of $${amount} for "${caseTitle}" has been rejected. Reason: ${reason}`,
+        title_en: content.title_en,
+        title_ar: content.title_ar,
+        message_en: content.message_en,
+        message_ar: content.message_ar,
+        // Legacy fields for backward compatibility
+        title: content.title_en,
+        message: content.message_en,
         data: {
           contribution_id: contributionId,
           amount,
@@ -60,7 +86,6 @@ export class ContributionNotificationService {
           rejection_reason: reason
         },
         read: false
-        // Remove created_at to let database set the timestamp
       }
 
       const { error } = await this.supabase
@@ -81,18 +106,30 @@ export class ContributionNotificationService {
 
   async sendPendingNotification(contributionId: string, donorId: string, amount: number, caseTitle: string) {
     try {
+      const content = createBilingualNotification(
+        NOTIFICATION_TEMPLATES.contributionPending.title_en,
+        NOTIFICATION_TEMPLATES.contributionPending.title_ar,
+        NOTIFICATION_TEMPLATES.contributionPending.message_en,
+        NOTIFICATION_TEMPLATES.contributionPending.message_ar,
+        { amount, caseTitle }
+      )
+
       const notification = {
         type: 'contribution_pending' as const,
         recipient_id: donorId,
-        title: 'Contribution Submitted',
-        message: `Your contribution of $${amount} for "${caseTitle}" has been submitted and is under review.`,
+        title_en: content.title_en,
+        title_ar: content.title_ar,
+        message_en: content.message_en,
+        message_ar: content.message_ar,
+        // Legacy fields for backward compatibility
+        title: content.title_en,
+        message: content.message_en,
         data: {
           contribution_id: contributionId,
           amount,
           case_title: caseTitle
         },
         read: false
-        // Remove created_at to let database set the timestamp
       }
 
       const { error } = await this.supabase

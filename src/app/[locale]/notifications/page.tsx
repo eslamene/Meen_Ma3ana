@@ -10,16 +10,32 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target, XCircle, AlertTriangle, RefreshCw, Copy, ChevronDown, ChevronRight, ExternalLink, Eye, Download } from 'lucide-react'
+import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target, XCircle, AlertTriangle, RefreshCw, Copy, ChevronDown, ChevronRight, ExternalLink, Eye, Download, Search, Filter, X, ChevronLeft, ChevronRight as ChevronRightIcon, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { theme, brandColors } from '@/lib/theme'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import DetailPageHeader from '@/components/crud/DetailPageHeader'
+import { cn } from '@/lib/utils'
+import Pagination from '@/components/ui/pagination'
 
 interface Notification {
   id: string
   type: string
-  title: string
-  message: string
+  title?: string // Legacy field
+  message?: string // Legacy field
+  title_en?: string
+  title_ar?: string
+  message_en?: string
+  message_ar?: string
   data?: Record<string, unknown>
   read: boolean
   created_at: string
@@ -45,6 +61,19 @@ export default function NotificationsPage() {
     caseTitle?: string
   } | null>(null)
 
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [limit] = useState(20)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [readStatusFilter, setReadStatusFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<string>('created_at')
+  const [sortOrder, setSortOrder] = useState<string>('desc')
+
   const supabase = createClient()
 
   const fetchNotifications = useCallback(async () => {
@@ -57,13 +86,26 @@ export default function NotificationsPage() {
         return
       }
 
-      const response = await fetch('/api/notifications')
+      // Build query parameters
+      const params = new URLSearchParams()
+      params.append('page', page.toString())
+      params.append('limit', limit.toString())
+      if (searchQuery) params.append('search', searchQuery)
+      if (typeFilter && typeFilter !== 'all') params.append('type', typeFilter)
+      if (readStatusFilter && readStatusFilter !== 'all') params.append('read', readStatusFilter)
+      if (sortBy) params.append('sortBy', sortBy)
+      if (sortOrder) params.append('sortOrder', sortOrder)
+
+      const response = await fetch(`/api/notifications?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         setNotifications(data.notifications || [])
         setUnreadCount(data.unreadCount || 0)
+        setTotal(data.pagination?.total || 0)
+        setTotalPages(data.pagination?.totalPages || 1)
       } else {
         console.error('Failed to fetch notifications')
+        toast.error('Error', { description: t('failedToLoadNotifications') })
       }
     } catch (error) {
       console.error('Error fetching notifications:', error)
@@ -71,11 +113,16 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, page, limit, searchQuery, typeFilter, readStatusFilter, sortBy, sortOrder, t])
 
   useEffect(() => {
     fetchNotifications()
   }, [fetchNotifications])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery, typeFilter, readStatusFilter, sortBy, sortOrder])
 
   const handleNotificationClick = async (notification: Notification) => {
     if (notification.read) return
@@ -207,10 +254,10 @@ export default function NotificationsPage() {
     const now = new Date()
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
     
-    if (diffInSeconds < 60) return 'Just now'
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`
+    if (diffInSeconds < 60) return t('justNow')
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} ${t('minutesAgo')}`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} ${t('hoursAgo')}`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ${t('daysAgo')}`
     
     return date.toLocaleDateString()
   }
@@ -224,7 +271,7 @@ export default function NotificationsPage() {
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text)
-        toast.success('Copied', { description: 'Transaction ID copied to clipboard' })
+        toast.success(t('copied'), { description: t('transactionIdCopied') })
       } else {
         // Fallback for older browsers or non-HTTPS
         const textArea = document.createElement('textarea')
@@ -238,10 +285,10 @@ export default function NotificationsPage() {
         
         try {
           document.execCommand('copy')
-          toast.success('Copied', { description: 'Transaction ID copied to clipboard' })
+          toast.success(t('copied'), { description: t('transactionIdCopied') })
         } catch (fallbackError) {
           console.error('Fallback copy failed:', fallbackError)
-          toast.error('Copy Failed', { description: 'Unable to copy to clipboard. Please copy manually.' })
+          toast.error(t('copyFailed'), { description: t('unableToCopy') })
         } finally {
           document.body.removeChild(textArea)
         }
@@ -277,58 +324,214 @@ export default function NotificationsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: theme.gradients.brandSubtle }}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: brandColors.meen[600] }}></div>
-          <p className="text-gray-600">Loading notifications...</p>
-        </div>
-      </div>
-    )
+  const notificationTypes = [
+    { value: 'all', label: t('allTypes') },
+    { value: 'contribution_approved', label: t('contributionApproved') },
+    { value: 'contribution_rejected', label: t('contributionRejected') },
+    { value: 'contribution_pending', label: t('contributionPending') },
+    { value: 'contribution_revised', label: t('contributionRevised') },
+    { value: 'case_update', label: t('caseUpdate') },
+    { value: 'case_progress', label: t('caseProgress') },
+    { value: 'case_contribution', label: t('caseContribution') },
+    { value: 'case_milestone', label: t('caseMilestone') },
+  ]
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setTypeFilter('all')
+    setReadStatusFilter('all')
+    setSortBy('created_at')
+    setSortOrder('desc')
+    setPage(1)
   }
 
-  return (
-    <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
-      <Container variant={containerVariant} className="py-8">
-      <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="text-gray-600 mt-2">{t('subtitle')}</p>
-        </div>
+  const hasActiveFilters = searchQuery || (typeFilter && typeFilter !== 'all') || (readStatusFilter && readStatusFilter !== 'all') || sortBy !== 'created_at' || sortOrder !== 'desc'
 
-        <Card style={{ boxShadow: theme.shadows.primary }}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-meen" />
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
+      <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
+        {/* Header */}
+        <DetailPageHeader
+          backUrl={`/${locale}/dashboard`}
+          icon={Bell}
+          title={t('title') || 'Notifications'}
+          description={t('subtitle') || 'View and manage your notifications'}
+          badge={unreadCount > 0 ? {
+            label: `${unreadCount} ${t('unread')}`,
+            variant: 'secondary',
+            className: 'bg-amber-100 text-amber-700 border-amber-200'
+          } : undefined}
+          menuActions={unreadCount > 0 ? [
+            {
+              label: t('markAllAsRead'),
+              onClick: handleMarkAllAsRead,
+              icon: CheckCheck,
+            },
+          ] : undefined}
+        />
+
+        {/* Search and Filters */}
+        <Card className="mb-6 border border-gray-200 shadow-sm">
+          <CardContent className="p-4 sm:p-6">
+            <div className="space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder={t('searchPlaceholder')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-10 text-sm"
+                />
+              </div>
+
+              {/* Filters Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="h-10 text-sm">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder={t('filterByType')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {notificationTypes.map(type => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={readStatusFilter} onValueChange={setReadStatusFilter}>
+                  <SelectTrigger className="h-10 text-sm">
+                    <SelectValue placeholder={t('filterByStatus')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('allStatus')}</SelectItem>
+                    <SelectItem value="unread">{t('unreadOnly')}</SelectItem>
+                    <SelectItem value="read">{t('readOnly')}</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="h-10 text-sm">
+                    <SelectValue placeholder={t('sortBy')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created_at">{t('date')}</SelectItem>
+                    <SelectItem value="type">{t('type')}</SelectItem>
+                    <SelectItem value="read">{t('readStatus')}</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortOrder} onValueChange={setSortOrder}>
+                  <SelectTrigger className="h-10 text-sm">
+                    <SelectValue placeholder={t('order')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">{t('newestFirst')}</SelectItem>
+                    <SelectItem value="asc">{t('oldestFirst')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Active Filters */}
+              {hasActiveFilters && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-500">{t('activeFilters')}:</span>
+                  {searchQuery && (
+                    <Badge variant="outline" className="text-xs">
+                      {t('search')}: {searchQuery}
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="ml-1.5 hover:text-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  )}
+                  {typeFilter && typeFilter !== 'all' && (
+                    <Badge variant="outline" className="text-xs">
+                      {t('type')}: {notificationTypes.find(t => t.value === typeFilter)?.label}
+                      <button
+                        onClick={() => setTypeFilter('all')}
+                        className="ml-1.5 hover:text-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  )}
+                  {readStatusFilter && readStatusFilter !== 'all' && (
+                    <Badge variant="outline" className="text-xs">
+                      {t('status')}: {readStatusFilter === 'read' ? t('read') : t('unread')}
+                      <button
+                        onClick={() => setReadStatusFilter('all')}
+                        className="ml-1.5 hover:text-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-7 text-xs"
+                  >
+                    {t('clearAll')}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Notifications List */}
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Bell className="h-5 w-5 text-indigo-600" />
               {t('notifications')}
-              {unreadCount > 0 && (
-                <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200">
-                  {unreadCount} unread
+              {total > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {total} {total === 1 ? t('notification') : t('notificationsCount')}
                 </Badge>
               )}
             </CardTitle>
-            {unreadCount > 0 && (
-              <Button
-                onClick={handleMarkAllAsRead}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <CheckCheck className="h-4 w-4" />
-                Mark all as read
-              </Button>
-            )}
           </CardHeader>
-          <CardContent>
-            {notifications.length === 0 ? (
-              <div className="text-center py-12">
-                <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications yet</h3>
-                <p className="text-gray-500">You&apos;ll see notifications here when there are updates about your contributions or cases you&apos;re following.</p>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mx-auto mb-4" />
+                  <p className="text-sm text-gray-600">{t('loadingNotifications')}</p>
+                </div>
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="text-center py-12 px-4">
+                <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {hasActiveFilters ? t('noNotificationsFound') : t('noNotificationsYet')}
+                </h3>
+                <p className="text-gray-500 text-sm">
+                  {hasActiveFilters 
+                    ? t('tryAdjustingFilters')
+                    : t('notificationsWillAppear')}
+                </p>
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="mt-4"
+                  >
+                    {t('clearFilters')}
+                  </Button>
+                )}
               </div>
             ) : (
-              <div className="space-y-4">
-              {notifications.map((notification) => {
+              <>
+                <div className="space-y-3 p-4 sm:p-6">
+                  {notifications.map((notification) => {
                 const isExpanded = expandedNotifications.has(notification.id)
                 const txId = (notification.data?.new_contribution_id as string) || (notification.data?.contribution_id as string)
                 const parentId = notification.data?.original_contribution_id as string
@@ -337,35 +540,56 @@ export default function NotificationsPage() {
                 const rejectionReason = notification.data?.rejection_reason as string
 
                 return (
-                  <div
-                    key={notification.id}
-                    className={`border rounded-lg transition-all hover:shadow-md ${
-                      !notification.read ? 'bg-meen-50 border-meen-200 shadow-sm' : 'bg-white border-gray-200'
-                    }`}
-                    style={!notification.read ? { boxShadow: theme.shadows.primary } : {}}
-                  >
-                    <div
-                      className="p-4 cursor-pointer"
-                      onClick={() => handleNotificationClick(notification)}
+                    <Card
+                      key={notification.id}
+                      className={cn(
+                        "border transition-all hover:shadow-md",
+                        !notification.read 
+                          ? "bg-indigo-50/50 border-indigo-200 shadow-sm" 
+                          : "bg-white border-gray-200"
+                      )}
                     >
-                      <div className="flex items-start gap-4">
-                        <div className={`p-2 rounded-full ${getNotificationColor(notification.type)}`}>
-                          {getNotificationIcon(notification.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 mb-1">{notification.title}</h4>
-                          <p className="text-gray-600 text-sm mb-2">{notification.message}</p>
-                          <div className="flex flex-wrap items-center gap-3">
+                      <CardContent className="p-4 sm:p-5">
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => handleNotificationClick(notification)}
+                        >
+                          <div className="flex items-start gap-3 sm:gap-4">
+                            <div className={cn(
+                              "p-2 sm:p-2.5 rounded-lg flex-shrink-0",
+                              getNotificationColor(notification.type)
+                            )}>
+                              {getNotificationIcon(notification.type)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <h4 className="font-semibold text-sm sm:text-base text-gray-900">
+                                  {locale === 'ar' 
+                                    ? (notification.title_ar || notification.title || '')
+                                    : (notification.title_en || notification.title || '')
+                                  }
+                                </h4>
+                                {!notification.read && (
+                                  <div className="h-2 w-2 rounded-full bg-indigo-600 flex-shrink-0 mt-1.5" />
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600 mb-3 leading-relaxed">
+                                {locale === 'ar'
+                                  ? (notification.message_ar || notification.message || '')
+                                  : (notification.message_en || notification.message || '')
+                                }
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                             {(() => {
                               // Show transaction ids when available
                               if (txId || parentId) {
                                 return (
                                   <div className="flex items-center gap-2 text-xs text-gray-600">
                                     {txId && (
-                                      <span className="font-mono">TX: {truncateId(txId)}</span>
+                                      <span className="font-mono">{t('tx')}: {truncateId(txId)}</span>
                                     )}
                                     {parentId && (
-                                      <span className="font-mono">Parent: {truncateId(parentId)}</span>
+                                      <span className="font-mono">{t('parent')}: {truncateId(parentId)}</span>
                                     )}
                                     {(txId || parentId) && (
                                       <button
@@ -374,8 +598,8 @@ export default function NotificationsPage() {
                                           e.stopPropagation()
                                           copyToClipboard(txId || parentId)
                                         }}
-                                        aria-label="Copy ID"
-                                        title="Copy Transaction ID"
+                                        aria-label={t('copyId')}
+                                        title={t('copyTransactionId')}
                                       >
                                         <Copy className="h-3.5 w-3.5" />
                                       </button>
@@ -385,129 +609,140 @@ export default function NotificationsPage() {
                               }
                               return null
                             })()}
-                            <span className="text-xs text-gray-500">{getTimeAgo(notification.created_at)}</span>
-                            <Badge variant="outline" className={getNotificationColor(notification.type)}>
-                              {notification.type.replace('_', ' ')}
-                            </Badge>
-                            {notification.type === 'contribution_pending' && (
-                              <Badge variant="outline" className="bg-meen-100 text-meen-800 border-meen-200">
-                                New
-                              </Badge>
-                            )}
+                                <span className="text-xs text-gray-500">{getTimeAgo(notification.created_at)}</span>
+                                <Badge variant="outline" className={cn("text-xs", getNotificationColor(notification.type))}>
+                                  {notificationTypes.find(nt => nt.value === notification.type)?.label || notification.type.replace(/_/g, ' ')}
+                                </Badge>
+                                {notification.type === 'contribution_pending' && (
+                                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">
+                                    {t('new')}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleExpanded(notification.id)
+                              }}
+                              className="p-1.5 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                              aria-label={isExpanded ? t('hideDetails') : t('showDetails')}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4 text-gray-500" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-gray-500" />
+                              )}
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {!notification.read && (
-                            <div className="flex-shrink-0">
-                              <Check className="h-4 w-4 text-meen" />
-                            </div>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleExpanded(notification.id)
-                            }}
-                            className="p-1 hover:bg-gray-100 rounded transition-colors"
-                            aria-label={isExpanded ? "Hide details" : "Show details"}
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4 text-gray-500" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-gray-500" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Expandable Details Section */}
-                    {isExpanded && (
-                      <div className="px-4 pb-4 border-t border-gray-100 bg-gray-50">
-                        <div className="pt-3 space-y-2">
-                          <h5 className="text-sm font-medium text-gray-900 mb-2">Transaction Details</h5>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      </CardContent>
+                      
+                      {/* Expandable Details Section */}
+                      {isExpanded && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 border-t border-gray-200 bg-gray-50/50">
+                          <div className="pt-4 space-y-3">
+                            <h5 className="text-sm font-semibold text-gray-900 mb-3">{t('details')}</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                             {amount && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600">Amount:</span>
+                                <span className="text-gray-600">{t('amount')}:</span>
                                 <span className="font-medium">{amount} EGP</span>
                               </div>
                             )}
                             {caseTitle && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600">Case:</span>
+                                <span className="text-gray-600">{t('case')}:</span>
                                 <span className="font-medium">{caseTitle}</span>
                               </div>
                             )}
                             {txId && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600">Transaction ID:</span>
+                                <span className="text-gray-600">{t('transactionId')}:</span>
                                 <span className="font-mono text-xs">{truncateId(txId)}</span>
                               </div>
                             )}
                             {parentId && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600">Parent Transaction:</span>
+                                <span className="text-gray-600">{t('parentTransaction')}:</span>
                                 <span className="font-mono text-xs">{truncateId(parentId)}</span>
                               </div>
                             )}
                             {rejectionReason && (
                               <div className="flex justify-between col-span-full">
-                                <span className="text-gray-600">Rejection Reason:</span>
+                                <span className="text-gray-600">{t('rejectionReason')}:</span>
                                 <span className="font-medium text-red-600">{rejectionReason}</span>
                               </div>
                             )}
                             <div className="flex justify-between">
-                              <span className="text-gray-600">Created:</span>
+                              <span className="text-gray-600">{t('created')}:</span>
                               <span className="font-medium">{new Date(notification.created_at).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-600">Status:</span>
+                              <span className="text-gray-600">{t('status')}:</span>
                               <span className={`font-medium ${
                                 notification.read ? 'text-meen' : 'text-ma3ana'
                               }`}>
-                                {notification.read ? 'Read' : 'Unread'}
+                                {notification.read ? t('read') : t('unread')}
                               </span>
                             </div>
                           </div>
                           
-                          {/* Action Buttons */}
-                          {(txId || parentId) && (
-                            <div className="pt-3 border-t border-gray-200 space-y-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleViewTransactionDetails(notification)
-                                  }}
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex items-center justify-center gap-2"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                  View Details
-                                </Button>
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleViewProof(txId || parentId)
-                                  }}
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex items-center justify-center gap-2 text-meen border-meen-300 hover:bg-meen-50"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  View Proof
-                                </Button>
+                            {/* Action Buttons */}
+                            {(txId || parentId) && (
+                              <div className="pt-3 border-t border-gray-200">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleViewTransactionDetails(notification)
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex items-center justify-center gap-2 h-9"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                    {t('viewDetails')}
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleViewProof(txId || parentId)
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex items-center justify-center gap-2 h-9 text-indigo-600 border-indigo-300 hover:bg-indigo-50"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    {t('viewProof')}
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </Card>
+                  )
+                })}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="border-t border-gray-200 px-4 sm:px-6 py-4">
+                    <Pagination
+                      page={page}
+                      totalPages={totalPages}
+                      total={total}
+                      limit={limit}
+                      onPageChange={setPage}
+                      loading={loading}
+                      showItemCount={true}
+                      itemName="notifications"
+                    />
                   </div>
-                )
-              })}
-              </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -519,7 +754,7 @@ export default function NotificationsPage() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Eye className="h-5 w-5" />
-                  Payment Proof
+                  {t('paymentProof')}
                 </DialogTitle>
               </DialogHeader>
               <div className="flex-1 overflow-auto">
@@ -547,9 +782,9 @@ export default function NotificationsPage() {
               {proofData.contributionId && (
                 <div className="flex justify-between items-center pt-4 border-t">
                   <div className="text-sm text-gray-600">
-                    <p><strong>Contribution ID:</strong> {truncateId(proofData.contributionId)}</p>
-                    {proofData.amount && <p><strong>Amount:</strong> {proofData.amount} EGP</p>}
-                    {proofData.caseTitle && <p><strong>Case:</strong> {proofData.caseTitle}</p>}
+                    <p><strong>{t('contributionId')}:</strong> {truncateId(proofData.contributionId)}</p>
+                    {proofData.amount && <p><strong>{t('amount')}:</strong> {proofData.amount} EGP</p>}
+                    {proofData.caseTitle && <p><strong>{t('case')}:</strong> {proofData.caseTitle}</p>}
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -559,7 +794,7 @@ export default function NotificationsPage() {
                       className="flex items-center gap-1"
                     >
                       <Copy className="h-4 w-4" />
-                      Copy ID
+                      {t('copyId')}
                     </Button>
                     <Button
                       variant="outline"
@@ -568,7 +803,7 @@ export default function NotificationsPage() {
                       className="flex items-center gap-1"
                     >
                       <Download className="h-4 w-4" />
-                      Download
+                      {t('download')}
                     </Button>
                   </div>
                 </div>

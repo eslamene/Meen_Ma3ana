@@ -225,24 +225,26 @@ export class CaseNotificationService {
         .orderBy(desc(notifications.created_at))
         .limit(limit)
 
-      return results.map(result => {
-        const parsedData = result.data
-          ? (typeof result.data === 'string' ? JSON.parse(result.data) : result.data)
-          : undefined
-        const normalizedType = (result.type as CaseNotification['type'])
-        const normalizedCreatedAt = result.createdAt instanceof Date ? result.createdAt : new Date(result.createdAt as any)
-        return {
-          id: result.id,
-          userId: result.userId,
-          type: normalizedType,
-          title: result.title,
-          message: result.message,
-          data: parsedData,
-          isRead: result.isRead,
-          createdAt: normalizedCreatedAt,
-          caseId: parsedData?.caseId,
-        }
-      })
+      return results
+        .filter(result => result.title != null && result.message != null)
+        .map(result => {
+          const parsedData = result.data
+            ? (typeof result.data === 'string' ? JSON.parse(result.data) : result.data)
+            : undefined
+          const normalizedType = (result.type as CaseNotification['type'])
+          const normalizedCreatedAt = result.createdAt instanceof Date ? result.createdAt : new Date(result.createdAt as any)
+          return {
+            id: result.id,
+            userId: result.userId,
+            type: normalizedType,
+            title: result.title!,
+            message: result.message!,
+            data: parsedData,
+            isRead: result.isRead,
+            createdAt: normalizedCreatedAt,
+            caseId: parsedData?.caseId,
+          }
+        })
     } catch (error) {
       defaultLogger.error('Error getting user notifications:', error)
       return []

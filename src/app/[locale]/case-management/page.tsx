@@ -302,7 +302,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-3 flex-wrap">
                         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
                           {tNav('caseManagement') || 'Case Management Dashboard'}
-                        </h1>
+                  </h1>
                         <Badge variant="outline" className="bg-ma3ana-100 text-ma3ana-800 border-ma3ana-200 text-xs font-semibold">
                           <Shield className="h-3 w-3 mr-1" />
                           {userRoleDisplayName}
@@ -310,9 +310,9 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <p className="text-sm sm:text-base text-gray-600">
-                      Welcome back, Administrator. Here&apos;s your system overview.
-                    </p>
-                  </div>
+                    Welcome back, Administrator. Here&apos;s your system overview.
+                  </p>
+                </div>
                 </div>
               </div>
             </div>

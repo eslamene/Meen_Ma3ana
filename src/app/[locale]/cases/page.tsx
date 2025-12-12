@@ -31,6 +31,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import { useAdmin } from '@/lib/admin/hooks'
 import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination'
 import { theme, brandColors } from '@/lib/theme'
+import Pagination from '@/components/ui/pagination'
 
 interface Case {
   id: string
@@ -275,54 +276,6 @@ export default function CasesPage() {
     return statistics.totalCases
   }
 
-  // Generate pagination page numbers with ellipses
-  const getPaginationPages = () => {
-    const { currentPage } = pagination.state
-    const { totalPages } = serverPagination
-    const pages: (number | string)[] = []
-    const maxVisible = 7 // Maximum number of page buttons to show
-    
-    if (totalPages <= maxVisible) {
-      // Show all pages if total is less than max visible
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i)
-      }
-    } else {
-      // Always show first page
-      pages.push(1)
-      
-      // Calculate start and end of visible range around current page
-      let start = Math.max(2, currentPage - 1)
-      let end = Math.min(totalPages - 1, currentPage + 1)
-      
-      // Adjust range to show more pages if we're near the edges
-      if (currentPage <= 3) {
-        end = Math.min(5, totalPages - 1)
-      } else if (currentPage >= totalPages - 2) {
-        start = Math.max(totalPages - 4, 2)
-      }
-      
-      // Add ellipsis after first page if needed
-      if (start > 2) {
-        pages.push('ellipsis-start')
-      }
-      
-      // Add visible pages around current page
-      for (let i = start; i <= end; i++) {
-        pages.push(i)
-      }
-      
-      // Add ellipsis before last page if needed
-      if (end < totalPages - 1) {
-        pages.push('ellipsis-end')
-      }
-      
-      // Always show last page
-      pages.push(totalPages)
-    }
-    
-    return pages
-  }
 
   return (
     <PermissionGuard permissions={["cases:view"]} fallback={
@@ -803,71 +756,23 @@ export default function CasesPage() {
               </>
             )}
 
-            {/* Enhanced Pagination with Ellipses - Hidden on mobile, shown on desktop */}
+            {/* Unified Pagination - Hidden on mobile, shown on desktop */}
             {serverPagination.totalPages > 1 && (
               <div className="flex justify-center mt-8 hidden sm:flex">
                 <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-2 flex-wrap justify-center">
-                      <Button
-                        variant="outline"
-                        disabled={pagination.state.currentPage === 1}
-                        onClick={() => {
-                          pagination.actions.setCurrentPage(pagination.state.currentPage - 1)
-                          window.scrollTo({ top: 0, behavior: 'smooth' })
-                        }}
-                        className="border-2 border-gray-200 hover:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {t('previous')}
-                      </Button>
-                      
-                      {getPaginationPages().map((pageNum, index) => {
-                        if (pageNum === 'ellipsis-start' || pageNum === 'ellipsis-end') {
-                          return (
-                            <span
-                              key={`ellipsis-${index}`}
-                              className="px-2 text-gray-500 font-medium"
-                            >
-                              ...
-                            </span>
-                          )
-                        }
-                        
-                        const page = pageNum as number
-                        const isActive = pagination.state.currentPage === page
-                        
-                        return (
-                          <Button
-                            key={page}
-                            variant={isActive ? 'default' : 'outline'}
-                            onClick={() => {
-                              pagination.actions.setCurrentPage(page)
-                              window.scrollTo({ top: 0, behavior: 'smooth' })
-                            }}
-                            className={
-                              isActive
-                                ? 'text-white border-0 shadow-md'
-                                : 'border-2 border-gray-200 hover:border-meen hover:bg-meen-50'
-                            }
-                            size="sm"
-                          >
-                            {page}
-                          </Button>
-                        )
-                      })}
-                      
-                      <Button
-                        variant="outline"
-                        disabled={pagination.state.currentPage >= serverPagination.totalPages}
-                        onClick={() => {
-                          pagination.actions.setCurrentPage(pagination.state.currentPage + 1)
-                          window.scrollTo({ top: 0, behavior: 'smooth' })
-                        }}
-                        className="border-2 border-gray-200 hover:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {t('next')}
-                      </Button>
-                    </div>
+                    <Pagination
+                      page={pagination.state.currentPage}
+                      totalPages={serverPagination.totalPages}
+                      total={serverPagination.total}
+                      limit={pagination.state.itemsPerPage}
+                      onPageChange={(newPage) => {
+                        pagination.actions.setCurrentPage(newPage)
+                      }}
+                      showItemCount={false}
+                      scrollToTop={true}
+                      maxVisiblePages={7}
+                    />
                   </CardContent>
                 </Card>
               </div>

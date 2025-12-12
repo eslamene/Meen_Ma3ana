@@ -8,10 +8,12 @@ import { safeFetch } from '@/lib/utils/safe-fetch'
 import { RoleFormModal } from '@/components/admin/rbac/RoleFormModal'
 import { PermissionAssignmentModal } from '@/components/admin/rbac/PermissionAssignmentModal'
 import { RolesDataTable } from '@/components/admin/rbac/RolesDataTable'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Plus } from 'lucide-react'
+import { Plus, Shield } from 'lucide-react'
+import DetailPageHeader from '@/components/crud/DetailPageHeader'
+import { useParams } from 'next/navigation'
 
 interface Role {
   id: string
@@ -36,6 +38,8 @@ interface Permission {
 
 export default function AdminRolesPage() {
   const { containerVariant } = useLayout()
+  const params = useParams()
+  const locale = params.locale as string
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,7 +75,7 @@ export default function AdminRolesPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => {
     fetchData()
@@ -146,50 +150,57 @@ export default function AdminRolesPage() {
 
   return (
     <PermissionGuard permission="admin:roles">
-      <div className="min-h-screen bg-gray-50">
-        <Container variant={containerVariant} className="py-6">
-        <div>
-          <h1 className="text-3xl font-bold">Role Management</h1>
-          <p className="text-muted-foreground">
-            Create and manage roles, assign permissions
-          </p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
+        <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
+          {/* Header */}
+          <DetailPageHeader
+            backUrl={`/${locale}/rbac`}
+            icon={Shield}
+            title="Role Management"
+            description="Create and manage roles, assign permissions"
+            showBackButton={false}
+            badge={{
+              label: `${roles.length} ${roles.length === 1 ? 'role' : 'roles'}`,
+              variant: 'secondary'
+            }}
+            menuActions={[
+              {
+                label: 'Create Role',
+                icon: Plus,
+                onClick: () => setCreateRoleModal(true),
+              },
+            ]}
+          />
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Roles</CardTitle>
-                <CardDescription>Create and manage roles, assign permissions</CardDescription>
-              </div>
-              <Button onClick={() => setCreateRoleModal(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Role
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading roles...</div>
-            ) : (
-              <RolesDataTable
-                roles={roles}
-                onEdit={(role) => {
-                  setSelectedRole(role)
-                  setEditRoleModal(true)
-                }}
-                onDelete={(role) => {
-                  setSelectedRole(role)
-                  // Handle delete
-                }}
-                onAssignPermissions={(role) => {
-                  setSelectedRole(role)
-                  setAssignPermissionsModal(true)
-                }}
-              />
-            )}
-          </CardContent>
-        </Card>
+          {/* Roles List */}
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="p-4 sm:p-6">
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block">
+                    <div className="h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-sm text-gray-600">Loading roles...</p>
+                  </div>
+                </div>
+              ) : (
+                <RolesDataTable
+                  roles={roles}
+                  onEdit={(role) => {
+                    setSelectedRole(role)
+                    setEditRoleModal(true)
+                  }}
+                  onDelete={(role) => {
+                    setSelectedRole(role)
+                    // Handle delete
+                  }}
+                  onAssignPermissions={(role) => {
+                    setSelectedRole(role)
+                    setAssignPermissionsModal(true)
+                  }}
+                />
+              )}
+            </CardContent>
+          </Card>
 
         {/* Create Role Modal */}
         {createRoleModal && (

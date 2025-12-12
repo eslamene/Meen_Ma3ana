@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { Plus, Edit2, Shield, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import Pagination from '@/components/ui/pagination'
 
 interface Permission {
   id: string
@@ -331,50 +332,16 @@ export default function AdminPermissionsPage() {
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
-                <div className="mt-6 flex items-center justify-between border-t pt-4">
-                  <div className="text-sm text-muted-foreground">
-                    Page {pagination.page} of {pagination.totalPages}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(pagination.page - 1)}
-                      disabled={!pagination.hasPrevPage}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Previous
-                    </Button>
-                    
-                    <div className="flex items-center gap-1">
-                      {getPageNumbers().map((page, index) => (
-                        <React.Fragment key={index}>
-                          {page === '...' ? (
-                            <span className="px-2 text-muted-foreground">...</span>
-                          ) : (
-                            <Button
-                              variant={pagination.page === page ? 'default' : 'outline'}
-                              size="sm"
-                              onClick={() => handlePageChange(page as number)}
-                              className="min-w-[40px]"
-                            >
-                              {page}
-                            </Button>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(pagination.page + 1)}
-                      disabled={!pagination.hasNextPage}
-                    >
-                      Next
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+                <div className="mt-6 border-t pt-4">
+                  <Pagination
+                    page={pagination.page}
+                    totalPages={pagination.totalPages}
+                    total={pagination.total}
+                    limit={pagination.limit}
+                    onPageChange={handlePageChange}
+                    showItemCount={true}
+                    itemName="permissions"
+                  />
                 </div>
               )}
               </>

@@ -643,6 +643,8 @@ export async function POST(request: NextRequest) {
 
     // Create notifications (non-blocking)
     try {
+      const { createBilingualNotification, NOTIFICATION_TEMPLATES } = await import('@/lib/notifications/bilingual-helpers')
+      
       const { data: admins } = await supabase
         .from('admin_user_roles')
         .select('user_id, admin_roles!inner(name)')
@@ -650,11 +652,25 @@ export async function POST(request: NextRequest) {
         .in('admin_roles.name', ['admin', 'super_admin'])
 
       if (admins && admins.length > 0) {
+        const caseTitle = caseData.title_en || caseData.title_ar || 'Unknown Case'
+        const content = createBilingualNotification(
+          NOTIFICATION_TEMPLATES.newContributionSubmitted.title_en,
+          NOTIFICATION_TEMPLATES.newContributionSubmitted.title_ar,
+          NOTIFICATION_TEMPLATES.newContributionSubmitted.message_en,
+          NOTIFICATION_TEMPLATES.newContributionSubmitted.message_ar,
+          { amount, caseTitle }
+        )
+
         const notifications = admins.map((admin: any) => ({
           type: 'contribution_pending',
           recipient_id: admin.user_id,
-          title: 'New Contribution Submitted',
-          message: `A new contribution of ${amount} EGP has been submitted for case: ${caseData.title_en || caseData.title_ar || 'Unknown Case'}`,
+          title_en: content.title_en,
+          title_ar: content.title_ar,
+          message_en: content.message_en,
+          message_ar: content.message_ar,
+          // Legacy fields for backward compatibility
+          title: content.title_en,
+          message: content.message_en,
           data: {
             contribution_id: contribution.id,
             case_id: caseId,

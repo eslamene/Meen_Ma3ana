@@ -131,3 +131,6 @@ Until the root cause is fixed, users can:
 
 The resend functionality is already implemented in the login and registration success screens.
 
+
+
+

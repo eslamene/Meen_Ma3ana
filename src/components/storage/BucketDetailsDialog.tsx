@@ -1,14 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,7 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import type { BucketMetadata, StorageRule } from '@/lib/storage/types'
-import { Loader2, Save, Image as ImageIcon, FileText, Video, Music } from 'lucide-react'
+import { Loader2, Save, Image as ImageIcon, FileText, Video, Music, Database } from 'lucide-react'
+import StandardModal, { StandardModalPreview, StandardFormField } from '@/components/ui/standard-modal'
 
 interface BucketDetailsDialogProps {
   open: boolean
@@ -77,13 +70,7 @@ export function BucketDetailsDialog({
   const [maxFileSize, setMaxFileSize] = useState(5)
   const [selectedExtensions, setSelectedExtensions] = useState<string[]>([])
 
-  useEffect(() => {
-    if (open && bucketName) {
-      fetchBucketDetails()
-    }
-  }, [open, bucketName])
-
-  const fetchBucketDetails = async () => {
+  const fetchBucketDetails = useCallback(async () => {
     try {
       setLoading(true)
       // Include count for admin details page (this is slower but needed for display)
@@ -122,7 +109,13 @@ export function BucketDetailsDialog({
     } finally {
       setLoading(false)
     }
-  }
+  }, [bucketName])
+
+  useEffect(() => {
+    if (open && bucketName) {
+      fetchBucketDetails()
+    }
+  }, [open, bucketName, fetchBucketDetails])
 
   const handleExtensionToggle = (extension: string) => {
     setSelectedExtensions(prev => {
@@ -178,89 +171,147 @@ export function BucketDetailsDialog({
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Bucket Configuration: {bucketName}</DialogTitle>
-          <DialogDescription>
-            View and manage storage bucket settings and upload rules
-          </DialogDescription>
-        </DialogHeader>
+  if (loading) {
+    return (
+      <StandardModal
+        open={open}
+        onOpenChange={onOpenChange}
+        title={`Bucket Configuration: ${bucketName}`}
+        description="View and manage storage bucket settings and upload rules"
+        sections={[]}
+        primaryAction={{
+          label: 'Loading...',
+          onClick: () => {},
+          disabled: true
+        }}
+        secondaryAction={{
+          label: 'Close',
+          onClick: () => onOpenChange(false)
+        }}
+      >
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
+      </StandardModal>
+    )
+  }
 
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-          </div>
-        ) : bucket ? (
-          <div className="space-y-6">
-            {/* Bucket Metadata */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900">Bucket Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-gray-500">Bucket Name</Label>
-                  <p className="text-sm font-medium text-gray-900">{bucket.name}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Visibility</Label>
-                  <div className="mt-1">
-                    <Badge variant={bucket.public ? 'default' : 'secondary'}>
-                      {bucket.public ? 'Public' : 'Private'}
-                    </Badge>
-                  </div>
-                </div>
+  if (!bucket) {
+    return (
+      <StandardModal
+        open={open}
+        onOpenChange={onOpenChange}
+        title={`Bucket Configuration: ${bucketName}`}
+        description="View and manage storage bucket settings and upload rules"
+        sections={[]}
+        primaryAction={{
+          label: 'Close',
+          onClick: () => onOpenChange(false)
+        }}
+      >
+        <div className="text-center py-12">
+          <p className="text-gray-500">Failed to load bucket details</p>
+        </div>
+      </StandardModal>
+    )
+  }
+
+  return (
+    <StandardModal
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`Bucket Configuration: ${bucketName}`}
+      description="View and manage storage bucket settings and upload rules"
+      preview={
+        <StandardModalPreview>
+          <div className="flex items-center gap-4">
+            <div 
+              className="p-3 rounded-lg"
+              style={{ backgroundColor: bucket.public ? '#10b98120' : '#6b728020' }}
+            >
+              <Database className="h-6 w-6" style={{ color: bucket.public ? '#10b981' : '#6b7280' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-gray-900 truncate">{bucket.name}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant={bucket.public ? 'default' : 'secondary'}>
+                  {bucket.public ? 'Public' : 'Private'}
+                </Badge>
                 {bucket.object_count !== undefined && (
-                  <div>
-                    <Label className="text-xs text-gray-500">Object Count</Label>
-                    <p className="text-sm font-medium text-gray-900">{bucket.object_count}</p>
-                  </div>
+                  <span className="text-sm text-gray-500">
+                    {bucket.object_count} {bucket.object_count === 1 ? 'object' : 'objects'}
+                  </span>
                 )}
-                <div>
-                  <Label className="text-xs text-gray-500">Created</Label>
-                  <p className="text-sm font-medium text-gray-900">
-                    {new Date(bucket.created_at).toLocaleDateString()}
-                  </p>
-                </div>
               </div>
             </div>
-
-            {/* Storage Rules */}
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="text-sm font-semibold text-gray-900">Upload Rules</h3>
-              
-              {/* Max File Size */}
+          </div>
+        </StandardModalPreview>
+      }
+      sections={[
+        {
+          title: 'Bucket Information',
+          children: (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="maxFileSize">Maximum File Size (MB)</Label>
+                <Label className="text-xs text-gray-500 mb-1 block">Bucket Name</Label>
+                <p className="text-sm font-medium text-gray-900">{bucket.name}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Visibility</Label>
+                <div>
+                  <Badge variant={bucket.public ? 'default' : 'secondary'}>
+                    {bucket.public ? 'Public' : 'Private'}
+                  </Badge>
+                </div>
+              </div>
+              {bucket.object_count !== undefined && (
+                <div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Object Count</Label>
+                  <p className="text-sm font-medium text-gray-900">{bucket.object_count}</p>
+                </div>
+              )}
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Created</Label>
+                <p className="text-sm font-medium text-gray-900">
+                  {new Date(bucket.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          )
+        },
+        {
+          title: 'Upload Rules',
+          children: (
+            <div className="space-y-6">
+              <StandardFormField
+                label="Maximum File Size (MB)"
+                description="Maximum allowed file size for uploads to this bucket"
+              >
                 <Input
-                  id="maxFileSize"
                   type="number"
                   min="1"
                   value={maxFileSize}
                   onChange={(e) => setMaxFileSize(parseInt(e.target.value) || 1)}
-                  className="mt-1"
+                  className="h-10"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Maximum allowed file size for uploads to this bucket
-                </p>
-              </div>
+              </StandardFormField>
 
-              {/* Allowed Extensions */}
               <div>
-                <Label>Allowed File Types</Label>
-                <p className="text-xs text-gray-500 mb-3">
+                <Label className="text-sm font-medium text-gray-900 mb-1 block">
+                  Allowed File Types
+                </Label>
+                <p className="text-xs text-gray-500 mb-4">
                   Select the file extensions that are allowed for uploads
                 </p>
                 
-                {/* Grouped by Category */}
                 <div className="space-y-4">
                   {/* Images */}
                   <div>
                     <Label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" />
+                      <ImageIcon className="h-4 w-4 text-indigo-600" />
                       Images
                     </Label>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 border rounded-lg p-3 bg-gray-50">
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 border border-gray-200 rounded-lg p-3 bg-gray-50/50">
                       {FILE_EXTENSIONS_BY_CATEGORY.image.map(ext => (
                         <div key={ext} className="flex items-center space-x-2">
                           <Checkbox
@@ -270,7 +321,7 @@ export function BucketDetailsDialog({
                           />
                           <Label
                             htmlFor={`ext-${ext}`}
-                            className="text-sm font-normal cursor-pointer"
+                            className="text-sm font-normal cursor-pointer text-gray-700"
                           >
                             {ext.toUpperCase()}
                           </Label>
@@ -282,10 +333,10 @@ export function BucketDetailsDialog({
                   {/* Documents */}
                   <div>
                     <Label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
+                      <FileText className="h-4 w-4 text-indigo-600" />
                       Documents
                     </Label>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 border rounded-lg p-3 bg-gray-50">
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 border border-gray-200 rounded-lg p-3 bg-gray-50/50">
                       {FILE_EXTENSIONS_BY_CATEGORY.document.map(ext => (
                         <div key={ext} className="flex items-center space-x-2">
                           <Checkbox
@@ -295,7 +346,7 @@ export function BucketDetailsDialog({
                           />
                           <Label
                             htmlFor={`ext-${ext}`}
-                            className="text-sm font-normal cursor-pointer"
+                            className="text-sm font-normal cursor-pointer text-gray-700"
                           >
                             {ext.toUpperCase()}
                           </Label>
@@ -307,10 +358,10 @@ export function BucketDetailsDialog({
                   {/* Videos */}
                   <div>
                     <Label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <Video className="h-4 w-4" />
+                      <Video className="h-4 w-4 text-indigo-600" />
                       Videos
                     </Label>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 border rounded-lg p-3 bg-gray-50">
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 border border-gray-200 rounded-lg p-3 bg-gray-50/50">
                       {FILE_EXTENSIONS_BY_CATEGORY.video.map(ext => (
                         <div key={ext} className="flex items-center space-x-2">
                           <Checkbox
@@ -320,7 +371,7 @@ export function BucketDetailsDialog({
                           />
                           <Label
                             htmlFor={`ext-${ext}`}
-                            className="text-sm font-normal cursor-pointer"
+                            className="text-sm font-normal cursor-pointer text-gray-700"
                           >
                             {ext.toUpperCase()}
                           </Label>
@@ -332,10 +383,10 @@ export function BucketDetailsDialog({
                   {/* Audio */}
                   <div>
                     <Label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <Music className="h-4 w-4" />
+                      <Music className="h-4 w-4 text-indigo-600" />
                       Audio
                     </Label>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 border rounded-lg p-3 bg-gray-50">
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 border border-gray-200 rounded-lg p-3 bg-gray-50/50">
                       {FILE_EXTENSIONS_BY_CATEGORY.audio.map(ext => (
                         <div key={ext} className="flex items-center space-x-2">
                           <Checkbox
@@ -345,7 +396,7 @@ export function BucketDetailsDialog({
                           />
                           <Label
                             htmlFor={`ext-${ext}`}
-                            className="text-sm font-normal cursor-pointer"
+                            className="text-sm font-normal cursor-pointer text-gray-700"
                           >
                             {ext.toUpperCase()}
                           </Label>
@@ -356,11 +407,11 @@ export function BucketDetailsDialog({
                 </div>
 
                 {selectedExtensions.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-xs text-gray-500 mb-2">Selected types:</p>
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Selected types:</p>
                     <div className="flex flex-wrap gap-2">
                       {selectedExtensions.map(ext => (
-                        <Badge key={ext} variant="secondary">
+                        <Badge key={ext} variant="secondary" className="text-xs">
                           {ext.toUpperCase()}
                         </Badge>
                       ))}
@@ -369,33 +420,21 @@ export function BucketDetailsDialog({
                 )}
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <p>Failed to load bucket details</p>
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-          <Button onClick={handleSave} disabled={saving || loading}>
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Rules
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          )
+        }
+      ]}
+      primaryAction={{
+        label: 'Save Rules',
+        onClick: handleSave,
+        loading: saving,
+        disabled: loading || selectedExtensions.length === 0
+      }}
+      secondaryAction={{
+        label: 'Close',
+        onClick: () => onOpenChange(false)
+      }}
+      maxWidth="2xl"
+    />
   )
 }
 

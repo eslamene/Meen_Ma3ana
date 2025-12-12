@@ -57,6 +57,7 @@ import {
   Edit,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import Pagination from '@/components/ui/pagination'
 
 interface ActivityLog {
   id: string
@@ -253,7 +254,8 @@ export default function AdminActivitiesPage() {
     }
   }
 
-  const getPageNumbers = () => {
+  // Removed getPageNumbers - using unified Pagination component
+  const _getPageNumbers = () => {
     const pages: (number | string)[] = []
     const totalPages = pagination.totalPages
     const currentPage = pagination.page
@@ -534,52 +536,17 @@ export default function AdminActivitiesPage() {
 
                     {/* Pagination */}
                     {pagination.totalPages > 1 && (
-                      <div className="flex items-center justify-between mt-6 pt-4 border-t">
-                        <div className="text-sm text-gray-600">
-                          Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-                          {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                          {pagination.total} activities
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePageChange(pagination.page - 1)}
-                            disabled={!pagination.hasPrevPage || loading}
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                            Previous
-                          </Button>
-                          
-                          <div className="flex items-center gap-1">
-                            {getPageNumbers().map((page, index) => (
-                              <React.Fragment key={index}>
-                                {page === '...' ? (
-                                  <span className="px-2">...</span>
-                                ) : (
-                                  <Button
-                                    variant={pagination.page === page ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => handlePageChange(page as number)}
-                                    disabled={loading}
-                                  >
-                                    {page}
-                                  </Button>
-                                )}
-                              </React.Fragment>
-                            ))}
-                          </div>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePageChange(pagination.page + 1)}
-                            disabled={!pagination.hasNextPage || loading}
-                          >
-                            Next
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      <div className="mt-6 pt-4 border-t">
+                        <Pagination
+                          page={pagination.page}
+                          totalPages={pagination.totalPages}
+                          total={pagination.total}
+                          limit={pagination.limit}
+                          onPageChange={handlePageChange}
+                          loading={loading}
+                          showItemCount={true}
+                          itemName="activities"
+                        />
                       </div>
                     )}
                   </>

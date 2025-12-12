@@ -1,0 +1,228 @@
+---
+description: Standard modal component usage and design patterns
+globs: **/*.tsx, **/*.ts
+alwaysApply: true
+---
+
+# Standard Modal Component
+
+**Use `StandardModal` from `@/components/ui/standard-modal` for all modal dialogs in the application.**
+
+## Overview
+
+The `StandardModal` component provides a consistent, accessible, and responsive modal experience across the entire application. It includes:
+
+- **Organized sections** with clear headers
+- **Optional preview sections** for real-time feedback
+- **Consistent footer** with primary/secondary actions
+- **Responsive design** that works on all screen sizes
+- **Loading states** and proper disabled handling
+- **Accessibility** built-in
+
+## When to Use
+
+Use `StandardModal` for:
+- ✅ Form dialogs (create/edit)
+- ✅ Confirmation dialogs (with custom footer)
+- ✅ Settings/modals with multiple sections
+- ✅ Any modal that needs consistent styling
+
+Use regular `Dialog` only for:
+- Simple alerts/notifications
+- Very custom layouts that don't fit the standard pattern
+
+## Basic Usage
+
+```tsx
+import StandardModal, { 
+  StandardModalPreview, 
+  StandardFormField, 
+  StandardStatusToggle 
+} from '@/components/ui/standard-modal'
+
+<StandardModal
+  open={isOpen}
+  onOpenChange={setIsOpen}
+  title="Edit Category"
+  description="Update category information"
+  sections={[
+    {
+      title: "Basic Information",
+      children: (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <StandardFormField label="Name" required>
+            <Input value={name} onChange={...} />
+          </StandardFormField>
+        </div>
+      )
+    }
+  ]}
+  primaryAction={{
+    label: "Save Changes",
+    onClick: handleSave,
+    loading: saving
+  }}
+  secondaryAction={{
+    label: "Cancel",
+    onClick: () => setIsOpen(false)
+  }}
+/>
+```
+
+## With Preview Section
+
+```tsx
+<StandardModal
+  open={isOpen}
+  onOpenChange={setIsOpen}
+  title="Edit Category"
+  preview={
+    <StandardModalPreview>
+      <div className="flex items-center gap-4">
+        <div style={{ backgroundColor: color }}>
+          <Icon />
+        </div>
+        <div>
+          <div className="font-semibold">{name}</div>
+          <Badge>{status}</Badge>
+        </div>
+      </div>
+    </StandardModalPreview>
+  }
+  sections={[...]}
+  primaryAction={{...}}
+/>
+```
+
+## Helper Components
+
+### StandardFormField
+
+Use for consistent form field styling:
+
+```tsx
+<StandardFormField 
+  label="Email" 
+  required 
+  description="User's email address"
+  error={errors.email}
+>
+  <Input value={email} onChange={...} />
+</StandardFormField>
+```
+
+### StandardStatusToggle
+
+Use for status/active toggle sections:
+
+```tsx
+<StandardStatusToggle
+  label="Category Status"
+  description="This category is visible and can be used for cases"
+  checked={isActive}
+  onCheckedChange={setIsActive}
+  id="is_active"
+/>
+```
+
+### StandardModalPreview
+
+Wrap preview content:
+
+```tsx
+<StandardModalPreview label="Preview">
+  {/* Preview content */}
+</StandardModalPreview>
+```
+
+## Design Patterns
+
+### Section Organization
+
+Always organize form fields into logical sections:
+
+```tsx
+sections={[
+  {
+    title: "Basic Information",
+    children: <NameAndDescriptionFields />
+  },
+  {
+    title: "Visual Appearance", 
+    children: <IconAndColorFields />
+  },
+  {
+    title: "Status",
+    children: <StatusToggle />
+  }
+]}
+```
+
+### Preview Sections
+
+Include preview sections when editing visual elements (icons, colors, layouts):
+
+```tsx
+preview={
+  <StandardModalPreview>
+    {/* Show how the item will look */}
+  </StandardModalPreview>
+}
+```
+
+### Responsive Design
+
+- Use `grid grid-cols-1 md:grid-cols-2` for two-column layouts
+- Buttons stack vertically on mobile (`flex-col sm:flex-row`)
+- Text sizes scale: `text-sm sm:text-base`
+- Padding scales: `p-4 sm:p-6`
+
+### Loading States
+
+Always handle loading states:
+
+```tsx
+primaryAction={{
+  label: "Save Changes",
+  onClick: handleSave,
+  loading: saving,  // Shows spinner and disables button
+  disabled: !isValid  // Additional validation
+}}
+```
+
+## Color Scheme
+
+- **Primary actions**: Indigo gradient (`from-indigo-500 to-indigo-600`)
+- **Destructive actions**: Red (`bg-red-600 hover:bg-red-700`)
+- **Preview background**: Gradient (`from-gray-50 to-indigo-50/30`)
+- **Section headers**: Gray border bottom
+- **Footer**: Light gray background with border top
+
+## Accessibility
+
+- All form fields must have proper labels
+- Required fields marked with red asterisk (`*`)
+- Loading states prevent double-submission
+- Proper focus management
+- Keyboard navigation support
+
+## Examples
+
+See `src/app/[locale]/admin/categories/page.tsx` for complete examples of:
+- Create modal with preview
+- Edit modal with preview
+- Multiple sections
+- Status toggles
+- Form validation
+
+## Migration Guide
+
+When improving existing modals:
+
+1. Replace `Dialog` with `StandardModal`
+2. Organize content into `sections`
+3. Add preview if editing visual elements
+4. Use helper components (`StandardFormField`, etc.)
+5. Update button styling to match standard
+6. Add loading states
+7. Test responsive behavior

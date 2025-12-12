@@ -41,8 +41,11 @@ const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> & {
     variant?: 'default' | 'branded'
+    dir?: 'ltr' | 'rtl'
   }
->(({ className, variant = 'branded', ...props }, ref) => {
+>(({ className, variant = 'branded', dir, ...props }, ref) => {
+  const isRTL = dir === 'rtl' || (typeof document !== 'undefined' && document.documentElement.dir === 'rtl')
+  
   if (variant === 'branded') {
     return (
       <div className={cn(
@@ -53,9 +56,11 @@ const TabsList = React.forwardRef<
         <TabsPrimitive.List
           ref={ref}
           className={cn(
-            "flex h-auto p-0 bg-transparent w-full justify-start gap-1 sm:gap-1.5 md:gap-2 flex-wrap sm:flex-nowrap",
+            "flex h-auto p-0 bg-transparent w-full gap-1 sm:gap-1.5 md:gap-2 flex-wrap sm:flex-nowrap",
+            isRTL ? "justify-start" : "justify-end",
             className
           )}
+          dir={dir}
           {...props}
         />
       </div>
@@ -81,12 +86,14 @@ interface TabsTriggerProps extends React.ComponentPropsWithoutRef<typeof TabsPri
   badge?: number | string
   badgeVariant?: 'default' | 'secondary' | 'destructive' | 'outline'
   tabIndex?: number
+  dir?: 'ltr' | 'rtl'
 }
 
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   TabsTriggerProps
->(({ className, variant = 'branded', icon: Icon, badge, badgeVariant, tabIndex = 0, ...props }, ref) => {
+>(({ className, variant = 'branded', icon: Icon, badge, badgeVariant, tabIndex = 0, dir, ...props }, ref) => {
+  const isRTL = dir === 'rtl' || (typeof document !== 'undefined' && document.documentElement.dir === 'rtl')
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const combinedRef = React.useCallback((node: HTMLButtonElement | null) => {
     if (typeof ref === 'function') {
@@ -105,8 +112,10 @@ const TabsTrigger = React.forwardRef<
       const updateStyles = () => {
         if (!element) return
         const isActive = element.getAttribute('data-state') === 'active'
+        const isRTL = element.closest('[dir="rtl"]') !== null || (typeof document !== 'undefined' && document.documentElement.dir === 'rtl')
         if (isActive) {
-          element.style.background = `linear-gradient(to right, ${colors.activeFrom}, ${colors.activeTo})`
+          const gradientDirection = isRTL ? 'to left' : 'to right'
+          element.style.background = `linear-gradient(${gradientDirection}, ${colors.activeFrom}, ${colors.activeTo})`
           element.style.boxShadow = `0 10px 15px -3px ${colors.shadow}, 0 4px 6px -2px ${colors.shadow}`
           element.style.color = 'white'
         } else {
@@ -153,11 +162,13 @@ const TabsTrigger = React.forwardRef<
           'transition-all duration-300 bg-transparent',
           'data-[state=inactive]:hover:bg-white/15 data-[state=inactive]:hover:border-white/50',
           'active:scale-95',
+          isRTL ? 'flex-row-reverse' : '',
           className
         )}
         style={{
           color: colors.inactive,
         }}
+        dir={dir}
         onMouseEnter={(e) => {
           if (e.currentTarget.getAttribute('data-state') !== 'active') {
             e.currentTarget.style.backgroundColor = colors.hoverBg
@@ -171,20 +182,21 @@ const TabsTrigger = React.forwardRef<
         {...props}
       >
         {Icon && (
-          <Icon className="h-4 w-4 sm:h-4 md:h-4.5 sm:w-4 md:w-4.5 flex-shrink-0 transition-all duration-300 group-data-[state=active]:scale-110 sm:group-data-[state=active]:scale-125 group-data-[state=active]:rotate-3" />
+          <Icon className={`h-4 w-4 sm:h-4 md:h-4.5 sm:w-4 md:w-4.5 flex-shrink-0 transition-all duration-300 group-data-[state=active]:scale-110 sm:group-data-[state=active]:scale-125 group-data-[state=active]:rotate-3 ${isRTL ? 'order-2' : ''}`} />
         )}
-        <span className="relative z-10 hidden md:inline truncate text-sm">{props.children}</span>
+        <span className={`relative z-10 hidden md:inline truncate text-sm ${isRTL ? 'order-1' : ''}`}>{props.children}</span>
         {badge !== undefined && badge !== null && (
           <Badge
             variant={badgeVariant || 'secondary'}
             className={cn(
-              'ml-0.5 sm:ml-1 md:ml-1.5',
+              isRTL ? 'mr-0.5 sm:mr-1 md:mr-1.5' : 'ml-0.5 sm:ml-1 md:ml-1.5',
               'h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6',
               'min-w-[16px] sm:min-w-[20px] md:min-w-[24px]',
               'px-1 sm:px-1.5 md:px-2',
               'text-[9px] sm:text-[10px] md:text-xs',
               'font-bold text-white border-0 shadow-md transition-all duration-300',
               'flex items-center justify-center flex-shrink-0',
+              isRTL ? 'order-3' : '',
               tabIndex === 0
                 ? 'bg-gradient-to-r from-amber-400 to-orange-500 group-data-[state=active]:from-yellow-400 group-data-[state=active]:to-amber-500 group-data-[state=active]:shadow-lg group-data-[state=active]:shadow-amber-500/40'
                 : 'bg-gradient-to-r from-orange-400 to-red-500 group-data-[state=active]:from-amber-400 group-data-[state=active]:to-orange-500 group-data-[state=active]:shadow-lg group-data-[state=active]:shadow-orange-500/40'
@@ -196,7 +208,9 @@ const TabsTrigger = React.forwardRef<
         <div
           className="absolute inset-0 rounded-lg opacity-0 group-data-[state=active]:opacity-100 transition-opacity duration-300 pointer-events-none"
           style={{
-            background: `linear-gradient(to right, ${colors.overlayFrom}, ${colors.overlayTo})`,
+            background: isRTL 
+              ? `linear-gradient(to left, ${colors.overlayFrom}, ${colors.overlayTo})`
+              : `linear-gradient(to right, ${colors.overlayFrom}, ${colors.overlayTo})`,
           }}
         />
       </TabsPrimitive.Trigger>

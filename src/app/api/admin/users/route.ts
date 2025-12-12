@@ -113,6 +113,35 @@ export async function GET(request: NextRequest) {
     
     logger.info('Users fetched:', allUsers.length)
 
+    // Fetch user profile data from users table
+    const userIds = allUsers.map(u => u.id)
+    let userProfiles: any[] | null = null
+    if (userIds.length > 0) {
+      const { data, error: profilesError } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, phone')
+        .in('id', userIds)
+      
+      if (profilesError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user profiles:', profilesError)
+        // Don't throw, just log - this allows the API to still return users
+      } else {
+        userProfiles = data
+      }
+    }
+
+    // Create a map of user profiles by id
+    const profilesByUserId = new Map<string, { first_name: string | null, last_name: string | null, phone: string | null }>()
+    if (userProfiles) {
+      userProfiles.forEach((profile: any) => {
+        profilesByUserId.set(profile.id, {
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone: profile.phone
+        })
+      })
+    }
+
     // Fetch user roles from admin_user_roles table
     const { data: userRoles, error: rolesError } = await supabase
       .from('admin_user_roles')
@@ -167,24 +196,33 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Sanitize user data and attach roles
-    let sanitizedUsers = allUsers.map(user => ({
+    // Sanitize user data and attach roles and profile data
+    let sanitizedUsers = allUsers.map(user => {
+      const profile = profilesByUserId.get(user.id) || { first_name: null, last_name: null, phone: null }
+      return {
       id: user.id,
       email: user.email,
       display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        phone: profile.phone,
       created_at: user.created_at,
       updated_at: user.updated_at,
       email_confirmed_at: user.email_confirmed_at,
       last_sign_in_at: user.last_sign_in_at,
       roles: rolesByUserId.get(user.id) || []
-    }))
+      }
+    })
 
     // Apply search filter
     if (search) {
       const searchLower = search.toLowerCase()
       sanitizedUsers = sanitizedUsers.filter(user => 
         (user.email?.toLowerCase().includes(searchLower) ?? false) ||
-        user.display_name?.toLowerCase().includes(searchLower)
+        user.display_name?.toLowerCase().includes(searchLower) ||
+        user.first_name?.toLowerCase().includes(searchLower) ||
+        user.last_name?.toLowerCase().includes(searchLower) ||
+        user.phone?.toLowerCase().includes(searchLower)
       )
     }
 

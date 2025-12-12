@@ -279,8 +279,12 @@ export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
   type: text('type').notNull(), // 'contribution_approved', 'contribution_rejected', 'contribution_pending', 'case_update', etc.
   recipient_id: uuid('recipient_id').notNull().references(() => users.id),
-  title: text('title').notNull(),
-  message: text('message').notNull(),
+  title: text('title'), // Legacy field, kept for backward compatibility
+  message: text('message'), // Legacy field, kept for backward compatibility
+  title_en: text('title_en'), // English title
+  title_ar: text('title_ar'), // Arabic title
+  message_en: text('message_en'), // English message
+  message_ar: text('message_ar'), // Arabic message
   data: jsonb('data'), // Additional data as JSON
   read: boolean('read').notNull().default(false),
   created_at: timestamp('created_at').notNull().defaultNow(),

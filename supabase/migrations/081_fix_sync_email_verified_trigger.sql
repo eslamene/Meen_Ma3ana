@@ -77,3 +77,6 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 COMMENT ON FUNCTION sync_email_verified() IS 'Syncs email_verified in users table when email_confirmed_at changes in auth.users. Now handles missing users table rows gracefully.';
 COMMENT ON FUNCTION sync_email_verified_on_insert() IS 'Syncs email_verified in users table when a new user is inserted with email_confirmed_at already set. Now handles missing users table rows gracefully.';
 
+
+
+

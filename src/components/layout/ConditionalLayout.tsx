@@ -7,7 +7,7 @@ import { User } from '@supabase/supabase-js'
 import NavigationBar from '@/components/navigation/NavigationBar'
 import SimpleSidebar from '@/components/navigation/SimpleSidebar'
 import { Button } from '@/components/ui/button'
-import { Menu, X, Home, ChevronRight } from 'lucide-react'
+import { Menu, X, Home, ChevronRight, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 
@@ -140,7 +140,9 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Fixed Top Header Bar - Mobile Only */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+      <header className={`lg:hidden fixed top-0 z-50 bg-white border-b border-gray-200 shadow-sm ${
+        locale === 'ar' ? 'right-0 left-0' : 'left-0 right-0'
+      }`}>
         <div className="flex items-center gap-2 h-14 px-3">
           {/* Menu Toggle Button */}
           <Button
@@ -221,9 +223,10 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
               const currentSegment = breadcrumbs[breadcrumbs.length - 1]
               const currentLabel = getSegmentLabel(currentSegment)
               
+              const ChevronIcon = locale === 'ar' ? ChevronLeft : ChevronRight
               return (
                 <>
-                  <ChevronRight className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                  <ChevronIcon className="h-3 w-3 text-gray-400 flex-shrink-0" />
                   <span className="text-gray-900 font-medium truncate">
                     {currentLabel}
                   </span>
@@ -246,9 +249,18 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
       <div 
         className={`min-h-screen transition-all duration-300 ${isDesktop ? '' : 'pt-14'}`}
         style={{
-          marginLeft: sidebarOpen && isDesktop 
-            ? (sidebarCollapsed ? '80px' : '256px') 
-            : '0',
+          ...(locale === 'ar' 
+            ? {
+                marginRight: sidebarOpen && isDesktop 
+                  ? (sidebarCollapsed ? '80px' : '256px') 
+                  : '0',
+              }
+            : {
+                marginLeft: sidebarOpen && isDesktop 
+                  ? (sidebarCollapsed ? '80px' : '256px') 
+                  : '0',
+              }
+          ),
         }}
       >
         <main className="min-h-screen">

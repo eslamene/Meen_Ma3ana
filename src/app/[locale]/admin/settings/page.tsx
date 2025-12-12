@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
@@ -30,17 +31,15 @@ import {
   ChevronUp,
   Grid3x3,
   List,
-  BarChart3
+  BarChart3,
+  Database,
+  FolderTree,
+  Edit,
+  FileText
 } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import StandardModal, { StandardFormField } from '@/components/ui/standard-modal'
+import TranslationButton from '@/components/translation/TranslationButton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Collapsible,
@@ -382,62 +381,96 @@ export default function SystemSettingsPage() {
     }>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
         <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <DetailPageHeader
-              backUrl={`/${locale}/admin`}
-              icon={Settings}
-              title="System Settings"
-              description="Manage all system configuration settings"
-            />
-            <Button
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Config
-            </Button>
-          </div>
+          <DetailPageHeader
+            backUrl={`/${locale}/admin`}
+            icon={Settings}
+            title="System Settings"
+            description="Manage all system configuration settings"
+            menuActions={[
+              {
+                label: 'Add Config',
+                onClick: () => setIsCreateDialogOpen(true),
+                icon: Plus,
+              },
+            ]}
+            badge={stats.total > 0 ? {
+              label: `${stats.total} ${stats.total === 1 ? 'config' : 'configs'}`,
+              variant: 'secondary'
+            } : undefined}
+          />
 
           {/* Stats Bar */}
-          <Card className="mb-6 shadow-sm">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-                  <div className="text-xs text-gray-500">Total Configs</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-100">
+                    <Database className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-bold text-blue-600">{stats.total}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Total Configs</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{stats.groups}</div>
-                  <div className="text-xs text-gray-500">Groups</div>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-green-100">
+                    <FolderTree className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-bold text-green-600">{stats.groups}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Groups</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-amber-600">{stats.edited}</div>
-                  <div className="text-xs text-gray-500">Edited</div>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-amber-100">
+                    <Edit className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-bold text-amber-600">{stats.edited}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Edited</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{stats.filtered}</div>
-                  <div className="text-xs text-gray-500">Filtered</div>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-100">
+                    <FileText className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-bold text-purple-600">{stats.filtered}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Filtered</div>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Search and Filters */}
-          <Card className="mb-6 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row gap-4">
+          <Card className="mb-6 border border-gray-200 shadow-sm">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search configs by key, value, or description..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 h-10 text-sm"
                   />
                 </div>
                 <div className="flex gap-2">
                   <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px] h-10 text-sm">
                       <Filter className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Filter by group" />
                     </SelectTrigger>
@@ -450,12 +483,12 @@ export default function SystemSettingsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="flex border rounded-md">
+                  <div className="flex border border-gray-300 rounded-md overflow-hidden">
                     <Button
                       variant={viewMode === 'detailed' ? 'default' : 'ghost'}
                       size="sm"
                       onClick={() => setViewMode('detailed')}
-                      className="rounded-r-none"
+                      className="rounded-none border-r border-gray-300"
                     >
                       <List className="h-4 w-4" />
                     </Button>
@@ -463,7 +496,7 @@ export default function SystemSettingsPage() {
                       variant={viewMode === 'compact' ? 'default' : 'ghost'}
                       size="sm"
                       onClick={() => setViewMode('compact')}
-                      className="rounded-l-none"
+                      className="rounded-none"
                     >
                       <Grid3x3 className="h-4 w-4" />
                     </Button>
@@ -471,7 +504,7 @@ export default function SystemSettingsPage() {
                 </div>
               </div>
               {searchQuery && (
-                <div className="mt-3 flex items-center justify-between text-sm">
+                <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm">
                   <span className="text-gray-600">
                     Found {stats.filtered} config{stats.filtered !== 1 ? 's' : ''} matching &quot;{searchQuery}&quot;
                   </span>
@@ -479,6 +512,7 @@ export default function SystemSettingsPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setSearchQuery('')}
+                    className="h-8"
                   >
                     <X className="h-4 w-4 mr-1" />
                     Clear
@@ -513,27 +547,29 @@ export default function SystemSettingsPage() {
           ) : (
             <div className="space-y-4">
               {/* Group Controls */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4">
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={expandAll}
+                    className="h-9"
                   >
-                    <ChevronDown className="h-4 w-4 mr-1" />
+                    <ChevronDown className="h-4 w-4 mr-1.5" />
                     Expand All
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={collapseAll}
+                    className="h-9"
                   >
-                    <ChevronUp className="h-4 w-4 mr-1" />
+                    <ChevronUp className="h-4 w-4 mr-1.5" />
                     Collapse All
                   </Button>
                 </div>
-                <div className="text-sm text-gray-500">
-                  Showing {stats.filtered} of {stats.total} configs
+                <div className="text-sm text-gray-600 font-medium">
+                  Showing <span className="text-indigo-600 font-semibold">{stats.filtered}</span> of <span className="text-gray-900">{stats.total}</span> configs
                 </div>
               </div>
 
@@ -549,133 +585,219 @@ export default function SystemSettingsPage() {
                     open={isExpanded}
                     onOpenChange={() => toggleGroup(groupType)}
                   >
-                    <Card className="shadow-lg">
+                    <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-all">
                       <CollapsibleTrigger className="w-full">
-                        <CardHeader className="border-b bg-gradient-to-r from-white to-gray-50 hover:from-gray-50 hover:to-gray-100 transition-colors cursor-pointer">
+                        <CardHeader className="border-b bg-gradient-to-r from-white via-gray-50/50 to-white hover:from-indigo-50/30 hover:via-gray-50 hover:to-indigo-50/30 transition-colors cursor-pointer py-4 sm:py-5">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="text-2xl">{icon}</div>
+                            <div className="flex items-center gap-3 sm:gap-4">
+                              <div className="p-2 sm:p-2.5 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-50 border border-indigo-200/50">
+                                <span className="text-xl sm:text-2xl">{icon}</span>
+                              </div>
                               <div className="text-left">
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold text-gray-900">
                                   {displayName}
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="secondary" className="text-xs font-medium bg-indigo-100 text-indigo-700 border-indigo-200">
                                     {groupConfigs.length}
                                   </Badge>
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="text-xs sm:text-sm text-gray-500 mt-0.5">
                                   {groupConfigs.length} configuration{groupConfigs.length !== 1 ? 's' : ''}
                                 </CardDescription>
                               </div>
                             </div>
                             {isExpanded ? (
-                              <ChevronUp className="h-5 w-5 text-gray-400" />
+                              <ChevronUp className="h-5 w-5 text-gray-400 flex-shrink-0" />
                             ) : (
-                              <ChevronDown className="h-5 w-5 text-gray-400" />
+                              <ChevronDown className="h-5 w-5 text-gray-400 flex-shrink-0" />
                             )}
                           </div>
                         </CardHeader>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <CardContent className="p-6">
+                        <CardContent className="p-4 sm:p-6">
                           {viewMode === 'compact' ? (
                             <div className="space-y-2">
-                              {groupConfigs.map((config) => (
-                                <div
-                                  key={config.config_key}
-                                  className="grid grid-cols-12 gap-4 items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                                >
-                                  <div className="col-span-4">
-                                    <div className="flex items-center gap-2">
-                                      <Label className="font-mono text-sm">{config.config_key}</Label>
-                                      <Badge variant="outline" className="text-xs">
-                                        {config.group_type || 'general'}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                  <div className="col-span-6">
-                                    <Input
-                                      type="text"
-                                      value={getConfigValue(config.config_key)}
-                                      onChange={(e) => handleConfigChange(config.config_key, 'config_value', e.target.value)}
-                                      className="h-9 text-sm"
-                                    />
-                                  </div>
-                                  <div className="col-span-2 text-right">
-                                    {editedConfigs.has(config.config_key) && (
-                                      <Badge variant="default" className="bg-amber-500">
-                                        Edited
-                                      </Badge>
+                              {groupConfigs.map((config) => {
+                                const isEdited = editedConfigs.has(config.config_key)
+                                return (
+                                  <div
+                                    key={config.config_key}
+                                    className={cn(
+                                      "grid grid-cols-12 gap-3 sm:gap-4 items-center p-3 sm:p-4 border rounded-lg transition-all",
+                                      isEdited 
+                                        ? "border-amber-300 bg-amber-50/30 hover:bg-amber-50/50" 
+                                        : "border-gray-200 hover:border-indigo-200 hover:bg-gray-50"
                                     )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="space-y-6">
-                              {groupConfigs.map((config) => (
-                                <div key={config.config_key} className="space-y-3 pb-4 border-b last:border-b-0 last:pb-0">
-                                  <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1 space-y-2">
-                                      <div className="flex items-center gap-2">
-                                        <Label htmlFor={config.config_key} className="font-semibold text-sm font-mono">
+                                  >
+                                    <div className="col-span-12 sm:col-span-4">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <Label className="font-mono text-xs sm:text-sm font-medium text-gray-900 break-all">
                                           {config.config_key}
                                         </Label>
-                                        <Badge variant="outline" className="text-xs">
+                                        <Badge variant="outline" className="text-xs shrink-0">
                                           {config.group_type || 'general'}
                                         </Badge>
-                                        {editedConfigs.has(config.config_key) && (
-                                          <Badge variant="default" className="bg-amber-500 text-xs">
+                                        {isEdited && (
+                                          <Badge variant="default" className="bg-amber-500 text-xs shrink-0">
+                                            <Edit className="h-3 w-3 mr-1" />
                                             Edited
                                           </Badge>
                                         )}
                                       </div>
-                                      
+                                    </div>
+                                    <div className="col-span-12 sm:col-span-8">
                                       <Input
-                                        id={config.config_key}
                                         type="text"
                                         value={getConfigValue(config.config_key)}
                                         onChange={(e) => handleConfigChange(config.config_key, 'config_value', e.target.value)}
-                                        className="h-10"
-                                        placeholder="Config value"
+                                        className={cn(
+                                          "h-9 sm:h-10 text-sm font-mono",
+                                          isEdited && "border-amber-300 focus-visible:ring-amber-500"
+                                        )}
                                       />
-                                      
-                                      {getConfigDescription(config.config_key, 'en') && (
-                                        <p className="text-xs text-gray-500">
-                                          {getConfigDescription(config.config_key, 'en')}
-                                        </p>
-                                      )}
-                                      
-                                      {getConfigDescription(config.config_key, 'ar') && (
-                                        <p className="text-xs text-gray-500 text-right" dir="rtl">
-                                          {getConfigDescription(config.config_key, 'ar')}
-                                        </p>
-                                      )}
-
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                                        <div className="space-y-1">
-                                          <Label className="text-xs text-gray-500">Description (EN)</Label>
-                                          <Textarea
-                                            value={getConfigDescription(config.config_key, 'en') || ''}
-                                            onChange={(e) => handleConfigChange(config.config_key, 'description', e.target.value || null)}
-                                            className="h-16 text-sm"
-                                            placeholder="English description"
-                                          />
-                                        </div>
-                                        <div className="space-y-1">
-                                          <Label className="text-xs text-gray-500">Description (AR)</Label>
-                                          <Textarea
-                                            value={getConfigDescription(config.config_key, 'ar') || ''}
-                                            onChange={(e) => handleConfigChange(config.config_key, 'description_ar', e.target.value || null)}
-                                            className="h-16 text-sm"
-                                            placeholder="Arabic description"
-                                            dir="rtl"
-                                          />
-                                        </div>
-                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {groupConfigs.map((config) => {
+                                const isEdited = editedConfigs.has(config.config_key)
+                                return (
+                                  <Card 
+                                    key={config.config_key} 
+                                    className={cn(
+                                      "border transition-all",
+                                      isEdited 
+                                        ? "border-amber-300 bg-amber-50/30 shadow-sm" 
+                                        : "border-gray-200 hover:border-indigo-200 hover:shadow-sm"
+                                    )}
+                                  >
+                                    <CardContent className="p-4 sm:p-5">
+                                      <div className="space-y-4">
+                                        {/* Config Key and Badges */}
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <Label 
+                                                htmlFor={config.config_key} 
+                                                className="font-semibold text-sm sm:text-base font-mono text-gray-900 break-all"
+                                              >
+                                                {config.config_key}
+                                              </Label>
+                                              <Badge variant="outline" className="text-xs font-medium shrink-0">
+                                                {config.group_type || 'general'}
+                                              </Badge>
+                                              {isEdited && (
+                                                <Badge variant="default" className="bg-amber-500 text-xs font-medium shrink-0">
+                                                  <Edit className="h-3 w-3 mr-1" />
+                                                  Edited
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Config Value */}
+                                        <div className="space-y-1">
+                                          <Label className="text-xs font-medium text-gray-700">Value</Label>
+                                          <Input
+                                            id={config.config_key}
+                                            type="text"
+                                            value={getConfigValue(config.config_key)}
+                                            onChange={(e) => handleConfigChange(config.config_key, 'config_value', e.target.value)}
+                                            className={cn(
+                                              "h-11 text-sm font-mono",
+                                              isEdited && "border-amber-300 focus-visible:ring-amber-500"
+                                            )}
+                                            placeholder="Config value"
+                                          />
+                                        </div>
+                                        
+                                        {/* Descriptions Preview */}
+                                        {(getConfigDescription(config.config_key, 'en') || getConfigDescription(config.config_key, 'ar')) && (
+                                          <div className="space-y-2 pt-2 border-t border-gray-200">
+                                            {getConfigDescription(config.config_key, 'en') && (
+                                              <div>
+                                                <p className="text-xs font-medium text-gray-500 mb-1">Description (EN)</p>
+                                                <p className="text-xs text-gray-600 leading-relaxed">
+                                                  {getConfigDescription(config.config_key, 'en')}
+                                                </p>
+                                              </div>
+                                            )}
+                                            {getConfigDescription(config.config_key, 'ar') && (
+                                              <div>
+                                                <p className="text-xs font-medium text-gray-500 mb-1">Description (AR)</p>
+                                                <p className="text-xs text-gray-600 leading-relaxed text-right" dir="rtl">
+                                                  {getConfigDescription(config.config_key, 'ar')}
+                                                </p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Description Editors */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-gray-200">
+                                          <div className="space-y-2">
+                                            <Label className="text-xs font-medium text-gray-700">Description (EN)</Label>
+                                            <div className="relative">
+                                              <Textarea
+                                                value={getConfigDescription(config.config_key, 'en') || ''}
+                                                onChange={(e) => handleConfigChange(config.config_key, 'description', e.target.value || null)}
+                                                className={cn(
+                                                  "h-24 text-sm resize-none pr-10",
+                                                  isEdited && "border-amber-300 focus-visible:ring-amber-500"
+                                                )}
+                                                placeholder="English description"
+                                              />
+                                              <div className="absolute bottom-2 right-2">
+                                                <TranslationButton
+                                                  sourceText={getConfigDescription(config.config_key, 'ar') || ''}
+                                                  direction="ar-to-en"
+                                                  onTranslate={(translated) => handleConfigChange(config.config_key, 'description', translated)}
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  iconOnly
+                                                  disabled={!getConfigDescription(config.config_key, 'ar')}
+                                                  className="h-7 w-7 p-0 bg-white hover:bg-gray-50 shadow-sm"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="space-y-2">
+                                            <Label className="text-xs font-medium text-gray-700">Description (AR)</Label>
+                                            <div className="relative">
+                                              <Textarea
+                                                value={getConfigDescription(config.config_key, 'ar') || ''}
+                                                onChange={(e) => handleConfigChange(config.config_key, 'description_ar', e.target.value || null)}
+                                                className={cn(
+                                                  "h-24 text-sm resize-none pl-10",
+                                                  isEdited && "border-amber-300 focus-visible:ring-amber-500"
+                                                )}
+                                                placeholder="Arabic description"
+                                                dir="rtl"
+                                              />
+                                              <div className="absolute bottom-2 left-2">
+                                                <TranslationButton
+                                                  sourceText={getConfigDescription(config.config_key, 'en') || ''}
+                                                  direction="en-to-ar"
+                                                  onTranslate={(translated) => handleConfigChange(config.config_key, 'description_ar', translated)}
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  iconOnly
+                                                  disabled={!getConfigDescription(config.config_key, 'en')}
+                                                  className="h-7 w-7 p-0 bg-white hover:bg-gray-50 shadow-sm"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )
+                              })}
                             </div>
                           )}
                         </CardContent>
@@ -686,162 +808,197 @@ export default function SystemSettingsPage() {
               })}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-4 border-t">
-                <div className="text-sm text-gray-500">
-                  {hasChanges && (
-                    <div className="flex items-center gap-2 text-amber-600">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{stats.edited} unsaved change{stats.edited !== 1 ? 's' : ''}</span>
+              <Card className="border border-gray-200 shadow-sm mt-6">
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      {hasChanges ? (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                          <span className="text-sm font-medium text-amber-700">
+                            {stats.edited} unsaved change{stats.edited !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-700">All changes saved</span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleReset}
-                    disabled={saving || !hasChanges}
-                    className="min-w-[100px]"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Reset
-                  </Button>
-                  <Button
-                    onClick={handleSave}
-                    disabled={saving || !hasChanges}
-                    className="min-w-[120px] bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
+                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                      <Button
+                        variant="outline"
+                        onClick={handleReset}
+                        disabled={saving || !hasChanges}
+                        className="flex-1 sm:flex-initial min-w-[100px] h-10"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Reset
+                      </Button>
+                      <Button
+                        onClick={handleSave}
+                        disabled={saving || !hasChanges}
+                        className="flex-1 sm:flex-initial min-w-[140px] h-10 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 shadow-sm hover:shadow-md"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </Container>
       </div>
 
       {/* Create Config Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Configuration</DialogTitle>
-            <DialogDescription>
-              Add a new system configuration setting. The group type will be automatically determined based on the config key pattern.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="new_config_key">Config Key *</Label>
-              <Input
-                id="new_config_key"
-                value={newConfig.config_key || ''}
-                onChange={(e) => {
-                  const key = e.target.value
-                  setNewConfig({
-                    ...newConfig,
-                    config_key: key,
-                    group_type: getGroupType(key) || null
-                  })
-                }}
-                placeholder="e.g., validation.case.title.min_length"
-              />
-              <p className="text-xs text-gray-500">
-                Group type will be: <Badge variant="outline">{newConfig.config_key ? getGroupType(newConfig.config_key) : 'general'}</Badge>
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="new_config_value">Config Value *</Label>
-              <Input
-                id="new_config_value"
-                value={newConfig.config_value || ''}
-                onChange={(e) => setNewConfig({ ...newConfig, config_value: e.target.value })}
-                placeholder="Enter the configuration value"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="new_description">Description (EN)</Label>
-                <Textarea
-                  id="new_description"
-                  value={newConfig.description || ''}
-                  onChange={(e) => setNewConfig({ ...newConfig, description: e.target.value })}
-                  placeholder="English description"
-                  className="h-20"
-                />
+      <StandardModal
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        title="Create New Configuration"
+        description="Add a new system configuration setting. The group type will be automatically determined based on the config key pattern."
+        sections={[
+          {
+            title: 'Configuration Details',
+            children: (
+              <div className="space-y-4">
+                <StandardFormField
+                  label="Config Key"
+                  required
+                  description={`Group type will be: ${newConfig.config_key ? getGroupType(newConfig.config_key) : 'general'}`}
+                >
+                  <Input
+                    value={newConfig.config_key || ''}
+                    onChange={(e) => {
+                      const key = e.target.value
+                      setNewConfig({
+                        ...newConfig,
+                        config_key: key,
+                        group_type: getGroupType(key) || null
+                      })
+                    }}
+                    placeholder="e.g., validation.case.title.min_length"
+                    className="h-10"
+                  />
+                </StandardFormField>
+                
+                <StandardFormField
+                  label="Config Value"
+                  required
+                >
+                  <Input
+                    value={newConfig.config_value || ''}
+                    onChange={(e) => setNewConfig({ ...newConfig, config_value: e.target.value })}
+                    placeholder="Enter the configuration value"
+                    className="h-10"
+                  />
+                </StandardFormField>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="new_description_ar">Description (AR)</Label>
-                <Textarea
-                  id="new_description_ar"
-                  value={newConfig.description_ar || ''}
-                  onChange={(e) => setNewConfig({ ...newConfig, description_ar: e.target.value })}
-                  placeholder="Arabic description"
-                  className="h-20"
-                  dir="rtl"
-                />
+            )
+          },
+          {
+            title: 'Descriptions',
+            children: (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Description (EN)</Label>
+                  <div className="relative">
+                    <Textarea
+                      value={newConfig.description || ''}
+                      onChange={(e) => setNewConfig({ ...newConfig, description: e.target.value })}
+                      placeholder="English description"
+                      className="h-24 text-sm resize-none pr-10"
+                    />
+                    <div className="absolute bottom-2 right-2">
+                      <TranslationButton
+                        sourceText={newConfig.description_ar || ''}
+                        direction="ar-to-en"
+                        onTranslate={(translated) => setNewConfig({ ...newConfig, description: translated })}
+                        size="sm"
+                        variant="ghost"
+                        iconOnly
+                        disabled={!newConfig.description_ar}
+                        className="h-7 w-7 p-0 bg-white hover:bg-gray-50"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Description (AR)</Label>
+                  <div className="relative">
+                    <Textarea
+                      value={newConfig.description_ar || ''}
+                      onChange={(e) => setNewConfig({ ...newConfig, description_ar: e.target.value })}
+                      placeholder="Arabic description"
+                      className="h-24 text-sm resize-none pl-10"
+                      dir="rtl"
+                    />
+                    <div className="absolute bottom-2 left-2">
+                      <TranslationButton
+                        sourceText={newConfig.description || ''}
+                        direction="en-to-ar"
+                        onTranslate={(translated) => setNewConfig({ ...newConfig, description_ar: translated })}
+                        size="sm"
+                        variant="ghost"
+                        iconOnly
+                        disabled={!newConfig.description}
+                        className="h-7 w-7 p-0 bg-white hover:bg-gray-50"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="new_group_type">Group Type (Optional)</Label>
-              <Input
-                id="new_group_type"
-                value={newConfig.group_type || ''}
-                onChange={(e) => setNewConfig({ ...newConfig, group_type: e.target.value || null })}
-                placeholder="Leave empty for auto-detection"
-              />
-              <p className="text-xs text-gray-500">
-                If left empty, will be determined automatically from the config key pattern
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsCreateDialogOpen(false)
-                setNewConfig({
-                  config_key: '',
-                  config_value: '',
-                  description: '',
-                  description_ar: '',
-                  group_type: null,
-                })
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreateConfig}
-              disabled={saving || !newConfig.config_key || !newConfig.config_value}
-              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Config
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            )
+          },
+          {
+            title: 'Advanced',
+            children: (
+              <StandardFormField
+                label="Group Type"
+                description="If left empty, will be determined automatically from the config key pattern"
+              >
+                <Input
+                  value={newConfig.group_type || ''}
+                  onChange={(e) => setNewConfig({ ...newConfig, group_type: e.target.value || null })}
+                  placeholder="Leave empty for auto-detection"
+                  className="h-10"
+                />
+              </StandardFormField>
+            )
+          }
+        ]}
+        primaryAction={{
+          label: 'Create Config',
+          onClick: handleCreateConfig,
+          loading: saving,
+          disabled: !newConfig.config_key || !newConfig.config_value
+        }}
+        secondaryAction={{
+          label: 'Cancel',
+          onClick: () => {
+            setIsCreateDialogOpen(false)
+            setNewConfig({
+              config_key: '',
+              config_value: '',
+              description: '',
+              description_ar: '',
+              group_type: null,
+            })
+          }
+        }}
+        maxWidth="2xl"
+      />
     </PermissionGuard>
   )
 }

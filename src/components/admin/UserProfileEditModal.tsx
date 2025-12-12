@@ -1,15 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
-import { Loader2, User, Mail, Phone, MapPin, Globe, Trash2, AlertTriangle } from 'lucide-react'
+import { Loader2, User, Mail, Phone, MapPin, Globe, Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import StandardModal, { 
+  StandardModalPreview, 
+  StandardFormField, 
+  StandardStatusToggle 
+} from '@/components/ui/standard-modal'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 interface UserProfile {
   id: string
@@ -172,149 +176,251 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
     }
   }
 
+  const getInitials = (firstName: string | null, lastName: string | null, email: string) => {
+    if (firstName && lastName) {
+      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+    }
+    if (firstName) {
+      return firstName.charAt(0).toUpperCase()
+    }
+    if (lastName) {
+      return lastName.charAt(0).toUpperCase()
+    }
+    return email.charAt(0).toUpperCase()
+  }
+
+  const getUserDisplayName = () => {
+    if (user?.first_name || user?.last_name) {
+      return `${user.first_name || ''} ${user.last_name || ''}`.trim()
+    }
+    return user?.email?.split('@')[0] || 'User'
+  }
+
+  if (fetching) {
+    return (
+      <StandardModal
+        open={open}
+        onOpenChange={onClose}
+        title="Edit User Profile"
+        description="Loading user information..."
+        primaryAction={{
+          label: "Close",
+          onClick: onClose,
+        }}
+        sections={[
+          {
+            title: "Loading",
+            children: (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+              </div>
+            )
+          }
+        ]}
+      />
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit User Profile</DialogTitle>
-          <DialogDescription>
-            {user?.email && `Update profile for ${user.email}`}
-          </DialogDescription>
-        </DialogHeader>
-
-        {fetching ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : user ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email (read-only) */}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={user.email}
-                  disabled
-                  className="pl-10 bg-muted"
-                />
-              </div>
-            </div>
-
-            {/* First Name */}
-            <div className="space-y-2">
-              <Label htmlFor="first_name">First Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="first_name"
-                  value={formData.first_name}
-                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  className="pl-10"
-                  placeholder="First name"
-                />
-              </div>
-            </div>
-
-            {/* Last Name */}
-            <div className="space-y-2">
-              <Label htmlFor="last_name">Last Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="last_name"
-                  value={formData.last_name}
-                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  className="pl-10"
-                  placeholder="Last name"
-                />
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="pl-10"
-                  placeholder="Phone number"
-                />
-              </div>
-            </div>
-
-            {/* Address */}
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="pl-10"
-                  placeholder="Address"
-                />
-              </div>
-            </div>
-
-            {/* Language */}
-            <div className="space-y-2">
-              <Label htmlFor="language">Language</Label>
-              <Select value={formData.language} onValueChange={(value) => setFormData({ ...formData, language: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ar">العربية (Arabic)</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Status Switches */}
-            <div className="space-y-4 pt-4 border-t">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="is_active">Active</Label>
-                  <p className="text-sm text-muted-foreground">User account is active</p>
+    <>
+      <StandardModal
+        open={open}
+        onOpenChange={onClose}
+        title="Edit User Profile"
+        description={user.email ? `Update profile for ${user.email}` : 'Update user profile information'}
+        preview={
+          <StandardModalPreview>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Avatar className="h-12 w-12 sm:h-14 sm:w-14 ring-2 ring-indigo-200">
+                <AvatarFallback className="text-base sm:text-lg font-bold bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
+                  {getInitials(user.first_name, user.last_name, user.email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                  {getUserDisplayName()}
                 </div>
-                <Switch
-                  id="is_active"
+                <div className="text-xs sm:text-sm text-gray-600 truncate mt-0.5">
+                  {user.email}
+                </div>
+                {user.phone && (
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    {user.phone}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5 items-end">
+                <Badge 
+                  variant={formData.is_active ? 'default' : 'secondary'}
+                  className={formData.is_active 
+                    ? 'bg-green-100 text-green-700 border-green-200' 
+                    : 'bg-gray-100 text-gray-700 border-gray-200'
+                  }
+                >
+                  {formData.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+                <Badge 
+                  variant={formData.email_verified ? 'default' : 'secondary'}
+                  className={formData.email_verified 
+                    ? 'bg-blue-100 text-blue-700 border-blue-200' 
+                    : 'bg-gray-100 text-gray-700 border-gray-200'
+                  }
+                >
+                  {formData.email_verified ? (
+                    <>
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Verified
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Unverified
+                    </>
+                  )}
+                </Badge>
+              </div>
+            </div>
+          </StandardModalPreview>
+        }
+        sections={[
+          {
+            title: "Basic Information",
+            children: (
+              <div className="space-y-4">
+                <StandardFormField label="Email" description="User email address (cannot be changed)">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={user.email}
+                      disabled
+                      className="pl-10 h-10 bg-gray-50"
+                    />
+                  </div>
+                </StandardFormField>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <StandardFormField label="First Name">
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="first_name"
+                        value={formData.first_name}
+                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        className="pl-10 h-10"
+                        placeholder="First name"
+                      />
+                    </div>
+                  </StandardFormField>
+
+                  <StandardFormField label="Last Name">
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="last_name"
+                        value={formData.last_name}
+                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                        className="pl-10 h-10"
+                        placeholder="Last name"
+                      />
+                    </div>
+                  </StandardFormField>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <StandardFormField label="Phone">
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="pl-10 h-10"
+                        placeholder="Phone number"
+                      />
+                    </div>
+                  </StandardFormField>
+
+                  <StandardFormField label="Language">
+                    <Select value={formData.language} onValueChange={(value) => setFormData({ ...formData, language: value })}>
+                      <SelectTrigger className="h-10">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-gray-400" />
+                          <SelectValue />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ar">العربية (Arabic)</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </StandardFormField>
+                </div>
+
+                <StandardFormField label="Address">
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      className="pl-10 h-10"
+                      placeholder="Address"
+                    />
+                  </div>
+                </StandardFormField>
+              </div>
+            )
+          },
+          {
+            title: "Account Status",
+            children: (
+              <div className="space-y-4">
+                <StandardStatusToggle
+                  label="Active"
+                  description={formData.is_active 
+                    ? 'User account is active and can access the system' 
+                    : 'User account is inactive and cannot access the system'}
                   checked={formData.is_active}
                   onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                  id="is_active"
                 />
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="email_verified">Email Verified</Label>
-                  <p className="text-sm text-muted-foreground">User email is verified</p>
-                </div>
-                <Switch
-                  id="email_verified"
+                <StandardStatusToggle
+                  label="Email Verified"
+                  description={formData.email_verified 
+                    ? 'User email has been verified' 
+                    : 'User email has not been verified'}
                   checked={formData.email_verified}
-                  onCheckedChange={(checked) => setFormData({ ...formData, email_verified: checked })}
-                  disabled
-                  className="opacity-50 cursor-not-allowed"
+                  onCheckedChange={() => {}} // Read-only
+                  id="email_verified"
+                  disabled={true}
                 />
               </div>
-            </div>
-
-            {/* Contribution Count (read-only) */}
-            {user.contribution_count !== undefined && (
-              <div className="pt-4 border-t">
-                <p className="text-sm text-muted-foreground">
-                  Total Contributions: <span className="font-medium">{user.contribution_count}</span>
-                </p>
+            )
+          },
+          ...(user.contribution_count !== undefined ? [{
+            title: "Account Statistics",
+            children: (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Total Contributions</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Number of contributions made by this user</p>
+                  </div>
+                  <Badge variant="secondary" className="text-base font-semibold px-3 py-1">
+                    {user.contribution_count}
+                  </Badge>
+                </div>
                 {user.contribution_count > 0 && (
-                  <div className="mt-2 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-amber-800">
                       This user has contributions and cannot be deleted.
@@ -322,9 +428,26 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                   </div>
                 )}
               </div>
-            )}
-
-            <DialogFooter className="flex justify-between items-center">
+            )
+          }] : [])
+        ]}
+        primaryAction={{
+          label: "Save Changes",
+          onClick: () => {
+            const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+            handleSubmit(fakeEvent)
+          },
+          loading: loading,
+          disabled: loading || deleting
+        }}
+        secondaryAction={{
+          label: "Cancel",
+          onClick: onClose,
+          disabled: loading || deleting
+        }}
+        footer={
+          <div className="px-4 sm:px-6 py-4 border-t bg-gray-50/50">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-between items-center">
               <div>
                 {(!user.contribution_count || user.contribution_count === 0) && (
                   <Button
@@ -332,7 +455,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                     variant="destructive"
                     onClick={() => setShowDeleteDialog(true)}
                     disabled={loading || deleting}
-                    className="mr-auto"
+                    className="w-full sm:w-auto"
                   >
                     {deleting ? (
                       <>
@@ -348,19 +471,39 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                   </Button>
                 )}
               </div>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={onClose} disabled={loading || deleting}>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onClose} 
+                  disabled={loading || deleting}
+                  className="w-full sm:w-auto"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading || deleting}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Changes
+                <Button 
+                  type="button"
+                  onClick={() => {
+                    const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+                    handleSubmit(fakeEvent)
+                  }} 
+                  disabled={loading || deleting}
+                  className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
                 </Button>
               </div>
-            </DialogFooter>
-          </form>
-        ) : null}
-      </DialogContent>
+            </div>
+          </div>
+        }
+      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
@@ -376,7 +519,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         disabled={deleting}
         autoClose={false}
       />
-    </Dialog>
+    </>
   )
 }
 
