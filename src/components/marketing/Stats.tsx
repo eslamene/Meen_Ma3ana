@@ -4,6 +4,7 @@ import { useTranslations, useLocale } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { Heart, Users, HandHeart, Sparkles, TrendingUp, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface LandingStats {
   totalRaised: number
@@ -178,16 +179,19 @@ export default function Stats() {
 
         {/* Community Message Section */}
         <div className="bg-gradient-to-r from-[#6B8E7E] to-[#5a7a6b] rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden mb-16">
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div 
-              className="absolute top-0 left-0 w-full h-full"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cpath d='M36 34c0 3.314-2.686 6-6 6s-6-2.686-6-6 2.686-6 6-6 6 2.686 6 6z' fill='%23ffffff'/%3E%3C/g%3E%3C/svg%3E")`,
-                backgroundSize: '60px 60px'
-              }}
-            ></div>
+          {/* Background image */}
+          <div className="absolute inset-0">
+            <Image 
+              src="/img/Child-Poverty-General.jpg"
+              alt="Children in need"
+              fill
+              className="object-cover"
+              priority
+              quality={85}
+            />
           </div>
+          {/* Gradient overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#6B8E7E]/50 to-[#5a7a6b]/50"></div>
 
           <div className="relative z-10 text-center text-white">
             <TrendingUp className="h-12 w-12 mx-auto mb-6 opacity-90" />
