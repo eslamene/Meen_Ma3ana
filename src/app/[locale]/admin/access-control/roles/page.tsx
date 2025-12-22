@@ -11,6 +11,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Shield, Users, Plus } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Types
 interface Role {
   id: string
@@ -69,11 +71,11 @@ export default function RolesPage() {
         setRoles(rolesWithCounts)
       } else {
         const errorData = await res.json()
-        console.error('Roles fetch error:', errorData)
+        logger.error('Roles fetch error:', { error: errorData })
         toast.error('Error', { description: errorData.error || 'Failed to fetch roles' })
       }
     } catch (error) {
-      console.error('Roles fetch error:', error)
+      logger.error('Roles fetch error:', { error: error })
       toast.error('Error', { description: 'Failed to fetch roles' })
     } finally {
       setLoading(false)

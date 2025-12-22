@@ -1,41 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { createGetHandler } from '@/lib/utils/api-wrapper'
+import type { ApiResponse } from '@/types/api'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+interface ContributionWithApproval {
+  id: string
+  amount: number
+  status: string
+  created_at: string
+  approval_status?: {
+    status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
+  } | Array<{
+    status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
+  }>
+}
 
-    // Check if user is admin
-    const { data: adminRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles!inner(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('admin_roles.name', ['admin', 'super_admin'])
-      .limit(1)
+interface AdminDashboardStats {
+  totalUsers: number
+  totalContributions: number
+  totalAmount: number
+  activeCases: number
+  completedCases: number
+  pendingContributions: number
+  approvedContributions: number
+  rejectedContributions: number
+  totalProjects: number
+  recentActivity: Array<{
+    id: string
+    type: string
+    status: string
+    amount: number
+    date: string
+  }>
+}
 
-    const isAdmin = (adminRoles?.length || 0) > 0
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
-    }
+export const GET = createGetHandler(
+  async (request, { user, supabase, logger }) => {
 
     // Fetch all system-wide statistics
     const [
@@ -60,19 +59,6 @@ export async function GET(request: NextRequest) {
     const totalUsers = users?.length || 0
     const totalContributions = contributions?.length || 0
     
-    // Contribution type for admin dashboard
-    interface ContributionWithApproval {
-      id: string
-      amount: number
-      status: string
-      created_at: string
-      approval_status?: {
-        status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
-      } | Array<{
-        status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
-      }>
-    }
-
     // Calculate total amount from approved contributions only
     const totalAmount = contributions?.reduce((sum, c: ContributionWithApproval) => {
       const approvalStatus = Array.isArray(c.approval_status) 
@@ -126,23 +112,20 @@ export async function GET(request: NextRequest) {
       })) || []
 
     return NextResponse.json({
-      totalUsers,
-      totalContributions,
-      totalAmount,
-      activeCases,
-      completedCases,
-      pendingContributions,
-      approvedContributions,
-      rejectedContributions,
-      totalProjects,
-      recentActivity
+      data: {
+        totalUsers,
+        totalContributions,
+        totalAmount,
+        activeCases,
+        completedCases,
+        pendingContributions,
+        approvedContributions,
+        rejectedContributions,
+        totalProjects,
+        recentActivity
+      }
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in admin dashboard API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
+  },
+  { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/dashboard' }
+)
 

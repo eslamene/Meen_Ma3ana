@@ -14,6 +14,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertCircle, Send, MessageSquare, User as UserIcon, Calendar, Plus } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Message {
   id: string
   sender_id: string
@@ -146,7 +148,7 @@ export default function SponsorCommunicationsPage() {
       setUser(user)
       fetchData()
     } catch (err) {
-      console.error('Error checking authentication:', err)
+      logger.error('Error checking authentication:', { error: err })
       router.push('/auth/login')
     }
   }, [supabase.auth, router, fetchData])
@@ -199,7 +201,7 @@ export default function SponsorCommunicationsPage() {
 
       await fetchData()
     } catch (err) {
-      console.error('Error marking message as read:', err)
+      logger.error('Error marking message as read:', { error: err })
     }
   }
 

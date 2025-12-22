@@ -27,6 +27,8 @@ import DetailPageHeader from '@/components/crud/DetailPageHeader'
 import { cn } from '@/lib/utils'
 import Pagination from '@/components/ui/pagination'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Notification {
   id: string
   type: string
@@ -104,11 +106,11 @@ export default function NotificationsPage() {
         setTotal(data.pagination?.total || 0)
         setTotalPages(data.pagination?.totalPages || 1)
       } else {
-        console.error('Failed to fetch notifications')
+        logger.error('Failed to fetch notifications')
         toast.error('Error', { description: t('failedToLoadNotifications') })
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error)
+      logger.error('Error fetching notifications:', { error: error })
       toast.error('Error', { description: 'Failed to load notifications' })
     } finally {
       setLoading(false)
@@ -147,7 +149,7 @@ export default function NotificationsPage() {
         setUnreadCount(prev => Math.max(0, prev - 1))
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error)
+      logger.error('Error marking notification as read:', { error: error })
     } finally {
       // Mark as read completed
     }
@@ -170,7 +172,7 @@ export default function NotificationsPage() {
         setUnreadCount(0)
       }
     } catch (error) {
-      console.error('Error marking all notifications as read:', error)
+      logger.error('Error marking all notifications as read:', { error: error })
     }
   }
 
@@ -287,14 +289,14 @@ export default function NotificationsPage() {
           document.execCommand('copy')
           toast.success(t('copied'), { description: t('transactionIdCopied') })
         } catch (fallbackError) {
-          console.error('Fallback copy failed:', fallbackError)
+          logger.error('Fallback copy failed:', { error: fallbackError })
           toast.error(t('copyFailed'), { description: t('unableToCopy') })
         } finally {
           document.body.removeChild(textArea)
         }
       }
     } catch (error) {
-      console.error('Failed to copy:', error)
+      logger.error('Failed to copy:', { error: error })
       toast.error('Copy Failed', { description: 'Unable to copy to clipboard. Please copy manually.' })
     }
   }
@@ -319,7 +321,7 @@ export default function NotificationsPage() {
         toast.error('Error', { description: 'Failed to fetch contribution details.' })
       }
     } catch (error) {
-      console.error('Error fetching contribution:', error)
+      logger.error('Error fetching contribution:', { error: error })
       toast.error('Error', { description: 'Failed to fetch contribution details.' })
     }
   }

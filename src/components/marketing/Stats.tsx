@@ -6,6 +6,8 @@ import { Heart, Users, HandHeart, Sparkles, TrendingUp, ArrowRight } from 'lucid
 import Link from 'next/link'
 import Image from 'next/image'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface LandingStats {
   totalRaised: number
   activeCases: number
@@ -84,7 +86,7 @@ export default function Stats() {
           setStats(data)
         }
       } catch (error) {
-        console.error('Error fetching landing stats:', error)
+        logger.error('Error fetching landing stats:', { error: error })
       } finally {
         setLoading(false)
       }
@@ -182,7 +184,7 @@ export default function Stats() {
           {/* Background image */}
           <div className="absolute inset-0">
             <Image 
-              src="/img/Child-Poverty-General.jpg"
+              src="/img/Child-Poverty-General.jpeg"
               alt="Children in need"
               fill
               className="object-cover"

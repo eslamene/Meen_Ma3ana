@@ -26,6 +26,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface ContributionFormProps {
   caseId: string
   caseTitle: string
@@ -92,10 +94,10 @@ export default function ContributionForm({
           const data = await response.json()
           setPaymentMethods(data.paymentMethods || [])
         } else {
-          console.error('Failed to fetch payment methods')
+          logger.error('Failed to fetch payment methods')
         }
       } catch (error) {
-        console.error('Error fetching payment methods:', error)
+        logger.error('Error fetching payment methods:', { error: error })
       } finally {
         setLoadingPaymentMethods(false)
       }
@@ -240,7 +242,7 @@ export default function ContributionForm({
       }, 3000)
 
     } catch (error) {
-      console.error('Error submitting contribution:', error)
+      logger.error('Error submitting contribution:', { error: error })
       toast.error('Submission Failed', { description: error instanceof Error ? error.message : 'Failed to submit contribution' })
     } finally {
       setIsSubmitting(false)

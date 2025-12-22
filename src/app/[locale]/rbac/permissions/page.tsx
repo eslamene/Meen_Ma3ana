@@ -16,6 +16,8 @@ import { toast } from 'sonner'
 import { Plus, Edit2, Shield, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import Pagination from '@/components/ui/pagination'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Permission {
   id: string
   name: string
@@ -80,7 +82,7 @@ export default function AdminPermissionsPage() {
         })
       }
     } catch (error) {
-      console.error('Fetch error:', error)
+      logger.error('Fetch error:', { error: error })
       toast.error('Error', {
         description: 'Failed to fetch permissions'
       })
@@ -194,7 +196,7 @@ export default function AdminPermissionsPage() {
         fetchPermissions()
       }
     } catch (error) {
-      console.error('Create permission error:', error)
+      logger.error('Create permission error:', { error: error })
       toast.error('Error', {
         description: 'Failed to create permission'
       })

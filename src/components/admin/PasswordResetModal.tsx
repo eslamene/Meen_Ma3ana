@@ -7,6 +7,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { Loader2, Key, AlertTriangle, CheckCircle } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface PasswordResetModalProps {
   open: boolean
   userId: string | null
@@ -42,7 +44,7 @@ export function PasswordResetModal({ open, userId, userEmail, onClose, onSuccess
       onSuccess()
       onClose()
     } catch (error) {
-      console.error('Error resetting password:', error)
+      logger.error('Error resetting password:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to send password reset email' })
     } finally {
       setLoading(false)

@@ -15,6 +15,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Repeat, AlertCircle, CheckCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface RecurringContributionFormProps {
   caseId?: string
   projectId?: string
@@ -60,7 +62,7 @@ export default function RecurringContributionForm({
     const getUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser()
       if (error) {
-        console.error('Error getting user:', error)
+        logger.error('Error getting user:', { error: error })
         return
       }
       setUser(user)

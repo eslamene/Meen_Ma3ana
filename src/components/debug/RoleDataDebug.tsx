@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, Eye, EyeOff } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function RoleDataDebug() {
   const [roleData, setRoleData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -19,10 +21,10 @@ export default function RoleDataDebug() {
         const data = await response.json()
         setRoleData(data)
       } else {
-        console.error('Failed to fetch role data:', response.statusText)
+        logger.error('Failed to fetch role data:', { error: response.statusText })
       }
     } catch (error) {
-      console.error('Error fetching role data:', error)
+      logger.error('Error fetching role data:', { error: error })
     } finally {
       setLoading(false)
     }

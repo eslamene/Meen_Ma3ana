@@ -27,6 +27,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Contribution {
   id: string
   caseId: string
@@ -122,7 +124,7 @@ export default function ContributionDetailsModal({
       await navigator.clipboard.writeText(text)
       toast.success('Copied!', { description: 'Transaction ID copied to clipboard' })
     } catch (err: any) {
-      console.error('Failed to copy: ', err)
+      logger.error('Failed to copy: ', { error: err })
       toast.error('Error', { description: 'Failed to copy to clipboard' })
     }
   }

@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface StorageBucket {
   id: string
   name: string
@@ -58,10 +60,10 @@ export class StorageBucketService {
     } catch (error) {
       // Re-throw with more context if it's not already an Error
       if (error instanceof Error) {
-        console.error('Error in listBuckets:', error.message, error.stack)
+        logger.error('Error in listBuckets:', { error: { message: error.message, stack: error.stack } })
         throw error
       }
-      console.error('Unknown error in listBuckets:', error)
+      logger.error('Unknown error in listBuckets:', { error: error })
       throw new Error(`Failed to list buckets: ${String(error)}`)
     }
   }
@@ -80,7 +82,7 @@ export class StorageBucketService {
   static async updateBucket(name: string, data: UpdateBucketData): Promise<StorageBucket> {
     const supabase = this.getServiceClient()
 
-    const updateData: any = {}
+    const updateData: Partial<UpdateBucketData> = {}
     if (data.public !== undefined) updateData.public = data.public
     if (data.file_size_limit !== undefined) updateData.file_size_limit = data.file_size_limit
     if (data.allowed_mime_types !== undefined) updateData.allowed_mime_types = data.allowed_mime_types

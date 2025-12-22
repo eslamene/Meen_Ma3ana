@@ -1,25 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminPermission } from '@/lib/security/rls'
+import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createClient } from '@supabase/supabase-js'
+import { env } from '@/config/env'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { user: adminUser, supabase, logger } = context
 
   try {
     logger.info('Starting users fetch...')
-    
-    // Require admin permission
-    const authResult = await requireAdminPermission(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
-    const { user: adminUser, supabase } = authResult
 
     // Parse query parameters
     const { searchParams } = new URL(request.url)
@@ -32,15 +22,11 @@ export async function GET(request: NextRequest) {
 
     // Validate pagination
     if (page < 1) {
-      return NextResponse.json({ 
-        error: 'Page must be greater than 0' 
-      }, { status: 400 })
+      throw new ApiError('VALIDATION_ERROR', 'Page must be greater than 0', 400)
     }
 
     if (limit < 1 || limit > 100) {
-      return NextResponse.json({ 
-        error: 'Limit must be between 1 and 100' 
-      }, { status: 400 })
+      throw new ApiError('VALIDATION_ERROR', 'Limit must be between 1 and 100', 400)
     }
 
     // Log the admin access
@@ -58,9 +44,14 @@ export async function GET(request: NextRequest) {
     logger.info('Admin user authenticated', { userId: adminUser.id, page, limit, search, roleFilter })
 
     // Create service role client for admin operations (listUsers requires service role key)
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+      throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+    }
+    
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -83,18 +74,7 @@ export async function GET(request: NextRequest) {
       
       if (usersError) {
         logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users:', usersError)
-        const errorDetails: any = {
-          code: usersError.code,
-          message: usersError.message
-        }
-        if ((usersError as any).details) {
-          errorDetails.details = (usersError as any).details
-        }
-        if ((usersError as any).hint) {
-          errorDetails.hint = (usersError as any).hint
-        }
-        logger.error('Users fetch error details:', errorDetails)
-        throw usersError
+        throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to fetch users: ${usersError.message}`, 500)
       }
 
       if (!authUsersPage?.users || authUsersPage.users.length === 0) {
@@ -115,7 +95,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch user profile data from users table
     const userIds = allUsers.map(u => u.id)
-    let userProfiles: any[] | null = null
+    let userProfiles: Array<{ id: string; first_name: string | null; last_name: string | null; phone: string | null }> | null = null
     if (userIds.length > 0) {
       const { data, error: profilesError } = await supabase
         .from('users')
@@ -133,7 +113,7 @@ export async function GET(request: NextRequest) {
     // Create a map of user profiles by id
     const profilesByUserId = new Map<string, { first_name: string | null, last_name: string | null, phone: string | null }>()
     if (userProfiles) {
-      userProfiles.forEach((profile: any) => {
+      userProfiles.forEach((profile) => {
         profilesByUserId.set(profile.id, {
           first_name: profile.first_name,
           last_name: profile.last_name,
@@ -158,15 +138,16 @@ export async function GET(request: NextRequest) {
 
     if (rolesError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user roles:', rolesError)
-      const rolesErrorDetails: any = {
+      const rolesErrorDetails: { code?: string; message?: string; details?: string; hint?: string } = {
         code: rolesError.code,
         message: rolesError.message
       }
-      if ((rolesError as any).details) {
-        rolesErrorDetails.details = (rolesError as any).details
+      const errorObj = rolesError as { details?: string; hint?: string }
+      if (errorObj.details) {
+        rolesErrorDetails.details = errorObj.details
       }
-      if ((rolesError as any).hint) {
-        rolesErrorDetails.hint = (rolesError as any).hint
+      if (errorObj.hint) {
+        rolesErrorDetails.hint = errorObj.hint
       }
       logger.error('User roles error details:', rolesErrorDetails)
       // Don't throw, just return empty array - this allows the API to still return users
@@ -175,11 +156,28 @@ export async function GET(request: NextRequest) {
     logger.info('User roles fetched:', userRoles?.length || 0)
 
     // Group roles by user_id
-    const rolesByUserId = new Map<string, any[]>()
+    type UserRoleEntry = {
+      id: string
+      role_id: string
+      name: string
+      display_name: string | null
+      description: string | null
+      assigned_at: string | null
+      assigned_by: string | null
+    }
+    const rolesByUserId = new Map<string, UserRoleEntry[]>()
     if (userRoles) {
-      userRoles.forEach((ur: any) => {
-        const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
-        if (role) {
+      userRoles.forEach((ur: { 
+        id: string
+        user_id: string
+        role_id: string
+        assigned_at: string | null
+        assigned_by: string | null
+        admin_roles?: Array<{ id: string; name: string; display_name: string | null; description: string | null }> | { id: string; name: string; display_name: string | null; description: string | null }
+      }) => {
+        const adminRole = ur.admin_roles
+        const role = Array.isArray(adminRole) ? adminRole[0] : adminRole
+        if (role && typeof role === 'object' && 'name' in role) {
           if (!rolesByUserId.has(ur.user_id)) {
             rolesByUserId.set(ur.user_id, [])
           }
@@ -239,8 +237,8 @@ export async function GET(request: NextRequest) {
 
     // Apply sorting
     sanitizedUsers.sort((a, b) => {
-      let aValue: any
-      let bValue: any
+      let aValue: string | number
+      let bValue: string | number
 
       switch (sortBy) {
         case 'email':
@@ -299,10 +297,17 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
+    // Re-throw ApiError as-is
+    if (error instanceof ApiError) {
+      throw error
+    }
+    // Wrap other errors
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Users API error:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch users',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch users', 500)
   }
 }
+
+export const GET = createGetHandler(getHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users' 
+})

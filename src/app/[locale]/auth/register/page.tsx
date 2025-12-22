@@ -9,6 +9,8 @@ import SocialSignIn from '@/components/auth/SocialSignIn'
 import { ArrowRight, CheckCircle2, Shield } from 'lucide-react'
 import SystemContentModal from '@/components/marketing/SystemContentModal'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function RegisterPage() {
   const t = useTranslations('auth')
   const params = useParams()

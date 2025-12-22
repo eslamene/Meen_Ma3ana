@@ -7,6 +7,8 @@
 
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface ValidationSettings {
   caseTitleMinLength: number
   caseTitleMaxLength: number
@@ -46,14 +48,14 @@ export async function getValidationSettings(): Promise<ValidationSettings> {
       ])
 
     if (error) {
-      console.error('Error fetching validation settings:', error)
-      console.warn('Using default validation settings due to error')
+      logger.error('Error fetching validation settings:', { error: error })
+      logger.warn('Using default validation settings due to error')
       return DEFAULT_SETTINGS
     }
 
     // Log if no data returned
     if (!data || data.length === 0) {
-      console.warn('No validation settings found in system_config, using defaults')
+      logger.warn('No validation settings found in system_config, using defaults')
       return DEFAULT_SETTINGS
     }
 
@@ -88,8 +90,8 @@ export async function getValidationSettings(): Promise<ValidationSettings> {
     
     return settings
   } catch (error) {
-    console.error('Exception fetching validation settings:', error)
-    console.warn('Using default validation settings due to exception')
+    logger.error('Exception fetching validation settings:', { error: error })
+    logger.warn('Using default validation settings due to exception')
     return DEFAULT_SETTINGS
   }
 }

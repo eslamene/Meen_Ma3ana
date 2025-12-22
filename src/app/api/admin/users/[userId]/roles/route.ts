@@ -6,68 +6,36 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandlerWithParams, createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { adminService } from '@/lib/admin/service'
-import { defaultLogger } from '@/lib/logger'
 
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  context: ApiHandlerContext,
+  params: { userId: string }
 ) {
-  try {
-    const { userId } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  const { logger } = context
+  const { userId } = params
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user has admin role
-    const hasAdminRole = await adminService.hasRole(user.id, 'admin') || 
-                         await adminService.hasRole(user.id, 'super_admin')
-
-    if (!hasAdminRole) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    const userRoles = await adminService.getUserRoles(userId)
-    return NextResponse.json({ userRoles })
-  } catch (error) {
-    defaultLogger.error('Error fetching user roles:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+  const userRoles = await adminService.getUserRoles(userId)
+  return NextResponse.json({ userRoles })
 }
 
-export async function POST(
+async function postHandler(
   request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  context: ApiHandlerContext,
+  params: { userId: string }
 ) {
-  try {
-    const { userId } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user, logger } = context
+  const { userId } = params
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user has admin role
-    const hasAdminRole = await adminService.hasRole(user.id, 'admin') || 
-                         await adminService.hasRole(user.id, 'super_admin')
-    const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
-
-    if (!hasAdminRole) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
 
     const body = await request.json()
     const { role_ids, roleId, expiresAt } = body
 
-    defaultLogger.info('Role assignment request:', {
+    logger.info('Role assignment request', {
       userId,
       role_ids,
       roleId,
@@ -79,10 +47,7 @@ export async function POST(
     const roleIds = role_ids || (roleId ? [roleId] : [])
 
     if (!Array.isArray(roleIds)) {
-      return NextResponse.json(
-        { error: 'role_ids must be an array' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'role_ids must be an array', 400)
     }
 
     // SECURITY: Prevent regular admins from assigning/removing super_admin role
@@ -96,16 +61,17 @@ export async function POST(
       const hasSuperAdmin = requestedRoles?.some(r => r.name === 'super_admin')
       
       if (hasSuperAdmin) {
-        return NextResponse.json(
-          { error: 'Only super_admin can assign super_admin role' },
-          { status: 403 }
-        )
+        throw new ApiError('FORBIDDEN', 'Only super_admin can assign super_admin role', 403)
       }
     }
 
     // Get current user roles
     const currentUserRoles = await adminService.getUserRoles(userId)
-    const currentRoleIds = currentUserRoles.map(ur => ur.role_id || (ur as any).role?.id).filter(Boolean)
+    interface UserRole {
+      role_id?: string
+      role?: { id: string }
+    }
+    const currentRoleIds = currentUserRoles.map((ur: UserRole) => ur.role_id || ur.role?.id).filter(Boolean) as string[]
 
     // SECURITY: Prevent regular admins from removing super_admin role
     if (!isSuperAdmin) {
@@ -115,43 +81,41 @@ export async function POST(
         .eq('user_id', userId)
         .eq('is_active', true)
 
-      const hasSuperAdminRole = currentRoles?.some((ur: any) => {
+      interface RoleCheck {
+        role_id: string
+        admin_roles?: Array<{ name: string }> | { name: string }
+      }
+      const hasSuperAdminRole = currentRoles?.some((ur: RoleCheck) => {
         const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
         return role?.name === 'super_admin'
       })
 
       if (hasSuperAdminRole) {
         // Check if super_admin role is being removed
-        const superAdminRoleId = currentRoles?.find((ur: any) => {
+        const superAdminRoleId = currentRoles?.find((ur: RoleCheck) => {
           const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
           return role?.name === 'super_admin'
         })?.role_id
 
         if (superAdminRoleId && !roleIds.includes(superAdminRoleId)) {
-          return NextResponse.json(
-            { error: 'Only super_admin can remove super_admin role' },
-            { status: 403 }
-          )
+          throw new ApiError('FORBIDDEN', 'Only super_admin can remove super_admin role', 403)
         }
       }
     }
 
     // SECURITY: Prevent users from assigning roles to themselves (except super_admin)
     if (userId === user.id && !isSuperAdmin) {
-      return NextResponse.json(
-        { error: 'You cannot modify your own roles' },
-        { status: 403 }
-      )
+      throw new ApiError('FORBIDDEN', 'You cannot modify your own roles', 403)
     }
 
-    defaultLogger.info('Current user roles:', {
+    logger.info('Current user roles', {
       userId,
       currentRoleIds,
       requestedRoleIds: roleIds,
-      currentUserRolesStructure: currentUserRoles.map(ur => ({
+      currentUserRolesStructure: currentUserRoles.map((ur: UserRole) => ({
         role_id: ur.role_id,
         hasRole: !!ur.role,
-        roleId: (ur as any).role?.id
+        roleId: ur.role?.id
       }))
     })
 
@@ -159,7 +123,7 @@ export async function POST(
     const rolesToAdd = roleIds.filter(id => !currentRoleIds.includes(id))
     const rolesToRemove = currentRoleIds.filter(id => !roleIds.includes(id))
 
-    defaultLogger.info('Role changes:', {
+    logger.info('Role changes', {
       rolesToAdd,
       rolesToRemove,
       comparison: {
@@ -176,12 +140,12 @@ export async function POST(
       try {
         const removed = await adminService.removeRoleFromUser(userId, roleId)
         removeResults.push({ roleId, success: removed })
-        defaultLogger.info(`Removed role ${roleId}:`, removed)
+        logger.info(`Removed role ${roleId}`, { removed })
         if (!removed) {
-          defaultLogger.error(`Failed to remove role ${roleId}`)
+          logger.error(`Failed to remove role ${roleId}`)
         }
       } catch (error) {
-        defaultLogger.error(`Error removing role ${roleId}:`, error)
+        logger.error(`Error removing role ${roleId}`, { error })
         removeResults.push({ roleId, success: false, error: error instanceof Error ? error.message : 'Unknown error' })
       }
     }
@@ -197,12 +161,12 @@ export async function POST(
           expiresAt
         )
         addResults.push({ roleId, success: added })
-        defaultLogger.info(`Added role ${roleId}:`, added)
+        logger.info(`Added role ${roleId}`, { added })
         if (!added) {
-          defaultLogger.error(`Failed to add role ${roleId}`)
+          logger.error(`Failed to add role ${roleId}`)
         }
       } catch (error) {
-        defaultLogger.error(`Error adding role ${roleId}:`, error)
+        logger.error(`Error adding role ${roleId}`, { error })
         addResults.push({ roleId, success: false, error: error instanceof Error ? error.message : 'Unknown error' })
       }
     }
@@ -212,20 +176,11 @@ export async function POST(
     const failedRemoves = removeResults.filter(r => !r.success)
 
     if (failedAdds.length > 0 || failedRemoves.length > 0) {
-      defaultLogger.error('Some role operations failed:', {
+      logger.error('Some role operations failed', {
         failedAdds,
         failedRemoves
       })
-      return NextResponse.json({
-        success: false,
-        error: 'Some role operations failed',
-        added: addResults.filter(r => r.success).length,
-        removed: removeResults.filter(r => r.success).length,
-        failed: {
-          adds: failedAdds,
-          removes: failedRemoves
-        }
-      }, { status: 500 })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Some role operations failed', 500)
     }
 
     return NextResponse.json({ 
@@ -233,12 +188,15 @@ export async function POST(
       added: rolesToAdd.length,
       removed: rolesToRemove.length
     })
-  } catch (error) {
-    defaultLogger.error('Error assigning roles:', error)
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users/[userId]/roles' 
+})
+
+export const POST = createPostHandlerWithParams(postHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users/[userId]/roles' 
+})
 

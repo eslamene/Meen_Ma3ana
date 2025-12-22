@@ -50,6 +50,8 @@ const eslintConfig = [
       "@typescript-eslint/ban-ts-comment": "off",
       "@typescript-eslint/triple-slash-reference": "off",
       "@typescript-eslint/no-empty-object-type": "off",
+      // Enforce use of centralized logger instead of console
+      "no-console": process.env.NODE_ENV === "production" ? "error" : "warn",
     },
     linterOptions: {
       reportUnusedDisableDirectives: false,
@@ -97,6 +99,15 @@ const eslintConfig = [
       "@typescript-eslint/ban-ts-comment": "off",
       "@typescript-eslint/triple-slash-reference": "off",
       "@typescript-eslint/no-empty-object-type": "off",
+      // Allow console in scripts and config files
+      "no-console": process.env.NODE_ENV === "production" ? "error" : "warn",
+    }
+  },
+  // Allow console in scripts directory
+  {
+    files: ["scripts/**/*.{js,ts}"],
+    rules: {
+      "no-console": "off",
     }
   }
 ];

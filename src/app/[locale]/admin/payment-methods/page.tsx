@@ -40,6 +40,8 @@ import {
 } from 'lucide-react'
 import TranslationButton from '@/components/translation/TranslationButton'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface PaymentMethod {
   id: string
   code: string
@@ -97,7 +99,7 @@ export default function AdminPaymentMethodsPage() {
       const data = await response.json()
       setPaymentMethods(data.paymentMethods || [])
     } catch (error) {
-      console.error('Error fetching payment methods:', error)
+      logger.error('Error fetching payment methods:', { error: error })
       toast.error('Error', { description: 'Failed to load payment methods' })
     } finally {
       setLoading(false)
@@ -162,7 +164,7 @@ export default function AdminPaymentMethodsPage() {
 
       fetchPaymentMethods()
     } catch (error: any) {
-      console.error('Error toggling payment method:', error)
+      logger.error('Error toggling payment method:', { error: error })
       toast.error('Error', { description: error.message || 'Failed to update payment method' })
     } finally {
       setSaving(false)
@@ -201,7 +203,7 @@ export default function AdminPaymentMethodsPage() {
 
       fetchPaymentMethods()
     } catch (error: any) {
-      console.error('Error updating order:', error)
+      logger.error('Error updating order:', { error: error })
       toast.error('Error', { description: 'Failed to update order' })
     } finally {
       setSaving(false)
@@ -238,7 +240,7 @@ export default function AdminPaymentMethodsPage() {
       setIsCreateDialogOpen(false)
       fetchPaymentMethods()
     } catch (error: any) {
-      console.error('Error creating payment method:', error)
+      logger.error('Error creating payment method:', { error: error })
       toast.error('Error', { description: error.message || 'Failed to create payment method' })
     } finally {
       setSaving(false)
@@ -278,7 +280,7 @@ export default function AdminPaymentMethodsPage() {
       setEditingMethod(null)
       fetchPaymentMethods()
     } catch (error: any) {
-      console.error('Error updating payment method:', error)
+      logger.error('Error updating payment method:', { error: error })
       toast.error('Error', { description: error.message || 'Failed to update payment method' })
     } finally {
       setSaving(false)
@@ -305,7 +307,7 @@ export default function AdminPaymentMethodsPage() {
       setDeletingMethodId(null)
       fetchPaymentMethods()
     } catch (error: any) {
-      console.error('Error deleting payment method:', error)
+      logger.error('Error deleting payment method:', { error: error })
       toast.error('Error', { description: error.message || 'Failed to delete payment method' })
     } finally {
       setSaving(false)

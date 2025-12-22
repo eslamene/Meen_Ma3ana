@@ -14,6 +14,8 @@ import { Menu, ChevronDown, ChevronRight, Shield, Users } from 'lucide-react'
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
 import { useParams } from 'next/navigation'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Types
 interface Permission {
   id: string
@@ -83,7 +85,7 @@ export default function MenuAccessPage() {
         setMenuItems(menuRes.data?.menuItems || [])
       }
     } catch (error) {
-      console.error('Fetch error:', error)
+      logger.error('Fetch error:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to fetch data' })
     } finally {
       setLoading(false)

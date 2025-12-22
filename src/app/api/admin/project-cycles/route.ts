@@ -1,117 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { ProjectCycleManager } from '@/lib/project-cycle-manager'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+  const body = await request.json()
+  const { action, projectId } = body
 
-  try {
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  switch (action) {
+    case 'check_and_advance':
+      await ProjectCycleManager.checkAndAdvanceCycles()
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Cycle advancement check completed' 
+      })
 
-    // Check if user is admin
-    if (user.user_metadata?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
-    }
+    case 'advance_project':
+      if (!projectId) {
+        throw new ApiError('VALIDATION_ERROR', 'Project ID required', 400)
+      }
+      await ProjectCycleManager.advanceProjectCycle(projectId)
+      return NextResponse.json({ 
+        success: true, 
+        message: `Project ${projectId} cycle advanced` 
+      })
 
-    const body = await request.json()
-    const { action, projectId } = body
+    case 'pause_project':
+      if (!projectId) {
+        throw new ApiError('VALIDATION_ERROR', 'Project ID required', 400)
+      }
+      await ProjectCycleManager.pauseProject(projectId)
+      return NextResponse.json({ 
+        success: true, 
+        message: `Project ${projectId} paused` 
+      })
 
-    switch (action) {
-      case 'check_and_advance':
-        await ProjectCycleManager.checkAndAdvanceCycles()
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Cycle advancement check completed' 
-        })
+    case 'resume_project':
+      if (!projectId) {
+        throw new ApiError('VALIDATION_ERROR', 'Project ID required', 400)
+      }
+      await ProjectCycleManager.resumeProject(projectId)
+      return NextResponse.json({ 
+        success: true, 
+        message: `Project ${projectId} resumed` 
+      })
 
-      case 'advance_project':
-        if (!projectId) {
-          return NextResponse.json({ error: 'Project ID required' }, { status: 400 })
-        }
-        await ProjectCycleManager.advanceProjectCycle(projectId)
-        return NextResponse.json({ 
-          success: true, 
-          message: `Project ${projectId} cycle advanced` 
-        })
-
-      case 'pause_project':
-        if (!projectId) {
-          return NextResponse.json({ error: 'Project ID required' }, { status: 400 })
-        }
-        await ProjectCycleManager.pauseProject(projectId)
-        return NextResponse.json({ 
-          success: true, 
-          message: `Project ${projectId} paused` 
-        })
-
-      case 'resume_project':
-        if (!projectId) {
-          return NextResponse.json({ error: 'Project ID required' }, { status: 400 })
-        }
-        await ProjectCycleManager.resumeProject(projectId)
-        return NextResponse.json({ 
-          success: true, 
-          message: `Project ${projectId} resumed` 
-        })
-
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-    }
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in project cycle management:', error)
-    return NextResponse.json(
-      { error: 'Failed to process cycle management request' },
-      { status: 500 }
-    )
+    default:
+      throw new ApiError('VALIDATION_ERROR', 'Invalid action', 400)
   }
 }
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
 
-  try {
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const { searchParams } = new URL(request.url)
+  const projectId = searchParams.get('projectId')
 
-    // Check if user is admin
-    if (user.user_metadata?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get('projectId')
-
-    if (!projectId) {
-      return NextResponse.json({ error: 'Project ID required' }, { status: 400 })
-    }
-
-    const stats = await ProjectCycleManager.getProjectCycleStats(projectId)
-    
-    return NextResponse.json({
-      success: true,
-      stats
-    })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error getting project cycle stats:', error)
-    return NextResponse.json(
-      { error: 'Failed to get project cycle statistics' },
-      { status: 500 }
-    )
+  if (!projectId) {
+    throw new ApiError('VALIDATION_ERROR', 'Project ID required', 400)
   }
-} 
+
+  const stats = await ProjectCycleManager.getProjectCycleStats(projectId)
+  
+  return NextResponse.json({
+    success: true,
+    stats
+  })
+}
+
+export const POST = createPostHandler(postHandler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/project-cycles' })
+export const GET = createGetHandler(getHandler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/project-cycles' }) 

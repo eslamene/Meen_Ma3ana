@@ -11,6 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Clock, User, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import type { CaseStatus } from '@/drizzle/schema'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface StatusHistoryItem {
   id: string
   previousStatus: CaseStatus | null
@@ -55,7 +57,7 @@ export default function StatusManagementPanel({
         setStatusHistory(data.history || [])
       }
     } catch (error) {
-      console.error('Error fetching status history:', error)
+      logger.error('Error fetching status history:', { error: error })
     }
   }, [caseId])
 
@@ -67,7 +69,7 @@ export default function StatusManagementPanel({
         setAvailableTransitions(data.transitions || [])
       }
     } catch (error) {
-      console.error('Error fetching available transitions:', error)
+      logger.error('Error fetching available transitions:', { error: error })
     }
   }, [caseId])
 

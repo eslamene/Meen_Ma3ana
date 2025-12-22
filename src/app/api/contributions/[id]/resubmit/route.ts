@@ -1,38 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { RouteContext } from '@/types/next-api'
+import { createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function POST(
+async function handler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  const { id } = await context.params
-  try {
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     const body = await request.json()
     const { reply } = body
 
     if (!reply || !reply.trim()) {
-      return NextResponse.json(
-        { error: 'Reply is required' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Reply is required', 400)
     }
 
     // Verify the contribution belongs to the current user
@@ -43,17 +26,11 @@ export async function POST(
       .single()
 
     if (contributionError || !contribution) {
-      return NextResponse.json(
-        { error: 'Contribution not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Contribution not found', 404)
     }
 
     if (contribution.donor_id !== user.id) {
-      return NextResponse.json(
-        { error: 'You can only resubmit your own contributions' },
-        { status: 403 }
-      )
+      throw new ApiError('FORBIDDEN', 'You can only resubmit your own contributions', 403)
     }
 
     // Get the current approval status
@@ -64,17 +41,11 @@ export async function POST(
       .single()
 
     if (approvalError || !approvalStatus) {
-      return NextResponse.json(
-        { error: 'Approval status not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Approval status not found', 404)
     }
 
     if (approvalStatus.status !== 'rejected') {
-      return NextResponse.json(
-        { error: 'Only rejected contributions can be resubmitted' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Only rejected contributions can be resubmitted', 400)
     }
 
     // Update the approval status with the donor reply and increment resubmission count
@@ -128,11 +99,6 @@ export async function POST(
       success: true,
       message: 'Resubmission sent successfully'
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in resubmission:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-} 
+}
+
+export const POST = createPostHandlerWithParams<{ id: string }>(handler, { requireAuth: true, loggerContext: 'api/contributions/[id]/resubmit' }) 

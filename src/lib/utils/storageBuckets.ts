@@ -7,6 +7,8 @@
 
 import { StorageBucketService } from '@/lib/services/storageBucketService'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 /**
  * Common bucket names used in the application
  * These are fallback values if dynamic lookup fails
@@ -50,7 +52,7 @@ export async function getAvailableBuckets(): Promise<string[]> {
     
     return bucketNames
   } catch (error) {
-    console.error('Failed to fetch buckets dynamically, using fallback:', error)
+    logger.error('Failed to fetch buckets dynamically, using fallback:', { error: error })
     // Return fallback bucket names if API call fails
     return Object.values(BUCKET_NAMES)
   }
@@ -73,7 +75,7 @@ export async function isPrivateBucket(bucketName: string): Promise<boolean> {
     const bucket = await StorageBucketService.getBucket(bucketName)
     return bucket ? !bucket.public : false
   } catch (error) {
-    console.error('Failed to check bucket privacy:', error)
+    logger.error('Failed to check bucket privacy:', { error: error })
     // Default to private for security
     return true
   }

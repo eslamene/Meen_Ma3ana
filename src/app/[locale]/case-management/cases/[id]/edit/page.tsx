@@ -52,6 +52,8 @@ import {
 } from 'lucide-react'
 import TranslationButton from '@/components/translation/TranslationButton'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Case {
   id: string
   title: string | null
@@ -133,7 +135,7 @@ export default function CaseEditPage() {
         .eq('case_id', caseId)
 
       if (error) {
-        console.error('Error fetching contributions:', error)
+        logger.error('Error fetching contributions:', { error: error })
         return
       }
 
@@ -150,7 +152,7 @@ export default function CaseEditPage() {
 
       setApprovedContributionsTotal(approvedTotal)
     } catch (error) {
-      console.error('Error calculating approved contributions:', error)
+      logger.error('Error calculating approved contributions:', { error: error })
     }
   }, [caseId, supabase])
 
@@ -162,7 +164,7 @@ export default function CaseEditPage() {
         .eq('case_id', caseId)
 
       if (error) {
-        console.error('Error fetching total contributions:', error)
+        logger.error('Error fetching total contributions:', { error: error })
         return
       }
 
@@ -173,7 +175,7 @@ export default function CaseEditPage() {
 
       setTotalContributions(total)
     } catch (error) {
-      console.error('Error calculating total contributions:', error)
+      logger.error('Error calculating total contributions:', { error: error })
     }
   }, [caseId, supabase])
 
@@ -182,14 +184,14 @@ export default function CaseEditPage() {
       const response = await fetch('/api/categories')
       
       if (!response.ok) {
-        console.error('Error fetching categories:', response.statusText)
+        logger.error('Error fetching categories:', { error: response.statusText })
         return
       }
 
       const result = await response.json()
       setCategories(result.categories || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      logger.error('Error fetching categories:', { error: error })
     }
   }, [])
 
@@ -201,7 +203,7 @@ export default function CaseEditPage() {
         console.log('Validation settings loaded in edit form:', settings)
         setValidationSettings(settings)
       } catch (error) {
-        console.error('Failed to load validation settings:', error)
+        logger.error('Failed to load validation settings:', { error: error })
       }
     }
     loadValidationSettings()
@@ -273,10 +275,10 @@ export default function CaseEditPage() {
             creatorName = fullName || null
             creatorEmail = creatorData.email || null
           } else if (creatorError) {
-            console.error('Error fetching creator info:', creatorError)
+            logger.error('Error fetching creator info:', { error: creatorError })
           }
         } catch (creatorErr) {
-          console.error('Error fetching creator info:', creatorErr)
+          logger.error('Error fetching creator info:', { error: creatorErr })
           // Don't fail the whole request if creator fetch fails
         }
       }
@@ -327,7 +329,7 @@ export default function CaseEditPage() {
             setSelectedBeneficiary(beneficiaryData as Beneficiary)
           }
         } catch (beneficiaryErr) {
-          console.error('Error fetching beneficiary:', beneficiaryErr)
+          logger.error('Error fetching beneficiary:', { error: beneficiaryErr })
           // Don't fail the whole request if beneficiary fetch fails
         }
       }
@@ -340,7 +342,7 @@ export default function CaseEditPage() {
         .order('display_order', { ascending: true })
 
       if (filesError) {
-        console.error('Error fetching case files:', filesError)
+        logger.error('Error fetching case files:', { error: filesError })
         setCaseFiles([])
       } else {
         const files: CaseFile[] = (filesData || []).map((file) => ({
@@ -364,7 +366,7 @@ export default function CaseEditPage() {
         setCaseFiles(files)
       }
     } catch (error) {
-      console.error('Error fetching case:', error)
+      logger.error('Error fetching case:', { error: error })
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -501,7 +503,7 @@ export default function CaseEditPage() {
     
     // Validation settings must be loaded before validation
     if (!validationSettings) {
-      console.warn('Validation settings not loaded yet, cannot validate form')
+      logger.warn('Validation settings not loaded yet, cannot validate form')
       toast.error('Error', { description: 'Validation settings are loading. Please wait a moment and try again.' })
       return false
     }
@@ -663,8 +665,8 @@ export default function CaseEditPage() {
       // Ensure toast is visible by using a small delay
       await new Promise(resolve => setTimeout(resolve, 100))
     } catch (error) {
-      console.error('Error updating case:', error)
-      console.error('Catch block error details:', JSON.stringify(error, null, 2))
+      logger.error('Error updating case:', { error: error })
+      logger.error('Catch block error details:', { error: JSON.stringify(error, null, 2) })
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       toast.error('Update Failed', {
         description: `An unexpected error occurred: ${errorMessage}`
@@ -754,7 +756,7 @@ export default function CaseEditPage() {
 
     } catch (error) {
       // Only log actual errors, not business logic responses
-      console.error('Unexpected error deleting case:', error)
+      logger.error('Unexpected error deleting case:', { error: error })
       
       // Show error message for unexpected errors only
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete case'
@@ -866,7 +868,7 @@ export default function CaseEditPage() {
           )
           setTimeout(() => setCopiedId(false), 2000)
         } catch (fallbackError) {
-          console.error('Fallback copy failed:', fallbackError)
+          logger.error('Fallback copy failed:', { error: fallbackError })
           toast.error(
             'Copy Failed',
             { description: 'Unable to copy to clipboard. Please copy manually.' }
@@ -876,7 +878,7 @@ export default function CaseEditPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to copy:', error)
+      logger.error('Failed to copy:', { error: error })
       toast.error(
         'Copy Failed',
         { description: 'Unable to copy to clipboard. Please copy manually.' }

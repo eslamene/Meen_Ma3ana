@@ -1,23 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
+  
   try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     // Fetch user profile data
     const { data: userProfile, error: profileError } = await supabase
@@ -58,30 +45,48 @@ export async function GET(request: NextRequest) {
       completedCases: 0,
       averageContribution: 0,
       lastContribution: null as string | null,
-      latestContribution: null as any
+      latestContribution: null as {
+        id: string
+        amount: number | null
+        created_at: string
+        case_id: string | null
+        status: string
+        cases: {
+          title_en?: string
+          title_ar?: string
+          status: string
+        } | null
+      } | null
     }
 
     if (contributions && contributions.length > 0) {
       // Helper function to safely parse amount, defaulting to 0 for null/undefined/invalid
-      const parseAmount = (amount: any): number => {
+      const parseAmount = (amount: unknown): number => {
         if (amount === null || amount === undefined) {
           return 0
         }
-        const parsed = parseFloat(amount)
-        return isNaN(parsed) ? 0 : parsed
+        if (typeof amount === 'string') {
+          const parsed = parseFloat(amount)
+          return isNaN(parsed) ? 0 : parsed
+        }
+        if (typeof amount === 'number') {
+          return isNaN(amount) ? 0 : amount
+        }
+        return 0
       }
 
       // Helper function to validate case object shape
-      const isValidCaseObject = (caseObj: any): boolean => {
+      const isValidCaseObject = (caseObj: unknown): caseObj is { title_en?: string; title_ar?: string; status: string } => {
         if (!caseObj || typeof caseObj !== 'object') {
           return false
         }
-        // Must have at least title and status properties
-        return typeof caseObj.title === 'string' && typeof caseObj.status === 'string'
+        const obj = caseObj as Record<string, unknown>
+        // Must have at least status property and either title_en or title_ar
+        return typeof obj.status === 'string' && (typeof obj.title_en === 'string' || typeof obj.title_ar === 'string')
       }
 
       // Helper function to extract valid case object from various forms
-      const extractCaseObject = (cases: any): any | null => {
+      const extractCaseObject = (cases: unknown): { title_en?: string; title_ar?: string; status: string } | null => {
         if (!cases) {
           return null
         }
@@ -105,7 +110,7 @@ export async function GET(request: NextRequest) {
       
       // Get unique cases and their statuses
       const uniqueCases = new Map()
-      contributions.forEach((c: any) => {
+      contributions.forEach((c) => {
         if (!uniqueCases.has(c.case_id)) {
           const caseData = extractCaseObject(c.cases)
           // Only add to uniqueCases if we have a valid case object
@@ -115,8 +120,8 @@ export async function GET(request: NextRequest) {
         }
       })
       
-      const activeCases = Array.from(uniqueCases.values()).filter((c: any) => c.status === 'published').length
-      const completedCases = Array.from(uniqueCases.values()).filter((c: any) => c.status === 'closed').length
+      const activeCases = Array.from(uniqueCases.values()).filter((c) => c.status === 'published').length
+      const completedCases = Array.from(uniqueCases.values()).filter((c) => c.status === 'closed').length
       const lastContribution = contributions[0]?.created_at || null
 
       // Normalize the latest contribution
@@ -153,4 +158,6 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const GET = withApiHandler(handler, { requireAuth: true, loggerContext: 'api/profile/stats' })
 

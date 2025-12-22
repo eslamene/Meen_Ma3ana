@@ -6,44 +6,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { ActivityService } from '@/lib/services/activityService'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    // Check authentication and admin permissions
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: userRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-
-    const isAdmin = userRoles?.some((ur: any) => {
-      const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
-      return role?.name === 'admin' || role?.name === 'super_admin'
-    })
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
-        { status: 403 }
-      )
-    }
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger } = context
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams
@@ -88,12 +54,7 @@ export async function GET(request: NextRequest) {
         end_date: endDate?.toISOString(),
       })
     }
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error getting visitor data:', error)
-    return NextResponse.json(
-      { error: 'Failed to get visitor data' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandler(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/activity/visitors' })
 

@@ -39,6 +39,8 @@ import { useAdmin } from '@/lib/admin/hooks'
 import { SortableTree, SimpleTreeItemWrapper, TreeItemComponentProps } from 'dnd-kit-sortable-tree'
 import type { TreeItems } from 'dnd-kit-sortable-tree'
 import DynamicIcon from '@/components/ui/dynamic-icon'
+import { defaultLogger as logger } from '@/lib/logger'
+
 import {
   Tooltip,
   TooltipContent,
@@ -315,7 +317,7 @@ export default function AdminMenuPage() {
         
         if (!response.ok) {
           const errorData = await response.data.error.catch(() => ({}))
-          console.error(`Failed to update menu item ${update.id}:`, errorData, 'Update body was:', updateBody)
+          logger.error(`Failed to update menu item ${update.id}:`, { error: errorData, updateBody })
         }
         
         return response
@@ -335,7 +337,7 @@ export default function AdminMenuPage() {
             }
           })
         )
-        console.error('Menu update errors:', errorDetails)
+        logger.error('Menu update errors:', { error: errorDetails })
         throw new Error(`Failed to update ${errors.length} menu items. Check console for details.`)
       }
 
@@ -344,7 +346,7 @@ export default function AdminMenuPage() {
       })
       await fetchMenuItems() // Refresh to get updated data
     } catch (error) {
-      console.error('Save error:', error)
+      logger.error('Save error:', { error: error })
       toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to save menu order'
       })
@@ -520,7 +522,7 @@ export default function AdminMenuPage() {
         }
       }
     } catch (error) {
-      console.error('Save error:', error)
+      logger.error('Save error:', { error: error })
       toast.error('Error', {
         description: error instanceof Error ? error.message : (isAdding ? 'Failed to create menu item' : 'Failed to update menu item')
       })
@@ -597,7 +599,7 @@ export default function AdminMenuPage() {
         throw new Error(res.error || 'Failed to delete menu item')
       }
     } catch (error) {
-      console.error('Delete error:', error)
+      logger.error('Delete error:', { error: error })
       toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to delete menu item'
       })
@@ -992,7 +994,7 @@ const TreeItemComponent = React.forwardRef<HTMLDivElement, TreeItemComponentProp
     } as MenuItem
 
     if (!menuItem || !menuItem.id) {
-      console.warn('TreeItemComponent: menuItem missing id', { treeItem, menuItem })
+      logger.warn('TreeItemComponent: menuItem missing id', { treeItem, menuItem })
       return null
     }
 

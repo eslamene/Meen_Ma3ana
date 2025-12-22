@@ -33,6 +33,8 @@ import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination
 import { theme, brandColors } from '@/lib/theme'
 import Pagination from '@/components/ui/pagination'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Case {
   id: string
   title: string
@@ -179,7 +181,7 @@ export default function CasesPage() {
       setServerPagination(data.pagination || { total: 0, totalPages: 0 })
       setStatistics(data.statistics || { totalCases: 0, activeCases: 0, totalRaised: 0 })
     } catch (error) {
-      console.error('Error fetching cases:', error)
+      logger.error('Error fetching cases:', { error: error })
     } finally {
       setLoading(false)
       console.log('Fetch completed, loading set to false')

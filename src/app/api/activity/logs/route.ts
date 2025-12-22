@@ -5,27 +5,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ActivityService, ActivityQueryParams } from '@/lib/services/activityService'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-import { createClient } from '@/lib/supabase/server'
+import { ActivityService, ActivityQueryParams, type ActivityType, type ActivityCategory, type ActivitySeverity } from '@/lib/services/activityService'
+import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
 
   try {
-    // Check authentication and admin permissions
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
     // Check if user is admin (simplified check - you may want to use your permission system)
     const { data: userRoles } = await supabase
       .from('admin_user_roles')
@@ -33,22 +19,26 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    const isAdmin = userRoles?.some((ur: any) => {
+    const isAdmin = userRoles?.some((ur: { admin_roles?: Array<{ name: string }> | { name: string } }) => {
       const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
-      return role?.name === 'admin' || role?.name === 'super_admin'
+      return role && typeof role === 'object' && 'name' in role && (role.name === 'admin' || role.name === 'super_admin')
     })
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams
+    const activityTypeParam = searchParams.get('activity_type')
+    const categoryParam = searchParams.get('category')
+    const severityParam = searchParams.get('severity')
+    
     const queryParams: ActivityQueryParams = {
       limit: parseInt(searchParams.get('limit') || '100'),
       offset: parseInt(searchParams.get('offset') || '0'),
-      activity_type: searchParams.get('activity_type') as any,
-      category: searchParams.get('category') as any,
+      activity_type: activityTypeParam ? (activityTypeParam as ActivityType) : undefined,
+      category: categoryParam ? (categoryParam as ActivityCategory) : undefined,
       action: searchParams.get('action') || undefined,
       resource_type: searchParams.get('resource_type') || undefined,
       resource_id: searchParams.get('resource_id') || undefined,
-      severity: searchParams.get('severity') as any,
+      severity: severityParam ? (severityParam as ActivitySeverity) : undefined,
       search: searchParams.get('search') || undefined,
     }
 
@@ -95,3 +85,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export const GET = withApiHandler(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/activity/logs' })

@@ -21,6 +21,8 @@ import { HexColorPicker } from 'react-colorful'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
+import { defaultLogger as logger } from '@/lib/logger'
+
 import StandardModal, { 
   StandardModalPreview, 
   StandardFormField, 
@@ -107,7 +109,7 @@ export default function AdminCategoriesPage() {
       const data = await response.json()
       setCategories(data.categories || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      logger.error('Error fetching categories:', { error: error })
       toast.error('Error', { description: 'Failed to load categories' })
     } finally {
       setLoading(false)
@@ -183,7 +185,7 @@ export default function AdminCategoriesPage() {
 
       fetchCategories()
     } catch (error: any) {
-      console.error('Error toggling category:', error)
+      logger.error('Error toggling category:', { error: error })
       toast.error('Error', { description: error.message || 'Failed to update category' })
     } finally {
       setSaving(false)
@@ -215,7 +217,7 @@ export default function AdminCategoriesPage() {
       setIsCreateDialogOpen(false)
       fetchCategories()
     } catch (error: any) {
-      console.error('Error creating category:', error)
+      logger.error('Error creating category:', { error: error })
       toast.error('Error', { description: error.message || 'Failed to create category' })
     } finally {
       setSaving(false)
@@ -250,7 +252,7 @@ export default function AdminCategoriesPage() {
       setEditingCategory(null)
       fetchCategories()
     } catch (error: any) {
-      console.error('Error updating category:', error)
+      logger.error('Error updating category:', { error: error })
       toast.error('Error', { description: error.message || 'Failed to update category' })
     } finally {
       setSaving(false)
@@ -277,7 +279,7 @@ export default function AdminCategoriesPage() {
       setDeletingCategoryId(null)
       fetchCategories()
     } catch (error: any) {
-      console.error('Error deleting category:', error)
+      logger.error('Error deleting category:', { error: error })
       toast.error('Error', { description: error.message || 'Failed to delete category' })
     } finally {
       setSaving(false)

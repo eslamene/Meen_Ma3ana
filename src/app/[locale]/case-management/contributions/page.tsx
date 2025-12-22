@@ -17,6 +17,8 @@ import { useLayout } from '@/components/layout/LayoutProvider'
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
 import { theme, brandColors } from '@/lib/theme'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Contribution {
   id: string
   caseId: string
@@ -150,7 +152,7 @@ export default function AdminContributionsPage() {
       }))
       setStats(data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 })
     } catch (err) {
-      console.error('Error fetching contributions:', err)
+      logger.error('Error fetching contributions:', { error: err })
       setError(err instanceof Error ? err.message : 'Failed to fetch contributions')
     } finally {
       setLoading(false)
@@ -210,7 +212,7 @@ export default function AdminContributionsPage() {
       // Refresh the contributions list
       await fetchContributions()
     } catch (error) {
-      console.error('Error updating contribution status:', error)
+      logger.error('Error updating contribution status:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update status' })
     }
   }

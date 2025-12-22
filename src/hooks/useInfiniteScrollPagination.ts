@@ -8,6 +8,8 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { getPaginationSettings, DEFAULT_SCROLL_ITEMS_PER_PAGE } from '@/lib/utils/paginationSettings'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface PaginationConfig {
   /**
    * Total number of items (for client-side pagination)
@@ -189,7 +191,7 @@ export function useInfiniteScrollPagination(
         const settings = await getPaginationSettings()
         setScrollItemsPerPage(settings.scrollItemsPerPage)
       } catch (error) {
-        console.error('Error loading pagination settings:', error)
+        logger.error('Error loading pagination settings:', { error: error })
         setScrollItemsPerPage(DEFAULT_SCROLL_ITEMS_PER_PAGE)
       }
     }

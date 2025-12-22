@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler, ApiHandlerContext, createPostHandler } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
+import { env } from '@/config/env'
 
 /**
  * Translation API Route
@@ -87,7 +90,7 @@ async function performTranslation(
       // Re-throw with the original error message
       throw error
     }
-    console.warn('MyMemory translation failed:', error)
+    logger.warn('MyMemory translation failed:', error)
   } finally {
     // Always clear the timeout
     clearTimeout(timeoutId)
@@ -118,12 +121,12 @@ async function performTranslation(
       }
     }
   } catch (error) {
-    console.warn('LibreTranslate failed:', error)
+    logger.warn('LibreTranslate failed:', error)
   }
   */
 
   // Use Google Translate API (requires API key)
-  const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY
+  const apiKey = env.GOOGLE_TRANSLATE_API_KEY
   
   if (!apiKey) {
     throw new Error('Google Translate API key is not configured. Please set GOOGLE_TRANSLATE_API_KEY in your environment variables.')
@@ -190,61 +193,40 @@ async function performTranslation(
       throw error
     }
     
-    console.error('Google Translate API error:', error)
+    // Error will be logged by the handler
     throw new Error('An unexpected error occurred while translating. Please try again.')
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const body: TranslationRequest = await request.json()
-    const { text, direction } = body
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
+  
+  const body: TranslationRequest = await request.json()
+  const { text, direction } = body
 
-    // Validate input
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Text to translate is required and cannot be empty' },
-        { status: 400 }
-      )
-    }
-
-    if (!direction || (direction !== 'ar-to-en' && direction !== 'en-to-ar')) {
-      return NextResponse.json(
-        { error: 'Invalid translation direction. Must be "ar-to-en" or "en-to-ar"' },
-        { status: 400 }
-      )
-    }
-
-    // Check text length (prevent abuse)
-    if (text.length > 5000) {
-      return NextResponse.json(
-        { error: 'Text to translate is too long. Maximum length is 5000 characters' },
-        { status: 400 }
-      )
-    }
-
-    // Perform translation
-    const translatedText = await performTranslation(text, direction)
-
-    return NextResponse.json({
-      translatedText,
-      sourceLanguage: direction === 'ar-to-en' ? 'ar' : 'en',
-      targetLanguage: direction === 'ar-to-en' ? 'en' : 'ar',
-    })
-  } catch (error) {
-    console.error('Translation error:', error)
-    
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json(
-      { error: 'An unexpected error occurred during translation' },
-      { status: 500 }
-    )
+  // Validate input
+  if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    throw new ApiError('VALIDATION_ERROR', 'Text to translate is required and cannot be empty', 400)
   }
+
+  if (!direction || (direction !== 'ar-to-en' && direction !== 'en-to-ar')) {
+    throw new ApiError('VALIDATION_ERROR', 'Invalid translation direction. Must be "ar-to-en" or "en-to-ar"', 400)
+  }
+
+  // Check text length (prevent abuse)
+  if (text.length > 5000) {
+    throw new ApiError('VALIDATION_ERROR', 'Text to translate is too long. Maximum length is 5000 characters', 400)
+  }
+
+  // Perform translation
+  const translatedText = await performTranslation(text, direction)
+
+  return NextResponse.json({
+    translatedText,
+    sourceLanguage: direction === 'ar-to-en' ? 'ar' : 'en',
+    targetLanguage: direction === 'ar-to-en' ? 'en' : 'ar',
+  })
 }
+
+export const POST = createPostHandler(handler, { loggerContext: 'api/translate' })
 

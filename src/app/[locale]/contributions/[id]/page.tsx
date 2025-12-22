@@ -14,6 +14,8 @@ import { toast } from 'sonner'
 import ContributionRevisionModal from '@/components/contributions/ContributionRevisionModal'
 import { theme, brandColors } from '@/lib/theme'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Contribution {
   id: string
   caseId: string
@@ -103,7 +105,7 @@ export default function ContributionDetailsPage() {
       const data = await response.json()
       setContribution(data)
     } catch (error) {
-      console.error('Error fetching contribution:', error)
+      logger.error('Error fetching contribution:', { error: error })
       setError(t('failedToLoad'))
     } finally {
       setLoading(false)
@@ -149,7 +151,7 @@ export default function ContributionDetailsPage() {
         description: t('transactionIdCopied')
       })
     } catch (error) {
-      console.error('Failed to copy:', error)
+      logger.error('Failed to copy:', { error: error })
     }
   }
 
@@ -217,7 +219,7 @@ export default function ContributionDetailsPage() {
       await fetchContribution()
       setShowRevisionModal(false)
     } catch (error) {
-      console.error('Error submitting revision:', error)
+      logger.error('Error submitting revision:', { error: error })
       toast.error('Submission Failed', {
         description: 'Failed to submit revision. Please try again.'
       })

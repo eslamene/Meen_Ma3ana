@@ -9,6 +9,8 @@ import { Heart } from 'lucide-react'
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
 import ContributionsList from '@/components/contributions/ContributionsList'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Contribution {
   id: string
   caseId: string
@@ -141,7 +143,7 @@ export default function ContributionsPage() {
         hasPrevPage: data.pagination.hasPreviousPage ?? data.pagination.hasPrevPage ?? false
       }))
     } catch (err) {
-      console.error('Error fetching contributions:', err)
+      logger.error('Error fetching contributions:', { error: err })
       setError(err instanceof Error ? err.message : 'Failed to fetch contributions')
     } finally {
       setLoading(false)
@@ -180,7 +182,7 @@ export default function ContributionsPage() {
       // Refresh the contributions list
       await fetchContributions()
     } catch (error) {
-      console.error('Error updating contribution status:', error)
+      logger.error('Error updating contribution status:', { error: error })
     }
   }
 

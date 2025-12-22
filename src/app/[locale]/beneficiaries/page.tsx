@@ -17,6 +17,8 @@ import { toast } from 'sonner'
 import type { Beneficiary } from '@/types/beneficiary'
 import type { City, IdType } from '@/types/beneficiary'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function BeneficiariesPage() {
   const t = useTranslations('beneficiaries')
   const params = useParams()
@@ -51,11 +53,11 @@ export default function BeneficiariesPage() {
           setBeneficiaries(beneficiariesResponse.data)
           setFilteredBeneficiaries(beneficiariesResponse.data)
         } else {
-          console.error('Error loading beneficiaries:', beneficiariesResponse.error)
+          logger.error('Error loading beneficiaries:', { error: beneficiariesResponse.error })
         }
         setCities(citiesData)
       } catch (error) {
-        console.error('Error loading data:', error)
+        logger.error('Error loading data:', { error: error })
       } finally {
         setLoading(false)
       }
@@ -110,7 +112,7 @@ export default function BeneficiariesPage() {
       })
       
       if (!response.ok) {
-        let errorData: any = {}
+        let errorData: { error?: string; details?: string } = {}
         try {
           errorData = await response.json()
         } catch (parseError) {
@@ -191,10 +193,10 @@ export default function BeneficiariesPage() {
         })
       } else if (error && typeof error === 'object') {
         // Log non-Error objects with their properties
-        console.error('Unexpected error deleting beneficiary:', error)
+        logger.error('Unexpected error deleting beneficiary:', { error: error })
       } else {
         // Log primitive errors
-        console.error('Unexpected error deleting beneficiary:', errorMessage)
+        logger.error('Unexpected error deleting beneficiary:', { error: errorMessage })
       }
       
       toast.error('Delete Failed', {

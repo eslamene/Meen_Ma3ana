@@ -27,6 +27,8 @@ import {
 import { useTranslations } from 'next-intl'
 import DynamicIcon from '@/components/ui/dynamic-icon'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface CaseFilters {
   search: string
   type: string
@@ -86,7 +88,7 @@ export default function FilterSidebar({
       const data = await response.json()
       setCategories(data.categories || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      logger.error('Error fetching categories:', { error: error })
     } finally {
       setCategoriesLoading(false)
     }

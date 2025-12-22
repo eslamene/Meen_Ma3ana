@@ -77,9 +77,9 @@ export class NotificationService {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static getStatusChangeTemplate(
     data: NotificationData,
-    _caseData: any,
-    _creator: any,
-    _changedByUser: any
+    _caseData: typeof cases.$inferSelect | undefined,
+    _creator: typeof users.$inferSelect | undefined,
+    _changedByUser: typeof users.$inferSelect | null
   ): NotificationTemplate {
     const statusLabels = {
       draft: 'Draft',

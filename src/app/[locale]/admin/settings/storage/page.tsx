@@ -30,6 +30,8 @@ import {
 } from 'lucide-react'
 import type { StorageBucket } from '@/lib/storage/types'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function StorageConfigurationPage() {
   const router = useRouter()
   const params = useParams()
@@ -54,7 +56,7 @@ export default function StorageConfigurationPage() {
       const data = await response.json()
       setBuckets(data.buckets || [])
     } catch (error) {
-      console.error('Error fetching buckets:', error)
+      logger.error('Error fetching buckets:', { error: error })
       toast.error('Error', { description: 'Failed to load storage buckets' })
     } finally {
       setLoading(false)

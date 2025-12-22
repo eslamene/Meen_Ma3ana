@@ -455,7 +455,7 @@ export class ActivityService {
       
       // Get total count (without limit/offset)
       const countValues = [...values] // Copy values without limit/offset
-      const countResult = await client.unsafe(countQuery, countValues as any[])
+      const countResult = await client.unsafe(countQuery, countValues as unknown[])
       
       const countRows = Array.isArray(countResult)
         ? countResult
@@ -469,7 +469,7 @@ export class ActivityService {
       query += ` ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`
       values.push(limit, offset)
 
-      const result = await client.unsafe(query, values as any[])
+      const result = await client.unsafe(query, values as unknown[])
 
       // Extract rows from drizzle result
       const extractedRows = Array.isArray(result)
@@ -542,7 +542,7 @@ export class ActivityService {
         ORDER BY period DESC, activity_type
       `
 
-      const result = await client.unsafe(query, values as any[])
+      const result = await client.unsafe(query, values as unknown[])
 
       const extractedRows = Array.isArray(result)
         ? result
@@ -640,7 +640,7 @@ export class ActivityService {
         ORDER BY period DESC
       `
 
-      const result = await client.unsafe(query, values as any[])
+      const result = await client.unsafe(query, values as unknown[])
 
       const extractedRows = Array.isArray(result)
         ? result
@@ -660,7 +660,7 @@ export class ActivityService {
         GROUP BY DATE_TRUNC('${truncFormat}', session_start)
       `
 
-      const sessionResult = await client.unsafe(sessionQuery, values as any[])
+      const sessionResult = await client.unsafe(sessionQuery, values as unknown[])
       const sessionRows = Array.isArray(sessionResult)
         ? sessionResult
         : (sessionResult && typeof sessionResult === 'object' && 'rows' in sessionResult && Array.isArray((sessionResult as { rows?: unknown[] }).rows))
@@ -735,7 +735,7 @@ export class ActivityService {
       query += ` ORDER BY session_start DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`
       values.push(limit, offset)
 
-      const result = await client.unsafe(query, values as any[])
+      const result = await client.unsafe(query, values as unknown[])
 
       const extractedRows = Array.isArray(result)
         ? result

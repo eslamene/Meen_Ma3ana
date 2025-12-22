@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { useAdmin } from '@/lib/admin/hooks'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface UserRoleInfoProps {
   showDetails?: boolean
   className?: string
@@ -45,7 +47,7 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
           setRoleData(data)
         }
       } catch (error) {
-        console.error('Error fetching role data:', error)
+        logger.error('Error fetching role data:', { error: error })
       } finally {
         setIsLoadingRoleData(false)
       }
@@ -106,7 +108,8 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
     }
   }
 
-  const getPermissionCategory = (permission: any) => {
+  type Permission = { id: string; name: string; resource?: string; display_name?: string; description?: string }
+  const getPermissionCategory = (permission: Permission) => {
     const resource = permission.resource || permission.name?.split(':')[0] || 'general'
     switch (resource.toLowerCase()) {
       case 'admin': return 'Administration'
@@ -123,7 +126,7 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
     }
   }
 
-  const groupedPermissions = userPermissions.reduce((acc: Record<string, any[]>, permission: any) => {
+  const groupedPermissions = userPermissions.reduce((acc: Record<string, Permission[]>, permission: Permission) => {
     const category = getPermissionCategory(permission)
     if (!acc[category]) {
       acc[category] = []
@@ -164,7 +167,7 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
             <div className="mt-3">
               <p className="text-sm text-gray-600 mb-2">Additional Roles:</p>
               <div className="flex flex-wrap gap-2">
-                {roleData.roles.slice(1).map((role: any) => (
+                {roleData.roles.slice(1).map((role) => (
                   <Badge 
                     key={role.id} 
                     variant="outline" 
@@ -214,7 +217,7 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
                     {category}
                   </h5>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {(categoryPermissions as any[]).map((permission: any) => (
+                    {categoryPermissions.map((permission: Permission) => (
                       <div 
                         key={permission.id} 
                         className="flex items-center gap-2 text-sm text-gray-700"

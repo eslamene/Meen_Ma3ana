@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+async function getHandler(
+  request: NextRequest,
+  context: ApiHandlerContext
+) {
+  const { supabase, user, logger } = context
 
     // Fetch user's messages
     const { data: messagesData, error: messagesError } = await supabase
@@ -47,11 +36,8 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (messagesError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching messages:', messagesError)
-      return NextResponse.json(
-        { error: 'Failed to fetch messages' },
-        { status: 500 }
-      )
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching messages', { error: messagesError })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch messages', 500)
     }
 
     // Fetch user's approved sponsorships for recipient selection
@@ -77,7 +63,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data to match the expected interface
-    const transformedMessages = (messagesData || []).map((item: any) => {
+    interface MessageItem {
+      id: string
+      sender_id: string
+      recipient_id: string
+      subject: string
+      message: string
+      is_read: boolean
+      created_at: string
+      sender?: Array<{ first_name?: string; last_name?: string; email?: string; role?: string }> | { first_name?: string; last_name?: string; email?: string; role?: string }
+      recipient?: Array<{ first_name?: string; last_name?: string; email?: string; role?: string }> | { first_name?: string; last_name?: string; email?: string; role?: string }
+    }
+    const transformedMessages = (messagesData || []).map((item: MessageItem) => {
       // Normalize sender - handle both array and single object cases
       const senderData = Array.isArray(item.sender) 
         ? item.sender[0] 
@@ -111,7 +108,14 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const transformedSponsorships = (sponsorshipsData || []).map((item: any) => {
+    interface SponsorshipItem {
+      id: string
+      case_id: string
+      amount: number | string
+      status: string
+      case?: Array<{ title_en?: string; title_ar?: string; description_en?: string; description_ar?: string }> | { title_en?: string; title_ar?: string; description_en?: string; description_ar?: string }
+    }
+    const transformedSponsorships = (sponsorshipsData || []).map((item: SponsorshipItem) => {
       // Normalize case - handle both array and single object cases
       const caseData = Array.isArray(item.case)
         ? item.case[0]
@@ -133,60 +137,36 @@ export async function GET(request: NextRequest) {
       messages: transformedMessages,
       sponsorships: transformedSponsorships
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in sponsor communications API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+async function postHandler(
+  request: NextRequest,
+  context: ApiHandlerContext
+) {
+  const { supabase, user, logger } = context
+  const body = await request.json()
+  const { recipient_id, subject, message } = body
 
-    const body = await request.json()
-    const { recipient_id, subject, message } = body
+  if (!recipient_id || !subject || !message) {
+    throw new ApiError('VALIDATION_ERROR', 'Missing required fields: recipient_id, subject, message', 400)
+  }
 
-    if (!recipient_id || !subject || !message) {
-      return NextResponse.json(
-        { error: 'Missing required fields: recipient_id, subject, message' },
-        { status: 400 }
-      )
-    }
+  // Insert message
+  const { data: newMessage, error: insertError } = await supabase
+    .from('communications')
+    .insert({
+      sender_id: user.id,
+      recipient_id,
+      subject,
+      message
+    })
+    .select()
+    .single()
 
-    // Insert message
-    const { data: newMessage, error: insertError } = await supabase
-      .from('communications')
-      .insert({
-        sender_id: user.id,
-        recipient_id,
-        subject,
-        message
-      })
-      .select()
-      .single()
-
-    if (insertError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating message:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to send message' },
-        { status: 500 }
-      )
-    }
+  if (insertError) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating message', { error: insertError })
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to send message', 500)
+  }
 
     // Create notification for recipient
     await supabase
@@ -203,12 +183,15 @@ export async function POST(request: NextRequest) {
       })
 
     return NextResponse.json({ message: newMessage })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in sponsor communications POST API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandler(getHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/sponsor/communications' 
+})
+
+export const POST = createPostHandler(postHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/sponsor/communications' 
+})
 

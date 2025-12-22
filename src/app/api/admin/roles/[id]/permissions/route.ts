@@ -7,29 +7,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { adminService } from '@/lib/admin/service'
-import { defaultLogger } from '@/lib/logger'
-import { RouteContext } from '@/types/next-api'
+import { createGetHandlerWithParams, createPutHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  try {
-    const params = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user has admin role
-    const hasAdminRole = await adminService.hasRole(user.id, 'admin') || 
-                         await adminService.hasRole(user.id, 'super_admin')
-
-    if (!hasAdminRole) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     // Fetch role with permissions
     const { data: roleData, error } = await supabase
@@ -43,14 +30,18 @@ export async function GET(
           admin_permissions(*)
         )
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error) throw error
 
     // Extract permissions
+    interface RolePermission {
+      permission_id: string
+      admin_permissions?: unknown
+    }
     const permissions = (roleData.admin_role_permissions || [])
-      .map((rp: any) => rp.admin_permissions)
+      .map((rp: RolePermission) => rp.admin_permissions)
       .filter(Boolean)
 
     return NextResponse.json({
@@ -61,59 +52,38 @@ export async function GET(
       },
       permissions
     })
-  } catch (error) {
-    defaultLogger.error('Error fetching role permissions:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  try {
-    const params = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only super_admin can update role permissions
-    const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
-    if (!isSuperAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     const body = await request.json()
     const { permission_ids } = body
 
-    defaultLogger.info('Updating role permissions:', {
-      roleId: params.id,
+    logger.info('Updating role permissions:', {
+      roleId: id,
       permissionIds: permission_ids
     })
 
     if (!Array.isArray(permission_ids)) {
-      return NextResponse.json(
-        { error: 'permission_ids must be an array' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'permission_ids must be an array', 400)
     }
 
     // Remove all existing permissions for this role
     const { error: deleteError, data: deleteData } = await supabase
       .from('admin_role_permissions')
       .delete()
-      .eq('role_id', params.id)
+      .eq('role_id', id)
       .select()
 
     if (deleteError) {
-      defaultLogger.error('Error deleting role permissions:', {
-        roleId: params.id,
+      logger.error('Error deleting role permissions:', {
+        roleId: id,
         error: deleteError.message,
         code: deleteError.code,
         details: deleteError.details,
@@ -122,12 +92,12 @@ export async function PUT(
       throw deleteError
     }
 
-    defaultLogger.info('Deleted existing permissions:', deleteData?.length || 0)
+    logger.info('Deleted existing permissions:', deleteData?.length || 0)
 
     // Add new permissions
     if (permission_ids.length > 0) {
       const rolePermissions = permission_ids.map((permissionId: string) => ({
-        role_id: params.id,
+        role_id: id,
         permission_id: permissionId
       }))
 
@@ -137,8 +107,8 @@ export async function PUT(
         .select()
 
       if (insertError) {
-        defaultLogger.error('Error inserting role permissions:', {
-          roleId: params.id,
+        logger.error('Error inserting role permissions:', {
+          roleId: id,
           permissionIds: permission_ids,
           error: insertError.message,
           code: insertError.code,
@@ -148,18 +118,14 @@ export async function PUT(
         throw insertError
       }
 
-      defaultLogger.info('Inserted new permissions:', insertData?.length || 0)
+      logger.info('Inserted new permissions:', insertData?.length || 0)
     }
 
     return NextResponse.json({
       success: true,
       message: 'Role permissions updated successfully'
     })
-  } catch (error) {
-    defaultLogger.error('Error updating role permissions:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandlerWithParams<{ id: string }>(getHandler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/roles/[id]/permissions' })
+export const PUT = createPutHandlerWithParams<{ id: string }>(putHandler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/roles/[id]/permissions' })

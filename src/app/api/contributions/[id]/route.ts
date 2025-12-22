@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { RouteContext } from '@/types/next-api'
+import { createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(
+async function handler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const params = await context.params
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+  const { supabase, logger, user } = context
 
     // Check if user has admin permissions
     let isAdmin = false
@@ -37,8 +23,11 @@ export async function GET(
         .eq('user_id', user.id)
         .eq('is_active', true)
 
+      interface UserRole {
+        admin_roles?: Array<{ name?: string; level?: number }> | { name?: string; level?: number }
+      }
       if (!adminCheckError && adminRoles && adminRoles.length > 0) {
-        isAdmin = adminRoles.some((ur: any) => {
+        isAdmin = adminRoles.some((ur: UserRole) => {
           const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
           // Check for admin or super_admin roles, or any role with level >= 8 (admin level)
           return role?.name === 'admin' || 
@@ -112,18 +101,14 @@ export async function GET(
             userId: user.id,
             errorCode: contributionError.code
           })
-          return NextResponse.json(
-            { 
-              error: 'Contribution not found or access denied',
-              message: 'The contribution may not exist or you may not have permission to view it'
-            },
-            { status: 404 }
+          throw new ApiError(
+            'NOT_FOUND',
+            'Contribution not found or access denied',
+            404,
+            { message: 'The contribution may not exist or you may not have permission to view it' }
           )
         }
-      return NextResponse.json(
-        { error: 'Contribution not found' },
-        { status: 404 }
-        )
+        throw new ApiError('NOT_FOUND', 'Contribution not found', 404)
       }
       
       // Check for RLS/permission errors
@@ -134,23 +119,16 @@ export async function GET(
           isAdmin,
           errorCode: contributionError.code
         })
-        return NextResponse.json(
-          { 
-            error: 'Access denied',
-            message: 'You do not have permission to view this contribution'
-          },
-          { status: 403 }
+        throw new ApiError(
+          'FORBIDDEN',
+          'Access denied',
+          403,
+          { message: 'You do not have permission to view this contribution' }
         )
       }
       
       // For other errors, return a more specific message
-      return NextResponse.json(
-        { 
-          error: 'Failed to fetch contribution',
-          details: contributionError.message 
-        },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch contribution', 500, { details: contributionError.message })
     }
 
     // Check if user has permission to view this contribution
@@ -314,30 +292,6 @@ export async function GET(
     }
 
     return NextResponse.json(formattedContribution)
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in contributions API:', error)
-    
-    // Safely get contribution ID for logging
-    let contributionId = 'unknown'
-    try {
-      const params = await context.params
-      contributionId = params?.id || 'unknown'
-    } catch {
-      // If we can't get params, just use unknown
-    }
-    
-    logger.error('Full error details:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
-      contributionId
-    })
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandlerWithParams<{ id: string }>(handler, { requireAuth: true, loggerContext: 'api/contributions/[id]' })

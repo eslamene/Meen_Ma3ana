@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { db } from '@/lib/db'
 import { contributions, contributionApprovalStatus } from '@/drizzle/schema'
 import { eq, and, sql, sum } from 'drizzle-orm'
-import { RouteContext } from '@/types/next-api'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
 
 /**
  * GET /api/cases/[id]/progress
@@ -16,22 +14,17 @@ import { getCorrelationId } from '@/lib/correlation'
  * 
  * This endpoint is accessible to both authenticated and unauthenticated users.
  */
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+  const { supabase, logger } = context
+  const { id: caseId } = params
   
-  try {
-    const { id: caseId } = await context.params
-    
-    if (!caseId) {
-      return NextResponse.json(
-        { error: 'Case ID is required' },
-        { status: 400 }
-      )
-    }
+  if (!caseId) {
+    throw new ApiError('VALIDATION_ERROR', 'Case ID is required', 400)
+  }
 
     // Verify case exists and is published (public cases only)
     const supabase = await createClient()
@@ -42,11 +35,8 @@ export async function GET(
       .single()
 
     if (caseError || !caseData) {
-      logger.logStableError('RESOURCE_NOT_FOUND', 'Case not found:', caseError)
-      return NextResponse.json(
-        { error: 'Case not found' },
-        { status: 404 }
-      )
+      logger.logStableError('RESOURCE_NOT_FOUND', 'Case not found', { error: caseError })
+      throw new ApiError('NOT_FOUND', 'Case not found', 404)
     }
 
     // Only allow public access to published cases
@@ -54,10 +44,7 @@ export async function GET(
       // Check if user is authenticated and has permission
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        return NextResponse.json(
-          { error: 'Case not available' },
-          { status: 403 }
-        )
+        throw new ApiError('FORBIDDEN', 'Case not available', 403)
       }
       
       // Check if user is admin or case creator
@@ -71,10 +58,7 @@ export async function GET(
       const isCreator = caseData.created_by === user.id
       
       if (!isAdmin && !isCreator) {
-        return NextResponse.json(
-          { error: 'Case not available' },
-          { status: 403 }
-        )
+        throw new ApiError('FORBIDDEN', 'Case not available', 403)
       }
     }
 
@@ -135,12 +119,10 @@ export async function GET(
       // Include current_amount from case for backward compatibility
       currentAmount: Number(caseData.current_amount || 0)
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching case progress:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAuth: false, // Public endpoint
+  loggerContext: 'api/cases/[id]/progress' 
+})
 

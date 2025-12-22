@@ -24,6 +24,8 @@ import { GenericFileUploader, GenericFilePreviewModal, type FileCategoryConfig, 
 import { usePrefetchStorageRules } from '@/hooks/use-prefetch-storage-rules'
 import type { CreateBeneficiaryData, UpdateBeneficiaryData, IdType, City, DocumentType } from '@/types/beneficiary'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface PendingDocument {
   id: string
   file: File
@@ -42,6 +44,7 @@ export interface BeneficiaryFormProps {
   cities: City[]
   showDocuments?: boolean // Show documents section (defaults to true for create, false for edit)
   showFooter?: boolean // Whether to show the footer with submit button
+  allowCreateDocuments?: boolean // Allow managing documents during create mode and return them via onSubmit
   beneficiaryId?: string // Required in edit mode for immediate document uploads
   existingDocuments?: Array<{ id: string; file_name: string; document_type: DocumentType; file_url: string; file_size?: number; mime_type?: string; is_public: boolean; description?: string; uploaded_at: string }> // Existing documents in edit mode
   onDocumentUploaded?: (document: { id: string; file_name: string; document_type: DocumentType; file_url: string; file_size?: number; mime_type?: string; is_public: boolean; description?: string; uploaded_at: string }) => void // Callback when document is uploaded in edit mode
@@ -62,6 +65,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
   cities,
   showDocuments = mode === 'create',
   showFooter = true,
+  allowCreateDocuments = false,
   beneficiaryId,
   existingDocuments = [],
   onDocumentUploaded,
@@ -272,7 +276,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to upload document'
       setUploadError(errorMessage)
-      console.error('Error uploading document:', error)
+      logger.error('Error uploading document:', { error: error })
     } finally {
       setIsUploadingDocument(false)
     }
@@ -287,7 +291,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
         onDocumentDeleted(documentId)
       }
     } catch (error) {
-      console.error('Error deleting document:', error)
+      logger.error('Error deleting document:', { error: error })
       alert('Failed to delete document. Please try again.')
     }
   }
@@ -304,7 +308,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
         }
       }
     } catch (error) {
-      console.error('Error updating document visibility:', error)
+      logger.error('Error updating document visibility:', { error: error })
       alert('Failed to update document visibility. Please try again.')
     }
   }
@@ -353,7 +357,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
       setEditingDocumentId(null)
       setEditingDocumentData(null)
     } catch (error) {
-      console.error('Error updating document:', error)
+      logger.error('Error updating document:', { error: error })
       alert('Failed to update document. Please try again.')
     } finally {
       setIsSavingDocument(false)
@@ -375,13 +379,13 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
         // Validate file
         const maxSize = 5 * 1024 * 1024 // 5MB
         if (file.size > maxSize) {
-          console.error(`File ${file.name} exceeds 5MB limit`)
+          logger.error(`File ${file.name} exceeds 5MB limit`)
           continue
         }
 
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
         if (!allowedTypes.includes(file.type)) {
-          console.error(`File type not allowed for ${file.name}`)
+          logger.error(`File type not allowed for ${file.name}`)
           continue
         }
 
@@ -402,7 +406,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
 
         if (!uploadResponse.ok) {
           const errorData = await uploadResponse.json().catch(() => ({ error: 'Upload failed' }))
-          console.error(`Failed to upload ${file.name}:`, errorData.error)
+          logger.error(`Failed to upload ${file.name}:`, { error: errorData.error })
           continue
         }
 
@@ -433,7 +437,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
       setUploadSuccess(`Successfully uploaded ${filesWithCategories.length} document(s)!`)
       setTimeout(() => setUploadSuccess(null), 3000)
     } catch (error) {
-      console.error('Error in bulk upload:', error)
+      logger.error('Error in bulk upload:', { error: error })
       setUploadError('Failed to upload some documents. Please try again.')
     } finally {
       setBulkUploading(false)
@@ -498,8 +502,18 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
       city_id: formData.city_id && (typeof formData.city_id === 'string' ? formData.city_id.trim() !== '' : true) ? formData.city_id : undefined,
     }
     
-    // Documents are now handled separately via BeneficiaryFileManager after creation
-    onSubmit(cleanedData)
+    // For create flows that allow documents, return pending documents to parent
+    const documentsPayload =
+      mode === 'create' && allowCreateDocuments && pendingDocuments.length > 0
+        ? pendingDocuments.map((doc) => ({
+            file: doc.file,
+            documentType: doc.documentType,
+            isPublic: doc.isPublic,
+            description: doc.description,
+          }))
+        : undefined
+
+    onSubmit(cleanedData, documentsPayload)
   }
 
   // Track if this is the initial mount to avoid calling callback on first render
@@ -630,7 +644,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 gap-5">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="flex items-center gap-2 text-sm font-semibold">
                     <User className="h-4 w-4 text-gray-500" />
@@ -662,50 +676,33 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
                   </div>
                 )}
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <Label htmlFor="age" className="flex items-center gap-2 text-sm font-semibold">
-                    <User className="h-4 w-4 text-gray-500" />
-                    {t('age') || 'Age'}
-                  </Label>
-                  <Input
-                    id="age"
-                    type="number"
-                    value={formData.age || ''}
-                    onChange={(e) => handleChange('age', parseInt(e.target.value) || 0)}
-                    placeholder={t('agePlaceholder') || 'Enter age'}
-                    className="h-11"
-                  />
-                </div>
 
-                {mode === 'edit' && (
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2 text-sm font-semibold">
-                      <User className="h-4 w-4 text-gray-500" />
-                      {t('gender') || 'Gender'}
-                    </Label>
-                    <RadioGroup
-                      value={formData.gender || 'male'}
-                      onValueChange={(value) => handleChange('gender', value)}
-                      className="flex flex-wrap gap-4 sm:gap-6"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="male" id="gender_male" />
-                        <Label htmlFor="gender_male" className="cursor-pointer">{t('male') || 'Male'}</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="female" id="gender_female" />
-                        <Label htmlFor="gender_female" className="cursor-pointer">{t('female') || 'Female'}</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="other" id="gender_other" />
-                        <Label htmlFor="gender_other" className="cursor-pointer">{t('other') || 'Other'}</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                )}
-              </div>
+              {mode === 'edit' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm font-semibold">
+                    <User className="h-4 w-4 text-gray-500" />
+                    {t('gender') || 'Gender'}
+                  </Label>
+                  <RadioGroup
+                    value={formData.gender || 'male'}
+                    onValueChange={(value) => handleChange('gender', value)}
+                    className="flex flex-wrap gap-4 sm:gap-6"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="male" id="gender_male" />
+                      <Label htmlFor="gender_male" className="cursor-pointer">{t('male') || 'Male'}</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="female" id="gender_female" />
+                      <Label htmlFor="gender_female" className="cursor-pointer">{t('female') || 'Female'}</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="other" id="gender_other" />
+                      <Label htmlFor="gender_other" className="cursor-pointer">{t('other') || 'Other'}</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
@@ -782,7 +779,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="space-y-2">
                   <Label htmlFor="id_type" className="flex items-center gap-2 text-sm font-semibold">
                     <IdCard className="h-4 w-4 text-gray-500" />
@@ -814,6 +811,20 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
                     value={formData.national_id || ''}
                     onChange={(e) => handleChange('national_id', e.target.value)}
                     placeholder={idFieldPlaceholder}
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="age" className="flex items-center gap-2 text-sm font-semibold">
+                    <User className="h-4 w-4 text-gray-500" />
+                    {t('age') || 'Age'}
+                  </Label>
+                  <Input
+                    id="age"
+                    type="number"
+                    value={formData.age || ''}
+                    onChange={(e) => handleChange('age', parseInt(e.target.value) || 0)}
+                    placeholder={t('agePlaceholder') || 'Enter age'}
                     className="h-11"
                   />
                 </div>
@@ -993,7 +1004,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
         </div>
 
           {/* Right Side - Documents */}
-          {showDocuments && mode === 'edit' && (
+          {showDocuments && (mode === 'edit' || allowCreateDocuments) && (
             <div className="w-full space-y-6 lg:space-y-8 xl:pl-6">
             <div className="flex items-center gap-2 mb-6 pb-3 border-b border-gray-200">
               <FolderOpen className="h-5 w-5 text-blue-600 shrink-0" />
@@ -1017,8 +1028,9 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
               </div>
             )}
             
-            {/* Upload Form - Only show for admins in edit mode, always show in create mode */}
-            {(!adminLoading && isAdmin === true) && (
+            {/* Upload Form - In create mode (when allowed), always show.
+                In edit mode, only admins can upload. */}
+            {(mode === 'create' && allowCreateDocuments) || (mode === 'edit' && !adminLoading && isAdmin === true) ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
               <div>
@@ -1231,9 +1243,9 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
                 </div>
               )}
             </div>
-            )}
-            {/* Existing Documents List (Edit Mode) */}
-            {existingDocuments.length > 0 && (
+            ) : null}
+            {/* Existing Documents List (Edit Mode only) */}
+            {mode === 'edit' && existingDocuments.length > 0 && (
               <div className="space-y-3">
                 <Label className="text-sm font-semibold">
                   {t('existingDocuments') || 'Existing Documents'} ({existingDocuments.length})
@@ -1514,7 +1526,7 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
                 }
               }
             } catch (error) {
-              console.error('Error updating document:', error)
+              logger.error('Error updating document:', { error: error })
               throw error
             }
           }}

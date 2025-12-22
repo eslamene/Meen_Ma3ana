@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { createGetHandlerWithParams, createPutHandlerWithParams, createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-type RouteContext = {
-  params: Promise<{ id: string }>
-}
-
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
+  const { supabase, logger } = context
+  const { id } = params
 
     const { data: category, error } = await supabase
       .from('case_categories')
@@ -26,55 +19,19 @@ export async function GET(
 
     if (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching category:', error)
-      return NextResponse.json(
-        { error: 'Category not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Category not found', 404)
     }
 
     return NextResponse.json({ category })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in category GET API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function PATCH(
+async function patchHandler(
   request: NextRequest,
-  context: RouteContext
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (userData?.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      )
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     const body = await request.json()
     const {
@@ -90,7 +47,7 @@ export async function PATCH(
     } = body
 
     // Build update object
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     }
 
@@ -125,10 +82,7 @@ export async function PATCH(
         .maybeSingle()
 
       if (existingCategory) {
-        return NextResponse.json(
-          { error: 'Category with this name already exists' },
-          { status: 400 }
-        )
+        throw new ApiError('VALIDATION_ERROR', 'Category with this name already exists', 400)
       }
     }
 
@@ -141,55 +95,19 @@ export async function PATCH(
 
     if (updateError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating category:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update category' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to update category', 500)
     }
 
     return NextResponse.json({ category: updatedCategory })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in category PATCH API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function DELETE(
+async function deleteHandler(
   request: NextRequest,
-  context: RouteContext
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (userData?.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      )
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     // Check if category is used by any cases
     const { data: casesUsingCategory, error: casesError } = await supabase
@@ -200,17 +118,11 @@ export async function DELETE(
 
     if (casesError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking category usage:', casesError)
-      return NextResponse.json(
-        { error: 'Failed to check category usage' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to check category usage', 500)
     }
 
     if (casesUsingCategory && casesUsingCategory.length > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete category: It is being used by one or more cases. Deactivate it instead.' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Cannot delete category: It is being used by one or more cases. Deactivate it instead.', 400)
     }
 
     // Delete category
@@ -221,21 +133,15 @@ export async function DELETE(
 
     if (deleteError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting category:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete category' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to delete category', 500)
     }
 
     return NextResponse.json({ message: 'Category deleted successfully' })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in category DELETE API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandlerWithParams<{ id: string }>(getHandler, { loggerContext: 'api/categories/[id]' })
+export const PATCH = createPutHandlerWithParams<{ id: string }>(patchHandler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/categories/[id]' })
+export const DELETE = createDeleteHandlerWithParams<{ id: string }>(deleteHandler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/categories/[id]' })
 
 
 

@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Permission {
   id: string
   name: string
@@ -30,7 +32,7 @@ interface PermissionFormModalProps {
   }) => Promise<void>
   onSave?: (data: Partial<Permission>) => Promise<void>
   permission?: Permission
-  modules?: any[]
+  modules?: Array<{ id: string; name: string; display_name?: string; description?: string }>
 }
 
 const ACTIONS = ['view', 'create', 'update', 'delete', 'manage', 'read', 'approve']
@@ -105,7 +107,7 @@ export function PermissionFormModal({
       }
       onClose()
     } catch (error) {
-      console.error('Error saving permission:', error)
+      logger.error('Error saving permission:', { error: error })
     } finally {
       setSaving(false)
     }

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminPermission } from '@/lib/security/rls'
+import { createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createClient } from '@supabase/supabase-js'
-
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { env } from '@/config/env'
 
 /**
  * POST /api/admin/users/merge
@@ -31,46 +30,39 @@ import { getCorrelationId } from '@/lib/correlation'
  * 18. Audit logs (user_id)
  * 19. Optionally delete the source user account
  */
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function postHandler(
+  request: NextRequest,
+  context: ApiHandlerContext
+) {
+  const { user: adminUser, supabase, logger } = context
   
   // Declare backupId at function scope so it's accessible in catch block
   let backupId: string | null = null
 
+  const body = await request.json()
+  const { fromUserId, toUserId, deleteSource = false } = body
+
+  if (!fromUserId || !toUserId) {
+    throw new ApiError('VALIDATION_ERROR', 'fromUserId and toUserId are required', 400)
+  }
+
+  if (fromUserId === toUserId) {
+    throw new ApiError('VALIDATION_ERROR', 'Cannot merge user with itself', 400)
+  }
+
   try {
-    const body = await request.json()
-    const { fromUserId, toUserId, deleteSource = false } = body
-
-    if (!fromUserId || !toUserId) {
-      return NextResponse.json(
-        { error: 'fromUserId and toUserId are required' },
-        { status: 400 }
-      )
-    }
-
-    if (fromUserId === toUserId) {
-      return NextResponse.json(
-        { error: 'Cannot merge user with itself' },
-        { status: 400 }
-      )
-    }
-
-    // Require admin permission
-    const authResult = await requireAdminPermission(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
-    const { user: adminUser, supabase } = authResult
-
     // Extract request info for logging
     const { ipAddress, userAgent } = extractRequestInfo(request)
 
     // Create service role client for admin operations (bypasses RLS)
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+      throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+    }
+    
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -87,10 +79,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (fromError || !fromUser) {
-      return NextResponse.json(
-        { error: 'Source user not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Source user not found', 404)
     }
 
     const { data: toUser, error: toError } = await serviceRoleClient
@@ -100,10 +89,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (toError || !toUser) {
-      return NextResponse.json(
-        { error: 'Target user not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Target user not found', 404)
     }
 
     // Generate unique merge ID for this operation
@@ -155,7 +141,7 @@ export async function POST(request: NextRequest) {
             details: backupError.message || 'Unknown error',
             error_code: backupError.code,
             hint: backupError.hint,
-            full_error: process.env.NODE_ENV === 'development' ? JSON.stringify(backupError, null, 2) : undefined
+            full_error: env.NODE_ENV === 'development' ? JSON.stringify(backupError, null, 2) : undefined
           },
           { status: 500 }
         )
@@ -528,39 +514,54 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Account merge API error:', error)
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Account merge API error', { error })
     
     // If we have a backup_id, mark it as failed
     if (backupId) {
       try {
-        const serviceRoleClient = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!,
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false
+        if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+          logger.error('SUPABASE_SERVICE_ROLE_KEY is required for rollback')
+          // Continue without marking backup as failed
+        } else {
+          const serviceRoleClient = createClient(
+            env.NEXT_PUBLIC_SUPABASE_URL,
+            env.SUPABASE_SERVICE_ROLE_KEY,
+            {
+              auth: {
+                autoRefreshToken: false,
+                persistSession: false
+              }
             }
-          }
-        )
-        await serviceRoleClient
-          .from('user_merge_backups')
-          .update({
-            status: 'failed',
-            errors: [error instanceof Error ? error.message : 'Unknown error']
-          })
-          .eq('id', backupId)
+          )
+          await serviceRoleClient
+            .from('user_merge_backups')
+            .update({
+              status: 'failed',
+              errors: [error instanceof Error ? error.message : 'Unknown error']
+            })
+            .eq('id', backupId)
+        }
       } catch (updateError) {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Failed to update backup status to failed:', updateError)
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Failed to update backup status to failed', { error: updateError })
       }
     }
     
-    return NextResponse.json({
-      error: 'Failed to merge accounts',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      backup_id: backupId || undefined,
-      note: backupId ? 'A backup was created. You may need to manually verify data integrity.' : undefined
-    }, { status: 500 })
+    // Throw ApiError with backupId in details for proper error handling
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const apiError = new ApiError('INTERNAL_SERVER_ERROR', `Failed to merge accounts: ${errorMessage}`, 500)
+    // Include backupId in error details
+    if (backupId) {
+      apiError.details = {
+        backup_id: backupId,
+        note: 'A backup was created. You may need to manually verify data integrity.'
+      }
+    }
+    throw apiError
   }
 }
+
+export const POST = createPostHandler(postHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users/merge' 
+})
 

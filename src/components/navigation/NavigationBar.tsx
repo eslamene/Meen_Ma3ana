@@ -19,6 +19,8 @@ import { getPublicNavItems } from '@/lib/navigation/public-nav-config'
 import { getIcon } from '@/lib/icons/registry'
 import type { AdminMenuItem } from '@/lib/admin/types'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 /**
  * Helper function to check if a menu item is an admin module
  * Admin modules are identified by:
@@ -197,7 +199,7 @@ export default function NavigationBar() {
       const count = await notificationService.getUnreadNotificationCount(userId)
       setUnreadNotifications(count)
     } catch (error) {
-      console.error('Error fetching unread notifications:', error)
+      logger.error('Error fetching unread notifications:', { error: error })
       // Don't set error state, just keep count at 0
       setUnreadNotifications(0)
     }
@@ -211,7 +213,7 @@ export default function NavigationBar() {
         await fetchUnreadNotifications(user.id)
       }
     } catch (error) {
-      console.error('Error fetching user:', error)
+      logger.error('Error fetching user:', { error: error })
     }
   }, [supabase.auth, fetchUnreadNotifications])
 
@@ -269,7 +271,7 @@ export default function NavigationBar() {
       await supabase.auth.signOut()
       router.push(`/${locale}/landing`)
     } catch (error) {
-      console.error('Error signing out:', error)
+      logger.error('Error signing out:', { error: error })
     }
   }, [supabase.auth, router, locale])
 

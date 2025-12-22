@@ -1,38 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminPermission } from '@/lib/security/rls'
+import { createGetHandlerWithParams, createPutHandlerWithParams, createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createClient } from '@supabase/supabase-js'
-import { RouteContext } from '@/types/next-api'
-
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { env } from '@/config/env'
 
 /**
  * GET /api/admin/users/[userId]
  * Get detailed user information including profile data
  */
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ userId: string }>
+  context: ApiHandlerContext,
+  params: { userId: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const { userId } = await context.params
-    
-    // Require admin permission
-    const authResult = await requireAdminPermission(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
-    const { user: adminUser, supabase } = authResult
+  const { supabase, logger } = context
+  const { userId } = params
 
     // Create service role client for admin operations
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+      throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+    }
+
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -45,10 +38,7 @@ export async function GET(
     const { data: authUser, error: authError } = await serviceRoleClient.auth.admin.getUserById(userId)
     
     if (authError || !authUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'User not found', 404)
     }
 
     // Fetch user profile from users table
@@ -60,10 +50,7 @@ export async function GET(
 
     if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = not found
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user profile:', profileError)
-      return NextResponse.json(
-        { error: 'Failed to fetch user profile' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch user profile', 500)
     }
 
     // Fetch user roles
@@ -86,7 +73,14 @@ export async function GET(
       .select('*', { count: 'exact', head: true })
       .eq('donor_id', userId)
 
-    const roles = (userRoles || []).map((ur: any) => {
+    interface UserRoleEntry {
+      id: string
+      role_id: string
+      assigned_at: string | null
+      assigned_by: string | null
+      admin_roles?: Array<{ id: string; name: string; display_name: string | null; description: string | null }> | { id: string; name: string; display_name: string | null; description: string | null }
+    }
+    const roles = (userRoles || []).map((ur: UserRoleEntry) => {
       const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
       return role ? {
         id: ur.id,
@@ -127,38 +121,20 @@ export async function GET(
         contribution_count: contributionCount || 0
       }
     })
-
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'User API error:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch user',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
 }
 
 /**
  * PUT /api/admin/users/[userId]
  * Update user profile (admin)
  */
-export async function PUT(
+async function putHandler(
   request: NextRequest,
-  context: RouteContext<{ userId: string }>
+  context: ApiHandlerContext,
+  params: { userId: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const { userId } = await context.params
-    const body = await request.json()
-    
-    // Require admin permission
-    const authResult = await requireAdminPermission(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
-    const { user: adminUser, supabase } = authResult
+  const { supabase, user: adminUser, logger } = context
+  const { userId } = params
+  const body = await request.json()
 
     // Log the admin action
     const { ipAddress, userAgent } = extractRequestInfo(request)
@@ -173,9 +149,14 @@ export async function PUT(
     )
 
     // Create service role client for admin operations
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+      throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+    }
+
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -188,10 +169,7 @@ export async function PUT(
     const { data: authUser, error: authError } = await serviceRoleClient.auth.admin.getUserById(userId)
     
     if (authError || !authUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'User not found', 404)
     }
 
     // Check if phone number is being updated and if it's already in use
@@ -208,10 +186,7 @@ export async function PUT(
       }
 
       if (existingUser) {
-        return NextResponse.json(
-          { error: 'Phone number is already in use by another account' },
-          { status: 400 }
-        )
+        throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
       }
     }
 
@@ -240,17 +215,11 @@ export async function PUT(
     if (profileError) {
       // Check if error is due to duplicate phone number
       if (profileError.code === '23505' && profileError.message.includes('phone')) {
-        return NextResponse.json(
-          { error: 'Phone number is already in use by another account' },
-          { status: 400 }
-        )
+        throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
       }
 
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating user profile:', profileError)
-      return NextResponse.json(
-        { error: 'Failed to update user profile', details: profileError.message },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to update user profile: ${profileError.message}`, 500)
     }
 
     // Update auth user metadata if email or other auth fields changed
@@ -278,14 +247,6 @@ export async function PUT(
         email: authUser.user.email
       }
     })
-
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'User update API error:', error)
-    return NextResponse.json({
-      error: 'Failed to update user',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
 }
 
 /**
@@ -293,28 +254,23 @@ export async function PUT(
  * Delete user (only if they have no related activities)
  * Checks all tables that reference the user to prevent deletion if any activities exist
  */
-export async function DELETE(
+async function deleteHandler(
   request: NextRequest,
-  context: RouteContext<{ userId: string }>
+  context: ApiHandlerContext,
+  params: { userId: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const { userId } = await context.params
-    
-    // Require admin permission
-    const authResult = await requireAdminPermission(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
-    const { user: adminUser, supabase } = authResult
+  const { supabase, user: adminUser, logger } = context
+  const { userId } = params
 
     // Create service role client for admin operations
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+      throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+    }
+
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -327,10 +283,7 @@ export async function DELETE(
     const { data: authUser, error: authError } = await serviceRoleClient.auth.admin.getUserById(userId)
     
     if (authError || !authUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'User not found', 404)
     }
 
     // Comprehensive check for all user-related activities
@@ -421,14 +374,7 @@ export async function DELETE(
         .map(a => `${a.count} ${a.type}`)
         .join(', ')
       
-      return NextResponse.json(
-        { 
-          error: 'Cannot delete user with related activities',
-          message: `User has related activities: ${activitySummary}. Users with activities cannot be deleted to maintain data integrity.`,
-          activities: activities
-        },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', `User has related activities: ${activitySummary}. Users with activities cannot be deleted to maintain data integrity.`, 400)
     }
 
     // Log the admin action before deletion
@@ -462,23 +408,27 @@ export async function DELETE(
 
     if (authDeleteError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting auth user:', authDeleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete user', details: authDeleteError.message },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to delete user: ${authDeleteError.message}`, 500)
     }
 
     return NextResponse.json({
       success: true,
       message: 'User deleted successfully'
     })
-
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'User delete API error:', error)
-    return NextResponse.json({
-      error: 'Failed to delete user',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
 }
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users/[userId]' 
+})
+
+export const PUT = createPutHandlerWithParams(putHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users/[userId]' 
+})
+
+export const DELETE = createDeleteHandlerWithParams(deleteHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users/[userId]' 
+})
 

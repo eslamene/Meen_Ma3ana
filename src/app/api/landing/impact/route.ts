@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db, client } from '@/lib/db'
 import { cases, contributions, caseCategories } from '@/drizzle/schema'
 import { eq, and, sql, sum, countDistinct, gte, lte } from 'drizzle-orm'
 import { categorizeCase } from '@/lib/utils/category-detection'
+import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+
+import { Logger } from '@/lib/logger'
+import { getCorrelationId } from '@/lib/correlation'
 
 // Month name mappings
 const monthNames: Record<number, { en: string; ar: string }> = {
@@ -20,7 +24,9 @@ const monthNames: Record<number, { en: string; ar: string }> = {
   12: { en: 'December', ar: 'ديسمبر' },
 }
 
-export async function GET() {
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
+
   try {
     // Calculate all stats directly from cases and contributions tables
     const startDate = new Date('2025-07-01')
@@ -160,7 +166,19 @@ export async function GET() {
 
     // Transform the view data to match the expected format
     // Ensure categorySummaryData is an array before iterating
-    const categorySummary: Record<string, any> = {}
+    interface CategorySummaryItem {
+      name?: string
+      nameArabic?: string
+      totalCases?: number
+      totalAmount?: number
+      totalAmountFormatted?: string
+      averagePerCase?: number
+      description?: string
+      descriptionAr?: string
+      icon?: string
+      color?: string
+    }
+    const categorySummary: Record<string, CategorySummaryItem> = {}
     const safeCategoryData = Array.isArray(categorySummaryData) ? categorySummaryData : []
     for (const row of safeCategoryData) {
       // Use category_id as key, or generate a slug from name_en
@@ -383,7 +401,7 @@ export async function GET() {
       categorySummary,
     })
   } catch (error) {
-    console.error('Error fetching impact data from database:', error)
+    logger.error('Error fetching impact data from database:', { error: error })
     return NextResponse.json(
       { error: 'Failed to fetch impact data' },
       { status: 500 }
@@ -400,3 +418,5 @@ function formatAmount(amount: number): string {
   }
   return amount.toLocaleString()
 }
+
+export const GET = withApiHandler(handler, { loggerContext: 'api/landing/impact' })

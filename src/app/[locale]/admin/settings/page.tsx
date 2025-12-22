@@ -41,6 +41,8 @@ import { Textarea } from '@/components/ui/textarea'
 import StandardModal, { StandardFormField } from '@/components/ui/standard-modal'
 import TranslationButton from '@/components/translation/TranslationButton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { defaultLogger as logger } from '@/lib/logger'
+
 import {
   Collapsible,
   CollapsibleContent,
@@ -133,7 +135,7 @@ export default function SystemSettingsPage() {
       const groups = new Set(configs.map((c: any) => c.group_type || 'general'))
       setExpandedGroups(groups as Set<string>)
     } catch (error) {
-      console.error('Error fetching settings:', error)
+      logger.error('Error fetching settings:', { error: error })
       toast.error('Error', { description: 'Failed to load system settings' })
     } finally {
       setLoading(false)
@@ -248,7 +250,7 @@ export default function SystemSettingsPage() {
       setHasChanges(false)
       await fetchSettings()
     } catch (error) {
-      console.error('Error saving settings:', error)
+      logger.error('Error saving settings:', { error: error })
       toast.error('Error', { description: 'Failed to save system settings' })
     } finally {
       setSaving(false)
@@ -289,7 +291,7 @@ export default function SystemSettingsPage() {
       })
       await fetchSettings()
     } catch (error) {
-      console.error('Error creating config:', error)
+      logger.error('Error creating config:', { error: error })
       toast.error('Error', { description: 'Failed to create config' })
     } finally {
       setSaving(false)

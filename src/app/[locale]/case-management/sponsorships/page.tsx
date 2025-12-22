@@ -14,6 +14,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertCircle, CheckCircle, XCircle, Clock, Building2, User as UserIcon, Calendar, DollarSign, MessageSquare } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface SponsorshipRequest {
   id: string
   sponsor_id: string
@@ -119,7 +121,7 @@ export default function AdminSponsorshipsPage() {
       }
 
     } catch (err) {
-      console.error('Error checking authentication:', err)
+      logger.error('Error checking authentication:', { error: err })
       window.location.href = '/auth/login'
     }
   }, [])

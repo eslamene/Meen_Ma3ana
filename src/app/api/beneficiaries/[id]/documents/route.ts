@@ -1,50 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { RouteContext } from '@/types/next-api'
+import { createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
+  const { supabase, logger } = context
+  const { id } = params
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('beneficiary_documents')
+    .select('*')
+    .eq('beneficiary_id', id)
+    .order('created_at', { ascending: false })
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const { data, error } = await supabase
-      .from('beneficiary_documents')
-      .select('*')
-      .eq('beneficiary_id', id)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary documents:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch documents' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ documents: data || [] })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in beneficiary documents GET API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  if (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary documents', { error })
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch documents', 500)
   }
+
+  return NextResponse.json({ documents: data || [] })
 }
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/beneficiaries/[id]/documents' 
+})
 

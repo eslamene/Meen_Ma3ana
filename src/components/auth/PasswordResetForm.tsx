@@ -7,6 +7,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import { getAppUrl } from '@/lib/utils/app-url'
 import { Mail, ArrowRight } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function PasswordResetForm() {
   const t = useTranslations('auth')
   const params = useParams()
@@ -52,7 +54,7 @@ export default function PasswordResetForm() {
       setMessage(t('resetEmailSent'))
       setEmail('') // Clear the email field after successful submission
     } catch (error) {
-      console.error('Password reset error:', error)
+      logger.error('Password reset error:', { error: error })
       let errorMessage = t('unknownError')
       
       if (error instanceof Error) {

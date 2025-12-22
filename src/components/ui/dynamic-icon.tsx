@@ -5,6 +5,8 @@ import { getIconComponent } from '@/lib/icons/registry'
 import { FileText } from 'lucide-react'
 import type { LucideProps } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface DynamicIconProps extends LucideProps {
   /**
    * Icon name (e.g., "camera", "home", "user")
@@ -47,7 +49,7 @@ export default function DynamicIcon({
   // If icon not found, use fallback
   if (!IconComponent) {
     if (name && name !== fallback) {
-      console.warn(`Icon "${name}" not found in registry, using fallback "${fallback}"`)
+      logger.warn(`Icon "${name}" not found in registry, using fallback "${fallback}"`)
     }
     return <FallbackIcon {...props} />
   }

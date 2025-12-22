@@ -6,6 +6,8 @@
 import { createStorageAdminClient } from './server'
 import type { UploadValidationResult, StorageRule } from './types'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 /**
  * Validate a file upload against storage rules
  * @param bucketName - The name of the storage bucket
@@ -29,7 +31,7 @@ export async function validateUpload(
     if (ruleError) {
       // If there's an error fetching rules, log it but allow upload
       // (rules are optional - if no rule exists, use defaults)
-      console.warn('Error fetching storage rules:', ruleError)
+      logger.warn('Error fetching storage rules:', ruleError)
     }
 
     // If no rule exists, use default validation (5MB, common file types)
@@ -80,7 +82,7 @@ export async function validateUpload(
 
     return { valid: true }
   } catch (error) {
-    console.error('Error validating upload:', error)
+    logger.error('Error validating upload:', { error: error })
     // On error, allow upload but log the issue
     // This prevents blocking uploads due to validation system failures
     return {
@@ -106,13 +108,13 @@ export async function getStorageRule(bucketName: string): Promise<StorageRule | 
       .maybeSingle()
 
     if (error) {
-      console.error('Error fetching storage rule:', error)
+      logger.error('Error fetching storage rule:', { error: error })
       return null
     }
 
     return rule
   } catch (error) {
-    console.error('Error getting storage rule:', error)
+    logger.error('Error getting storage rule:', { error: error })
     return null
   }
 }

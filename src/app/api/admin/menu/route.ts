@@ -6,33 +6,31 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { adminService } from '@/lib/admin/service'
-import { defaultLogger } from '@/lib/logger'
 
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, user, logger } = context
 
-    const { searchParams } = new URL(request.url)
-    const getAll = searchParams.get('all') === 'true'
+  const { searchParams } = new URL(request.url)
+  const getAll = searchParams.get('all') === 'true'
 
-    if (getAll) {
-      // Return all menu items for admin management
-      if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
+  if (getAll) {
+    // Return all menu items for admin management - requires admin role
+    // Check if user is authenticated and is admin
+    if (user.id === 'anonymous') {
+      throw new ApiError('UNAUTHORIZED', 'Authentication required', 401)
+    }
 
-      // Check if user has admin role
-      const hasAdminRole = await adminService.hasRole(user.id, 'admin') || 
-                           await adminService.hasRole(user.id, 'super_admin')
+    const hasAdminRole = await adminService.hasRole(user.id, 'admin') || 
+                         await adminService.hasRole(user.id, 'super_admin')
 
-      if (!hasAdminRole) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
+    if (!hasAdminRole) {
+      throw new ApiError('FORBIDDEN', 'Admin access required', 403)
+    }
 
-      const { data: menuItems, error } = await supabase
+    const { data: menuItems, error } = await supabase
         .from('admin_menu_items')
         .select(`
           *,
@@ -40,41 +38,28 @@ export async function GET(request: NextRequest) {
         `)
         .order('sort_order', { ascending: true })
 
-      if (error) throw error
-
-      return NextResponse.json({ menuItems: menuItems || [] })
+    if (error) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching menu items:', error)
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch menu items', 500)
     }
 
-    // Return user's accessible menu items
-    const menuItems = await adminService.getUserMenuItems(user?.id || null)
-    
-      return NextResponse.json({ menuItems })
-  } catch (error) {
-    defaultLogger.error('Error fetching menu items:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ menuItems: menuItems || [] })
   }
+
+  // Return user's accessible menu items (no auth required for this)
+  const menuItems = await adminService.getUserMenuItems(user?.id || null)
+  
+  return NextResponse.json({ menuItems })
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, user, logger } = context
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only super_admin can create menu items
-    const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
-    if (!isSuperAdmin) {
-      return NextResponse.json({ 
-        error: 'Forbidden',
-        details: 'Only super_admin can create menu items'
-      }, { status: 403 })
-    }
+  // Only super_admin can create menu items
+  const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
+  if (!isSuperAdmin) {
+    throw new ApiError('FORBIDDEN', 'Only super_admin can create menu items', 403)
+  }
 
     const body = await request.json()
     const { 
@@ -93,10 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!label || !href) {
-      return NextResponse.json(
-        { error: 'Label and href are required' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Label and href are required', 400)
     }
 
     const finalParentId = parent_id || null
@@ -110,13 +92,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (existingItem) {
-      return NextResponse.json(
-        { 
-          error: 'Menu item already exists',
-          details: `A menu item with href "${href}" already exists under the same parent`
-        },
-        { status: 409 }
-      )
+      throw new ApiError('CONFLICT', `A menu item with href "${href}" already exists under the same parent`, 409)
     }
 
     // Get max sort_order for the parent if not provided
@@ -157,7 +133,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      defaultLogger.error('Error creating menu item:', {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating menu item', {
         error,
         errorCode: error.code,
         errorMessage: error.message,
@@ -168,31 +144,22 @@ export async function POST(request: NextRequest) {
       
       // Check for specific error codes
       if (error.code === '23505') { // Unique violation
-        return NextResponse.json(
-          { 
-            error: 'Menu item already exists',
-            details: 'A menu item with this href and parent already exists'
-          },
-          { status: 409 }
-        )
+        throw new ApiError('CONFLICT', 'A menu item with this href and parent already exists', 409)
       }
       
-      return NextResponse.json(
-        { 
-          error: 'Failed to create menu item',
-          details: error.message || error.details || 'Database error occurred'
-        },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', error.message || error.details || 'Database error occurred', 500)
     }
 
     return NextResponse.json({ menuItem: newItem }, { status: 201 })
-  } catch (error) {
-    defaultLogger.error('Error creating menu item:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandler(getHandler, { 
+  requireAuth: false, // GET can work without auth for user menu, admin check done manually when getAll=true
+  loggerContext: 'api/admin/menu' 
+})
+
+export const POST = createPostHandler(postHandler, { 
+  requireAdmin: true, // Will be further restricted to super_admin in handler
+  loggerContext: 'api/admin/menu' 
+})
 

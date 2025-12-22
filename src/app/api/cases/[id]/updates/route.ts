@@ -1,70 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandlerWithParams, createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { caseUpdateService } from '@/lib/case-updates'
 import { caseNotificationService } from '@/lib/notifications/case-notifications'
-import { RouteContext } from '@/types/next-api'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const { searchParams } = new URL(request.url)
-    const includePrivate = searchParams.get('includePrivate') === 'true'
-    
-    const updates = await caseUpdateService.getDynamicUpdates({
-      caseId: id,
-      isPublic: includePrivate ? undefined : true,
-      limit: 50
-    })
-    
-    return NextResponse.json({
-      updates: updates || []
-    })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in case updates API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+  const { logger } = context
+  const { id } = params
+  const { searchParams } = new URL(request.url)
+  const includePrivate = searchParams.get('includePrivate') === 'true'
+  
+  const updates = await caseUpdateService.getDynamicUpdates({
+    caseId: id,
+    isPublic: includePrivate ? undefined : true,
+    limit: 50
+  })
+  
+  return NextResponse.json({
+    updates: updates || []
+  })
 }
 
-export async function POST(
+async function postHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+  const { user, logger } = context
+  const { id } = params
+  const body = await request.json()
+  const { title, content, updateType, isPublic, attachments } = body
 
-    const body = await request.json()
-    const { title, content, updateType, isPublic, attachments } = body
-
-    if (!title || !content) {
-      return NextResponse.json(
-        { error: 'Title and content are required' },
-        { status: 400 }
-      )
-    }
+  if (!title || !content) {
+    throw new ApiError('VALIDATION_ERROR', 'Title and content are required', 400)
+  }
 
     const newUpdate = await caseUpdateService.createUpdate({
       caseId: id,
@@ -93,11 +66,14 @@ export async function POST(
     return NextResponse.json({
       update: newUpdate
     }, { status: 201 })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating case update:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-} 
+}
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAuth: false, // Public endpoint
+  loggerContext: 'api/cases/[id]/updates' 
+})
+
+export const POST = createPostHandlerWithParams(postHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/cases/[id]/updates' 
+}) 

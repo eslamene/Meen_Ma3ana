@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminPermission } from '@/lib/security/rls'
+import { createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createClient } from '@supabase/supabase-js'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { env } from '@/config/env'
 
 /**
  * POST /api/admin/users/merge/rollback
@@ -11,28 +11,17 @@ import { getCorrelationId } from '@/lib/correlation'
  * 
  * This will restore all data that was migrated during the merge
  */
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function postHandler(
+  request: NextRequest,
+  context: ApiHandlerContext
+) {
+  const { user: adminUser, logger } = context
+  const body = await request.json()
+  const { mergeId } = body
 
-  try {
-    const body = await request.json()
-    const { mergeId } = body
-
-    if (!mergeId) {
-      return NextResponse.json(
-        { error: 'mergeId is required' },
-        { status: 400 }
-      )
-    }
-
-    // Require admin permission
-    const authResult = await requireAdminPermission(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
-    const { user: adminUser } = authResult
+  if (!mergeId) {
+    throw new ApiError('VALIDATION_ERROR', 'mergeId is required', 400)
+  }
 
     // Log the admin action
     const { ipAddress, userAgent } = extractRequestInfo(request)
@@ -47,9 +36,14 @@ export async function POST(request: NextRequest) {
     )
 
     // Create service role client for admin operations
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+      throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+    }
+    
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -66,27 +60,18 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (backupError || !backup) {
-      return NextResponse.json(
-        { error: 'Merge backup not found. Cannot rollback.' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Merge backup not found. Cannot rollback.', 404)
     }
 
     if (backup.status === 'rolled_back') {
-      return NextResponse.json(
-        { error: 'This merge has already been rolled back.' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'This merge has already been rolled back.', 400)
     }
 
     if (backup.status !== 'completed') {
-      return NextResponse.json(
-        { error: `Cannot rollback merge with status: ${backup.status}. Only completed merges can be rolled back.` },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', `Cannot rollback merge with status: ${backup.status}. Only completed merges can be rolled back.`, 400)
     }
 
-    const backupData = backup.backup_data as Record<string, any[]>
+    const backupData = backup.backup_data as Record<string, Array<{ id: string; [key: string]: unknown }>>
     const stats: Record<string, number> = {}
     const errors: string[] = []
 
@@ -94,7 +79,7 @@ export async function POST(request: NextRequest) {
     const restoreRecords = async (
       table: string,
       field: string,
-      records: any[],
+      records: Array<{ id: string; [key: string]: unknown }>,
       description: string
     ): Promise<number> => {
       if (!records || records.length === 0) return 0
@@ -167,7 +152,7 @@ export async function POST(request: NextRequest) {
     if (backupData.cases) {
       for (const caseRecord of backupData.cases) {
         try {
-          const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+          const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
           if (caseRecord.created_by === backup.to_user_id) updates.created_by = backup.from_user_id
           if (caseRecord.assigned_to === backup.to_user_id) updates.assigned_to = backup.from_user_id
           if (caseRecord.sponsored_by === backup.to_user_id) updates.sponsored_by = backup.from_user_id
@@ -204,7 +189,7 @@ export async function POST(request: NextRequest) {
     if (backupData.projects) {
       for (const project of backupData.projects) {
         try {
-          const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+          const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
           if (project.created_by === backup.to_user_id) updates.created_by = backup.from_user_id
           if (project.assigned_to === backup.to_user_id) updates.assigned_to = backup.from_user_id
 
@@ -235,7 +220,7 @@ export async function POST(request: NextRequest) {
     if (backupData.category_detection_rules) {
       for (const rule of backupData.category_detection_rules) {
         try {
-          const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+          const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
           if (rule.created_by === backup.to_user_id) updates.created_by = backup.from_user_id
           if (rule.updated_by === backup.to_user_id) updates.updated_by = backup.from_user_id
 
@@ -367,13 +352,10 @@ export async function POST(request: NextRequest) {
       },
       warnings: errors.length > 0 ? `Some operations had errors: ${errors.join('; ')}` : undefined
     })
-
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Rollback API error:', error)
-    return NextResponse.json({
-      error: 'Failed to rollback merge',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
 }
+
+export const POST = createPostHandler(postHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users/merge/rollback' 
+})
 

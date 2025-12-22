@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mail, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function VerifyEmailPage() {
   const t = useTranslations('auth')
   const { user, loading: authLoading } = useAuth()
@@ -51,7 +53,7 @@ export default function VerifyEmailPage() {
         setIsVerified(false)
       }
     } catch (error) {
-      console.error('Error checking verification status:', error)
+      logger.error('Error checking verification status:', { error: error })
       setIsVerified(false)
     } finally {
       setChecking(false)
@@ -76,7 +78,7 @@ export default function VerifyEmailPage() {
 
       setResendSuccess(true)
     } catch (error) {
-      console.error('Error resending verification email:', error)
+      logger.error('Error resending verification email:', { error: error })
     } finally {
       setResending(false)
     }

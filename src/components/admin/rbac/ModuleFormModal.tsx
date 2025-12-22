@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Module {
   id: string
   name: string
@@ -89,7 +91,7 @@ export function ModuleFormModal({
       })
       onClose()
     } catch (error) {
-      console.error('Error saving module:', error)
+      logger.error('Error saving module:', { error: error })
     } finally {
       setSaving(false)
     }

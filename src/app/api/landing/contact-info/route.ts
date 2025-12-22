@@ -1,9 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { systemConfig } from '@/drizzle/schema'
 import { inArray } from 'drizzle-orm'
+import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-export async function GET() {
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
+
   try {
     // Fetch contact-related config values
     const configs = await db
@@ -26,7 +29,7 @@ export async function GET() {
       email: configMap.email || '',
     })
   } catch (error) {
-    console.error('Error fetching system config:', error)
+    logger.error('Error fetching system config:', { error: error })
     // Return defaults if there's an error
     return NextResponse.json(
       {
@@ -39,4 +42,6 @@ export async function GET() {
     )
   }
 }
+
+export const GET = withApiHandler(handler, { loggerContext: 'api/landing/contact-info' })
 

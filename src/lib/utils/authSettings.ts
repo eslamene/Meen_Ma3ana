@@ -11,6 +11,8 @@
 
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface AuthSettings {
   passwordMinLength: number
   passwordRequireUppercase: boolean
@@ -72,14 +74,14 @@ export async function getAuthSettings(): Promise<AuthSettings> {
       ])
 
     if (error) {
-      console.error('Error fetching auth settings:', error)
-      console.warn('Using default auth settings due to error')
+      logger.error('Error fetching auth settings:', { error: error })
+      logger.warn('Using default auth settings due to error')
       return DEFAULT_SETTINGS
     }
 
     // Log if no data returned
     if (!data || data.length === 0) {
-      console.warn('No auth settings found in system_config, using defaults')
+      logger.warn('No auth settings found in system_config, using defaults')
       return DEFAULT_SETTINGS
     }
 
@@ -91,8 +93,8 @@ export async function getAuthSettings(): Promise<AuthSettings> {
     // Get email regex from system_config - this MUST come from database, not hardcoded
     let emailRegexFromConfig = settingsMap.get('auth.email.regex')
     if (!emailRegexFromConfig || emailRegexFromConfig.trim() === '') {
-      console.error('WARNING: auth.email.regex not found in system_config!')
-      console.error('Email validation will use fallback simple pattern. Please ensure auth.email.regex is set in system_config table.')
+      logger.error('WARNING: auth.email.regex not found in system_config!')
+      logger.error('Email validation will use fallback simple pattern. Please ensure auth.email.regex is set in system_config table.')
       // Don't throw - allow other settings to work, but emailRegex will be empty
       // This will trigger the fallback simple pattern in validateEmail()
     } else {
@@ -140,10 +142,10 @@ export async function getAuthSettings(): Promise<AuthSettings> {
         // Use the normalized pattern
         emailRegexFromConfig = normalizedPattern
       } catch (regexError) {
-        console.error('ERROR: Email regex from system_config is invalid after normalization!', regexError)
-        console.error('Original pattern (first 200 chars):', emailRegexFromConfig.substring(0, 200))
-        console.error('Normalized pattern (first 200 chars):', normalizedPattern.substring(0, 200))
-        console.error('Full pattern length:', emailRegexFromConfig.length)
+        logger.error('ERROR: Email regex from system_config is invalid after normalization!', { error: regexError })
+        logger.error('Original pattern (first 200 chars):', { error: emailRegexFromConfig.substring(0, 200) })
+        logger.error('Normalized pattern (first 200 chars):', { error: normalizedPattern.substring(0, 200) })
+        logger.error('Full pattern length:', { error: emailRegexFromConfig.length })
         // Set to empty so fallback is used
         emailRegexFromConfig = ''
       }
@@ -165,8 +167,8 @@ export async function getAuthSettings(): Promise<AuthSettings> {
     if (requireSpecialFromConfig === undefined || requireSpecialFromConfig === null) missingSettings.push('auth.password.require_special')
 
     if (missingSettings.length > 0) {
-      console.error('WARNING: Missing required auth settings in system_config:', missingSettings)
-      console.error('Please ensure all auth settings are configured in system_config table.')
+      logger.error('WARNING: Missing required auth settings in system_config:', { error: missingSettings })
+      logger.error('Please ensure all auth settings are configured in system_config table.')
     }
 
     const settings: AuthSettings = {
@@ -189,8 +191,8 @@ export async function getAuthSettings(): Promise<AuthSettings> {
     
     return settings
   } catch (error) {
-    console.error('Exception fetching auth settings:', error)
-    console.warn('Using default auth settings due to exception')
+    logger.error('Exception fetching auth settings:', { error: error })
+    logger.warn('Using default auth settings due to exception')
     return DEFAULT_SETTINGS
   }
 }

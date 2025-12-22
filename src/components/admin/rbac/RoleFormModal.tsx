@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Role {
   id: string
   name: string
@@ -74,7 +76,7 @@ export function RoleFormModal({
       }
       onClose()
     } catch (error) {
-      console.error('Error saving role:', error)
+      logger.error('Error saving role:', { error: error })
       // Don't close modal on error - let the parent handle error display
       throw error
     } finally {

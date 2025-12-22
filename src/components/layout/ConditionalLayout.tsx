@@ -11,6 +11,8 @@ import { Menu, X, Home, ChevronRight, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface ConditionalLayoutProps {
   children: React.ReactNode
 }
@@ -96,7 +98,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
       } catch (error) {
-        console.error('Error fetching user:', error)
+        logger.error('Error fetching user:', { error: error })
       } finally {
         setLoading(false)
       }

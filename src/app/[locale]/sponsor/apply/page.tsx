@@ -12,6 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, Building2, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface SponsorFormData {
   companyName: string
   contactPerson: string
@@ -72,7 +74,7 @@ export default function SponsorApplicationPage() {
         return
       }
     } catch (err) {
-      console.error('Error checking authentication:', err)
+      logger.error('Error checking authentication:', { error: err })
       router.push('/auth/login')
     }
   }, [supabase, router])
@@ -181,7 +183,7 @@ export default function SponsorApplicationPage() {
         router.push('/sponsor/dashboard')
       }, 2000)
     } catch (err) {
-      console.error('Error submitting application:', err)
+      logger.error('Error submitting application:', { error: err })
       _setError(t('applicationSubmissionError')) // eslint-disable-line @typescript-eslint/no-unused-vars
     } finally {
       setSubmitting(false)

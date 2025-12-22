@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { caseUpdateService } from '@/lib/case-updates'
+import { env } from '@/config/env'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger } = context
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const { searchParams } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
     
     // Get query parameters
     const search = searchParams.get('search') || ''
@@ -35,11 +33,11 @@ export async function GET(request: NextRequest) {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       if (uuidRegex.test(category)) {
         categoryId = category
-        if (process.env.NODE_ENV === 'development') {
+        if (env.NODE_ENV === 'development') {
           logger.debug('Filtering by assigned category ID', { categoryId })
         }
       } else {
-        if (process.env.NODE_ENV === 'development') {
+        if (env.NODE_ENV === 'development') {
           logger.debug('Invalid category ID format', { category })
         }
       }
@@ -66,7 +64,7 @@ export async function GET(request: NextRequest) {
       const categoryName = categoryNameMap[detectedCategory.toLowerCase()] || detectedCategory
       
       // Only log category filtering in development
-      if (process.env.NODE_ENV === 'development') {
+      if (env.NODE_ENV === 'development') {
         logger.debug('Filtering by detected category', { 
           originalCategory: detectedCategory, 
           mappedCategoryName: categoryName 
@@ -110,12 +108,12 @@ export async function GET(request: NextRequest) {
       if (categoryData) {
         detectedCategoryId = categoryData.id
         // Only log category ID resolution in development
-        if (process.env.NODE_ENV === 'development') {
+        if (env.NODE_ENV === 'development') {
           logger.debug('Detected category ID resolved', { detectedCategoryId, categoryName })
         }
       } else {
         // Only log missing category in development
-        if (process.env.NODE_ENV === 'development') {
+        if (env.NODE_ENV === 'development') {
           logger.debug('No detected category found', { categoryName, originalCategory: detectedCategory })
         }
       }
@@ -266,14 +264,11 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching cases:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch cases' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch cases', 500)
     }
 
     // Only log API response details in development to avoid exposing user data and counts in production
-    if (process.env.NODE_ENV === 'development') {
+    if (env.NODE_ENV === 'development') {
       logger.debug('API Response generated', { 
         totalCount: count,
         hasCategoryFilter: !!category,
@@ -318,7 +313,7 @@ export async function GET(request: NextRequest) {
       const descriptionAr = caseItem.description_ar && caseItem.description_ar.trim() ? caseItem.description_ar.trim() : null
 
       // Debug logging for first case (in development only)
-      if (process.env.NODE_ENV === 'development' && !firstCaseDebugged) {
+      if (env.NODE_ENV === 'development' && !firstCaseDebugged) {
         firstCaseDebugged = true
         logger.debug('Case transformation', {
           caseId: caseItem.id,
@@ -377,32 +372,19 @@ export async function GET(request: NextRequest) {
         totalRaised
       }
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in cases API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
+  
+  if (!user) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
 
-  try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const body = await request.json()
+  const body = await request.json()
     const {
       title,
       title_en,
@@ -431,10 +413,7 @@ export async function POST(request: NextRequest) {
     const finalDescriptionAr = description_ar || description || ''
 
     if ((!finalTitleEn && !finalTitleAr) || (!finalDescriptionEn && !finalDescriptionAr) || !targetAmount || !category || !priority) {
-      return NextResponse.json(
-        { error: 'Missing required fields. Please provide at least title_en or title_ar, and description_en or description_ar.' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Missing required fields. Please provide at least title_en or title_ar, and description_en or description_ar.', 400)
     }
 
     // Get category ID from category name
@@ -480,10 +459,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating case:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to create case' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create case', 500)
     }
 
     // Create initial case update
@@ -524,11 +500,7 @@ export async function POST(request: NextRequest) {
         createdBy: newCase.created_by,
       }
     }, { status: 201 })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in cases API POST:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-} 
+}
+
+export const GET = createGetHandler(getHandler, { loggerContext: 'api/cases' })
+export const POST = createPostHandler(postHandler, { requireAuth: true, loggerContext: 'api/cases' }) 

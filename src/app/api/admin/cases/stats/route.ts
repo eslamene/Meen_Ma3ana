@@ -1,41 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger } = context
+  
   try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: adminRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles!inner(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('admin_roles.name', ['admin', 'super_admin'])
-      .limit(1)
-
-    const isAdmin = (adminRoles?.length || 0) > 0
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
-    }
 
     // Parse query parameters for filtering
     const { searchParams } = new URL(request.url)
@@ -157,14 +126,14 @@ export async function GET(request: NextRequest) {
       
       if (Array.isArray(approvalStatuses) && approvalStatuses.length > 0) {
         // Sort by created_at descending, then updated_at descending to get the latest
-        const sorted = [...approvalStatuses].sort((a: any, b: any) => {
+        const sorted = [...approvalStatuses].sort((a: { updated_at?: string; created_at?: string }, b: { updated_at?: string; created_at?: string }) => {
           const aTime = new Date(a.updated_at || a.created_at || 0).getTime()
           const bTime = new Date(b.updated_at || b.created_at || 0).getTime()
           return bTime - aTime
         })
         latestStatus = sorted[0]?.status || 'none'
       } else if (approvalStatuses && !Array.isArray(approvalStatuses)) {
-        latestStatus = (approvalStatuses as any).status || 'none'
+        latestStatus = (approvalStatuses as { status?: string }).status || 'none'
       }
       
       if (latestStatus === 'approved') {
@@ -212,4 +181,6 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const GET = withApiHandler(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/cases/stats' })
 

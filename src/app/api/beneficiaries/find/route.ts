@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { env } from '@/config/env'
+import { withApiHandler, ApiHandlerContext, createGetHandler } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
   
-  try {
-    const { searchParams } = new URL(request.url)
-    const mobileNumber = searchParams.get('mobileNumber') || ''
-    const nationalId = searchParams.get('nationalId') || ''
-    const query = searchParams.get('query') || ''
+  const { searchParams } = new URL(request.url)
+  const mobileNumber = searchParams.get('mobileNumber') || ''
+  const nationalId = searchParams.get('nationalId') || ''
+  const query = searchParams.get('query') || ''
+  
+  // Create service role client to bypass RLS
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new ApiError('CONFIGURATION_ERROR', 'SUPABASE_SERVICE_ROLE_KEY is required for this operation', 500)
+  }
     
-    // Create service role client to bypass RLS
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -43,10 +46,7 @@ export async function GET(request: NextRequest) {
       
       if (error && error.code !== 'PGRST116') {
         logger.logStableError('INTERNAL_SERVER_ERROR', 'Error finding beneficiary by identifier:', error)
-        return NextResponse.json(
-          { success: false, error: error.message || 'Failed to find beneficiary' },
-          { status: 500 }
-        )
+        throw new ApiError('INTERNAL_SERVER_ERROR', error.message || 'Failed to find beneficiary', 500)
       }
       
       // Transform beneficiary to include calculated age
@@ -76,14 +76,11 @@ export async function GET(request: NextRequest) {
       
       if (error) {
         logger.logStableError('INTERNAL_SERVER_ERROR', 'Error searching beneficiaries:', error)
-        return NextResponse.json(
-          { success: false, error: error.message || 'Failed to search beneficiaries' },
-          { status: 500 }
-        )
+        throw new ApiError('INTERNAL_SERVER_ERROR', error.message || 'Failed to search beneficiaries', 500)
       }
       
       // Transform beneficiaries to include calculated age
-      const transformedResults = (results || []).map((beneficiary: any) => {
+      const transformedResults = (results || []).map((beneficiary: { year_of_birth?: number; age?: number; [key: string]: unknown }) => {
         if (beneficiary.year_of_birth) {
           const currentYear = new Date().getFullYear()
           beneficiary.age = currentYear - beneficiary.year_of_birth
@@ -97,16 +94,8 @@ export async function GET(request: NextRequest) {
       })
     }
     
-    return NextResponse.json(
-      { success: false, error: 'Either mobileNumber, nationalId, or query parameter is required' },
-      { status: 400 }
-    )
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error finding beneficiary:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to find beneficiary' },
-      { status: 500 }
-    )
-  }
+    throw new ApiError('VALIDATION_ERROR', 'Either mobileNumber, nationalId, or query parameter is required', 400)
 }
+
+export const GET = createGetHandler(handler, { loggerContext: 'api/beneficiaries/find' })
 

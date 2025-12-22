@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ActivityService, extractRequestInfo, generateSessionId } from '@/lib/services/activityService'
 import { createClient } from '@/lib/supabase/server'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 /**
  * Get or create session ID from cookies
  */
@@ -44,7 +46,7 @@ export function withActivityLogging<T extends unknown[]>(
       // Log asynchronously without blocking
       logApiCall(request, method, pathname, statusCode, duration).catch(error => {
         // Silently fail - don't break the request
-        console.error('Failed to log API call:', error)
+        logger.error('Failed to log API call:', { error: error })
       })
       
       return response
@@ -56,7 +58,7 @@ export function withActivityLogging<T extends unknown[]>(
       
       // Log error asynchronously
       logApiCall(request, method, pathname, 500, duration, error).catch(err => {
-        console.error('Failed to log API error:', err)
+        logger.error('Failed to log API error:', { error: err })
       })
       
       // Re-throw the error
@@ -111,7 +113,7 @@ async function logApiCall(
     })
   } catch (error) {
     // Silently fail - don't break the request
-    console.error('Error in logApiCall:', error)
+    logger.error('Error in logApiCall:', { error: error })
   }
 }
 

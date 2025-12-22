@@ -4,26 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { createStorageAdminClient } from '@/lib/storage/server'
-import { requirePermission } from '@/lib/security/guards'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
 import type { BucketListResponse } from '@/lib/storage/types'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function getHandler(
+  request: NextRequest,
+  context: ApiHandlerContext
+) {
+  const { logger } = context
 
-  try {
-    // Check permission - require manage:files or admin role
-    const guardResult = await requirePermission('manage:files')(request)
-
-    if (guardResult instanceof NextResponse) {
-      logger.warn('Unauthorized access to storage buckets', { status: guardResult.status })
-      return guardResult
-    }
-
-    logger.info('Fetching storage buckets', { userId: guardResult.user.id })
+  logger.info('Fetching storage buckets', { userId: context.user.id })
 
     // Create admin client for storage operations
     const supabase = createStorageAdminClient()
@@ -32,11 +24,8 @@ export async function GET(request: NextRequest) {
     const { data: buckets, error } = await supabase.storage.listBuckets()
 
     if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error listing buckets:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch buckets', details: error.message },
-        { status: 500 }
-      )
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error listing buckets', { error })
+      throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to fetch buckets: ${error.message}`, 500)
     }
 
     // Fetch storage rules for each bucket to include in response
@@ -66,12 +55,10 @@ export async function GET(request: NextRequest) {
     logger.info('Successfully fetched buckets', { count: bucketsWithRules.length })
 
     return NextResponse.json(response)
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in storage buckets API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandler(getHandler, { 
+  requirePermissions: ['manage:files'], 
+  loggerContext: 'api/storage/buckets' 
+})
 

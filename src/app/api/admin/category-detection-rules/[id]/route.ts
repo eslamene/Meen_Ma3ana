@@ -5,33 +5,26 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createPutHandlerWithParams, createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { adminService } from '@/lib/admin/service'
-import { defaultLogger } from '@/lib/logger'
 import { db } from '@/lib/db'
 import { categoryDetectionRules, caseCategories } from '@/drizzle/schema'
 import { eq, and } from 'drizzle-orm'
-import { RouteContext } from '@/types/next-api'
 import { clearCategoryRulesCache } from '@/lib/utils/category-detection'
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  try {
-    const params = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  const { user, logger } = context
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only super_admin can update rules
-    const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
-    if (!isSuperAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  // Only super_admin can update rules
+  const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
+  if (!isSuperAdmin) {
+    throw new ApiError('FORBIDDEN', 'Only super_admin can update rules', 403)
+  }
 
     const body = await request.json()
     const { category_id, keyword, priority, is_active } = body
@@ -44,10 +37,7 @@ export async function PUT(
       .limit(1)
 
     if (existing.length === 0) {
-      return NextResponse.json(
-        { error: 'Rule not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Rule not found', 404)
     }
 
     // If category_id is being changed, verify it exists
@@ -59,10 +49,7 @@ export async function PUT(
         .limit(1)
 
       if (category.length === 0) {
-        return NextResponse.json(
-          { error: 'Category not found' },
-          { status: 400 }
-        )
+        throw new ApiError('VALIDATION_ERROR', 'Category not found', 400)
       }
     }
 
@@ -86,14 +73,11 @@ export async function PUT(
       const duplicateExists = duplicate.some(r => r.id !== params.id)
 
       if (duplicateExists) {
-        return NextResponse.json(
-          { error: 'A rule with this category and keyword already exists' },
-          { status: 400 }
-        )
+        throw new ApiError('VALIDATION_ERROR', 'A rule with this category and keyword already exists', 400)
       }
     }
 
-    const updateData: any = {
+    const updateData: { updated_at: Date; updated_by: string; [key: string]: unknown } = {
       updated_at: new Date(),
       updated_by: user.id,
     }
@@ -109,7 +93,7 @@ export async function PUT(
       .where(eq(categoryDetectionRules.id, params.id))
       .returning()
 
-    defaultLogger.info('Category detection rule updated:', {
+    logger.info('Category detection rule updated', {
       ruleId: params.id,
       updates: Object.keys(updateData),
     })
@@ -118,33 +102,20 @@ export async function PUT(
     clearCategoryRulesCache()
 
     return NextResponse.json({ rule: updatedRule })
-  } catch (error) {
-    defaultLogger.error('Error updating category detection rule:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function DELETE(
+async function deleteHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  try {
-    const params = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  const { user, logger } = context
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only super_admin can delete rules
-    const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
-    if (!isSuperAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  // Only super_admin can delete rules
+  const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
+  if (!isSuperAdmin) {
+    throw new ApiError('FORBIDDEN', 'Only super_admin can delete rules', 403)
+  }
 
     // Check if rule exists
     const existing = await db
@@ -154,17 +125,14 @@ export async function DELETE(
       .limit(1)
 
     if (existing.length === 0) {
-      return NextResponse.json(
-        { error: 'Rule not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Rule not found', 404)
     }
 
     await db
       .delete(categoryDetectionRules)
       .where(eq(categoryDetectionRules.id, params.id))
 
-    defaultLogger.info('Category detection rule deleted:', {
+    logger.info('Category detection rule deleted', {
       ruleId: params.id,
       categoryId: existing[0].category_id,
       keyword: existing[0].keyword,
@@ -174,12 +142,15 @@ export async function DELETE(
     clearCategoryRulesCache()
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    defaultLogger.error('Error deleting category detection rule:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const PUT = createPutHandlerWithParams(putHandler, { 
+  requireAdmin: true, // Will be further restricted to super_admin in handler
+  loggerContext: 'api/admin/category-detection-rules/[id]' 
+})
+
+export const DELETE = createDeleteHandlerWithParams(deleteHandler, { 
+  requireAdmin: true, // Will be further restricted to super_admin in handler
+  loggerContext: 'api/admin/category-detection-rules/[id]' 
+})
 

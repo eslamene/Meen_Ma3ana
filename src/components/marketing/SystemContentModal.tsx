@@ -12,6 +12,8 @@ import {
 import { X, Share2, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface SystemContentModalProps {
   contentKey: string
   open: boolean
@@ -78,7 +80,7 @@ export default function SystemContentModal({
         })
       } catch (err) {
         // User cancelled or error occurred
-        console.error('Error sharing:', err)
+        logger.error('Error sharing:', { error: err })
       }
     } else {
       // Fallback: copy to clipboard
@@ -94,7 +96,7 @@ export default function SystemContentModal({
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
       } catch (err) {
-        console.error('Error copying:', err)
+        logger.error('Error copying:', { error: err })
       }
     }
   }
@@ -245,7 +247,7 @@ export default function SystemContentModal({
   // Debug: Log when modal should be open
   useEffect(() => {
     if (open) {
-      console.log('SystemContentModal: Modal should be open, contentKey:', contentKey)
+      logger.debug('SystemContentModal: Modal should be open', { contentKey })
     }
   }, [open, contentKey])
 

@@ -1,88 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
+
+  // Fetch user's sponsorships with case info
+  const { data: sponsorships, error: sponsorshipsError } = await supabase
+    .from('sponsorships')
+    .select(`
+      id,
+      case_id,
+      amount,
+      status,
+      start_date,
+      end_date,
+      created_at,
+      case:cases(
+        title_en,
+        title_ar,
+        description_en,
+        description_ar,
+        target_amount,
+        current_amount,
+        status
       )
-    }
+    `)
+    .eq('sponsor_id', user.id)
+    .order('created_at', { ascending: false })
 
-    // Fetch user's sponsorships with case info
-    const { data: sponsorships, error: sponsorshipsError } = await supabase
-      .from('sponsorships')
-      .select(`
-        id,
-        case_id,
-        amount,
-        status,
-        start_date,
-        end_date,
-        created_at,
-        case:cases(
-          title_en,
-          title_ar,
-          description_en,
-          description_ar,
-          target_amount,
-          current_amount,
-          status
-        )
-      `)
-      .eq('sponsor_id', user.id)
-      .order('created_at', { ascending: false })
-
-    if (sponsorshipsError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching sponsorships:', sponsorshipsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch sponsorships' },
-        { status: 500 }
-      )
-    }
-
-    // Transform the data to match the expected interface
-    const transformedData = (sponsorships || []).map((item: any) => {
-      // Normalize case - handle both array and single object cases
-      const caseData = Array.isArray(item.case)
-        ? item.case[0]
-        : item.case
-
-      return {
-        id: item.id,
-        case_id: item.case_id,
-        amount: parseFloat(String(item.amount)),
-        status: item.status,
-        start_date: item.start_date,
-        end_date: item.end_date,
-        created_at: item.created_at,
-        case: {
-          title: caseData?.title_en || caseData?.title_ar || '',
-          description: caseData?.description_en || caseData?.description_ar || '',
-          target_amount: parseFloat(String(caseData?.target_amount || '0')),
-          current_amount: parseFloat(String(caseData?.current_amount || '0')),
-          status: caseData?.status || ''
-        }
-      }
-    })
-
-    return NextResponse.json({ sponsorships: transformedData })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in sponsor dashboard API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  if (sponsorshipsError) {
+    logger.error('Error fetching sponsorships:', sponsorshipsError)
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch sponsorships', 500)
   }
+
+  // Transform the data to match the expected interface
+  interface SponsorshipItem {
+    id: string
+    case_id: string
+    amount: number | string
+    status: string
+    start_date: string | null
+    end_date: string | null
+    created_at: string
+    case?: Array<{ title_en?: string; title_ar?: string; description_en?: string; description_ar?: string; target_amount?: number | string; current_amount?: number | string; status?: string }> | { title_en?: string; title_ar?: string; description_en?: string; description_ar?: string; target_amount?: number | string; current_amount?: number | string; status?: string }
+  }
+  const transformedData = (sponsorships || []).map((item: SponsorshipItem) => {
+    // Normalize case - handle both array and single object cases
+    const caseData = Array.isArray(item.case)
+      ? item.case[0]
+      : item.case
+
+    return {
+      id: item.id,
+      case_id: item.case_id,
+      amount: parseFloat(String(item.amount)),
+      status: item.status,
+      start_date: item.start_date,
+      end_date: item.end_date,
+      created_at: item.created_at,
+      case: {
+        title: caseData?.title_en || caseData?.title_ar || '',
+        description: caseData?.description_en || caseData?.description_ar || '',
+        target_amount: parseFloat(String(caseData?.target_amount || '0')),
+        current_amount: parseFloat(String(caseData?.current_amount || '0')),
+        status: caseData?.status || ''
+      }
+    }
+  })
+
+  return NextResponse.json({ sponsorships: transformedData })
 }
+
+export const GET = createGetHandler(handler, { requireAuth: true, loggerContext: 'api/sponsor/dashboard' })
 

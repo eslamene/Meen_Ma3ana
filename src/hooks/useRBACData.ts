@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface Permission {
   id: string
   name: string
@@ -55,7 +57,7 @@ export function useRBACData() {
         setPermissionsByModule(permissionsData.permissionsByModule || {})
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
-        console.error('Error fetching RBAC data:', err)
+        logger.error('Error fetching RBAC data:', { error: err })
       } finally {
         setLoading(false)
       }

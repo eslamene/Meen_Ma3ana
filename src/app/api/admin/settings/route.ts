@@ -1,64 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandler, createPutHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger } = context
 
-    // Check if user is admin
-    const { data: adminRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles!inner(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('admin_roles.name', ['admin', 'super_admin'])
-      .limit(1)
+  // Fetch ALL system config entries with group_type
+  const { data, error } = await supabase
+    .from('system_config')
+    .select('config_key, config_value, description, description_ar, group_type')
+    .order('group_type, config_key')
 
-    const isAdmin = (adminRoles?.length || 0) > 0
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
-    }
-
-    // Fetch ALL system config entries with group_type
-    const { data, error } = await supabase
-      .from('system_config')
-      .select('config_key, config_value, description, description_ar, group_type')
-      .order('group_type, config_key')
-
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching settings:', error)
-      return NextResponse.json(
-        { error: 'Failed to load system settings' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ configs: data || [] })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in admin settings GET API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  if (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching settings:', error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to load system settings', 500)
   }
+
+  return NextResponse.json({ configs: data || [] })
 }
 
 // Cache for group type patterns to avoid repeated database queries
@@ -70,7 +30,7 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
  * Dynamically determines group_type based on existing configs in the database
  * Learns patterns from existing configs and uses them to classify new ones
  */
-async function getGroupType(supabase: any, configKey: string, logger: Logger): Promise<string> {
+async function getGroupType(supabase: SupabaseClient, configKey: string, logger: Logger): Promise<string> {
   try {
     // Refresh cache if expired or not initialized
     const now = Date.now()
@@ -115,7 +75,7 @@ async function getGroupType(supabase: any, configKey: string, logger: Logger): P
 /**
  * Refreshes the group type patterns cache by analyzing existing configs
  */
-async function refreshGroupTypePatterns(supabase: any, logger: Logger): Promise<void> {
+async function refreshGroupTypePatterns(supabase: SupabaseClient, logger: Logger): Promise<void> {
   try {
     // Fetch all existing configs with their group types
     const { data: configs, error } = await supabase
@@ -181,209 +141,119 @@ async function refreshGroupTypePatterns(supabase: any, logger: Logger): Promise<
   }
 }
 
-export async function PUT(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+async function putHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
 
-    // Check if user is admin
-    const { data: adminRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles!inner(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('admin_roles.name', ['admin', 'super_admin'])
-      .limit(1)
+  const body = await request.json()
+  const { configs } = body
 
-    const isAdmin = (adminRoles?.length || 0) > 0
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
-    }
-
-    const body = await request.json()
-    const { configs } = body
-
-    if (!configs || !Array.isArray(configs)) {
-      return NextResponse.json(
-        { error: 'Invalid settings data. Expected array of configs.' },
-        { status: 400 }
-      )
-    }
-
-    // Update or insert each config
-    for (const config of configs) {
-      if (!config.config_key || config.config_value === undefined || config.config_value === null) {
-        continue // Skip invalid entries
-      }
-
-      const groupType = config.group_type || await getGroupType(supabase, config.config_key, logger)
-
-      // Check if config exists
-      const { data: existing, error: checkError } = await supabase
-        .from('system_config')
-        .select('id')
-        .eq('config_key', config.config_key)
-        .maybeSingle()
-
-      if (existing && !checkError) {
-        // Update existing config
-        const { error } = await supabase
-          .from('system_config')
-          .update({
-            config_value: String(config.config_value),
-            description: config.description || null,
-            description_ar: config.description_ar || null,
-            group_type: groupType,
-            updated_at: new Date().toISOString(),
-            updated_by: user.id
-          })
-          .eq('config_key', config.config_key)
-
-        if (error) {
-          logger.logStableError('INTERNAL_SERVER_ERROR', `Error updating ${config.config_key}:`, error)
-          return NextResponse.json(
-            { error: `Failed to update ${config.config_key}` },
-            { status: 500 }
-          )
-        }
-      } else {
-        // Insert new config
-        const { error } = await supabase
-          .from('system_config')
-          .insert({
-            config_key: config.config_key,
-            config_value: String(config.config_value),
-            description: config.description || null,
-            description_ar: config.description_ar || null,
-            group_type: groupType,
-            updated_by: user.id
-          })
-
-        if (error) {
-          logger.logStableError('INTERNAL_SERVER_ERROR', `Error creating ${config.config_key}:`, error)
-          return NextResponse.json(
-            { error: `Failed to create ${config.config_key}` },
-            { status: 500 }
-          )
-        }
-      }
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in admin settings PUT API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  if (!configs || !Array.isArray(configs)) {
+    throw new ApiError('VALIDATION_ERROR', 'Invalid settings data. Expected array of configs.', 400)
   }
-}
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+  // Update or insert each config
+  for (const config of configs) {
+    if (!config.config_key || config.config_value === undefined || config.config_value === null) {
+      continue // Skip invalid entries
     }
 
-    // Check if user is admin
-    const { data: adminRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles!inner(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('admin_roles.name', ['admin', 'super_admin'])
-      .limit(1)
+    const groupType = config.group_type || await getGroupType(supabase, config.config_key, logger)
 
-    const isAdmin = (adminRoles?.length || 0) > 0
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
-    }
-
-    const body = await request.json()
-    const { config_key, config_value, description, description_ar, group_type } = body
-
-    if (!config_key || config_value === undefined || config_value === null) {
-      return NextResponse.json(
-        { error: 'config_key and config_value are required' },
-        { status: 400 }
-      )
-    }
-
-    // Check if config already exists
+    // Check if config exists
     const { data: existing, error: checkError } = await supabase
       .from('system_config')
       .select('id')
-      .eq('config_key', config_key)
+      .eq('config_key', config.config_key)
       .maybeSingle()
 
     if (existing && !checkError) {
-      return NextResponse.json(
-        { error: `Config key '${config_key}' already exists. Use PUT to update it.` },
-        { status: 409 }
-      )
+      // Update existing config
+      const { error } = await supabase
+        .from('system_config')
+        .update({
+          config_value: String(config.config_value),
+          description: config.description || null,
+          description_ar: config.description_ar || null,
+          group_type: groupType,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id
+        })
+        .eq('config_key', config.config_key)
+
+      if (error) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', `Error updating ${config.config_key}:`, error)
+        throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to update ${config.config_key}`, 500)
+      }
+    } else {
+      // Insert new config
+      const { error } = await supabase
+        .from('system_config')
+        .insert({
+          config_key: config.config_key,
+          config_value: String(config.config_value),
+          description: config.description || null,
+          description_ar: config.description_ar || null,
+          group_type: groupType,
+          updated_by: user.id
+        })
+
+      if (error) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', `Error creating ${config.config_key}:`, error)
+        throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to create ${config.config_key}`, 500)
+      }
     }
-
-    // Determine group_type automatically if not provided
-    const finalGroupType = group_type || await getGroupType(supabase, config_key, logger)
-
-    // Insert new config
-    const { data: newConfig, error } = await supabase
-      .from('system_config')
-      .insert({
-        config_key,
-        config_value: String(config_value),
-        description: description || null,
-        description_ar: description_ar || null,
-        group_type: finalGroupType,
-        updated_by: user.id
-      })
-      .select()
-      .single()
-
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', `Error creating config ${config_key}:`, error)
-      return NextResponse.json(
-        { error: `Failed to create config: ${error.message}` },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ success: true, config: newConfig })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in admin settings POST API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
+
+  return NextResponse.json({ success: true })
 }
+
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
+
+  const body = await request.json()
+  const { config_key, config_value, description, description_ar, group_type } = body
+
+  if (!config_key || config_value === undefined || config_value === null) {
+    throw new ApiError('VALIDATION_ERROR', 'config_key and config_value are required', 400)
+  }
+
+  // Check if config already exists
+  const { data: existing, error: checkError } = await supabase
+    .from('system_config')
+    .select('id')
+    .eq('config_key', config_key)
+    .maybeSingle()
+
+  if (existing && !checkError) {
+    throw new ApiError('CONFLICT', `Config key '${config_key}' already exists. Use PUT to update it.`, 409)
+  }
+
+  // Determine group_type automatically if not provided
+  const finalGroupType = group_type || await getGroupType(supabase, config_key, logger)
+
+  // Insert new config
+  const { data: newConfig, error } = await supabase
+    .from('system_config')
+    .insert({
+      config_key,
+      config_value: String(config_value),
+      description: description || null,
+      description_ar: description_ar || null,
+      group_type: finalGroupType,
+      updated_by: user.id
+    })
+    .select()
+    .single()
+
+  if (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', `Error creating config ${config_key}:`, error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to create config: ${error.message}`, 500)
+  }
+
+  return NextResponse.json({ success: true, config: newConfig })
+}
+
+export const GET = createGetHandler(getHandler, { requireAdmin: true, loggerContext: 'api/admin/settings' })
+export const PUT = createPutHandler(putHandler, { requireAdmin: true, loggerContext: 'api/admin/settings' })
+export const POST = createPostHandler(postHandler, { requireAdmin: true, loggerContext: 'api/admin/settings' })
 

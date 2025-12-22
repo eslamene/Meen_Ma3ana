@@ -15,6 +15,8 @@ import { BeneficiaryDocumentService } from '@/lib/services/beneficiaryDocumentSe
 import { useAdmin } from '@/lib/admin/hooks'
 import type { BeneficiaryDocument, DocumentType } from '@/types/beneficiary'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface BeneficiaryDocumentUploadProps {
   beneficiaryId: string
   onDocumentUploaded: (document: BeneficiaryDocument) => void
@@ -35,7 +37,7 @@ export default function BeneficiaryDocumentUpload({
 
   // Debug logging
   useEffect(() => {
-    console.log('BeneficiaryDocumentUpload - Admin check:', {
+    logger.debug('BeneficiaryDocumentUpload - Admin check', {
       adminLoading,
       isAdmin,
       hasAdminRole: hasRole('admin'),
@@ -75,7 +77,7 @@ export default function BeneficiaryDocumentUpload({
   }
 
   const handleUpload = async () => {
-    console.log('🔄 handleUpload called', { 
+    logger.debug('handleUpload called', { 
       selectedFile: selectedFile?.name, 
       beneficiaryId,
       isAdmin,
@@ -83,13 +85,13 @@ export default function BeneficiaryDocumentUpload({
     })
     
     if (!selectedFile) {
-      console.error('❌ No file selected')
+      logger.error('❌ No file selected')
       setUploadError('Please select a file to upload')
       return
     }
 
     if (!isAdmin) {
-      console.error('❌ User is not an admin')
+      logger.error('❌ User is not an admin')
       setUploadError('Only administrators can upload documents')
       return
     }
@@ -117,7 +119,7 @@ export default function BeneficiaryDocumentUpload({
       setUploadError(null)
       setUploadSuccess(null)
 
-      console.log('Starting upload...', { beneficiaryId, fileName: selectedFile.name, fileSize: selectedFile.size, fileType: selectedFile.type })
+      logger.debug('Starting upload', { beneficiaryId, fileName: selectedFile.name, fileSize: selectedFile.size, fileType: selectedFile.type })
 
       // Create a safe filename
       const safeName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')
@@ -129,7 +131,7 @@ export default function BeneficiaryDocumentUpload({
       formData.append('fileName', fileName)
       formData.append('bucket', 'beneficiaries')
 
-      console.log('Sending upload request to /api/upload...', {
+      logger.debug('Sending upload request to /api/upload', {
         beneficiaryId,
         fileName,
         fileSize: selectedFile.size,
@@ -141,18 +143,21 @@ export default function BeneficiaryDocumentUpload({
         body: formData,
       })
 
-      console.log('Upload response status:', uploadResponse.status, uploadResponse.ok)
-      console.log('Upload response headers:', Object.fromEntries(uploadResponse.headers.entries()))
+      logger.debug('Upload response', { 
+        status: uploadResponse.status, 
+        ok: uploadResponse.ok,
+        headers: Object.fromEntries(uploadResponse.headers.entries())
+      })
 
       if (!uploadResponse.ok) {
         let errorMessage = 'Failed to upload file'
         try {
         const errorData = await uploadResponse.json()
           errorMessage = errorData.error || errorMessage
-          console.error('Upload error response:', errorData)
+          logger.error('Upload error response:', { error: errorData })
         } catch (e) {
           const text = await uploadResponse.text()
-          console.error('Upload error (non-JSON):', text)
+          logger.error('Upload error (non-JSON):', { error: text })
           errorMessage = `Upload failed with status ${uploadResponse.status}: ${text}`
         }
         throw new Error(errorMessage)
@@ -161,16 +166,16 @@ export default function BeneficiaryDocumentUpload({
       let uploadData
       try {
         const responseText = await uploadResponse.text()
-        console.log('Upload response text:', responseText)
+        logger.debug('Upload response text', { responseText })
         uploadData = JSON.parse(responseText)
-        console.log('Upload successful, parsed response:', uploadData)
+        logger.debug('Upload successful, parsed response', { uploadData })
       } catch (parseError) {
-        console.error('Failed to parse upload response:', parseError)
+        logger.error('Failed to parse upload response:', { error: parseError })
         throw new Error('Failed to parse server response')
       }
 
       if (!uploadData.url && !uploadData.path) {
-        console.error('No URL or path in upload response:', uploadData)
+        logger.error('No URL or path in upload response:', { error: uploadData })
         throw new Error('Upload succeeded but no URL or path returned')
       }
 
@@ -182,9 +187,9 @@ export default function BeneficiaryDocumentUpload({
       if (!fileUrl) {
         throw new Error('No file URL available in response')
       }
-      console.log('Using file URL:', fileUrl)
+      logger.debug('Using file URL', { fileUrl })
 
-      console.log('Creating document record in database...')
+      logger.debug('Creating document record in database')
       let newDocument
       try {
       // Create document record
@@ -199,11 +204,11 @@ export default function BeneficiaryDocumentUpload({
         description: description.trim() || undefined
       })
 
-        console.log('Document created successfully:', newDocument)
+        logger.debug('Document created successfully', { newDocument })
       } catch (dbError) {
-        console.error('Database insert failed:', dbError)
+        logger.error('Database insert failed:', { error: dbError })
         const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error'
-        console.error('Full error details:', dbError)
+        logger.error('Full error details:', { error: dbError })
         throw new Error(`Failed to save document record: ${errorMessage}`)
       }
 
@@ -237,7 +242,7 @@ export default function BeneficiaryDocumentUpload({
       }, 3000)
 
     } catch (error) {
-      console.error('Error uploading document:', error)
+      logger.error('Error uploading document:', { error: error })
       const errorMessage = error instanceof Error ? error.message : 'Failed to upload document. Please try again.'
       setUploadError(errorMessage)
       setUploadSuccess(null)
@@ -253,7 +258,7 @@ export default function BeneficiaryDocumentUpload({
       await BeneficiaryDocumentService.delete(documentId)
       onDocumentDeleted(documentId)
     } catch (error) {
-      console.error('Error deleting document:', error)
+      logger.error('Error deleting document:', { error: error })
       alert('Failed to delete document. Please try again.')
     }
   }
@@ -263,7 +268,7 @@ export default function BeneficiaryDocumentUpload({
       await BeneficiaryDocumentService.update(documentId, { is_public: isPublic })
       // Refresh documents or update local state
     } catch (error) {
-      console.error('Error updating document visibility:', error)
+      logger.error('Error updating document visibility:', { error: error })
       alert('Failed to update document visibility. Please try again.')
     }
   }
@@ -392,7 +397,7 @@ export default function BeneficiaryDocumentUpload({
           {/* Upload Button */}
           <Button
             onClick={(e) => {
-              console.log('🔘 Upload button clicked', { 
+              logger.debug('Upload button clicked', { 
                 selectedFile: selectedFile?.name, 
                 isUploading,
                 isAdmin 

@@ -34,6 +34,8 @@ import LanguageSwitcher from '@/components/LanguageSwitcher'
 import type { AdminMenuItem } from '@/lib/admin/types'
 import { getIcon } from '@/lib/icons/registry'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface SimpleSidebarProps {
   isOpen: boolean
   onToggle: () => void
@@ -83,7 +85,7 @@ export default function SimpleSidebar({
       const count = await notificationService.getUnreadNotificationCount(userId)
       setNotificationCount(count)
     } catch (error) {
-      console.error('Error fetching unread notifications:', error)
+      logger.error('Error fetching unread notifications:', { error: error })
       setNotificationCount(0)
     }
   }, [supabase])
@@ -116,7 +118,7 @@ export default function SimpleSidebar({
       await supabase.auth.signOut()
       router.push(`/${locale}/landing`)
     } catch (error) {
-      console.error('Error signing out:', error)
+      logger.error('Error signing out:', { error: error })
     }
   }
 

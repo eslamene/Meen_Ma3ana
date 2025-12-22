@@ -6,6 +6,8 @@
 import { ActivityService, extractRequestInfo, generateSessionId } from '@/lib/services/activityService'
 import { createClient } from '@/lib/supabase/server'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 /**
  * Get or create session ID from cookies
  */
@@ -48,11 +50,11 @@ export async function logPageView(request: Request, pathname: string): Promise<v
       },
     }).catch(error => {
       // Silently fail - don't break the request
-      console.error('Failed to log page view:', error)
+      logger.error('Failed to log page view:', { error: error })
     })
   } catch (error) {
     // Silently fail - don't break the request
-    console.error('Error in logPageView:', error)
+    logger.error('Error in logPageView:', { error: error })
   }
 }
 
@@ -87,11 +89,11 @@ export async function logApiCall(
       },
     }).catch(error => {
       // Silently fail - don't break the request
-      console.error('Failed to log API call:', error)
+      logger.error('Failed to log API call:', { error: error })
     })
   } catch (error) {
     // Silently fail - don't break the request
-    console.error('Error in logApiCall:', error)
+    logger.error('Error in logApiCall:', { error: error })
   }
 }
 

@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
+import { defaultLogger as logger } from '@/lib/logger'
+
 import { 
   BarChart3, 
   TrendingUp, 
@@ -102,7 +104,7 @@ export default function AdminAnalyticsPage() {
       setMetrics(data.metrics)
       setRecentActivity(data.recentActivity)
     } catch (error) {
-      console.error('Error fetching analytics data:', error)
+      logger.error('Error fetching analytics data:', { error: error })
       // Fallback to empty data on error
       setMetrics({
         totalCases: 0,

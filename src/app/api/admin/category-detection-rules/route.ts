@@ -5,36 +5,22 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { adminService } from '@/lib/admin/service'
-import { defaultLogger } from '@/lib/logger'
 import { db } from '@/lib/db'
 import { categoryDetectionRules, caseCategories } from '@/drizzle/schema'
 import { eq, desc, and, inArray } from 'drizzle-orm'
 import { clearCategoryRulesCache } from '@/lib/utils/category-detection'
 
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if user has admin role
-    const hasAdminRole = await adminService.hasRole(user.id, 'admin') || 
-                         await adminService.hasRole(user.id, 'super_admin')
-
-    if (!hasAdminRole) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
 
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('category_id')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    const whereConditions: any[] = []
+    const whereConditions: ReturnType<typeof eq>[] = []
 
     if (categoryId && categoryId !== 'all') {
       whereConditions.push(eq(categoryDetectionRules.category_id, categoryId))
@@ -71,44 +57,28 @@ export async function GET(request: NextRequest) {
       )
 
     return NextResponse.json({ rules })
-  } catch (error) {
-    defaultLogger.error('Error fetching category detection rules:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { user, logger } = context
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only super_admin can create rules
-    const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
-    if (!isSuperAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  // Only super_admin can create rules
+  const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
+  if (!isSuperAdmin) {
+    throw new ApiError('FORBIDDEN', 'Only super_admin can create rules', 403)
+  }
 
     const body = await request.json()
     
     // Check if this is a bulk update request
     if (body.bulk && Array.isArray(body.rule_ids)) {
-      return handleBulkUpdate(body, user.id)
+      return handleBulkUpdate(body, user.id, logger)
     }
 
     const { category_id, keyword, priority = 0, is_active = true } = body
 
     if (!category_id || !keyword) {
-      return NextResponse.json(
-        { error: 'category_id and keyword are required' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'category_id and keyword are required', 400)
     }
 
     // Verify category exists
@@ -119,10 +89,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     if (category.length === 0) {
-      return NextResponse.json(
-        { error: 'Category not found' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Category not found', 400)
     }
 
     // Check for duplicate
@@ -138,10 +105,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     if (existing.length > 0) {
-      return NextResponse.json(
-        { error: 'A rule with this category and keyword already exists' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'A rule with this category and keyword already exists', 400)
     }
 
     const [newRule] = await db
@@ -156,7 +120,7 @@ export async function POST(request: NextRequest) {
       })
       .returning()
 
-    defaultLogger.info('Category detection rule created:', {
+    logger.info('Category detection rule created', {
       ruleId: newRule.id,
       categoryId: category_id,
       keyword,
@@ -166,30 +130,28 @@ export async function POST(request: NextRequest) {
     clearCategoryRulesCache()
 
     return NextResponse.json({ rule: newRule }, { status: 201 })
-  } catch (error) {
-    defaultLogger.error('Error creating category detection rule:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+}
+
+type BulkUpdateBody = {
+  bulk?: boolean
+  rule_ids: string[]
+  updates: {
+    category_id?: string
+    keyword?: string
+    priority?: number
+    is_active?: boolean
   }
 }
 
-async function handleBulkUpdate(body: any, userId: string) {
+async function handleBulkUpdate(body: BulkUpdateBody, userId: string, logger: ApiHandlerContext['logger']) {
   const { rule_ids, updates } = body
 
   if (!Array.isArray(rule_ids) || rule_ids.length === 0) {
-    return NextResponse.json(
-      { error: 'rule_ids array is required and must not be empty' },
-      { status: 400 }
-    )
+    throw new ApiError('VALIDATION_ERROR', 'rule_ids array is required and must not be empty', 400)
   }
 
   if (!updates || typeof updates !== 'object') {
-    return NextResponse.json(
-      { error: 'updates object is required' },
-      { status: 400 }
-    )
+    throw new ApiError('VALIDATION_ERROR', 'updates object is required', 400)
   }
 
   // Validate category if being updated
@@ -201,14 +163,11 @@ async function handleBulkUpdate(body: any, userId: string) {
       .limit(1)
 
     if (category.length === 0) {
-      return NextResponse.json(
-        { error: 'Category not found' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Category not found', 400)
     }
   }
 
-  const updateData: any = {
+  const updateData: { updated_at: Date; updated_by: string; [key: string]: unknown } = {
     updated_at: new Date(),
     updated_by: userId,
   }
@@ -224,7 +183,7 @@ async function handleBulkUpdate(body: any, userId: string) {
     .where(inArray(categoryDetectionRules.id, rule_ids))
     .returning()
 
-  defaultLogger.info('Category detection rules bulk updated:', {
+  logger.info('Category detection rules bulk updated', {
     count: updatedRules.length,
     ruleIds: rule_ids,
     updates: Object.keys(updateData),
@@ -239,4 +198,14 @@ async function handleBulkUpdate(body: any, userId: string) {
     rules: updatedRules 
   })
 }
+
+export const GET = createGetHandler(getHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/category-detection-rules' 
+})
+
+export const POST = createPostHandler(postHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/category-detection-rules' 
+})
 

@@ -10,6 +10,8 @@ import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target 
 import { createClient } from '@/lib/supabase/client'
 import { CaseNotification } from '@/lib/notifications/case-notifications'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface NotificationCenterProps {
   isOpen: boolean
   onClose: () => void
@@ -80,7 +82,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         setUnreadCount(data.unreadCount || 0)
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error)
+      logger.error('Error fetching notifications:', { error: error })
     } finally {
       setLoading(false)
     }
@@ -109,7 +111,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         setUnreadCount(prev => Math.max(0, prev - 1))
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error)
+      logger.error('Error marking notification as read:', { error: error })
     }
   }
 
@@ -126,7 +128,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         setUnreadCount(0)
       }
     } catch (error) {
-      console.error('Error marking all notifications as read:', error)
+      logger.error('Error marking all notifications as read:', { error: error })
     }
   }
 

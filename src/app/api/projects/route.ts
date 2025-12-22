@@ -2,23 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { projects, projectCycles } from '@/lib/db'
 import { eq, desc } from 'drizzle-orm'
-import { createClient } from '@/lib/supabase/server'
+import { env } from '@/config/env'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
 
     const body = await request.json()
     const {
@@ -34,10 +23,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!name || !description || !category || !targetAmount || !cycleDuration) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Missing required fields', 400)
     }
 
     // Calculate cycle duration in days
@@ -84,10 +70,7 @@ export async function POST(request: NextRequest) {
 
     if (projectError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating project:', projectError)
-      return NextResponse.json(
-        { error: 'Failed to create project' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create project', 500)
     }
 
     // Create first cycle
@@ -113,36 +96,16 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(project)
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating project:', error)
-    return NextResponse.json(
-      { error: 'Failed to create project' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    // Check if Supabase environment variables are set
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      logger.error('Missing Supabase environment variables')
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      )
-    }
-
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
+  
+  // Check if Supabase environment variables are set
+  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    logger.error('Missing Supabase environment variables')
+    throw new ApiError('CONFIGURATION_ERROR', 'Server configuration error', 500)
+  }
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -174,16 +137,10 @@ export async function GET(request: NextRequest) {
       
       // Handle specific database connection errors
       if (error.code === 'SASL_SIGNATURE_MISMATCH') {
-        return NextResponse.json(
-          { error: 'Database authentication error. Please check your Supabase configuration.' },
-          { status: 500 }
-        )
+        throw new ApiError('CONFIGURATION_ERROR', 'Database authentication error. Please check your Supabase configuration.', 500)
       }
       
-      return NextResponse.json(
-        { error: 'Failed to fetch projects' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch projects', 500)
     }
 
     return NextResponse.json({
@@ -194,11 +151,7 @@ export async function GET(request: NextRequest) {
         total: projectList?.length || 0,
       },
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching projects:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch projects' },
-      { status: 500 }
-    )
-  }
-} 
+}
+
+export const GET = createGetHandler(getHandler, { requireAuth: true, loggerContext: 'api/projects' })
+export const POST = createPostHandler(postHandler, { requireAuth: true, loggerContext: 'api/projects' }) 

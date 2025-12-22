@@ -134,7 +134,10 @@ function createLogger() {
       }
     } catch (error) {
       // If pino-pretty fails, fall back to basic logger
-      console.warn('Failed to initialize pino-pretty, using basic logger:', error)
+      // Use console.warn here since logger isn't available yet
+      if (typeof console !== 'undefined') {
+        console.warn('Failed to initialize pino-pretty, using basic logger:', error)
+      }
     }
   }
 
@@ -187,7 +190,9 @@ export class Logger {
       logger.warn(this.formatMessage(message, data))
     } catch (error) {
       // Fallback to console if logger worker fails
-      console.warn('[Logger]', message, data || '')
+      if (typeof console !== 'undefined') {
+        console.warn('[Logger]', message, data || '')
+      }
     }
   }
 
@@ -268,9 +273,11 @@ export class Logger {
       logger.error(logData)
     } catch (loggerError) {
       // Fallback to console if logger worker fails
-      console.error('[Logger]', message, error || '', data || '')
-      if (loggerError instanceof Error) {
-        console.error('[Logger Error]', loggerError.message)
+      if (typeof console !== 'undefined') {
+        console.error('[Logger]', message, data || '')
+        if (loggerError instanceof Error) {
+          console.error('[Logger Error]', loggerError.message)
+        }
       }
     }
   }

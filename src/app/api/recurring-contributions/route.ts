@@ -1,25 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
 /**
  * GET /api/recurring-contributions
  * Fetch recurring contributions for the authenticated user
  * Returns contributions with joined case and project data
  */
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
 
     // Fetch recurring contributions with joined case and project data
     const { data: contributions, error } = await supabase
@@ -34,13 +23,31 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       logger.error('Error fetching recurring contributions:', error)
-      return NextResponse.json({ 
-        error: 'Failed to fetch recurring contributions' 
-      }, { status: 500 })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch recurring contributions', 500)
     }
 
     // Transform the data to include case/project metadata in a flat structure
-    const transformedContributions = (contributions || []).map((contrib: any) => {
+    interface RecurringContribution {
+      id: string
+      amount: number
+      frequency: string
+      status: string
+      start_date: string | null
+      end_date: string | null
+      next_contribution_date: string | null
+      total_contributions?: number
+      successful_contributions?: number
+      failed_contributions?: number
+      payment_method: string | null
+      auto_process: boolean
+      notes: string | null
+      case_id: string | null
+      project_id: string | null
+      created_at: string
+      cases?: Array<{ title_en?: string; title_ar?: string }> | { title_en?: string; title_ar?: string }
+      projects?: Array<{ name?: string }> | { name?: string }
+    }
+    const transformedContributions = (contributions || []).map((contrib: RecurringContribution) => {
       const caseData = Array.isArray(contrib.cases) ? contrib.cases[0] : contrib.cases
       const projectData = Array.isArray(contrib.projects) ? contrib.projects[0] : contrib.projects
 
@@ -68,11 +75,14 @@ export async function GET(request: NextRequest) {
     })
 
     // Calculate aggregates server-side
+    interface TransformedContribution {
+      status: string
+    }
     const total = transformedContributions.length
-    const active = transformedContributions.filter((c: any) => c.status === 'active').length
-    const paused = transformedContributions.filter((c: any) => c.status === 'paused').length
-    const cancelled = transformedContributions.filter((c: any) => c.status === 'cancelled').length
-    const completed = transformedContributions.filter((c: any) => c.status === 'completed').length
+    const active = transformedContributions.filter((c: TransformedContribution) => c.status === 'active').length
+    const paused = transformedContributions.filter((c: TransformedContribution) => c.status === 'paused').length
+    const cancelled = transformedContributions.filter((c: TransformedContribution) => c.status === 'cancelled').length
+    const completed = transformedContributions.filter((c: TransformedContribution) => c.status === 'completed').length
 
     return NextResponse.json({
       contributions: transformedContributions,
@@ -84,30 +94,14 @@ export async function GET(request: NextRequest) {
         completed
       }
     })
-  } catch (error) {
-    logger.error('Unexpected error in GET /api/recurring-contributions:', error)
-    return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 })
-  }
 }
 
 /**
  * POST /api/recurring-contributions
  * Create a new recurring contribution
  */
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
 
     const body = await request.json()
     const {
@@ -124,21 +118,15 @@ export async function POST(request: NextRequest) {
 
     // Validation
     if (!amount || amount <= 0) {
-      return NextResponse.json({ 
-        error: 'Amount must be greater than 0' 
-      }, { status: 400 })
+      throw new ApiError('VALIDATION_ERROR', 'Amount must be greater than 0', 400)
     }
 
     if (!frequency || !['weekly', 'monthly', 'quarterly', 'yearly'].includes(frequency)) {
-      return NextResponse.json({ 
-        error: 'Invalid frequency. Must be one of: weekly, monthly, quarterly, yearly' 
-      }, { status: 400 })
+      throw new ApiError('VALIDATION_ERROR', 'Invalid frequency. Must be one of: weekly, monthly, quarterly, yearly', 400)
     }
 
     if (!startDate) {
-      return NextResponse.json({ 
-        error: 'Start date is required' 
-      }, { status: 400 })
+      throw new ApiError('VALIDATION_ERROR', 'Start date is required', 400)
     }
 
     // Calculate next contribution date based on frequency
@@ -182,17 +170,11 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       logger.error('Error creating recurring contribution:', insertError)
-      return NextResponse.json({ 
-        error: 'Failed to create recurring contribution',
-        details: insertError.message
-      }, { status: 500 })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create recurring contribution', 500, { details: insertError.message })
     }
 
     return NextResponse.json(contribution, { status: 201 })
-  } catch (error) {
-    logger.error('Unexpected error in POST /api/recurring-contributions:', error)
-    return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 })
-  }
 }
+
+export const GET = createGetHandler(getHandler, { requireAuth: true, loggerContext: 'api/recurring-contributions' })
+export const POST = createPostHandler(postHandler, { requireAuth: true, loggerContext: 'api/recurring-contributions' })

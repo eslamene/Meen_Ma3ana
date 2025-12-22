@@ -27,6 +27,8 @@ import {
 import { getIconWithFallback } from '@/lib/icons/registry'
 import type { AdminMenuItem } from '@/lib/admin/types'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Note: useAdmin handles permissions internally
 
 interface SidebarNavigationProps {
@@ -80,7 +82,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
       const count = await notificationService.getUnreadNotificationCount(userId)
       setUnreadNotifications(count)
     } catch (error) {
-      console.error('Error fetching notifications:', error)
+      logger.error('Error fetching notifications:', { error: error })
     }
   }, [supabase])
 
@@ -92,7 +94,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
         await fetchUnreadNotifications(user.id)
       }
     } catch (error) {
-      console.error('Error fetching user:', error)
+      logger.error('Error fetching user:', { error: error })
     } finally {
       setLoading(false)
     }
@@ -144,7 +146,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
         findActiveItem(menuItems)
       }
     } catch (error) {
-      console.error('Error in SidebarNavigation useEffect:', error)
+      logger.error('Error in SidebarNavigation useEffect:', { error: error })
     }
   }, [pathname, locale, menuItems, modulesLoading, expandedModules])
 
@@ -155,7 +157,7 @@ export default function SidebarNavigation({ isOpen, onToggle }: SidebarNavigatio
       await supabase.auth.signOut()
       router.push(`/${locale}/landing`)
     } catch (error) {
-      console.error('Error signing out:', error)
+      logger.error('Error signing out:', { error: error })
     }
   }
 

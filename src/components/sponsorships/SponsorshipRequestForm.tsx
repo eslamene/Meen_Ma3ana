@@ -14,6 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, CheckCircle, Building2, Calendar, DollarSign } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Case {
   id: string
   title: string
@@ -80,7 +82,7 @@ export default function SponsorshipRequestForm({
     const getUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser()
       if (error) {
-        console.error('Error getting user:', error)
+        logger.error('Error getting user:', { error: error })
         return
       }
       setUser(user)
@@ -111,7 +113,7 @@ export default function SponsorshipRequestForm({
       }))
       setCases(mappedCases)
     } catch (err: any) {
-      console.error('Error fetching cases:', err)
+      logger.error('Error fetching cases:', { error: err })
     }
   }, [supabase])
 
@@ -173,7 +175,7 @@ export default function SponsorshipRequestForm({
         })
 
       if (notificationError) {
-        console.error('Error creating notification:', notificationError)
+        logger.error('Error creating notification:', { error: notificationError })
       }
 
       setSuccess(true)

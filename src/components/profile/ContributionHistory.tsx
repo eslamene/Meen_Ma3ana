@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Calendar, DollarSign, Eye, Download, Heart, Target, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Contribution {
   id: string
   caseId: string
@@ -54,16 +56,16 @@ export default function ContributionHistory() {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        console.error('API Error Response:', errorData)
+        logger.error('API Error Response:', { error: errorData })
         throw new Error(errorData.error || 'Failed to fetch contributions')
       }
       
       const data = await response.json()
-      console.log('API Response:', data)
+      logger.debug('API Response', { data })
       setContributions(data.contributions || [])
       setPagination(prev => data.pagination || prev)
     } catch (error) {
-      console.error('Error fetching contributions:', error)
+      logger.error('Error fetching contributions:', { error: error })
       setError('Failed to load contributions')
     } finally {
       setLoading(false)

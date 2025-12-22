@@ -40,6 +40,8 @@ import ContributionHistory from '@/components/profile/ContributionHistory'
 import UserRoleInfo from '@/components/profile/UserRoleInfo'
 import { theme, brandColors } from '@/lib/theme'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface UserProfile {
   id: string
   email: string
@@ -159,7 +161,7 @@ export default function ProfilePage() {
         })
       }
     } catch (err) {
-      console.error('Error fetching user profile:', err)
+      logger.error('Error fetching user profile:', { error: err })
       setError('Failed to load profile')
     } finally {
       setLoading(false)

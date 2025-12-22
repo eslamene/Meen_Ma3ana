@@ -5,6 +5,8 @@ import { locales } from '@/i18n/request'
 import { Inter, Cairo } from 'next/font/google'
 import DirSetter from '@/components/marketing/DirSetter'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 const inter = Inter({ 
   subsets: ['latin'],
   variable: '--font-inter',

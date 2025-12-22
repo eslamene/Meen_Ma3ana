@@ -20,6 +20,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner'
 import { theme, brandColors } from '@/lib/theme'
 import Pagination from '@/components/ui/pagination'
+import { defaultLogger as logger } from '@/lib/logger'
+
 import { 
   Users, 
   Search, 
@@ -122,7 +124,7 @@ export default function AdminUsersPage() {
         toast.error('Error', { description: usersRes.error || 'Failed to fetch users' })
       }
     } catch (error) {
-      console.error('Fetch error:', error)
+      logger.error('Fetch error:', { error: error })
       toast.error('Error', { description: 'Failed to fetch users' })
     } finally {
       setLoading(false)
@@ -153,7 +155,7 @@ export default function AdminUsersPage() {
         })))
       }
     } catch (error) {
-      console.error('Error fetching roles:', error)
+      logger.error('Error fetching roles:', { error: error })
       toast.error('Error', { description: 'Failed to fetch roles' })
     }
   }, [toast])
@@ -178,7 +180,7 @@ export default function AdminUsersPage() {
         setUserCurrentRoles([])
       }
     } catch (error) {
-      console.error('Error fetching user roles:', error)
+      logger.error('Error fetching user roles:', { error: error })
       toast.error('Error', { description: 'Failed to fetch user roles' })
       setUserCurrentRoles([])
     } finally {
@@ -218,7 +220,7 @@ export default function AdminUsersPage() {
       // Close modal
       setRoleAssignmentModal({ open: false, userId: null, userEmail: null })
     } catch (error) {
-      console.error('Error saving roles:', error)
+      logger.error('Error saving roles:', { error: error })
       toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to assign roles'
       })
@@ -267,7 +269,7 @@ export default function AdminUsersPage() {
       setDeleteDialog({ open: false, userId: null, userEmail: null })
       await fetchUsers()
     } catch (error) {
-      console.error('Error deleting user:', error)
+      logger.error('Error deleting user:', { error: error })
       toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to delete user',
       })

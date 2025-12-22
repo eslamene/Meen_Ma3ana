@@ -4,6 +4,8 @@ import { useTranslations, useLocale } from 'next-intl'
 import { MessageCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface ContactInfo {
   whatsappNumber: string
   whatsappDefaultMessage: string
@@ -32,7 +34,7 @@ export default function WhatsAppChat() {
           setContactInfo(data)
         }
       } catch (error) {
-        console.error('Error fetching contact info:', error)
+        logger.error('Error fetching contact info:', { error: error })
         // Keep empty values on error
       } finally {
         setLoading(false)

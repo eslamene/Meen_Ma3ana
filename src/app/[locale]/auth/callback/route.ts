@@ -41,7 +41,7 @@ export async function GET(
     const errorCode = errorCodeParam || 'unknown'
     const errorDesc = errorDescParam ? decodeURIComponent(errorDescParam.replace(/\+/g, ' ')) : 'Error confirming user'
     
-    console.error('❌ Supabase auth error from query params (Supabase failed before our code ran):', {
+    logger.error('❌ Supabase auth error from query params (Supabase failed before our code ran):', {
       error: supabaseError,
       errorCode,
       errorDescription: errorDesc,
@@ -185,7 +185,7 @@ export async function GET(
             )
           
           if (userError) {
-            console.error('Error syncing email_verified:', userError)
+            logger.error('Error syncing email_verified:', { error: userError })
             // Don't fail the confirmation if this update fails
             // But log it for debugging
           } else {
@@ -214,7 +214,7 @@ export async function GET(
           }
         } catch (upsertError) {
           // Catch any unexpected errors during upsert
-          console.error('Unexpected error during user upsert:', upsertError)
+          logger.error('Unexpected error during user upsert:', { error: upsertError })
           // Continue with redirect - don't fail the email confirmation
         }
       }

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import type { User } from '@supabase/supabase-js'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface MenuModule {
   id: string
   name: string
@@ -61,7 +63,7 @@ export async function getMenuModules(user: User | null): Promise<TransformedMenu
   })
 
   if (error) {
-    console.error('Error fetching menu items:', error)
+    logger.error('Error fetching menu items:', { error: error })
     return []
   }
 

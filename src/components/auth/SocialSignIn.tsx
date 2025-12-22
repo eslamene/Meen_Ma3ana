@@ -7,6 +7,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import { getAppUrl } from '@/lib/utils/app-url'
 import { Chrome, Apple, Facebook } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface SocialSignInProps {
   mode?: 'login' | 'register'
   onSuccess?: () => void
@@ -49,7 +51,7 @@ export default function SocialSignIn({ mode = 'login', onSuccess, onError }: Soc
       setLoading(null)
       const errorMessage = error?.message || t('socialSignInError')
       onError?.(errorMessage)
-      console.error(`Error signing in with ${provider}:`, error)
+      logger.error(`Error signing in with ${provider}:`, { error: error })
     }
   }
 

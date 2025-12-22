@@ -1,41 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: adminRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles!inner(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('admin_roles.name', ['admin', 'super_admin'])
-      .limit(1)
-
-    const isAdmin = (adminRoles?.length || 0) > 0
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
-    }
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger } = context
 
     const { data, error } = await supabase
       .from('sponsorships')
@@ -68,21 +36,23 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching sponsorships:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch sponsorship requests' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch sponsorship requests', 500)
     }
 
     // Transform the data to match the expected interface
-    const transformedData = ((data || []) as any[]).map((item) => {
+    interface SponsorshipItem {
+      sponsor?: unknown
+      case?: unknown
+      [key: string]: unknown
+    }
+    const transformedData = ((data || []) as Array<SponsorshipItem>).map((item) => {
       const sponsor = Array.isArray(item.sponsor) ? item.sponsor[0] : item.sponsor
       const caseData = Array.isArray(item.case) ? item.case[0] : item.case
       return {
         id: item.id,
         sponsor_id: item.sponsor_id,
         case_id: item.case_id,
-        amount: parseFloat(item.amount),
+        amount: typeof item.amount === 'string' || typeof item.amount === 'number' ? parseFloat(String(item.amount)) : 0,
         status: item.status,
         terms: item.terms || '',
         start_date: item.start_date,
@@ -105,12 +75,10 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({ sponsorships: transformedData })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in admin sponsorships API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandler(getHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/sponsorships' 
+})
 

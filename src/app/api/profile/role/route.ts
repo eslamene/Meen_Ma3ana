@@ -1,25 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { withApiHandler, ApiHandlerContext, createGetHandler } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
 /**
  * GET /api/profile/role
  * Get current user's role and permission information
  */
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const supabase = await createClient()
-    
-    // Check if user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
 
     // Get user's roles
     const { data: userRoles, error: rolesError } = await supabase
@@ -43,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     if (rolesError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user roles:', rolesError)
-      return NextResponse.json({ error: 'Failed to fetch roles' }, { status: 500 })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch roles', 500)
     }
 
     // Get user's permissions
@@ -69,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     if (permissionsError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user permissions:', permissionsError)
-      return NextResponse.json({ error: 'Failed to fetch permissions' }, { status: 500 })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch permissions', 500)
     }
 
     // Transform the data
@@ -109,8 +97,6 @@ export async function GET(request: NextRequest) {
       total_permissions: permissions.length,
       total_roles: roles.length
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in GET /api/profile/role:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
 }
+
+export const GET = createGetHandler(handler, { requireAuth: true, loggerContext: 'api/profile/role' })

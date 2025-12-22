@@ -15,6 +15,8 @@ import StandardModal, {
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface UserProfile {
   id: string
   email: string
@@ -91,7 +93,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         email_verified: data.user.email_verified ?? false
       })
     } catch (error) {
-      console.error('Error fetching user:', error)
+      logger.error('Error fetching user:', { error: error })
       toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to load user profile',
       })
@@ -135,7 +137,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       onSuccess()
       onClose()
     } catch (error) {
-      console.error('Error updating user:', error)
+      logger.error('Error updating user:', { error: error })
       toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to update user profile',
       })
@@ -167,7 +169,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       onSuccess()
       onClose()
     } catch (error) {
-      console.error('Error deleting user:', error)
+      logger.error('Error deleting user:', { error: error })
       toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to delete user',
       })

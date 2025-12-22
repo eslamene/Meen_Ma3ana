@@ -7,6 +7,8 @@
 
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface PaginationSettings {
   scrollItemsPerPage: number
   desktopDefaultItemsPerPage: number
@@ -40,14 +42,14 @@ export async function getPaginationSettings(): Promise<PaginationSettings> {
       ])
 
     if (error) {
-      console.error('Error fetching pagination settings:', error)
-      console.warn('Using default pagination settings due to error')
+      logger.error('Error fetching pagination settings:', { error: error })
+      logger.warn('Using default pagination settings due to error')
       return DEFAULT_SETTINGS
     }
 
     // Log if no data returned
     if (!data || data.length === 0) {
-      console.warn('No pagination settings found in system_config, using defaults')
+      logger.warn('No pagination settings found in system_config, using defaults')
       return DEFAULT_SETTINGS
     }
 
@@ -82,7 +84,7 @@ export async function getPaginationSettings(): Promise<PaginationSettings> {
           desktopItemsPerPageOptions = DEFAULT_SETTINGS.desktopItemsPerPageOptions
         }
       } catch (parseError) {
-        console.warn('Error parsing desktop items per page options, using defaults:', parseError)
+        logger.warn('Error parsing desktop items per page options, using defaults:', parseError)
         desktopItemsPerPageOptions = DEFAULT_SETTINGS.desktopItemsPerPageOptions
       }
     }
@@ -95,8 +97,8 @@ export async function getPaginationSettings(): Promise<PaginationSettings> {
 
     return settings
   } catch (error) {
-    console.error('Exception fetching pagination settings:', error)
-    console.warn('Using default pagination settings due to exception')
+    logger.error('Exception fetching pagination settings:', { error: error })
+    logger.warn('Using default pagination settings due to exception')
     return DEFAULT_SETTINGS
   }
 }

@@ -1,57 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { CaseLifecycleService } from '@/lib/case-lifecycle'
 import { db } from '@/lib/db'
 import { cases, users, type CaseStatus } from '@/drizzle/schema'
 import { eq } from 'drizzle-orm'
-import { RouteContext } from '@/types/next-api'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id: caseId } = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  const { user, logger } = context
+  const { id: caseId } = params
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  // Get case details
+  const [caseData] = await db
+    .select()
+    .from(cases)
+    .where(eq(cases.id, caseId))
 
-    // Get case details
-    const [caseData] = await db
-      .select()
-      .from(cases)
-      .where(eq(cases.id, caseId))
-
-    if (!caseData) {
-      return NextResponse.json({ error: 'Case not found' }, { status: 404 })
-    }
-
-    // Get user role
-    const [userData] = await db
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, user.id))
-
-    const userRole = userData?.role || 'donor'
-
-    // Get available transitions
-    const availableTransitions = CaseLifecycleService.getAvailableTransitions(
-      caseData.status as CaseStatus,
-      userRole,
-      false
-    )
-
-    return NextResponse.json({ transitions: availableTransitions })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error getting available transitions:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  if (!caseData) {
+    throw new ApiError('NOT_FOUND', 'Case not found', 404)
   }
-} 
+
+  // Get user role
+  const [userData] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, user.id))
+
+  const userRole = userData?.role || 'donor'
+
+  // Get available transitions
+  const availableTransitions = CaseLifecycleService.getAvailableTransitions(
+    caseData.status as CaseStatus,
+    userRole,
+    false
+  )
+
+  return NextResponse.json({ transitions: availableTransitions })
+}
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/cases/[id]/transitions' 
+}) 

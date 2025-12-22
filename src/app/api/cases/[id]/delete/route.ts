@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { RouteContext } from '@/types/next-api'
+import { createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function DELETE(
+async function deleteHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id: caseId } = await context.params
-    const supabase = await createClient()
+  const { supabase, logger } = context
+  const { id: caseId } = params
 
     // 1. Check if case has any contributions
     const { data: contributions, error: contributionsError } = await supabase
@@ -23,14 +18,12 @@ export async function DELETE(
       .limit(1)
 
     if (contributionsError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking contributions:', contributionsError)
-      return NextResponse.json(
-        { error: 'Failed to check case contributions' },
-        { status: 500 }
-      )
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking contributions', { error: contributionsError })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to check case contributions', 500)
     }
 
     if (contributions && contributions.length > 0) {
+      // Return 200 with blocked status (not an error, but a business rule)
       return NextResponse.json(
         { 
           success: false,
@@ -49,11 +42,8 @@ export async function DELETE(
       .eq('case_id', caseId)
 
     if (filesError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching case files:', filesError)
-      return NextResponse.json(
-        { error: 'Failed to fetch case files' },
-        { status: 500 }
-      )
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching case files', { error: filesError })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch case files', 500)
     }
 
     // 3. Start cascaded deletion manually
@@ -94,11 +84,8 @@ export async function DELETE(
         .eq('id', caseId)
 
       if (caseDeleteError) {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting case:', caseDeleteError)
-        return NextResponse.json(
-          { error: 'Failed to delete case' },
-          { status: 500 }
-        )
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting case', { error: caseDeleteError })
+        throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to delete case', 500)
       }
 
       // 11. Log the deletion to audit_logs
@@ -114,11 +101,8 @@ export async function DELETE(
         }
       })
     } catch (deleteError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in cascaded deletion:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete case and related data' },
-        { status: 500 }
-      )
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in cascaded deletion', { error: deleteError })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to delete case and related data', 500)
     }
 
     // 4. Delete files from storage
@@ -133,7 +117,7 @@ export async function DELETE(
           .remove(filePaths)
 
         if (storageError) {
-          logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting files from storage:', storageError)
+          logger.warn('Error deleting files from storage', { error: storageError })
           // Don't fail the entire operation if storage cleanup fails
         }
       }
@@ -143,12 +127,9 @@ export async function DELETE(
       success: true,
       message: 'Case and all related data deleted successfully'
     })
-
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Unexpected error in case deletion:', error)
-    return NextResponse.json(
-      { error: 'An unexpected error occurred' },
-      { status: 500 }
-    )
-  }
 }
+
+export const DELETE = createDeleteHandlerWithParams(deleteHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/cases/[id]/delete' 
+})

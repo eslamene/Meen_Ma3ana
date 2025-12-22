@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Shield, AlertTriangle } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Role {
   id: string
   name: string
@@ -58,7 +60,7 @@ export function UserRoleAssignmentModal({
       setSaving(true)
       await onSave(selectedRoles)
     } catch (error) {
-      console.error('Error saving roles:', error)
+      logger.error('Error saving roles:', { error: error })
     } finally {
       setSaving(false)
     }

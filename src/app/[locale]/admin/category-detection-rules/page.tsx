@@ -38,6 +38,8 @@ import { cn } from '@/lib/utils'
 import DynamicIcon from '@/components/ui/dynamic-icon'
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Category {
   id: string
   name: string
@@ -108,7 +110,7 @@ export default function CategoryDetectionRulesPage() {
       const data = await response.json()
       setCategories(data.categories || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      logger.error('Error fetching categories:', { error: error })
       toast.error('Error', { description: 'Failed to load categories' })
     } finally {
       setCategoriesLoading(false)
@@ -145,7 +147,7 @@ export default function CategoryDetectionRulesPage() {
         setExpandedCategories(categoryIds)
       }
     } catch (error) {
-      console.error('Error fetching rules:', error)
+      logger.error('Error fetching rules:', { error: error })
       toast.error('Error', { description: 'Failed to load category detection rules' })
     } finally {
       setLoading(false)
@@ -214,7 +216,7 @@ export default function CategoryDetectionRulesPage() {
       cancelEdit()
       await fetchRules()
     } catch (error) {
-      console.error('Error updating rule:', error)
+      logger.error('Error updating rule:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update rule' })
     } finally {
       setSaving(prev => ({ ...prev, [editingRuleId]: false }))
@@ -245,7 +247,7 @@ export default function CategoryDetectionRulesPage() {
 
       await fetchRules()
     } catch (error) {
-      console.error('Error toggling rule status:', error)
+      logger.error('Error toggling rule status:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update rule status' })
     } finally {
       setSaving(prev => ({ ...prev, [ruleId]: false }))
@@ -272,7 +274,7 @@ export default function CategoryDetectionRulesPage() {
 
       await fetchRules()
     } catch (error) {
-      console.error('Error deleting rule:', error)
+      logger.error('Error deleting rule:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to delete rule' })
     } finally {
       setSaving(prev => ({ ...prev, [ruleId]: false }))
@@ -325,7 +327,7 @@ export default function CategoryDetectionRulesPage() {
       cancelAdd()
       await fetchRules()
     } catch (error) {
-      console.error('Error creating rule:', error)
+      logger.error('Error creating rule:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to create rule' }) 
     } finally {
       setSaving(prev => ({ ...prev, [`add-${newCategoryId}`]: false }))

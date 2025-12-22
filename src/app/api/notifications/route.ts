@@ -1,26 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
+  
   try {
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
@@ -112,22 +98,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
+  
   try {
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     const body = await request.json()
     const { action, notificationId } = body
@@ -171,4 +145,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}
+
+export const GET = withApiHandler(getHandler, { requireAuth: true, loggerContext: 'api/notifications' })
+export const POST = withApiHandler(postHandler, { requireAuth: true, loggerContext: 'api/notifications' })

@@ -15,6 +15,8 @@ import { Plus, Shield } from 'lucide-react'
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
 import { useParams } from 'next/navigation'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Role {
   id: string
   name: string
@@ -70,7 +72,7 @@ export default function AdminRolesPage() {
         setPermissions(permissionsRes.data?.permissions || [])
       }
     } catch (error) {
-      console.error('Fetch error:', error)
+      logger.error('Fetch error:', { error: error })
       toast.error('Error', { description: 'Failed to fetch data' })
     } finally {
       setLoading(false)
@@ -100,7 +102,7 @@ export default function AdminRolesPage() {
         toast.error('Error', { description: errorMessage })
       }
     } catch (error) {
-      console.error('Update role error:', error)
+      logger.error('Update role error:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update role' })
     }
   }
@@ -122,7 +124,7 @@ export default function AdminRolesPage() {
         toast.error('Error', { description: errorMessage })
       }
     } catch (error) {
-      console.error('Assign permissions error:', error)
+      logger.error('Assign permissions error:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to assign permissions' })
     }
   }
@@ -143,7 +145,7 @@ export default function AdminRolesPage() {
         toast.error('Error', { description: errorMessage })
       }
     } catch (error) {
-      console.error('Create role error:', error)
+      logger.error('Create role error:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to create role' })
     }
   }
@@ -224,7 +226,7 @@ export default function AdminRolesPage() {
                 await handleEditRole(data)
               } catch (error) {
                 // Error already handled in handleEditRole
-                console.error('Error in edit role handler:', error)
+                logger.error('Error in edit role handler:', { error: error })
               }
             }}
             role={selectedRole}

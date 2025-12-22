@@ -5,6 +5,8 @@
 import type { AuthSettings } from '@/lib/utils/authSettings'
 import { getDefaultAuthSettings } from '@/lib/utils/authSettings'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 /**
  * Validates password strength using configurable settings
  * Requirements are configurable via system_config:
@@ -284,8 +286,8 @@ export function validateEmail(email: string, settings?: AuthSettings): boolean {
       return false
     } catch (error) {
       // If configured regex is invalid, fall back to simple pattern
-      console.error('Invalid email regex in config, falling back to simple pattern:', error)
-      console.error('Pattern that failed (first 200 chars):', authSettings.emailRegex.substring(0, 200))
+      logger.error('Invalid email regex in config, falling back to simple pattern:', { error: error })
+      logger.error('Pattern that failed (first 200 chars):', { error: authSettings.emailRegex.substring(0, 200) })
       // Fall through to simple pattern validation below
     }
   }

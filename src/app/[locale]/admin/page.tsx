@@ -31,6 +31,8 @@ import {
 } from 'lucide-react'
 import { theme, brandColors } from '@/lib/theme'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Admin Quick Actions Component
 interface AdminQuickActionsSectionProps {
   router: ReturnType<typeof useRouter>
@@ -199,7 +201,7 @@ export default function AdminPage() {
       
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          console.error('Unauthorized or forbidden access to admin dashboard')
+          logger.error('Unauthorized or forbidden access to admin dashboard')
           return
         }
         throw new Error(`Failed to fetch system stats: ${response.statusText}`)
@@ -219,7 +221,7 @@ export default function AdminPage() {
         recentActivity: data.recentActivity || []
       })
     } catch (error) {
-      console.error('Error fetching system stats:', error)
+      logger.error('Error fetching system stats:', { error: error })
     } finally {
       setLoading(false)
     }

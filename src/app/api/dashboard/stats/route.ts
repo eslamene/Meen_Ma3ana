@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { withApiHandler, createGetHandler } from '@/lib/utils/api-wrapper'
+import { createApiError } from '@/lib/utils/api-errors'
+import type { ApiResponse } from '@/types/api'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+interface DashboardStats {
+  totalContributions: number
+  totalAmount: number
+  activeCases: number
+  completedCases: number
+}
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+export const GET = createGetHandler(
+  async (request, { user, supabase, logger }) => {
 
     // Fetch user's contributions
     const { data: contributions, error: contributionsError } = await supabase
@@ -26,11 +20,8 @@ export async function GET(request: NextRequest) {
       .eq('donor_id', user.id)
 
     if (contributionsError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching contributions:', contributionsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch contributions' },
-        { status: 500 }
-      )
+      logger.error('Error fetching contributions', { error: contributionsError })
+      throw createApiError.internalError('Failed to fetch contributions')
     }
 
     // Fetch user's cases
@@ -40,11 +31,8 @@ export async function GET(request: NextRequest) {
       .eq('created_by', user.id)
 
     if (casesError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching cases:', casesError)
-      return NextResponse.json(
-        { error: 'Failed to fetch cases' },
-        { status: 500 }
-      )
+      logger.error('Error fetching cases', { error: casesError })
+      throw createApiError.internalError('Failed to fetch cases')
     }
 
     // Calculate statistics
@@ -57,19 +45,16 @@ export async function GET(request: NextRequest) {
     const completedCases = (cases || []).filter((c) => c.status === 'completed' || c.status === 'closed').length
 
     return NextResponse.json({
-      stats: {
-        totalContributions,
-        totalAmount,
-        activeCases,
-        completedCases
+      data: {
+        stats: {
+          totalContributions,
+          totalAmount,
+          activeCases,
+          completedCases
+        }
       }
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in dashboard stats API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
+  },
+  { requireAuth: true, loggerContext: 'api/dashboard/stats' }
+)
 

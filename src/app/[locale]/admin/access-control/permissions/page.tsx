@@ -15,6 +15,8 @@ import { toast } from 'sonner'
 import { getIconWithFallback } from '@/lib/icons/registry'
 import { PermissionFormModal } from '@/components/admin/rbac/PermissionFormModal'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Module {
   id: string
   name: string
@@ -144,9 +146,9 @@ export default function PermissionsPage() {
         const contentType = permissionsRes.headers.get('content-type')
         if (contentType?.includes('application/json')) {
           const errorData = await permissionsRes.json().catch(() => ({}))
-          console.error('Permissions fetch error:', errorData)
+          logger.error('Permissions fetch error:', { error: errorData })
         } else {
-          console.error('Permissions fetch error: Non-JSON response', permissionsRes.status)
+          logger.error('Permissions fetch error: Non-JSON response', { error: permissionsRes.status })
         }
       }
 
@@ -155,10 +157,10 @@ export default function PermissionsPage() {
         setRoles(rolesData.roles || [])
       } else {
         const errorData = await rolesRes.json().catch(() => ({}))
-        console.error('Roles fetch error:', errorData)
+        logger.error('Roles fetch error:', { error: errorData })
       }
     } catch (error) {
-      console.error('Fetch data error:', error)
+      logger.error('Fetch data error:', { error: error })
       toast.error('Error', {
         description: 'Failed to fetch data'
       })

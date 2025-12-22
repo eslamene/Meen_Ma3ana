@@ -15,6 +15,8 @@ import BeneficiaryFileManager from '@/components/beneficiaries/BeneficiaryFileMa
 import { toast } from 'sonner'
 import type { Beneficiary, BeneficiaryDocument } from '@/types/beneficiary'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function BeneficiaryDetailPage() {
   const t = useTranslations('beneficiaries')
   const params = useParams()
@@ -41,11 +43,11 @@ export default function BeneficiaryDetailPage() {
         if (result.success && result.data) {
           setBeneficiary(result.data)
         } else {
-          console.error('Error loading beneficiary:', result.error)
+          logger.error('Error loading beneficiary:', { error: result.error })
           router.push(`/${locale}/beneficiaries`)
         }
       } catch (error) {
-        console.error('Error loading beneficiary:', error)
+        logger.error('Error loading beneficiary:', { error: error })
         router.push(`/${locale}/beneficiaries`)
       } finally {
         setLoading(false)
@@ -80,7 +82,7 @@ export default function BeneficiaryDetailPage() {
       
       router.push(`/${locale}/beneficiaries`)
     } catch (error) {
-      console.error('Error deleting beneficiary:', error)
+      logger.error('Error deleting beneficiary:', { error: error })
       toast.error(
         'Delete Failed',
         { description: error instanceof Error ? error.message : 'Failed to delete beneficiary' }  

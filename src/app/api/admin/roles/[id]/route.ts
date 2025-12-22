@@ -6,27 +6,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { adminService } from '@/lib/admin/service'
-import { defaultLogger } from '@/lib/logger'
-import { RouteContext } from '@/types/next-api'
+import { createPutHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-export async function PUT(
+async function handler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  try {
-    const params = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only super_admin can update roles
-    const isSuperAdmin = await adminService.hasRole(user.id, 'super_admin')
-    if (!isSuperAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     const body = await request.json()
     const { display_name, display_name_ar, description, description_ar, level } = body
@@ -39,10 +28,7 @@ export async function PUT(
       .single()
 
     if (existingRole?.is_system) {
-      return NextResponse.json(
-        { error: 'Cannot update system roles' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Cannot update system roles', 400)
     }
 
     const { data, error } = await supabase
@@ -62,12 +48,7 @@ export async function PUT(
     if (error) throw error
 
     return NextResponse.json({ role: data })
-  } catch (error) {
-    defaultLogger.error('Error updating role:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const PUT = createPutHandlerWithParams<{ id: string }>(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/roles/[id]' })
 

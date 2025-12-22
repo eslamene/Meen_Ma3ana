@@ -28,6 +28,8 @@ import ContributionRejectionModal from '@/components/contributions/ContributionR
 import ContributionDetailsModal from '@/components/contributions/ContributionDetailsModal'
 import PaymentProofModal from '@/components/contributions/PaymentProofModal'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Utility functions
 const formatAmount = (amount: number) => `EGP ${amount.toLocaleString()}`
 const getTimeAgo = (dateString: string) => {
@@ -173,7 +175,7 @@ const ContributionItem = ({
         description: 'Transaction ID copied to clipboard'
       })
     } catch (err) {
-      console.error('Failed to copy: ', err)
+      logger.error('Failed to copy: ', { error: err })
       toast.error('Error',  {
         description: 'Failed to copy to clipboard'
       })

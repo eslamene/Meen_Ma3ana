@@ -6,21 +6,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { ActivityService, extractRequestInfo } from '@/lib/services/activityService'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-import { createClient } from '@/lib/supabase/server'
+import { createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger } = context
+  
+  const body = await request.json()
+  const { ipAddress, userAgent } = extractRequestInfo(request)
 
-  try {
-    const body = await request.json()
-    const { ipAddress, userAgent } = extractRequestInfo(request)
-
-    // Get user if authenticated
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  // Get user if authenticated
+  const { data: { user } } = await supabase.auth.getUser()
 
     // Use user_id from body or from auth
     const userId = body.user_id || user?.id
@@ -113,12 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true }, { status: 200 })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error tracking activity:', error)
-    return NextResponse.json(
-      { error: 'Failed to track activity' },
-      { status: 500 }
-    )
-  }
 }
+
+export const POST = createPostHandler(handler, { loggerContext: 'api/activity/track' })
 

@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminPermission } from '@/lib/security/rls'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createClient } from '@supabase/supabase-js'
-import { RouteContext } from '@/types/next-api'
 import { getAppUrl } from '@/lib/utils/app-url'
-
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { env } from '@/config/env'
+import { createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
 /**
  * POST /api/admin/users/[userId]/reset-password
@@ -14,109 +12,89 @@ import { getCorrelationId } from '@/lib/correlation'
  * 
  * This sends a password reset email to the user
  */
-export async function POST(
+async function handler(
   request: NextRequest,
-  context: RouteContext<{ userId: string }>
+  context: ApiHandlerContext,
+  params: { userId: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+  const { logger, user: adminUser } = context
+  const { userId } = params
 
-  try {
-    const { userId } = await context.params
-    
-    // Require admin permission
-    const authResult = await requireAdminPermission(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
+  // Log the admin action
+  const { ipAddress, userAgent } = extractRequestInfo(request)
+  await AuditService.logAdminAction(
+    adminUser.id,
+    'admin_password_reset',
+    'user',
+    userId,
+    {},
+    ipAddress,
+    userAgent
+  )
 
-    const { user: adminUser, supabase } = authResult
-
-    // Log the admin action
-    const { ipAddress, userAgent } = extractRequestInfo(request)
-    await AuditService.logAdminAction(
-      adminUser.id,
-      'admin_password_reset',
-      'user',
-      userId,
-      {},
-      ipAddress,
-      userAgent
-    )
-
-    // Create service role client for admin operations
-    const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
-
-    // Get user email
-    const { data: authUser, error: authError } = await serviceRoleClient.auth.admin.getUserById(userId)
-    
-    if (authError || !authUser || !authUser.user.email) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    // Get locale from request or default to 'en'
-    const { searchParams } = new URL(request.url)
-    const locale = searchParams.get('locale') || 'en'
-
-    // Send password reset email
-    const redirectTo = `${getAppUrl()}/${locale}/auth/reset-password`
-    
-    const { error: resetError } = await serviceRoleClient.auth.admin.generateLink({
-      type: 'recovery',
-      email: authUser.user.email,
-      options: {
-        redirectTo
-      }
-    })
-
-    if (resetError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error generating password reset link:', resetError)
-      return NextResponse.json(
-        { error: 'Failed to send password reset email', details: resetError.message },
-        { status: 500 }
-      )
-    }
-
-    // Note: generateLink doesn't actually send the email, we need to use resetPasswordForEmail
-    // But that requires the anon key. Let's use the service role to send it.
-    const { error: emailError } = await serviceRoleClient.auth.resetPasswordForEmail(
-      authUser.user.email,
-      {
-        redirectTo
-      }
-    )
-
-    if (emailError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error sending password reset email:', emailError)
-      return NextResponse.json(
-        { error: 'Failed to send password reset email', details: emailError.message },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Password reset email sent successfully'
-    })
-
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Password reset API error:', error)
-    return NextResponse.json({
-      error: 'Failed to reset password',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+  // Create service role client for admin operations
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+    throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
   }
+  
+  const serviceRoleClient = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  )
+
+  // Get user email
+  const { data: authUser, error: authError } = await serviceRoleClient.auth.admin.getUserById(userId)
+  
+  if (authError || !authUser || !authUser.user.email) {
+    throw new ApiError('NOT_FOUND', 'User not found', 404)
+  }
+
+  // Get locale from request or default to 'en'
+  const { searchParams } = new URL(request.url)
+  const locale = searchParams.get('locale') || 'en'
+
+  // Send password reset email
+  const redirectTo = `${getAppUrl()}/${locale}/auth/reset-password`
+  
+  const { error: resetError } = await serviceRoleClient.auth.admin.generateLink({
+    type: 'recovery',
+    email: authUser.user.email,
+    options: {
+      redirectTo
+    }
+  })
+
+  if (resetError) {
+    logger.error('Error generating password reset link:', resetError)
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to send password reset email', 500, { details: resetError.message })
+  }
+
+  // Note: generateLink doesn't actually send the email, we need to use resetPasswordForEmail
+  // But that requires the anon key. Let's use the service role to send it.
+  const { error: emailError } = await serviceRoleClient.auth.resetPasswordForEmail(
+    authUser.user.email,
+    {
+      redirectTo
+    }
+  )
+
+  if (emailError) {
+    logger.error('Error sending password reset email:', emailError)
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to send password reset email', 500, { details: emailError.message })
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: 'Password reset email sent successfully'
+  })
 }
+
+export const POST = createPostHandlerWithParams<{ userId: string }>(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/users/[userId]/reset-password' })
 

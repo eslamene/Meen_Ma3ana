@@ -17,6 +17,8 @@ import { LookupService } from '@/lib/services/lookupService'
 import { toast } from 'sonner'
 import type { Beneficiary, UpdateBeneficiaryData, City, IdType } from '@/types/beneficiary'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function EditBeneficiaryPage() {
   const t = useTranslations('beneficiaries')
   const params = useParams()
@@ -49,11 +51,11 @@ export default function EditBeneficiaryPage() {
         if (result.success && result.data) {
           setBeneficiary(result.data)
         } else {
-          console.error('Error loading beneficiary:', result.error)
+          logger.error('Error loading beneficiary:', { error: result.error })
           router.push(`/${locale}/beneficiaries`)
         }
       } catch (error) {
-        console.error('Error loading beneficiary:', error)
+        logger.error('Error loading beneficiary:', { error: error })
         router.push(`/${locale}/beneficiaries`)
       } finally {
         setLoading(false)
@@ -76,7 +78,7 @@ export default function EditBeneficiaryPage() {
         setCities(citiesData)
         setIdTypes(idTypesData)
       } catch (error) {
-        console.error('Error loading lookup data:', error)
+        logger.error('Error loading lookup data:', { error: error })
       }
     }
 
@@ -114,7 +116,7 @@ export default function EditBeneficiaryPage() {
         router.push(`/${locale}/beneficiaries/${updatedBeneficiary.id}`)
       }, 500)
     } catch (error) {
-      console.error('Error updating beneficiary:', error)
+      logger.error('Error updating beneficiary:', { error: error })
       toast.error(
         'Update Failed',
         { description: error instanceof Error ? error.message : 'Failed to update beneficiary. Please try again.' }
@@ -136,7 +138,7 @@ export default function EditBeneficiaryPage() {
       })
       
       if (!response.ok) {
-        let errorData: any = {}
+        let errorData: { error?: string; details?: string } = {}
         try {
           errorData = await response.json()
         } catch (parseError) {
@@ -217,10 +219,10 @@ export default function EditBeneficiaryPage() {
         })
       } else if (error && typeof error === 'object') {
         // Log non-Error objects with their properties
-        console.error('Unexpected error deleting beneficiary:', error)
+        logger.error('Unexpected error deleting beneficiary:', { error: error })
       } else {
         // Log primitive errors
-        console.error('Unexpected error deleting beneficiary:', errorMessage)
+        logger.error('Unexpected error deleting beneficiary:', { error: errorMessage })
       }
       
       toast.error('Delete Failed', {

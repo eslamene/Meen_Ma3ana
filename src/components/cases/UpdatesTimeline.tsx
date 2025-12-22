@@ -16,6 +16,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useAdmin } from '@/lib/admin/hooks'
 import { cn } from '@/lib/utils'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 type UpdateType = 'progress' | 'milestone' | 'general' | 'emergency'
 
 interface UpdatesTimelineProps {
@@ -143,11 +145,11 @@ export default function UpdatesTimeline({
         setShowCreateForm(false)
       } else {
         const error = await response.json()
-        console.error('Error creating update:', error)
+        logger.error('Error creating update:', { error: error })
         // TODO: Show error toast
       }
     } catch (error) {
-      console.error('Error creating update:', error)
+      logger.error('Error creating update:', { error: error })
       // TODO: Show error toast
     } finally {
       setIsSubmitting(false)
@@ -179,10 +181,10 @@ export default function UpdatesTimeline({
         setEditingUpdate(null)
       } else {
         const error = await response.json()
-        console.error('Error updating update:', error)
+        logger.error('Error updating update:', { error: error })
       }
     } catch (error) {
-      console.error('Error updating update:', error as Error)
+      logger.error('Error updating update:', { error: error as Error })
     }
   }
 
@@ -200,10 +202,10 @@ export default function UpdatesTimeline({
         // TODO: Update parent component state
       } else {
         const error = await response.json()
-        console.error('Error deleting update:', error)
+        logger.error('Error deleting update:', { error: error })
       }
     } catch (error) {
-      console.error('Error deleting update:', error)
+      logger.error('Error deleting update:', { error: error })
     }
   }
 

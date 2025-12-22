@@ -11,6 +11,8 @@ import type { BucketMetadata, StorageRule } from '@/lib/storage/types'
 import { Loader2, Save, Image as ImageIcon, FileText, Video, Music, Database } from 'lucide-react'
 import StandardModal, { StandardModalPreview, StandardFormField } from '@/components/ui/standard-modal'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface BucketDetailsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -102,7 +104,7 @@ export function BucketDetailsDialog({
         ])
       }
     } catch (error) {
-      console.error('Error fetching bucket details:', error)
+      logger.error('Error fetching bucket details:', { error: error })
       toast.error('Error', {
         description: 'Failed to load bucket details'
       })
@@ -164,7 +166,7 @@ export function BucketDetailsDialog({
         onUpdate()
       }
     } catch (error: any) {
-      console.error('Error saving storage rules:', error)
+      logger.error('Error saving storage rules:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to update storage rules' })
     } finally {
       setSaving(false)

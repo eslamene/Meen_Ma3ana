@@ -37,6 +37,8 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { usePrefetchStorageRules } from '@/hooks/use-prefetch-storage-rules'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Sanitize filename for storage (remove special characters, Arabic, emojis, etc.)
 function sanitizeFilename(filename: string): string {
   // Get file extension
@@ -221,8 +223,8 @@ export default function CaseFileManager({
           .upload(storagePath, file)
 
         if (error) {
-          console.error('Upload error:', error)
-          console.error(`Failed to upload ${file.name}: ${error.message}`)
+          logger.error('Upload error:', { error: error })
+          logger.error(`Failed to upload ${file.name}: ${error.message}`)
           continue
         }
 
@@ -266,7 +268,7 @@ export default function CaseFileManager({
         }))
 
         // Log what we're trying to insert (for debugging)
-        console.log('Attempting to insert files:', {
+        logger.debug('Attempting to insert files', {
           count: filesToInsert.length,
           caseId,
           sample: filesToInsert[0] ? {
@@ -285,7 +287,7 @@ export default function CaseFileManager({
           .single()
 
         if (caseCheckError || !caseCheck) {
-          console.error('Case not found before file insert:', {
+          logger.error('Case not found before file insert', {
             caseId,
             error: caseCheckError
           })
@@ -298,7 +300,7 @@ export default function CaseFileManager({
               await supabase.storage
                 .from('case-files')
                 .remove([file.path])
-                .catch(err => console.warn('Failed to cleanup storage file:', err))
+                .catch(err => logger.warn('Failed to cleanup storage file:', err))
             }
           }
           return
@@ -330,8 +332,8 @@ export default function CaseFileManager({
             }
           }
           
-          console.error('Error inserting files into database:', errorInfo)
-          console.error('Full error object:', insertError)
+          logger.error('Error inserting files into database:', { error: errorInfo })
+          logger.error('Full error object:', { error: insertError })
           
           // More user-friendly error message based on error type
           let userMessage = 'Files uploaded but failed to save to database.'
@@ -345,7 +347,7 @@ export default function CaseFileManager({
                 await supabase.storage
                   .from('case-files')
                   .remove([file.path])
-                  .catch(err => console.warn('Failed to cleanup storage file:', err))
+                  .catch(err => logger.warn('Failed to cleanup storage file:', err))
               }
             }
           } else if (insertError.code === '23503') {
@@ -360,7 +362,7 @@ export default function CaseFileManager({
           
           toast.error('Database Error', { description: userMessage })
         } else {
-          console.log('Successfully inserted files:', insertData?.length || 0)
+          logger.info('Successfully inserted files', { count: insertData?.length || 0 })
         }
       }
 
@@ -371,7 +373,7 @@ export default function CaseFileManager({
       // Notify parent component
       notifyParent(updatedFiles)
 
-      console.log(`Successfully uploaded ${newFiles.length} file(s)`)
+      logger.info('Successfully uploaded files', { count: newFiles.length })
       
       toast.success('Files Uploaded', {
         description: `Successfully uploaded ${newFiles.length} file(s)`
@@ -381,7 +383,7 @@ export default function CaseFileManager({
     } catch (error) {
       // Log detailed error information
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Upload error:', {
+      logger.error('Upload error', {
         error,
         message: errorMessage,
         stack: error instanceof Error ? error.stack : undefined
@@ -420,7 +422,7 @@ export default function CaseFileManager({
         throw error
       }
     } catch (error) {
-      console.error('Error updating case documents:', error)
+      logger.error('Error updating case documents:', { error: error })
       throw error
     }
   }
@@ -455,8 +457,8 @@ export default function CaseFileManager({
           hint: dbError.hint || null,
           error: dbError
         }
-        console.error('Database delete error:', JSON.stringify(errorDetails, null, 2))
-        console.error('Full error object:', dbError)
+        logger.error('Database delete error:', { error: JSON.stringify(errorDetails, null, 2) })
+        logger.error('Full error object:', { error: dbError })
         toast.error('Delete Failed', {
           description: `Failed to delete file: ${errorDetails.message}`
         })
@@ -477,8 +479,8 @@ export default function CaseFileManager({
             statusCode: (storageError as any).statusCode || null,
             error: storageError
           }
-          console.warn('Storage delete warning:', JSON.stringify(errorDetails, null, 2))
-          console.warn('Full storage error object:', storageError)
+          logger.warn('Storage delete warning:', JSON.stringify(errorDetails, null, 2))
+          logger.warn('Full storage error object:', storageError)
           // Continue even if storage delete fails
         }
       }
@@ -500,8 +502,8 @@ export default function CaseFileManager({
         stack: error instanceof Error ? error.stack : null,
         error: error
       }
-      console.error('Error deleting file:', JSON.stringify(errorDetails, null, 2))
-      console.error('Full error object:', error)
+      logger.error('Error deleting file:', { error: JSON.stringify(errorDetails, null, 2) })
+      logger.error('Full error object:', { error: error })
       toast.error('Delete Failed', { description: `Failed to delete file: ${errorDetails.message}` })
       setDeleteDialog({ open: false, fileId: null })
     }
@@ -726,9 +728,7 @@ export default function CaseFileManager({
           onFileUpdate={async (updatedFile: GenericFile) => {
             try {
               const caseFile = updatedFile as CaseFile
-              console.log('Updating file:', caseFile)
-              console.log('Case ID:', caseId)
-              console.log('File ID:', caseFile.id)
+              logger.debug('Updating file', { caseFile, caseId, fileId: caseFile.id })
               
               const url = `/api/cases/${caseId}/files/${caseFile.id}`
               const payload = {
@@ -738,8 +738,7 @@ export default function CaseFileManager({
                 isPublic: caseFile.isPublic
               }
               
-              console.log('Request URL:', url)
-              console.log('Request payload:', payload)
+              logger.debug('File update request', { url, payload })
               
               // Update in database
               const response = await fetch(url, {
@@ -748,16 +747,18 @@ export default function CaseFileManager({
                 body: JSON.stringify(payload)
               })
 
-              console.log('API response status:', response.status)
-              console.log('API response headers:', Object.fromEntries(response.headers.entries()))
+              logger.debug('File update response', { 
+                status: response.status,
+                headers: Object.fromEntries(response.headers.entries())
+              })
               
               if (!response.ok) {
                 let errorText = ''
                 try {
                   errorText = await response.text()
-                  console.log('Error response text:', errorText)
+                  logger.error('File update error response', { errorText })
                   const errorData = JSON.parse(errorText)
-                  console.error('Server error response:', errorData)
+                  logger.error('Server error response:', { error: errorData })
                   throw new Error(
                     errorData.details || 
                     errorData.message || 
@@ -765,14 +766,14 @@ export default function CaseFileManager({
                     `Failed to update file (${response.status})`
                   )
                 } catch (parseError) {
-                  console.error('Failed to parse error response:', parseError)
-                  console.error('Raw error text:', errorText)
+                  logger.error('Failed to parse error response:', { error: parseError })
+                  logger.error('Raw error text:', { error: errorText })
                   throw new Error(`Failed to update file (${response.status}): ${errorText || 'Unknown error'}`)
                 }
               }
 
               const responseData = await response.json()
-              console.log('API response data:', responseData)
+              logger.debug('File update response data', { responseData })
 
               // Update local state with the updated file
               const updatedFiles = files.map(f => 
@@ -785,9 +786,9 @@ export default function CaseFileManager({
               
               toast.success("File Updated", { description: "File updated successfully" })
             } catch (error) {
-              console.error('Error updating file:', error)
-              console.error('Error message:', (error as Error)?.message)
-              console.error('Error details:', error)
+              logger.error('Error updating file:', { error: error })
+              logger.error('Error message:', { error: (error as Error)?.message })
+              logger.error('Error details:', { error: error })
               toast.error("Update Failed", { description: "Failed to update file" })
             }
           }}

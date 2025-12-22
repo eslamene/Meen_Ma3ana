@@ -43,6 +43,8 @@ import type { LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { theme, brandColors } from '@/lib/theme'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Dynamic Quick Actions Component
 interface QuickActionsSectionProps {
   quickActions: Array<{
@@ -238,7 +240,7 @@ export default function DashboardPage() {
         })
       }
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error)
+      logger.error('Error fetching dashboard stats:', { error: error })
     } finally {
       setLoading(false)
     }
@@ -272,7 +274,7 @@ export default function DashboardPage() {
         setRecentTransactions(transactions)
       }
     } catch (error) {
-      console.error('Error fetching recent transactions:', error)
+      logger.error('Error fetching recent transactions:', { error: error })
     } finally {
       setTransactionsLoading(false)
     }
@@ -295,7 +297,7 @@ export default function DashboardPage() {
       // Refresh admin data from the hook
       await refreshAdminData()
     } catch (error) {
-      console.error('Error refreshing role:', error)
+      logger.error('Error refreshing role:', { error: error })
     } finally {
       setRefreshingRole(false)
     }

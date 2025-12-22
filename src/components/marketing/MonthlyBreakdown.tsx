@@ -5,6 +5,8 @@ import { useEffect, useState, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, TrendingUp, Users, DollarSign, Clock } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface MonthlyData {
   month: number
   year: number
@@ -77,7 +79,9 @@ export default function MonthlyBreakdown() {
           })
           
           // Debug: Log the sorted order
-          console.log('Sorted months (oldest to newest):', sortedData.map(d => `${d.monthName} ${d.year}`))
+          logger.debug('Sorted months (oldest to newest)', { 
+            sorted: sortedData.map(d => `${d.monthName} ${d.year}`) 
+          })
           
           setMonthlyData(sortedData)
           // Set default selection to most recent month (last in ascending order)
@@ -87,7 +91,7 @@ export default function MonthlyBreakdown() {
           }
         }
       } catch (error) {
-        console.error('Error fetching monthly breakdown:', error)
+        logger.error('Error fetching monthly breakdown:', { error: error })
       } finally {
         setLoading(false)
       }

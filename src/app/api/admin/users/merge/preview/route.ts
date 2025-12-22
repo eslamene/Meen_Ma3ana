@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminPermission } from '@/lib/security/rls'
+import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { createClient } from '@supabase/supabase-js'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { env } from '@/config/env'
 
 /**
  * GET /api/admin/users/merge/preview
@@ -14,41 +14,32 @@ import { getCorrelationId } from '@/lib/correlation'
  * - Potential issues or conflicts
  * - Validation results
  */
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function getHandler(
+  request: NextRequest,
+  context: ApiHandlerContext
+) {
+  const { logger } = context
+  const { searchParams } = new URL(request.url)
+  const fromUserId = searchParams.get('fromUserId')
+  const toUserId = searchParams.get('toUserId')
 
-  try {
-    const { searchParams } = new URL(request.url)
-    const fromUserId = searchParams.get('fromUserId')
-    const toUserId = searchParams.get('toUserId')
+  if (!fromUserId || !toUserId) {
+    throw new ApiError('VALIDATION_ERROR', 'fromUserId and toUserId are required', 400)
+  }
 
-    if (!fromUserId || !toUserId) {
-      return NextResponse.json(
-        { error: 'fromUserId and toUserId are required' },
-        { status: 400 }
-      )
-    }
+  if (fromUserId === toUserId) {
+    throw new ApiError('VALIDATION_ERROR', 'Cannot merge user with itself', 400)
+  }
 
-    if (fromUserId === toUserId) {
-      return NextResponse.json(
-        { error: 'Cannot merge user with itself' },
-        { status: 400 }
-      )
-    }
-
-    // Require admin permission
-    const authResult = await requireAdminPermission(request)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
-    const { user: adminUser } = authResult
-
-    // Create service role client for admin operations
+  // Create service role client for admin operations
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+    throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+  }
+    
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -65,10 +56,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (fromError || !fromUser) {
-      return NextResponse.json(
-        { error: 'Source user not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Source user not found', 404)
     }
 
     const { data: toUser, error: toError } = await serviceRoleClient
@@ -78,10 +66,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (toError || !toUser) {
-      return NextResponse.json(
-        { error: 'Target user not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Target user not found', 404)
     }
 
     // Helper function to count records
@@ -217,15 +202,12 @@ export async function GET(request: NextRequest) {
         has_warnings: preview.validation.warnings.length > 0
       }
     })
-
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Merge preview API error:', error)
-    return NextResponse.json({
-      error: 'Failed to generate merge preview',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
 }
+
+export const GET = createGetHandler(getHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/users/merge/preview' 
+})
 
 
 

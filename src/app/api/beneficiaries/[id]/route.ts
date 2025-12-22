@@ -1,24 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { RouteContext } from '@/types/next-api'
-
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { env } from '@/config/env'
+import { createGetHandlerWithParams, createPutHandlerWithParams, createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { BUCKET_NAMES } from '@/lib/utils/storageBuckets'
 
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
+  const { logger } = context
+  const { id } = params
     
     // Create service role client to bypass RLS for beneficiary fetching
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for beneficiary operations')
+      throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+    }
+    
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -37,23 +41,14 @@ export async function GET(
     if (error) {
       if (error.code === 'PGRST116') {
         // No rows returned
-        return NextResponse.json(
-          { success: false, error: 'Beneficiary not found' },
-          { status: 404 }
-        )
+        throw new ApiError('NOT_FOUND', 'Beneficiary not found', 404)
       }
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary:', error)
-      return NextResponse.json(
-        { success: false, error: error.message || 'Failed to fetch beneficiary' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', error.message || 'Failed to fetch beneficiary', 500)
     }
 
     if (!data) {
-      return NextResponse.json(
-        { success: false, error: 'Beneficiary not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Beneficiary not found', 404)
     }
 
     // Transform beneficiary to include calculated age
@@ -67,30 +62,27 @@ export async function GET(
       success: true,
       data: beneficiary
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch beneficiary' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const body = await request.json()
+  const { logger } = context
+  const { id } = params
+  const body = await request.json()
+  
+  // Create service role client to bypass RLS for beneficiary update
+  // This allows authorized users (via API route) to update beneficiaries
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    logger.error('SUPABASE_SERVICE_ROLE_KEY is required for beneficiary operations')
+    throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+  }
     
-    // Create service role client to bypass RLS for beneficiary update
-    // This allows authorized users (via API route) to update beneficiaries
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -107,10 +99,7 @@ export async function PUT(
       .single()
     
     if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'Beneficiary not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Beneficiary not found', 404)
     }
     
     // Start with a clean object - only include fields that should be updated
@@ -202,10 +191,7 @@ export async function PUT(
     
     // Ensure we have at least one field to update
     if (Object.keys(dataToUpdate).length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'No fields to update' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'No fields to update', 400)
     }
     
     const { data: beneficiary, error } = await serviceRoleClient
@@ -217,17 +203,11 @@ export async function PUT(
     
     if (error) {
       logger.error('Error updating beneficiary:', error, { beneficiaryId: id, updateData: dataToUpdate })
-      return NextResponse.json(
-        { success: false, error: error.message || 'Failed to update beneficiary' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', error.message || 'Failed to update beneficiary', 500)
     }
-    
+
     if (!beneficiary) {
-      return NextResponse.json(
-        { success: false, error: 'Beneficiary not found after update' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Beneficiary not found after update', 404)
     }
     
     // Transform beneficiary to include calculated age
@@ -240,29 +220,29 @@ export async function PUT(
       success: true,
       data: beneficiary
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating beneficiary:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to update beneficiary' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function DELETE(
+async function deleteHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
+  const { logger } = context
+  const { id } = params
     
     // Create service role client to bypass RLS for beneficiary deletion
     // This allows authorized users (via API route) to delete beneficiaries
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for beneficiary operations')
+      return NextResponse.json(
+        { success: false, error: 'Service configuration error' },
+        { status: 500 }
+      )
+    }
+    
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -279,10 +259,7 @@ export async function DELETE(
     
     if (documentsError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary documents:', documentsError)
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch beneficiary documents for deletion' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch beneficiary documents for deletion', 500)
     }
     
     const documentsCount = documents?.length || 0
@@ -297,16 +274,13 @@ export async function DELETE(
       .single()
     
     if (beneficiaryError || !beneficiary) {
-      return NextResponse.json(
-        { success: false, error: 'Beneficiary not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Beneficiary not found', 404)
     }
     
     // Safety check: Check for cases linked to this beneficiary
     // Cases can be linked via beneficiary_id OR via beneficiary_name/beneficiary_contact
     // We need to check all possible links
-    let casesByBeneficiaryId: any[] = []
+    let casesByBeneficiaryId: Array<{ id: string; [key: string]: unknown }> = []
     
     // Check cases linked via beneficiary_id
     const { data: casesById, error: casesByIdError, count: countById } = await serviceRoleClient
@@ -322,7 +296,7 @@ export async function DELETE(
     
     // Check cases linked via beneficiary_name or beneficiary_contact
     // Use OR query to check both name and contact
-    let casesByNameContact: any[] = []
+    let casesByNameContact: Array<{ id: string; [key: string]: unknown }> = []
     let countByNameContact = 0
     
     // Build OR conditions for Supabase
@@ -363,17 +337,17 @@ export async function DELETE(
     
     if (totalCount > 0) {
       logger.warn(`Blocking deletion of beneficiary ${id} - assigned to ${totalCount} case(s)`)
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Cannot delete beneficiary. This beneficiary is assigned to ${totalCount} case(s). Please remove the beneficiary from all cases before deleting.`,
+      throw new ApiError(
+        'VALIDATION_ERROR',
+        `Cannot delete beneficiary. This beneficiary is assigned to ${totalCount} case(s). Please remove the beneficiary from all cases before deleting.`,
+        400,
+        {
           assignedCasesCount: totalCount,
           assignedCases: allCases.map(c => ({
             id: c.id,
             title: c.title_en || c.title_ar || 'Untitled Case'
           }))
-        },
-        { status: 400 }
+        }
       )
     }
     
@@ -393,27 +367,19 @@ export async function DELETE(
         logger.warn('RPC function not found, falling back to manual deletion. Please run migration 066_create_delete_beneficiary_transaction.sql')
         // Fall through to manual deletion below
       } else if (rpcError.code === 'P0001' || rpcError.message?.includes('Beneficiary not found')) {
-        return NextResponse.json(
-          { success: false, error: 'Beneficiary not found' },
-          { status: 404 }
-        )
+        throw new ApiError('NOT_FOUND', 'Beneficiary not found', 404)
       } else if (rpcError.code === 'P0002' || rpcError.message?.includes('Cannot delete beneficiary')) {
         const caseCountMatch = rpcError.message?.match(/(\d+)/)
         const caseCount = caseCountMatch ? parseInt(caseCountMatch[1], 10) : 0
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: rpcError.message || 'Cannot delete beneficiary with existing cases',
-            assignedCasesCount: caseCount
-          },
-          { status: 400 }
+        throw new ApiError(
+          'VALIDATION_ERROR',
+          rpcError.message || 'Cannot delete beneficiary with existing cases',
+          400,
+          { assignedCasesCount: caseCount }
         )
       } else {
         logger.logStableError('INTERNAL_SERVER_ERROR', 'Transaction error during beneficiary deletion:', rpcError)
-        return NextResponse.json(
-          { success: false, error: rpcError.message || 'Failed to delete beneficiary' },
-          { status: 500 }
-        )
+        throw new ApiError('INTERNAL_SERVER_ERROR', rpcError.message || 'Failed to delete beneficiary', 500)
       }
     }
     
@@ -424,10 +390,7 @@ export async function DELETE(
       
       if (!deletedBeneficiary) {
         logger.logStableError('INTERNAL_SERVER_ERROR', 'No rows deleted - beneficiary may not exist or deletion was blocked')
-        return NextResponse.json(
-          { success: false, error: 'Beneficiary could not be deleted. It may not exist or may be referenced by other records.' },
-          { status: 404 }
-        )
+        throw new ApiError('NOT_FOUND', 'Beneficiary could not be deleted. It may not exist or may be referenced by other records.', 404)
       }
       
       logger.info(`Deleted ${documentsCount} document record(s) from database`)
@@ -521,18 +484,12 @@ export async function DELETE(
 
     if (deleteError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary:', deleteError)
-      return NextResponse.json(
-        { success: false, error: deleteError.message || 'Failed to delete beneficiary' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', deleteError.message || 'Failed to delete beneficiary', 500)
     }
 
     if (!deletedDataManual || deletedDataManual.length === 0) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'No rows deleted - beneficiary may not exist or deletion was blocked')
-      return NextResponse.json(
-        { success: false, error: 'Beneficiary could not be deleted. It may not exist or may be referenced by other records.' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Beneficiary could not be deleted. It may not exist or may be referenced by other records.', 404)
     }
     
     // Storage deletion for fallback path
@@ -585,11 +542,8 @@ export async function DELETE(
       message: `Beneficiary deleted successfully${documentsCount > 0 ? ` along with ${documentsCount} associated document(s)` : ''}`,
       data: deletedDataManual[0]
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to delete beneficiary' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandlerWithParams<{ id: string }>(getHandler, { loggerContext: 'api/beneficiaries/[id]' })
+export const PUT = createPutHandlerWithParams<{ id: string }>(putHandler, { loggerContext: 'api/beneficiaries/[id]' })
+export const DELETE = createDeleteHandlerWithParams<{ id: string }>(deleteHandler, { loggerContext: 'api/beneficiaries/[id]' })

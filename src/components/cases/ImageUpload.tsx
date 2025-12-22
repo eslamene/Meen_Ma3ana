@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Upload, X, Image as ImageIcon, Trash2, Star, StarOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface UploadedImage {
   id: string
   file: File
@@ -70,7 +72,7 @@ export default function ImageUpload({
       // Validate file
       const error = validateFile(file)
       if (error) {
-        console.error(`File ${file.name}: ${error}`)
+        logger.error(`File ${file.name}: ${error}`)
         continue
       }
       
@@ -201,7 +203,7 @@ export default function ImageUpload({
             preview: urlData.publicUrl
           })
         } catch (error) {
-          console.error('Error uploading image:', error)
+          logger.error('Error uploading image:', { error: error })
           uploadedImages.push({
             ...image,
             error: t('uploadError')

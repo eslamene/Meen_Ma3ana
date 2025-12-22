@@ -1,9 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { systemContent } from '@/drizzle/schema'
 import { eq } from 'drizzle-orm'
+import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-export async function GET(request: Request) {
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
+
   try {
     const { searchParams } = new URL(request.url)
     const contentKey = searchParams.get('key')
@@ -32,11 +35,13 @@ export async function GET(request: Request) {
       content: content[0],
     })
   } catch (error) {
-    console.error('Error fetching system content:', error)
+    logger.error('Error fetching system content:', { error: error })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
   }
 }
+
+export const GET = withApiHandler(handler, { loggerContext: 'api/system-content' })
 

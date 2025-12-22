@@ -1,53 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
+import { env } from '@/config/env'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import type { ContributionRow } from '@/types/contribution'
 
 /**
  * Comprehensive GET handler for contributions API
  * Uses database functions for efficient search and filtering
  */
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
+  
+  // Parse query parameters
+  const { searchParams } = new URL(request.url)
+  const status = searchParams.get('status')
+  const search = searchParams.get('search')
+  const dateFrom = searchParams.get('dateFrom')
+  const dateTo = searchParams.get('dateTo')
+  const page = parseInt(searchParams.get('page') || '1', 10)
+  const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 100) // Max 100 per page
+  const sortBy = searchParams.get('sortBy') || 'created_at'
+  const sortOrder = searchParams.get('sortOrder') || 'desc'
+  const isAdmin = searchParams.get('admin') === 'true'
+  
+  const offset = (page - 1) * limit
 
-  try {
-    const supabase = await createClient()
-    
-    // Parse query parameters
-    const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
-    const search = searchParams.get('search')
-    const dateFrom = searchParams.get('dateFrom')
-    const dateTo = searchParams.get('dateTo')
-    const page = parseInt(searchParams.get('page') || '1', 10)
-    const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 100) // Max 100 per page
-    const sortBy = searchParams.get('sortBy') || 'created_at'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
-    const isAdmin = searchParams.get('admin') === 'true'
-    
-    const offset = (page - 1) * limit
+  // Validate pagination
+  if (page < 1) {
+    throw new ApiError('VALIDATION_ERROR', 'Page must be greater than 0', 400)
+  }
 
-    // Validate pagination
-    if (page < 1) {
-      return NextResponse.json({ 
-        error: 'Page must be greater than 0' 
-      }, { status: 400 })
-    }
-
-    if (limit < 1 || limit > 100) {
-      return NextResponse.json({ 
-        error: 'Limit must be between 1 and 100' 
-      }, { status: 400 })
-    }
-
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (limit < 1 || limit > 100) {
+    throw new ApiError('VALIDATION_ERROR', 'Limit must be between 1 and 100', 400)
+  }
 
     // Check if user is actually an admin (verify admin role via RBAC)
     let isActuallyAdmin = false
@@ -133,7 +120,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Normalize field names for frontend
-    const normalizedContributions = (contributions || []).map((c: any) => {
+    const normalizedContributions = (contributions || []).map((c: ContributionRow) => {
       const donorName = c.donor_first_name || c.donor_last_name
         ? `${c.donor_first_name || ''} ${c.donor_last_name || ''}`.trim()
         : c.donor_email || 'Anonymous'
@@ -191,34 +178,14 @@ export async function GET(request: NextRequest) {
       },
       stats
     })
-  } catch (error) {
-    logger.error('Unexpected error in GET /api/contributions:', error)
-    
-    // Better error serialization
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error'
-    const errorDetails = process.env.NODE_ENV === 'development' 
-      ? {
-          message: errorMessage,
-          stack: error instanceof Error ? error.stack : undefined,
-          ...(error && typeof error === 'object' && 'code' in error ? { code: (error as any).code } : {}),
-          ...(error && typeof error === 'object' && 'details' in error ? { details: (error as any).details } : {}),
-          ...(error && typeof error === 'object' && 'hint' in error ? { hint: (error as any).hint } : {})
-        }
-      : undefined
-    
-    return NextResponse.json({ 
-      error: errorMessage,
-      details: errorDetails
-    }, { status: 500 })
-  }
-    }
+}
 
 /**
  * Fallback method using direct Supabase queries
  * Used when database functions are not available
  */
 async function getContributionsDirectQuery(
-  supabase: any,
+  supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   isAdmin: boolean,
   filters: {
@@ -299,12 +266,17 @@ async function getContributionsDirectQuery(
     }
 
     // Fetch related data separately to avoid join issues
-    const caseIds = [...new Set(contributions.map((c: any) => c.case_id).filter(Boolean))]
-    const donorIds = [...new Set(contributions.map((c: any) => c.donor_id).filter(Boolean))]
-    const contributionIds = contributions.map((c: any) => c.id)
+    interface Contribution {
+      case_id?: string | null
+      donor_id?: string | null
+      id: string
+    }
+    const caseIds = [...new Set(contributions.map((c: Contribution) => c.case_id).filter(Boolean) as string[])]
+    const donorIds = [...new Set(contributions.map((c: Contribution) => c.donor_id).filter(Boolean) as string[])]
+    const contributionIds = contributions.map((c) => c.id)
 
     // Fetch cases (only if we have case IDs)
-    let cases: any[] = []
+    let cases: Array<{ id: string; [key: string]: unknown }> = []
     if (caseIds.length > 0) {
       const { data: casesData } = await supabase
         .from('cases')
@@ -314,7 +286,7 @@ async function getContributionsDirectQuery(
     }
 
     // Fetch users (only if we have donor IDs)
-    let users: any[] = []
+    let users: Array<{ id: string; [key: string]: unknown }> = []
     if (donorIds.length > 0) {
       const { data: usersData } = await supabase
         .from('users')
@@ -324,7 +296,7 @@ async function getContributionsDirectQuery(
     }
 
     // Fetch approval statuses (only if we have contribution IDs)
-    let approvalStatuses: any[] = []
+    let approvalStatuses: Array<{ contribution_id: string; status: string; [key: string]: unknown }> = []
     if (contributionIds.length > 0) {
       const { data: approvalData } = await supabase
         .from('contribution_approval_status')
@@ -335,12 +307,12 @@ async function getContributionsDirectQuery(
     }
 
     // Create lookup maps
-    const casesMap = new Map(cases.map((c: any) => [c.id, c]))
-    const usersMap = new Map(users.map((u: any) => [u.id, u]))
-    const approvalMap = new Map<string, any[]>()
+    const casesMap = new Map(cases.map((c) => [c.id, c]))
+    const usersMap = new Map(users.map((u) => [u.id, u]))
+    const approvalMap = new Map<string, Array<{ status: string; [key: string]: unknown }>>()
     
     // Group approval statuses by contribution_id
-    approvalStatuses.forEach((approval: any) => {
+    approvalStatuses.forEach((approval) => {
       const contribId = approval.contribution_id
       if (!approvalMap.has(contribId)) {
         approvalMap.set(contribId, [])
@@ -349,9 +321,15 @@ async function getContributionsDirectQuery(
     })
 
     // Combine data and apply filters
-    let enrichedContributions = contributions.map((c: any) => {
-      const caseData = casesMap.get(c.case_id)
-      const userData = usersMap.get(c.donor_id)
+    interface EnrichedContribution extends Contribution {
+      cases?: { title_en?: string; title_ar?: string } | null
+      users?: { id?: string; email?: string; first_name?: string; last_name?: string; phone?: string; [key: string]: unknown } | null
+      approval_status?: Array<{ status?: string; [key: string]: unknown }>
+      [key: string]: unknown
+    }
+    let enrichedContributions: EnrichedContribution[] = contributions.map((c: Contribution) => {
+      const caseData = casesMap.get(c.case_id || '')
+      const userData = usersMap.get(c.donor_id || '')
       const approvals = approvalMap.get(c.id) || []
       
       // Get latest approval status
@@ -359,15 +337,15 @@ async function getContributionsDirectQuery(
       
       return {
         ...c,
-        cases: caseData ? { title_en: caseData.title_en, title_ar: caseData.title_ar } : null,
-        users: userData,
+        cases: caseData ? { title_en: caseData.title_en as string | undefined, title_ar: caseData.title_ar as string | undefined } : null,
+        users: userData || null,
         approval_status: latestApproval ? [latestApproval] : []
       }
     })
 
     // Apply status filter
     if (filters.status && filters.status !== 'all') {
-      enrichedContributions = enrichedContributions.filter((c: any) => {
+      enrichedContributions = enrichedContributions.filter((c: EnrichedContribution) => {
         const approvalStatus = c.approval_status?.[0]?.status
         if (filters.status === 'approved') {
           return approvalStatus === 'approved'
@@ -383,13 +361,14 @@ async function getContributionsDirectQuery(
     // Apply search filter in memory
     if (filters.search && filters.search.trim()) {
       const searchLower = filters.search.toLowerCase()
-      enrichedContributions = enrichedContributions.filter((c: any) => {
-        const caseTitleEn = c.cases?.title_en?.toLowerCase() || ''
-        const caseTitleAr = c.cases?.title_ar?.toLowerCase() || ''
+      enrichedContributions = enrichedContributions.filter((c: EnrichedContribution) => {
+        const caseTitleEn = (c.cases?.title_en as string | undefined)?.toLowerCase() || ''
+        const caseTitleAr = (c.cases?.title_ar as string | undefined)?.toLowerCase() || ''
         const caseTitle = caseTitleEn || caseTitleAr
-        const donorEmail = c.users?.email?.toLowerCase() || ''
-        const donorFirstName = c.users?.first_name?.toLowerCase() || ''
-        const donorLastName = c.users?.last_name?.toLowerCase() || ''
+        const userData = c.users as { email?: string; first_name?: string; last_name?: string } | null | undefined
+        const donorEmail = userData?.email?.toLowerCase() || ''
+        const donorFirstName = userData?.first_name?.toLowerCase() || ''
+        const donorLastName = userData?.last_name?.toLowerCase() || ''
         return caseTitle.includes(searchLower) ||
                donorEmail.includes(searchLower) ||
                donorFirstName.includes(searchLower) ||
@@ -405,40 +384,41 @@ async function getContributionsDirectQuery(
     )
 
     // Normalize contributions
-    const normalizedContributions = paginatedContributions.map((c: any) => {
+    const normalizedContributions = paginatedContributions.map((c: EnrichedContribution) => {
       const approvalArray = Array.isArray(c.approval_status) 
         ? c.approval_status 
         : (c.approval_status ? [c.approval_status] : [])
-      const donorFirst = c.users?.first_name || ''
-      const donorLast = c.users?.last_name || ''
-      const donorName = `${donorFirst} ${donorLast}`.trim() || c.users?.email || 'Anonymous'
+      const userData = c.users as { first_name?: string; last_name?: string; email?: string; id?: string; phone?: string } | null | undefined
+      const donorFirst = userData?.first_name || ''
+      const donorLast = userData?.last_name || ''
+      const donorName = `${donorFirst} ${donorLast}`.trim() || userData?.email || 'Anonymous'
 
       return {
         id: c.id,
-        amount: typeof c.amount === 'string' ? parseFloat(c.amount) : c.amount,
-        status: c.status,
-        notes: c.notes || null,
-        message: c.message || null,
-        anonymous: !!c.anonymous,
-        payment_method: c.payment_methods?.code || c.payment_method || c.payment_method_id || null,
-        payment_method_id: c.payment_method_id || null,
-        payment_method_name: c.payment_methods?.name_en || c.payment_methods?.name || null,
-        payment_method_name_ar: c.payment_methods?.name_ar || null,
-        createdAt: c.created_at || null,
-        updatedAt: c.updated_at || null,
+        amount: typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount as number),
+        status: c.status as string,
+        notes: (c.notes as string | undefined) || null,
+        message: (c.message as string | undefined) || null,
+        anonymous: !!(c.anonymous as boolean | undefined),
+        payment_method: (c.payment_methods as { code?: string } | undefined)?.code || (c.payment_method as string | undefined) || (c.payment_method_id as string | undefined) || null,
+        payment_method_id: (c.payment_method_id as string | undefined) || null,
+        payment_method_name: (c.payment_methods as { name_en?: string; name?: string } | undefined)?.name_en || (c.payment_methods as { name?: string } | undefined)?.name || null,
+        payment_method_name_ar: (c.payment_methods as { name_ar?: string } | undefined)?.name_ar || null,
+        createdAt: (c.created_at as string | undefined) || null,
+        updatedAt: (c.updated_at as string | undefined) || null,
         caseId: c.case_id || null,
-        caseTitle: c.cases?.title_en || c.cases?.title_ar || '',
+        caseTitle: (c.cases?.title_en as string | undefined) || (c.cases?.title_ar as string | undefined) || '',
         donorName,
-        donorId: c.users?.id || null,
-        donorEmail: c.users?.email || null,
-        donorFirstName: c.users?.first_name || null,
-        donorLastName: c.users?.last_name || null,
-        donorPhone: c.users?.phone || null,
-        proofUrl: c.proof_url || c.proof_of_payment || null,
-        approval_status: approvalArray.map((approval: any) => ({
+        donorId: userData?.id || null,
+        donorEmail: userData?.email || null,
+        donorFirstName: userData?.first_name || null,
+        donorLastName: userData?.last_name || null,
+        donorPhone: userData?.phone || null,
+        proofUrl: (c.proof_url as string | undefined) || (c.proof_of_payment as string | undefined) || null,
+        approval_status: approvalArray.map((approval) => ({
           ...approval,
-          created_at: approval.created_at || null,
-          updated_at: approval.updated_at || null,
+          created_at: (approval.created_at as string | undefined) || null,
+          updated_at: (approval.updated_at as string | undefined) || null,
         }))
       }
     })
@@ -467,7 +447,7 @@ async function getContributionsDirectQuery(
  * Calculate contribution statistics
  */
 async function calculateStats(
-  supabase: any,
+  supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   isAdmin: boolean,
   logger: Logger
@@ -495,7 +475,11 @@ async function calculateStats(
       totalAmount: 0
     }
 
-    statsData?.forEach((contribution: any) => {
+    interface StatsContribution {
+      amount?: string | number
+      approval_status?: Array<{ status?: string }> | { status?: string }
+    }
+    statsData?.forEach((contribution: StatsContribution) => {
       const approvalStatusArray = contribution.approval_status
       const approvalStatus = Array.isArray(approvalStatusArray) && approvalStatusArray.length > 0 
         ? approvalStatusArray[0]?.status || 'pending'
@@ -503,7 +487,8 @@ async function calculateStats(
       
       if (approvalStatus === 'approved') {
         stats.approved++
-        stats.totalAmount += parseFloat(contribution.amount || '0')
+        const amountValue = typeof contribution.amount === 'number' ? contribution.amount : parseFloat(String(contribution.amount || '0'))
+        stats.totalAmount += amountValue
       } else if (approvalStatus === 'rejected' || approvalStatus === 'revised') {
         stats.rejected++
       } else {
@@ -526,27 +511,14 @@ async function calculateStats(
   }
 }
     
-// POST handler remains the same as before
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
 
     const body = await request.json()
     const { caseId, amount, message, anonymous, paymentMethod, proofOfPayment } = body
 
     if (!caseId || !amount || !paymentMethod) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: caseId, amount, and paymentMethod are required' 
-      }, { status: 400 })
+      throw new ApiError('VALIDATION_ERROR', 'Missing required fields: caseId, amount, and paymentMethod are required', 400)
     }
 
     // Convert payment method code to UUID if needed
@@ -567,18 +539,14 @@ export async function POST(request: NextRequest) {
 
       if (pmError || !paymentMethodData) {
         logger.error('Payment method lookup error:', pmError)
-        return NextResponse.json({ 
-          error: `Invalid payment method: ${paymentMethod}` 
-        }, { status: 400 })
+        throw new ApiError('VALIDATION_ERROR', `Invalid payment method: ${paymentMethod}`, 400)
       }
 
       paymentMethodId = paymentMethodData.id
     }
 
     if (amount <= 0) {
-      return NextResponse.json({ 
-        error: 'Amount must be greater than 0' 
-      }, { status: 400 })
+      throw new ApiError('VALIDATION_ERROR', 'Amount must be greater than 0', 400)
     }
 
     const { data: caseData, error: caseError } = await supabase
@@ -588,15 +556,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (caseError || !caseData) {
-      return NextResponse.json({ 
-        error: 'Case not found' 
-      }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Case not found', 404)
     }
 
     if (caseData.status !== 'published') {
-      return NextResponse.json({ 
-        error: 'Case is not published and cannot accept contributions' 
-      }, { status: 400 })
+      throw new ApiError('VALIDATION_ERROR', 'Case is not published and cannot accept contributions', 400)
     }
 
     const { data: contribution, error: insertError } = await supabase
@@ -617,9 +581,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       logger.error('Error inserting contribution:', insertError)
-      return NextResponse.json({ 
-        error: 'Failed to create contribution' 
-      }, { status: 500 })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create contribution', 500)
     }
 
     // Update case amount (non-blocking)
@@ -686,13 +648,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(contribution, { status: 201 })
-
-  } catch (error) {
-    logger.error('Error in POST /api/contributions:', error)
-    return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 })
-  }
 }
+
+export const GET = createGetHandler(getHandler, { requireAuth: true, loggerContext: 'api/contributions' })
+export const POST = createPostHandler(postHandler, { requireAuth: true, loggerContext: 'api/contributions' })
 
     

@@ -26,6 +26,8 @@ import { useTranslations, useLocale } from 'next-intl'
 import { useParams } from 'next/navigation'
 import DynamicIcon from '@/components/ui/dynamic-icon'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Case {
   id: string
   title: string
@@ -96,7 +98,7 @@ export default function CaseCard({
   if (process.env.NODE_ENV === 'development' && caseItem.id === caseItem.id) {
     const debugKey = `casecard-debug-${caseItem.id}`
     if (!sessionStorage.getItem(debugKey)) {
-      console.log('🔍 CaseCard Debug:', {
+      logger.debug('CaseCard Debug', {
         caseId: caseItem.id,
         locale,
         localeFromParams,

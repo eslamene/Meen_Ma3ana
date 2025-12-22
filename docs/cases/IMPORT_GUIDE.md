@@ -29,48 +29,48 @@ This system imports contributions from a CSV file (`docs/cases/contributions.csv
 
 ```bash
 # Step 1: Clear all existing data
-node scripts/01-clear-all-data.js
+node scripts/import/01-clear-all-data.js
 
 # Step 2: Import contributions
-node scripts/02-import-contributions-with-users.js
+node scripts/import/02-import-contributions-with-users.js
 
 # Step 3: Verify import
-node scripts/03-verify-import.js
+node scripts/import/03-verify-import.js
 ```
 
 **Option 2: Run Master Script**
 
 ```bash
 # Runs all steps automatically
-node scripts/00-run-full-import.js
+node scripts/import/00-run-full-import.js
 ```
 
 ## Scripts Overview
 
 ### Main Import Scripts
 
-1. **`scripts/01-clear-all-data.js`**
+1. **`scripts/import/01-clear-all-data.js`**
    - Clears all cases, contributions, notifications, and approval statuses
    - **WARNING**: This will delete all existing data!
 
-2. **`scripts/02-import-contributions-with-users.js`**
+2. **`scripts/import/02-import-contributions-with-users.js`**
    - Main import script that processes the CSV
    - Creates users, cases, contributions, approval statuses, and notifications
    - Handles ContributorID = 100 as "Unknown Contributor"
 
-3. **`scripts/03-verify-import.js`**
+3. **`scripts/import/03-verify-import.js`**
    - Verifies the import was successful
    - Compares CSV totals with database totals
    - Reports any discrepancies
 
 ### Utility Scripts
 
-- **`scripts/11-check-contribution-totals.js`** - Compare CSV vs database totals
-- **`scripts/12-check-duplicate-contributions.js`** - Find duplicate contributions
-- **`scripts/20-remove-duplicate-contributions.js`** - Remove duplicate contributions
-- **`scripts/30-backfill-contribution-notifications.js`** - Backfill notifications for existing contributions
-- **`scripts/31-backfill-donor-pending-notifications.js`** - Add pending notifications for donors
-- **`scripts/40-assign-donor-role-to-all.js`** - Assign 'donor' role to all users
+- **`scripts/verification/11-check-contribution-totals.js`** - Compare CSV vs database totals
+- **`scripts/verification/12-check-duplicate-contributions.js`** - Find duplicate contributions
+- **`scripts/cleanup/20-remove-duplicate-contributions.js`** - Remove duplicate contributions
+- **`scripts/backfill/30-backfill-contribution-notifications.js`** - Backfill notifications for existing contributions
+- **`scripts/backfill/31-backfill-donor-pending-notifications.js`** - Add pending notifications for donors
+- **`scripts/admin/40-assign-donor-role-to-all.js`** - Assign 'donor' role to all users
 
 ## CSV File Requirements
 
@@ -126,14 +126,14 @@ The import automatically creates notifications:
 
 ### Issue: "Total doesn't match CSV"
 - **Solution**: 
-  1. Run `node scripts/11-check-contribution-totals.js` to identify discrepancy
-  2. Run `node scripts/12-check-duplicate-contributions.js` to find duplicates
-  3. Run `node scripts/20-remove-duplicate-contributions.js` if needed
+  1. Run `node scripts/verification/11-check-contribution-totals.js` to identify discrepancy
+  2. Run `node scripts/verification/12-check-duplicate-contributions.js` to find duplicates
+  3. Run `node scripts/cleanup/20-remove-duplicate-contributions.js` if needed
 
 ### Issue: "Missing notifications"
 - **Solution**: 
-  - For all notifications: `node scripts/30-backfill-contribution-notifications.js`
-  - For donor pending: `node scripts/31-backfill-donor-pending-notifications.js`
+  - For all notifications: `node scripts/backfill/30-backfill-contribution-notifications.js`
+  - For donor pending: `node scripts/backfill/31-backfill-donor-pending-notifications.js`
 
 ## Migration Plan
 

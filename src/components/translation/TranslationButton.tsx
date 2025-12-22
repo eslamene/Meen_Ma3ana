@@ -6,6 +6,8 @@ import { Loader2, Languages } from 'lucide-react'
 import { translateText, type TranslationDirection } from '@/lib/services/translationService'
 import { toast } from 'sonner'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface TranslationButtonProps {
   /**
    * Source text to translate
@@ -99,7 +101,7 @@ export default function TranslationButton({
         description: 'Text has been translated successfully.',
       })
     } catch (error) {
-      console.error('Translation error:', error)
+      logger.error('Translation error:', { error: error })
       toast.error('Translation failed', {
         description: error instanceof Error ? error.message : 'An unexpected error occurred.',
       })

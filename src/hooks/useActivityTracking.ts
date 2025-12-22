@@ -10,6 +10,8 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 /**
  * Track page view
  */
@@ -32,11 +34,11 @@ async function trackPageView(path: string, userId?: string, sessionId?: string) 
     })
     
     if (!response.ok) {
-      console.error('Failed to track page view:', response.status, response.statusText)
+      logger.error('Failed to track page view:', { error: { status: response.status, statusText: response.statusText } })
     }
   } catch (error) {
     // Silently fail - don't break the app
-    console.error('Failed to track page view:', error)
+    logger.error('Failed to track page view:', { error: error })
   }
 }
 
@@ -66,7 +68,7 @@ async function trackUserAction(
     })
   } catch (error) {
     // Silently fail - don't break the app
-    console.error('Failed to track user action:', error)
+    logger.error('Failed to track user action:', { error: error })
   }
 }
 

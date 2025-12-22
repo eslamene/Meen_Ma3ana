@@ -17,6 +17,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ModuleFormModal } from '@/components/admin/rbac/ModuleFormModal'
 import { PermissionsByModule } from '@/hooks/useRBACData'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Module {
   id: string
   name: string
@@ -125,7 +127,7 @@ function ManagePermissionsContent({
         onSuccess()
       }
     } catch (error) {
-      console.error('Failed to move permissions:', error)
+      logger.error('Failed to move permissions:', { error: error })
       toast.error('Error', {
         description: 'Failed to move permissions',
       })
@@ -259,7 +261,7 @@ export default function ModulesPage() {
       setModules(modulesData.modules || [])
       setPermissionsByModule(permissionsData.permissionsByModule || {})
     } catch (error) {
-      console.error('Failed to fetch data:', error)
+      logger.error('Failed to fetch data:', { error: error })
     } finally {
       setLoading(false)
     }
@@ -343,7 +345,7 @@ export default function ModulesPage() {
         })
       }
     } catch (error) {
-      console.error('Failed to delete module:', error)
+      logger.error('Failed to delete module:', { error: error })
     }
   }
 

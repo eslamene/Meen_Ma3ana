@@ -1,27 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { env } from '@/config/env'
+import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+  const { searchParams } = new URL(request.url)
+  const roleId = searchParams.get('roleId')
 
-  try {
-    const { searchParams } = new URL(request.url)
-    const roleId = searchParams.get('roleId')
-
-    if (!roleId) {
-      return NextResponse.json({ error: 'Role ID required' }, { status: 400 })
-    }
+  if (!roleId) {
+    throw new ApiError('VALIDATION_ERROR', 'Role ID required', 400)
+  }
 
     logger.info('Fetching permissions for role:', roleId)
 
     // Create admin client
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+      throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+    }
+    
     const adminClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY
     )
 
     // Fetch role with permissions
@@ -48,12 +51,6 @@ export async function GET(request: NextRequest) {
       success: true,
       role: role
     })
-
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Role permissions API error:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch role permissions',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
 }
+
+export const GET = createGetHandler(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/role-permissions' })

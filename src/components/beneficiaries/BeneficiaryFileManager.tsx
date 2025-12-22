@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client'
 import { FileText, Image as ImageIcon } from 'lucide-react'
 import type { BeneficiaryDocument, DocumentType } from '@/types/beneficiary'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Convert BeneficiaryDocument to GenericFile
 function convertToGenericFile(doc: BeneficiaryDocument): GenericFile {
   return {
@@ -90,7 +92,7 @@ export default function BeneficiaryFileManager({
       setFiles(documents)
       onFilesChange?.(documents)
     } catch (error) {
-      console.error('Error loading beneficiary documents:', error)
+      logger.error('Error loading beneficiary documents:', { error: error })
     } finally {
       setLoading(false)
     }

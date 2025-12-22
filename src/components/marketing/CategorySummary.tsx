@@ -3,6 +3,8 @@
 import { useTranslations, useLocale } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface CategoryData {
   name: string
   nameArabic: string
@@ -39,7 +41,7 @@ export default function CategorySummary() {
           setCategories(data.categorySummary || {})
         }
       } catch (error) {
-        console.error('Error fetching category summary:', error)
+        logger.error('Error fetching category summary:', { error: error })
       } finally {
         setLoading(false)
       }

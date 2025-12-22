@@ -22,6 +22,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface PaymentMethod {
   id: string
   code: string
@@ -102,10 +104,10 @@ export default function ContributionRevisionModal({
           const data = await response.json()
           setPaymentMethods(data.paymentMethods || [])
         } else {
-          console.error('Failed to fetch payment methods')
+          logger.error('Failed to fetch payment methods')
         }
       } catch (error) {
-        console.error('Error fetching payment methods:', error)
+        logger.error('Error fetching payment methods:', { error: error })
       } finally {
         setLoadingPaymentMethods(false)
       }
@@ -255,7 +257,7 @@ export default function ContributionRevisionModal({
       const _data = await response.json()
       toast.success('Success', { description: 'Payment proof uploaded successfully.' })
     } catch (error) {
-      console.error('Error uploading payment proof:', error)
+      logger.error('Error uploading payment proof:', { error: error })
       toast.error('Error', { description: 'Failed to upload payment proof. Please try again.' })
     } finally {
       setUploading(false)

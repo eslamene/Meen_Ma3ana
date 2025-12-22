@@ -61,6 +61,8 @@ import {
 } from 'lucide-react'
 import TranslationButton from '@/components/translation/TranslationButton'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 type CaseType = 'one-time' | 'recurring'
 
 interface CaseFormData {
@@ -129,14 +131,14 @@ export default function CreateCasePage() {
       const response = await fetch('/api/categories')
       
       if (!response.ok) {
-        console.error('Error fetching categories:', response.statusText)
+        logger.error('Error fetching categories:', { error: response.statusText })
         return
       }
 
       const result = await response.json()
       setCategories(result.categories || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      logger.error('Error fetching categories:', { error: error })
     }
   }, [])
 
@@ -152,7 +154,7 @@ export default function CreateCasePage() {
         console.log('Validation settings loaded in create form:', settings)
         setValidationSettings(settings)
       } catch (error) {
-        console.error('Failed to load validation settings:', error)
+        logger.error('Failed to load validation settings:', { error: error })
       }
     }
     loadValidationSettings()
@@ -203,7 +205,7 @@ export default function CreateCasePage() {
 
     // Validation settings must be loaded
     if (!validationSettings) {
-      console.warn('Validation settings not loaded, cannot create draft case')
+      logger.warn('Validation settings not loaded, cannot create draft case')
       return null
     }
 
@@ -265,7 +267,7 @@ export default function CreateCasePage() {
             return null
           }
         } catch (error) {
-          console.error('Error creating draft case:', error)
+          logger.error('Error creating draft case:', { error: error })
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
           const errorMsg = `Failed to initialize case form: ${errorMessage}`
           setError(errorMsg)
@@ -284,7 +286,7 @@ export default function CreateCasePage() {
 
       if (titleEn.length >= minLength && titleAr.length >= minLength) {
         ensureDraftCase().catch(err => {
-          console.error('Error creating draft case for file upload:', err)
+          logger.error('Error creating draft case for file upload:', { error: err })
         })
       }
     }
@@ -495,7 +497,7 @@ export default function CreateCasePage() {
 
     // Validation settings must be loaded before form validation
     if (!validationSettings) {
-      console.warn('Validation settings not loaded yet, cannot validate form')
+      logger.warn('Validation settings not loaded yet, cannot validate form')
       toast.error('Error', { description: 'Validation settings are loading. Please wait a moment and try again.' })
       return false
     }
@@ -723,7 +725,7 @@ export default function CreateCasePage() {
         router.push(`/${locale}/cases/${caseId}`)
       }, 1500)
     } catch (error) {
-      console.error('Error saving case:', error)
+      logger.error('Error saving case:', { error: error })
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       toast.error('Create Failed', {
         description: `An unexpected error occurred: ${errorMessage}`
@@ -753,7 +755,7 @@ export default function CreateCasePage() {
           .eq('id', idToCheck)
         console.log('Draft case cleaned up:', idToCheck)
       } catch (error) {
-        console.error('Error cleaning up draft case:', error)
+        logger.error('Error cleaning up draft case:', { error: error })
         // Don't throw - cleanup errors shouldn't block navigation
       }
     }
@@ -795,7 +797,7 @@ export default function CreateCasePage() {
       if (draftCaseIdRef.current && !savingRef.current && !caseSavedRef.current) {
         // Only cleanup if case wasn't saved and we're actually leaving the page
         cleanupDraftCase().catch(err => {
-          console.error('Error during cleanup:', err)
+          logger.error('Error during cleanup:', { error: err })
         })
       }
     }
@@ -1292,7 +1294,7 @@ export default function CreateCasePage() {
                         ensureDraftCase().then(() => {
                           setActiveTab(value as 'details' | 'files')
                       }).catch(err => {
-                        console.error('Error creating draft case for file upload:', err)
+                        logger.error('Error creating draft case for file upload:', { error: err })
                         toast.error('Cannot Upload Files', {
                           description: `Please ensure both English and Arabic titles are at least ${minLength} characters long before uploading files.`
                         })

@@ -1,63 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
+import { createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
 /**
  * POST /api/admin/contributions/batch
  * Batch approve or reject contributions (admin only)
  */
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger } = context
 
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const body = await request.json()
+  const { ids, action, reason } = body
 
-    // Check if user is admin
-    const { data: adminRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles!inner(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('admin_roles.name', ['admin', 'super_admin'])
-      .limit(1)
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    throw new ApiError('VALIDATION_ERROR', 'ids array is required and must not be empty', 400)
+  }
 
-    const isAdmin = (adminRoles?.length || 0) > 0
+  if (!action || !['approve', 'reject'].includes(action)) {
+    throw new ApiError('VALIDATION_ERROR', 'action must be either "approve" or "reject"', 400)
+  }
 
-    if (!isAdmin) {
-      return NextResponse.json({ 
-        error: 'Forbidden' 
-      }, { status: 403 })
-    }
-
-    const body = await request.json()
-    const { ids, action, reason } = body
-
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json({ 
-        error: 'ids array is required and must not be empty' 
-      }, { status: 400 })
-    }
-
-    if (!action || !['approve', 'reject'].includes(action)) {
-      return NextResponse.json({ 
-        error: 'action must be either "approve" or "reject"' 
-      }, { status: 400 })
-    }
-
-    if (action === 'reject' && !reason) {
-      return NextResponse.json({ 
-        error: 'reason is required when rejecting contributions' 
-      }, { status: 400 })
-    }
+  if (action === 'reject' && !reason) {
+    throw new ApiError('VALIDATION_ERROR', 'reason is required when rejecting contributions', 400)
+  }
 
     // Fetch all contributions with their related data
     const { data: contributions, error: fetchError } = await supabase
@@ -73,15 +39,11 @@ export async function POST(request: NextRequest) {
 
     if (fetchError) {
       logger.error('Error fetching contributions:', fetchError)
-      return NextResponse.json({ 
-        error: 'Failed to fetch contributions' 
-      }, { status: 500 })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch contributions', 500)
     }
 
     if (!contributions || contributions.length === 0) {
-      return NextResponse.json({ 
-        error: 'No contributions found' 
-      }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'No contributions found', 404)
     }
 
     const notificationService = createContributionNotificationService(supabase)
@@ -211,12 +173,8 @@ export async function POST(request: NextRequest) {
       failed: failedCount,
       errors: errors.length > 0 ? errors : undefined
     })
-  } catch (error) {
-    logger.error('Unexpected error in POST /api/admin/contributions/batch:', error)
-    return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 })
-  }
 }
+
+export const POST = createPostHandler(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/contributions/batch' })
 
 

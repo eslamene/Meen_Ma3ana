@@ -59,6 +59,8 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import Pagination from '@/components/ui/pagination'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface ActivityLog {
   id: string
   user_id?: string
@@ -173,7 +175,7 @@ export default function AdminActivitiesPage() {
         hasPrevPage: pagination.page > 1,
       }))
     } catch (error) {
-      console.error('Error fetching activities:', error)
+      logger.error('Error fetching activities:', { error: error })
       toast.error('Error', { description: 'Failed to fetch activities' })
     } finally {
       setLoading(false)

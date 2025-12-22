@@ -14,6 +14,8 @@ import { toast } from 'sonner'
 import { GenericFileUploader, GenericFilePreviewModal, type FileCategoryConfig, type GenericFile } from './index'
 import { usePrefetchStorageRules } from '@/hooks/use-prefetch-storage-rules'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { defaultLogger as logger } from '@/lib/logger'
+
 import { 
   FolderOpen, 
   Grid,
@@ -160,7 +162,7 @@ export function GenericFileManager<T extends GenericFile = GenericFile>({
       setShowUploadDialog(false)
       toast.success('Upload Successful', { description: `Successfully uploaded ${filesWithCategories.length} file(s)` })
     } catch (error) {
-      console.error('Upload error:', error)
+      logger.error('Upload error:', { error: error })
       const errorMessage = error instanceof Error ? error.message : 'Failed to upload files. Please try again.'
       toast.error('Upload Error', { description: errorMessage })
     } finally {
@@ -185,7 +187,7 @@ export function GenericFileManager<T extends GenericFile = GenericFile>({
       
       toast.success('File Deleted', { description: t('deleteSuccess') || 'File deleted successfully' })
     } catch (error) {
-      console.error('Error deleting file:', error)
+      logger.error('Error deleting file:', { error: error })
       toast.error('Delete Failed', { description: t('deleteError') || 'Failed to delete file' })
     } finally {
       setDeleteDialog({ open: false, fileId: null })
@@ -607,7 +609,7 @@ function GenericFileGridItem<T extends GenericFile = GenericFile>({
       setIsEditing(false)
       toast.success('File Updated', { description: t('fileUpdated') || 'File updated successfully' })
     } catch (error) {
-      console.error('Error updating file:', error)
+      logger.error('Error updating file:', { error: error })
       toast.error('Update Failed', { description: t('updateError') || 'Failed to update file' })
     } finally {
       setIsSaving(false)
@@ -879,7 +881,7 @@ function GenericFileListItem<T extends GenericFile = GenericFile>({
       setIsEditing(false)
       toast.success('File Updated', { description: t('fileUpdated') || 'File updated successfully' })
     } catch (error) {
-      console.error('Error updating file:', error)
+      logger.error('Error updating file:', { error: error })
       toast.error('Update Failed', { description: t('updateError') || 'Failed to update file' })
     } finally {
       setIsSaving(false)

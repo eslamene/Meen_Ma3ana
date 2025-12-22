@@ -21,6 +21,8 @@ import { getAppUrl } from '@/lib/utils/app-url'
 import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface AuthFormProps {
   mode: 'login' | 'register'
   onSuccess?: () => void
@@ -142,7 +144,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
           if (checkError && checkError.code !== 'PGRST116') {
             // Error other than "not found" - don't show error, just log
-            console.error('Error checking email:', checkError)
+            logger.error('Error checking email:', { error: checkError })
             setEmailError('')
           } else if (existingUser) {
             setEmailError(t('authErrorEmailAlreadyExists'))
@@ -150,7 +152,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             setEmailError('')
           }
         } catch (err) {
-          console.error('Error validating email:', err)
+          logger.error('Error validating email:', { error: err })
           setEmailError('')
         } finally {
           setValidatingEmail(false)
@@ -225,7 +227,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
 
           if (checkError && checkError.code !== 'PGRST116') {
             // Error other than "not found" - don't show error, just log
-            console.error('Error checking phone:', checkError)
+            logger.error('Error checking phone:', { error: checkError })
             setPhoneError('')
           } else if (existingUser) {
             setPhoneError(t('phoneAlreadyExists'))
@@ -233,7 +235,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             setPhoneError('')
           }
         } catch (err) {
-          console.error('Error validating phone:', err)
+          logger.error('Error validating phone:', { error: err })
           setPhoneError('')
         } finally {
           setValidatingPhone(false)
@@ -364,14 +366,11 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         const redirectUrl = `${appUrl}/${localeParam}/auth/callback`
         
         // Log the URL being used for debugging
-        console.log('📧 Email redirect URL:', redirectUrl)
-        console.log('📧 App URL:', appUrl)
-        console.log('📧 Environment:', process.env.NODE_ENV)
-        console.log('📧 NEXT_PUBLIC_APP_URL:', process.env.NEXT_PUBLIC_APP_URL)
+        logger.debug('Email redirect URL', { redirectUrl, appUrl, environment: process.env.NODE_ENV, appUrlEnv: process.env.NEXT_PUBLIC_APP_URL })
         
         // Log warning in development if using localhost
         if (process.env.NODE_ENV === 'development' && appUrl.includes('localhost')) {
-          console.warn('⚠️ Using localhost for email redirect. Set NEXT_PUBLIC_APP_URL in production.')
+          logger.warn('⚠️ Using localhost for email redirect. Set NEXT_PUBLIC_APP_URL in production.')
         }
         
         // Sign up with user metadata
@@ -453,7 +452,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
               }
             } catch (resendErr) {
               // If resend fails, fall through to show generic error
-              console.error('Error checking/resending verification:', resendErr)
+              logger.error('Error checking/resending verification:', { error: resendErr })
             }
           }
           
@@ -497,7 +496,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
               return
             }
             
-            console.error('Error creating user record:', userError)
+            logger.error('Error creating user record:', { error: userError })
             // Don't fail registration if user record creation fails - it might be handled by trigger
           }
         }
@@ -596,8 +595,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       const appUrl = getAppUrl()
       const redirectUrl = `${appUrl}/${localeParam}/auth/callback`
       
-      console.log('📧 Resend - Email redirect URL:', redirectUrl)
-      console.log('📧 Resend - App URL:', appUrl)
+      logger.debug('Resend - Email redirect URL', { redirectUrl, appUrl })
 
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
@@ -636,7 +634,7 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
         duration: 5000
       })
     } catch (error) {
-      console.error('Error resending verification email:', error)
+      logger.error('Error resending verification email:', { error: error })
       const errorMessage = error instanceof Error && error.message?.includes('rate limit')
         ? t('resendRateLimit') || 'Please wait before resending another email.'
         : t('resendError') || 'Failed to send verification email. Please try again.'

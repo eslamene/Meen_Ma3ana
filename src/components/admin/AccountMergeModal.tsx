@@ -17,6 +17,8 @@ import StandardModal, {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface User {
   id: string
   email: string
@@ -117,7 +119,7 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
         
         // Only log unexpected errors (not 404, 403, 401)
         if (response.status >= 500 || response.status === 0) {
-          console.error('Error fetching source user:', {
+          logger.error('Error fetching source user', {
             status: response.status,
             error: response.error,
             userId: sourceUserId
@@ -129,7 +131,7 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
     } catch (error) {
       // This catch block should rarely be hit since safeFetch handles errors
       const errorMessage = error instanceof Error ? error.message : 'Failed to load source user'
-      console.error('Unexpected error fetching source user:', error)
+      logger.error('Unexpected error fetching source user:', { error: error })
       toast.error('Error', { description: errorMessage })
     } finally {
       setFetching(false)
@@ -161,7 +163,7 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
       } else {
         // Only log unexpected errors (not auth/permission errors)
         if (response.status >= 500 || response.status === 0) {
-          console.error('Error searching users:', {
+          logger.error('Error searching users', {
             status: response.status,
             error: response.error
           })
@@ -170,7 +172,7 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
       }
     } catch (error) {
       // This catch block should rarely be hit since safeFetch handles errors
-      console.error('Unexpected error searching users:', error)
+      logger.error('Unexpected error searching users:', { error: error })
     } finally {
       setSearching(false)
     }
@@ -211,11 +213,11 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
         setPreview(response.data.preview)
         setPreviewSummary(response.data.summary)
       } else {
-        console.error('Failed to load preview:', response.error)
+        logger.error('Failed to load preview:', { error: response.error })
         // Don't show error toast for preview failures, just log
       }
     } catch (error) {
-      console.error('Error loading preview:', error)
+      logger.error('Error loading preview:', { error: error })
     } finally {
       setLoadingPreview(false)
     }
@@ -251,7 +253,7 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
         const error = await response.json()
         
         // Log full error details for debugging
-        console.error('Merge error details:', error)
+        logger.error('Merge error details:', { error: error })
         
         // Provide helpful error message if migration is required
         if (error.migration_required) {
@@ -287,8 +289,7 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
           label: 'View Details',
           onClick: () => {
             // Show merge details
-            console.log('Merge ID:', data.merge_id)
-            console.log('Backup ID:', data.backup_id)
+            logger.info('Merge details', { mergeId: data.merge_id, backupId: data.backup_id })
             toast.info('Merge Details', {
               description: `Merge ID: ${data.merge_id}\nSave this ID for rollback if needed.`,
               duration: 15000
@@ -303,7 +304,7 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
         onClose()
       }, 2000)
     } catch (error) {
-      console.error('Error merging accounts:', error)
+      logger.error('Error merging accounts:', { error: error })
       toast.error('Error', { description: error instanceof Error ? error.message : 'Failed to merge accounts' })
     } finally {
       setLoading(false)

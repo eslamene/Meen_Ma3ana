@@ -1,27 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BeneficiaryService } from '@/lib/services/beneficiaryService'
 import { createClient } from '@supabase/supabase-js'
+import { env } from '@/config/env'
+import { withApiHandler, ApiHandlerContext, createGetHandler, createPostHandler } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+  const { searchParams } = new URL(request.url)
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '10')
+  const search = searchParams.get('search') || ''
+  const cityId = searchParams.get('cityId') || ''
+  const riskLevel = searchParams.get('riskLevel') || ''
 
-  try {
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
-    const search = searchParams.get('search') || ''
-    const cityId = searchParams.get('cityId') || ''
-    const riskLevel = searchParams.get('riskLevel') || ''
-
-    // Create service role client to bypass RLS for beneficiary fetching
-    // This allows authorized users (via API route) to fetch beneficiaries
+  // Create service role client to bypass RLS for beneficiary fetching
+  // This allows authorized users (via API route) to fetch beneficiaries
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    logger.error('SUPABASE_SERVICE_ROLE_KEY is required for beneficiary operations')
+    throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+  }
+    
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -60,14 +63,11 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiaries:', error)
-      return NextResponse.json(
-        { success: false, error: error.message || 'Failed to fetch beneficiaries' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', error.message || 'Failed to fetch beneficiaries', 500)
     }
 
     // Transform beneficiaries to include calculated age
-    const beneficiaries = (data || []).map((beneficiary: any) => {
+    const beneficiaries = (data || []).map((beneficiary: { year_of_birth?: number; age?: number; [key: string]: unknown }) => {
       if (beneficiary.year_of_birth) {
         const currentYear = new Date().getFullYear()
         beneficiary.age = currentYear - beneficiary.year_of_birth
@@ -79,27 +79,23 @@ export async function GET(request: NextRequest) {
       success: true,
       data: beneficiaries
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiaries:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch beneficiaries' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const body = await request.json()
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
+  
+  const body = await request.json()
+  
+  // Create service role client to bypass RLS for beneficiary creation
+  // This allows authorized users (via API route) to create beneficiaries
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    logger.error('SUPABASE_SERVICE_ROLE_KEY is required for beneficiary operations')
+    throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
+  }
     
-    // Create service role client to bypass RLS for beneficiary creation
-    // This allows authorized users (via API route) to create beneficiaries
     const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -134,14 +130,11 @@ export async function POST(request: NextRequest) {
     }
     
     if (existing) {
-      return NextResponse.json(
-        { success: false, error: 'Beneficiary with this mobile number or national ID already exists' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Beneficiary with this mobile number or national ID already exists', 400)
     }
     
     // Convert age to year of birth
-    const dataToInsert: any = { ...body }
+    const dataToInsert: Record<string, unknown> = { ...body }
     if (body.age) {
       const currentYear = new Date().getFullYear()
       dataToInsert.year_of_birth = currentYear - body.age
@@ -171,10 +164,7 @@ export async function POST(request: NextRequest) {
     
     if (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating beneficiary:', error)
-      return NextResponse.json(
-        { success: false, error: error.message || 'Failed to create beneficiary' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', error.message || 'Failed to create beneficiary', 500)
     }
     
     // Transform beneficiary to include calculated age
@@ -187,11 +177,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: beneficiary
     }, { status: 201 })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating beneficiary:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to create beneficiary' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandler(getHandler, { loggerContext: 'api/beneficiaries' })
+export const POST = createPostHandler(postHandler, { loggerContext: 'api/beneficiaries' })

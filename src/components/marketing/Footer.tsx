@@ -6,6 +6,8 @@ import { Facebook, Twitter, Instagram, Linkedin, Youtube, Mail } from 'lucide-re
 import Link from 'next/link'
 import SystemContentModal from './SystemContentModal'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface SocialMediaLinks {
   facebook?: string
   twitter?: string
@@ -37,7 +39,7 @@ export default function Footer({ currentYear }: FooterProps) {
           setSocialMedia(data.socialMedia || {})
         }
       } catch (error) {
-        console.error('Error fetching social media links:', error)
+        logger.error('Error fetching social media links:', { error: error })
       }
     }
 

@@ -6,6 +6,8 @@
 import { Heart, Mail } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface PublicNavItemConfig {
   key: string
   labelKey: string // Translation key
@@ -91,7 +93,7 @@ export async function getPublicNavItems(
     }
   } catch (error) {
     // If database fetch fails, fall back to config
-    console.warn('Failed to fetch nav items from database, using config fallback:', error)
+    logger.warn('Failed to fetch nav items from database, using config fallback:', error)
   }
   
   // Fallback to hardcoded config

@@ -1,29 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { db } from '@/lib/db'
 import { cases, contributions, sponsorships, users, projects, projectCycles } from '@/drizzle/schema'
 import { eq, and, gte, lte, desc, sql, count, sum, avg } from 'drizzle-orm'
-import { requirePermission } from '@/lib/security/guards'
-
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { env } from '@/config/env'
 
 // Disable in-memory cache in production to avoid cross-user data leakage
-const ENABLE_CACHE = process.env.NODE_ENV === 'development'
+const ENABLE_CACHE = env.NODE_ENV === 'development'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    // Use permission guard
-    const guardResult = await requirePermission('admin:analytics')(request)
-    if (guardResult instanceof NextResponse) {
-      return guardResult
-    }
-    
-    const { user, supabase } = guardResult
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
 
     // Get query parameters
     const { searchParams } = new URL(request.url)
@@ -264,16 +251,9 @@ export async function GET(request: NextRequest) {
     
     logger.info('📊 Analytics data computed')
     return NextResponse.json(responseData)
+}
 
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Analytics API error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch analytics data',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
-      },
-      { status: 500 }
-    )
-  }
-} 
+export const GET = createGetHandler(getHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/analytics' 
+}) 

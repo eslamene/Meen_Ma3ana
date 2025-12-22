@@ -46,7 +46,7 @@ export async function fetchStorageRules(bucketName: string): Promise<StorageRule
     
     return rule
   } catch (error) {
-    console.warn('Error fetching storage rules:', error)
+    logger.warn('Error fetching storage rules:', error)
     // Cache null result on error to prevent repeated failed requests
     storageRulesCache.set(bucketName, { rule: null, timestamp: Date.now() })
     return null

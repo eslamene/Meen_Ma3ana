@@ -12,6 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Plus, Calendar, DollarSign, Building2, CheckCircle, Clock, XCircle } from 'lucide-react'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Sponsorship {
   id: string
   case_id: string
@@ -74,7 +76,7 @@ export default function SponsorDashboardPage() {
       setUser(user)
       fetchSponsorships()
     } catch (err) {
-      console.error('Error checking authentication:', err)
+      logger.error('Error checking authentication:', { error: err })
       router.push('/auth/login')
     }
   }, [supabase.auth, router, fetchSponsorships])

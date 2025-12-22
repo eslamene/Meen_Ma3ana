@@ -9,6 +9,8 @@ import { getIcon } from '@/lib/icons/registry'
 import { LucideIcon } from 'lucide-react'
 import { normalizeLandingPath } from '@/lib/utils/app-url'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface MenuItemFromDB {
   id: string
   parent_id?: string
@@ -59,7 +61,7 @@ export async function getPublicNavItemsFromDB(
       .order('sort_order', { ascending: true })
 
     if (error) {
-      console.error('Error fetching public nav items:', error)
+      logger.error('Error fetching public nav items:', { error: error })
       return []
     }
 
@@ -184,7 +186,7 @@ export async function getPublicNavItemsFromDB(
     sortItems(rootItems)
     return rootItems
   } catch (error) {
-    console.error('Error in getPublicNavItemsFromDB:', error)
+    logger.error('Error in getPublicNavItemsFromDB:', { error: error })
     return []
   }
 }

@@ -1,109 +1,88 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandlerWithParams, createPatchHandlerWithParams, createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { CaseLifecycleService } from '@/lib/case-lifecycle'
 import { db } from '@/lib/db'
 import { cases, contributions } from '@/drizzle/schema'
 import { eq, sum } from 'drizzle-orm'
-import { RouteContext } from '@/types/next-api'
 
-import { Logger, defaultLogger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id: caseId } = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  const { logger } = context
+  const { id: caseId } = params
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get case status history
-    const historyResult = await CaseLifecycleService.getCaseStatusHistory(caseId)
-    
-    if (!historyResult.success) {
-      return NextResponse.json({ error: historyResult.error }, { status: 500 })
-    }
-
-    return NextResponse.json({ history: historyResult.history })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error getting case status history:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  // Get case status history
+  const historyResult = await CaseLifecycleService.getCaseStatusHistory(caseId)
+  
+  if (!historyResult.success) {
+    throw new ApiError('INTERNAL_SERVER_ERROR', historyResult.error || 'Failed to get case status history', 500)
   }
+
+  return NextResponse.json({ history: historyResult.history })
 }
 
-export async function PATCH(
+async function patchHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id: caseId } = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  const { user, logger } = context
+  const { id: caseId } = params
+  const body = await request.json()
+  const { newStatus, changeReason, systemTriggered = false } = body
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const body = await request.json()
-    const { newStatus, changeReason, systemTriggered = false } = body
+  // Change case status
+  const result = await CaseLifecycleService.changeCaseStatus({
+    caseId,
+    newStatus,
+    changedBy: user.id,
+    systemTriggered,
+    changeReason
+  })
 
-    // Change case status
-    const result = await CaseLifecycleService.changeCaseStatus({
-      caseId,
-      newStatus,
-      changedBy: user.id,
-      systemTriggered,
-      changeReason
-    })
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 })
-    }
-
-    return NextResponse.json({ case: result.case })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error changing case status:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  if (!result.success) {
+    throw new ApiError('VALIDATION_ERROR', result.error || 'Failed to change case status', 400)
   }
+
+  return NextResponse.json({ case: result.case })
 }
 
-export async function POST(
+async function postHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id: caseId } = await context.params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+  const { logger } = context
+  const { id: caseId } = params
+  const body = await request.json()
+  const { action } = body
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const body = await request.json()
-    const { action } = body
-
-    if (action === 'check-automatic-closure') {
-      // Check if case should be automatically closed
-      const result = await checkAndCloseCaseIfFullyFunded(caseId)
-      return NextResponse.json(result)
-    }
-
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error processing case action:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  if (action === 'check-automatic-closure') {
+    // Check if case should be automatically closed
+    const result = await checkAndCloseCaseIfFullyFunded(caseId)
+    return NextResponse.json(result)
   }
+
+    throw new ApiError('VALIDATION_ERROR', 'Invalid action', 400)
 }
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/cases/[id]/status' 
+})
+
+export const PATCH = createPatchHandlerWithParams(patchHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/cases/[id]/status' 
+})
+
+export const POST = createPostHandlerWithParams(postHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/cases/[id]/status' 
+})
 
 async function checkAndCloseCaseIfFullyFunded(caseId: string) {
   try {
@@ -160,7 +139,9 @@ async function checkAndCloseCaseIfFullyFunded(caseId: string) {
       }
     }
   } catch (error) {
-    defaultLogger.error('Error checking automatic closure:', error)
+    // This is a helper function, not a route handler, so we use defaultLogger
+    const { defaultLogger } = await import('@/lib/logger')
+    defaultLogger.error('Error checking automatic closure', { error })
     return { success: false, error: 'Failed to check automatic closure' }
   }
 } 

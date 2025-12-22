@@ -10,6 +10,8 @@ import { Search, Shield, Loader2 } from 'lucide-react'
 import StandardModal, { StandardFormField } from '@/components/ui/standard-modal'
 import { Card, CardContent } from '@/components/ui/card'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Permission {
   id: string
   name: string
@@ -93,7 +95,7 @@ export function PermissionAssignmentModal({
       await onSave(selectedPermissions)
       onClose()
     } catch (error) {
-      console.error('Error saving permissions:', error)
+      logger.error('Error saving permissions:', { error: error })
     } finally {
       setSaving(false)
     }
@@ -129,7 +131,7 @@ export function PermissionAssignmentModal({
           fetchingRef.current = false
         })
         .catch(error => {
-          console.error('Error fetching permissions:', error)
+          logger.error('Error fetching permissions:', { error: error })
           setSelectedPermissions(currentPermissions)
           fetchingRef.current = false
         })
@@ -162,7 +164,7 @@ export function PermissionAssignmentModal({
             setAllPermissions(flatPermissions)
           })
           .catch(error => {
-            console.error('Error fetching all permissions:', error)
+            logger.error('Error fetching all permissions:', { error: error })
             // Don't set empty array, keep existing permissions if any
           })
       }

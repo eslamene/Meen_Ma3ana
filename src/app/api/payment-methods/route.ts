@@ -1,91 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+async function getHandler(
+  request: NextRequest,
+  context: ApiHandlerContext
+) {
+  const { supabase, logger } = context
+  const { searchParams } = new URL(request.url)
+  const includeInactive = searchParams.get('includeInactive') === 'true'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+  let query = supabase
+    .from('payment_methods')
+    .select('id, code, name, name_en, name_ar, description, description_en, description_ar, icon, sort_order, is_active, created_at, updated_at')
+    .order('sort_order', { ascending: true })
 
-  try {
-    const { searchParams } = new URL(request.url)
-    const includeInactive = searchParams.get('includeInactive') === 'true'
-    
-    const supabase = await createClient()
-
-    let query = supabase
-      .from('payment_methods')
-      .select('id, code, name, name_en, name_ar, description, description_en, description_ar, icon, sort_order, is_active, created_at, updated_at')
-      .order('sort_order', { ascending: true })
-
-    if (!includeInactive) {
-      query = query.eq('is_active', true)
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      logger.error('Error fetching payment methods:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch payment methods' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ paymentMethods: data || [] })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in payment methods API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  if (!includeInactive) {
+    query = query.eq('is_active', true)
   }
+
+  const { data, error } = await query
+
+  if (error) {
+    logger.error('Error fetching payment methods', { error })
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch payment methods', 500)
+  }
+
+  return NextResponse.json({ paymentMethods: data || [] })
 }
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    let isAdmin = false
-    try {
-      const { data: adminRoles } = await supabase
-        .from('admin_user_roles')
-        .select(`
-          admin_roles (*)
-        `)
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-
-      if (adminRoles && adminRoles.length > 0) {
-        isAdmin = adminRoles.some((ur: any) => {
-          const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
-          return role?.name === 'admin' || role?.name === 'super_admin' || (role?.level && role.level >= 8)
-        })
-      }
-    } catch (error) {
-      logger.error('Error checking admin status:', error)
-    }
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      )
-    }
+async function postHandler(
+  request: NextRequest,
+  context: ApiHandlerContext
+) {
+  const { supabase, logger } = context
 
     const body = await request.json()
     const {
@@ -103,17 +51,11 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!code) {
-      return NextResponse.json(
-        { error: 'code is required' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'code is required', 400)
     }
 
     if (!name_en && !name) {
-      return NextResponse.json(
-        { error: 'name_en or name is required' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'name_en or name is required', 400)
     }
 
     // Check for duplicate code
@@ -124,10 +66,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (existingMethod) {
-      return NextResponse.json(
-        { error: 'Payment method with this code already exists' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Payment method with this code already exists', 400)
     }
 
     // Use name_en if provided, otherwise use name
@@ -156,19 +95,19 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating payment method:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to create payment method' },
-        { status: 500 }
-      )
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating payment method', { error: insertError })
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create payment method', 500)
     }
 
     return NextResponse.json({ paymentMethod: newMethod }, { status: 201 })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in payment methods API POST:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-} 
+}
+
+export const GET = createGetHandler(getHandler, { 
+  requireAuth: false, // Public endpoint
+  loggerContext: 'api/payment-methods' 
+})
+
+export const POST = createPostHandler(postHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/payment-methods' 
+}) 

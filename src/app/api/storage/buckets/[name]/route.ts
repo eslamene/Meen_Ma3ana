@@ -4,37 +4,24 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 import { createStorageAdminClient } from '@/lib/storage/server'
-import { requirePermission } from '@/lib/security/guards'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
 import type { BucketDetailsResponse } from '@/lib/storage/types'
-import type { RouteContext } from '@/types/next-api'
 
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ name: string }>
+  context: ApiHandlerContext,
+  params: { name: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+  const { logger } = context
+  const bucketName = decodeURIComponent(params.name)
+  
+  // Check if we need object count (only for admin details page, not for file uploader)
+  const url = new URL(request.url)
+  const includeCount = url.searchParams.get('includeCount') === 'true'
 
-  try {
-    // Check permission
-    const guardResult = await requirePermission('manage:files')(request)
-
-    if (guardResult instanceof NextResponse) {
-      logger.warn('Unauthorized access to bucket details', { status: guardResult.status })
-      return guardResult
-    }
-
-    const params = await context.params
-    const bucketName = decodeURIComponent(params.name)
-    
-    // Check if we need object count (only for admin details page, not for file uploader)
-    const url = new URL(request.url)
-    const includeCount = url.searchParams.get('includeCount') === 'true'
-
-    logger.info('Fetching bucket details', { userId: guardResult.user.id, bucketName, includeCount })
+  logger.info('Fetching bucket details', { userId: context.user.id, bucketName, includeCount })
 
     // Create admin client
     const supabase = createStorageAdminClient()
@@ -50,11 +37,8 @@ export async function GET(
     const { data: bucket, error: bucketError } = await supabase.storage.getBucket(bucketName)
 
     if (bucketError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching bucket:', bucketError)
-      return NextResponse.json(
-        { error: 'Bucket not found', details: bucketError.message },
-        { status: 404 }
-      )
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching bucket', { error: bucketError })
+      throw new ApiError('NOT_FOUND', `Bucket not found: ${bucketError.message}`, 404)
     }
 
     // Get object count ONLY if requested (this is slow, so skip for file uploader)
@@ -92,12 +76,10 @@ export async function GET(
     logger.info('Successfully fetched bucket details', { bucketName })
 
     return NextResponse.json(response)
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in bucket details API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requirePermissions: ['manage:files'], 
+  loggerContext: 'api/storage/buckets/[name]' 
+})
 

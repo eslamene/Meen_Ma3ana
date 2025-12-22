@@ -2,6 +2,8 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from '@/drizzle/schema'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 // Create the connection with proper URL encoding and error handling
 const connectionString = process.env.DATABASE_URL!
 
@@ -27,7 +29,7 @@ try {
     onparameter: () => {},
   })
 } catch (error: unknown) {
-  console.error('Error connecting to database:', error)
+  logger.error('Error connecting to database:', { error: error })
   // Fallback to URL string if parsing fails
   client = postgres(connectionString, {
     ssl: 'require',

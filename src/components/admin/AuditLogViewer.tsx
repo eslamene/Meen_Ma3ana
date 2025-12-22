@@ -22,6 +22,8 @@ import React from 'react'
 import type { AuditLogEntry } from '@/lib/services/auditService'
 
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface AuditLogViewerProps {
   className?: string
 }
@@ -98,7 +100,7 @@ export default function AuditLogViewer({ className }: AuditLogViewerProps) {
         setPermissionAuditLogs(logs)
       }
     } catch (error) {
-      console.error('Error loading audit logs:', error)
+      logger.error('Error loading audit logs:', { error: error })
     } finally {
       setLoading(false)
     }

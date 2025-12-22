@@ -17,6 +17,8 @@ import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination'
 import { theme, brandColors } from '@/lib/theme'
+import { defaultLogger as logger } from '@/lib/logger'
+
 import { 
   Target, 
   Plus, 
@@ -186,7 +188,7 @@ export default function AdminCasesPage() {
       
       // Warn if dataset is large (this view loads all cases into memory)
       if (loadedCases.length > 1000) {
-        console.warn(`Large dataset detected: ${loadedCases.length} cases loaded. This view may experience performance issues with very large datasets. Consider implementing server-side pagination.`)
+        logger.warn(`Large dataset detected: ${loadedCases.length} cases loaded. This view may experience performance issues with very large datasets. Consider implementing server-side pagination.`)
       }
       
       setCases(loadedCases)
@@ -198,7 +200,7 @@ export default function AdminCasesPage() {
         under_review: 0
       })
     } catch (error) {
-      console.error('Error fetching cases:', error)
+      logger.error('Error fetching cases:', { error: error })
       toast.error('Error', { description: 'Failed to load cases. Please try again.' })
     } finally {
       setLoading(false)
@@ -456,7 +458,7 @@ export default function AdminCasesPage() {
 
     } catch (error) {
       // Only log actual errors, not business logic responses
-      console.error('Unexpected error deleting case:', error)
+      logger.error('Unexpected error deleting case:', { error: error })
       
       // Show error message for unexpected errors only
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete case'
@@ -481,13 +483,13 @@ export default function AdminCasesPage() {
     try {
       const response = await fetch('/api/categories')
       if (!response.ok) {
-        console.error('Error fetching categories:', response.statusText)
+        logger.error('Error fetching categories:', { error: response.statusText })
         return
       }
       const result = await response.json()
       setCategories(result.categories || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      logger.error('Error fetching categories:', { error: error })
     }
   }, [])
 
@@ -588,8 +590,8 @@ export default function AdminCasesPage() {
         c.id === quickUpdateDialog.caseId 
           ? { 
               ...c, 
-              status: updateFormData.status as any,
-              priority: updateFormData.priority as any,
+              status: updateFormData.status as 'draft' | 'submitted' | 'published' | 'closed' | 'under_review',
+              priority: updateFormData.priority as 'low' | 'medium' | 'high' | 'urgent',
               category_id: categoryId || undefined
             }
           : c
@@ -604,7 +606,7 @@ export default function AdminCasesPage() {
 
       handleQuickUpdateCancel()
     } catch (error) {
-      console.error('Error updating case:', error)
+      logger.error('Error updating case:', { error: error })
       const errorMessage = error instanceof Error ? error.message : 'Failed to update case'
       toast.error('Update Failed', { description: errorMessage })
     } finally {

@@ -8,6 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Contribution {
   id: string
   amount: number
@@ -102,7 +104,7 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
       if (data.failed > 0) {
         toast.error(`Failed to process ${data.failed} contribution(s)`)
         if (data.errors && data.errors.length > 0) {
-          console.error('Batch processing errors:', data.errors)
+          logger.error('Batch processing errors:', { error: data.errors })
         }
       }
 
@@ -114,7 +116,7 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
       // Refresh the list
       onRefresh()
     } catch (error) {
-      console.error('Error processing bulk action:', error)
+      logger.error('Error processing bulk action:', { error: error })
       toast.error(
         error instanceof Error ? error.message : 'Failed to process bulk action'
       )

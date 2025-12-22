@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
-import { RouteContext } from '@/types/next-api'
+import { createGetHandlerWithParams, createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
+  const { supabase, logger } = context
+  const { id } = params
     
     // Get the contribution approval status
     const { data: approvalStatus, error } = await supabase
@@ -28,34 +24,22 @@ export async function GET(
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      throw new ApiError('INTERNAL_SERVER_ERROR', error.message, 500)
     }
 
     return NextResponse.json(approvalStatus)
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
 }
 
-export async function POST(
+async function postHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-    
-    const body = await request.json()
-    const { status, rejection_reason, admin_comment, donor_reply, payment_proof_url } = body
-
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
+  
+  const body = await request.json()
+  const { status, rejection_reason, admin_comment, donor_reply, payment_proof_url } = body
 
     // Check if approval status exists
     const { data: existingStatus } = await supabase
@@ -247,8 +231,7 @@ export async function POST(
     }
 
     return NextResponse.json(result)
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-} 
+}
+
+export const GET = createGetHandlerWithParams<{ id: string }>(getHandler, { requireAuth: true, loggerContext: 'api/contributions/[id]/approval-status' })
+export const POST = createPostHandlerWithParams<{ id: string }>(postHandler, { requireAuth: true, loggerContext: 'api/contributions/[id]/approval-status' }) 

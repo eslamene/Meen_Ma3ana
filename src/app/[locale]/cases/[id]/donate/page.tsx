@@ -10,6 +10,8 @@ import { ArrowLeft, TrendingUp, Target } from 'lucide-react'
 import ContributionForm from '@/components/contributions/ContributionForm'
 import { useApprovedContributions } from '@/lib/hooks/useApprovedContributions'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Case {
   id: string
   title: string
@@ -83,7 +85,7 @@ export default function DonatePage() {
           created_at: data.created_at
         })
       } catch (error) {
-        console.error('Error fetching case details:', error)
+        logger.error('Error fetching case details:', { error: error })
         setError('Failed to load case details')
       } finally {
         setLoading(false)

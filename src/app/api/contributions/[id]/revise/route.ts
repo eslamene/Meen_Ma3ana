@@ -1,30 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { RouteContext } from '@/types/next-api'
+import { createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function POST(
+async function handler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  const { id } = await context.params
-  
-  try {
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     const body = await request.json()
     
@@ -39,18 +24,12 @@ export async function POST(
 
     // Validate required fields
     if (!amount || !paymentMethod || !explanation) {
-      return NextResponse.json(
-        { error: 'Missing required fields: amount, paymentMethod, and explanation are required' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Missing required fields: amount, paymentMethod, and explanation are required', 400)
     }
 
     // Validate amount
     if (amount <= 0) {
-      return NextResponse.json(
-        { error: 'Amount must be greater than 0' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Amount must be greater than 0', 400)
     }
 
     // Verify the original contribution belongs to the current user
@@ -61,17 +40,11 @@ export async function POST(
       .single()
 
     if (contributionError || !originalContribution) {
-      return NextResponse.json(
-        { error: 'Original contribution not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Original contribution not found', 404)
     }
 
     if (originalContribution.donor_id !== user.id) {
-      return NextResponse.json(
-        { error: 'You can only revise your own contributions' },
-        { status: 403 }
-      )
+      throw new ApiError('FORBIDDEN', 'You can only revise your own contributions', 403)
     }
 
     // Get the current approval status to verify it's rejected
@@ -82,17 +55,11 @@ export async function POST(
       .single()
 
     if (approvalError || !approvalStatus) {
-      return NextResponse.json(
-        { error: 'Approval status not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Approval status not found', 404)
     }
 
     if (approvalStatus.status !== 'rejected') {
-      return NextResponse.json(
-        { error: 'Only rejected contributions can be revised' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Only rejected contributions can be revised', 400)
     }
 
     // Check if the case is still published
@@ -135,10 +102,7 @@ export async function POST(
 
     if (insertError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating revision contribution:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to create revision contribution' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create revision contribution', 500)
     }
 
     // Create approval status for the new contribution
@@ -208,11 +172,6 @@ export async function POST(
       message: 'Contribution revision created successfully',
       revisionId: newContribution.id
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in contribution revision:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-} 
+}
+
+export const POST = createPostHandlerWithParams<{ id: string }>(handler, { requireAuth: true, loggerContext: 'api/contributions/[id]/revise' }) 

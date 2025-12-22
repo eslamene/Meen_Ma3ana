@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface RecurringContribution {
   id: string
   amount: number
@@ -54,7 +56,7 @@ export default function RecurringContributionDashboard() {
     const getUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser()
       if (error) {
-        console.error('Error getting user:', error)
+        logger.error('Error getting user:', { error: error })
         return
       }
       setUser(user)

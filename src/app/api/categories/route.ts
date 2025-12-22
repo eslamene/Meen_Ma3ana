@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger } = context
 
-  try {
-    const { searchParams } = new URL(request.url)
-    const includeInactive = searchParams.get('includeInactive') === 'true'
-    
-    const supabase = await createClient()
+  const { searchParams } = new URL(request.url)
+  const includeInactive = searchParams.get('includeInactive') === 'true'
 
     let query = supabase
       .from('case_categories')
@@ -26,51 +22,14 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching categories:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch categories' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch categories', 500)
     }
 
     return NextResponse.json({ categories: data || [] })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in categories API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-
-  try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (userData?.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      )
-    }
+async function postHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { supabase, logger, user } = context
 
     const body = await request.json()
     const {
@@ -87,10 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!name_en && !name) {
-      return NextResponse.json(
-        { error: 'name_en or name is required' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'name_en or name is required', 400)
     }
 
     // Use name_en if provided, otherwise use name
@@ -132,21 +88,14 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating category:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to create category' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create category', 500)
     }
 
     return NextResponse.json({ category: newCategory }, { status: 201 })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in categories API POST:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandler(getHandler, { loggerContext: 'api/categories' })
+export const POST = createPostHandler(postHandler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/categories' })
 
 
 

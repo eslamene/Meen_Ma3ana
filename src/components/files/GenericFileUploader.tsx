@@ -9,6 +9,8 @@ import { Upload, X, FileText, Image as ImageIcon, File } from 'lucide-react'
 import { fetchStorageRules, validateFileClient, type StorageRule } from '@/lib/storage/clientValidation'
 import { toast } from 'sonner'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export interface FileCategoryConfig {
   label: string
   description?: string
@@ -99,7 +101,7 @@ export function GenericFileUploader({
           setStorageRule(rule)
         })
         .catch(error => {
-          console.warn('Error loading storage rules:', error)
+          logger.warn('Error loading storage rules:', error)
           setStorageRule(null)
         })
         .finally(() => {

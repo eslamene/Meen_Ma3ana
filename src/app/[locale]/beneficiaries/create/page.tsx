@@ -14,6 +14,8 @@ import { LookupService } from '@/lib/services/lookupService'
 import { toast } from 'sonner'
 import type { CreateBeneficiaryData, UpdateBeneficiaryData, City, IdType } from '@/types/beneficiary'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 export default function CreateBeneficiaryPage() {
   const t = useTranslations('beneficiaries')
   const router = useRouter()
@@ -44,7 +46,7 @@ export default function CreateBeneficiaryPage() {
         setCities(citiesData)
         setIdTypes(idTypesData)
       } catch (error) {
-        console.error('Error loading lookup data:', error)
+        logger.error('Error loading lookup data:', { error: error })
       } finally {
         setLoading(false)
       }
@@ -63,7 +65,7 @@ export default function CreateBeneficiaryPage() {
           .eq('id', draftBeneficiaryId)
         console.log('Draft beneficiary cleaned up:', draftBeneficiaryId)
       } catch (error) {
-        console.error('Error cleaning up draft beneficiary:', error)
+        logger.error('Error cleaning up draft beneficiary:', { error: error })
       }
     }
   }, [draftBeneficiaryId, isSubmitting, supabase])
@@ -149,12 +151,12 @@ export default function CreateBeneficiaryPage() {
         setCreatingDraft(false)
         return result.data.id
       } else {
-        console.error('Unexpected response format:', result)
+        logger.error('Unexpected response format:', { error: result })
         setCreatingDraft(false)
         return null
       }
     } catch (error) {
-      console.error('Error creating draft beneficiary (catch):', {
+      logger.error('Error creating draft beneficiary (catch):', {
         error,
         errorType: typeof error,
         errorMessage: error instanceof Error ? error.message : String(error),
@@ -172,7 +174,7 @@ export default function CreateBeneficiaryPage() {
     // Only create draft if both name and mobile_number are provided
     if (name.length > 0 && mobileNumber.length > 0 && !draftBeneficiaryId && !creatingDraft) {
       ensureDraftBeneficiary().catch(err => {
-        console.error('Error creating draft beneficiary:', err)
+        logger.error('Error creating draft beneficiary:', { error: err })
       })
     }
   }, [formData.name, formData.mobile_number, draftBeneficiaryId, creatingDraft, ensureDraftBeneficiary])
@@ -238,7 +240,7 @@ export default function CreateBeneficiaryPage() {
             .update(updateData)
             .eq('id', draftBeneficiaryId)
         } catch (error) {
-          console.error('Error updating draft beneficiary:', error)
+          logger.error('Error updating draft beneficiary:', { error: error })
         }
       }
       updateDraft()
@@ -330,7 +332,7 @@ export default function CreateBeneficiaryPage() {
         }, 500)
       }
     } catch (error) {
-      console.error('Error saving beneficiary:', error)
+      logger.error('Error saving beneficiary:', { error: error })
       const errorMessage = error instanceof Error ? error.message : 'Failed to save beneficiary. Please try again.'
       toast.error(
         'Save Failed',
@@ -404,6 +406,7 @@ export default function CreateBeneficiaryPage() {
                     idTypes={idTypes}
                     cities={cities}
                     showDocuments={false}
+                    allowCreateDocuments={false}
                     showFooter={false}
                     ref={formRef}
                     onFormDataChange={handleFormDataChange}

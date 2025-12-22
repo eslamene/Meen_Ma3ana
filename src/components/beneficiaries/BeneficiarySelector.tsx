@@ -24,6 +24,9 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Beneficiary, CreateBeneficiaryData, UpdateBeneficiaryData, IdType, City, DocumentType } from '@/types/beneficiary'
 
+import { defaultLogger as logger } from '@/lib/logger'
+import { createBeneficiaryClient } from '@/lib/services/beneficiaryClient'
+
 interface BeneficiarySelectorProps {
   selectedBeneficiary?: Beneficiary | null
   onSelect: (beneficiary: Beneficiary | null) => void
@@ -31,6 +34,107 @@ interface BeneficiarySelectorProps {
   defaultNationalId?: string
   defaultName?: string
   showOpenButton?: boolean
+}
+
+interface CreateBeneficiaryDialogContentProps {
+  t: ReturnType<typeof useTranslations<'beneficiaries'>>
+  containerVariant: string
+  defaultName?: string
+  defaultMobileNumber?: string
+  defaultNationalId?: string
+  idTypes: IdType[]
+  cities: City[]
+  isCreating: boolean
+  onCreateBeneficiary: (
+    data: CreateBeneficiaryData | UpdateBeneficiaryData,
+    documents?: Array<{ file: File; documentType: DocumentType; isPublic: boolean; description?: string }>
+  ) => Promise<void>
+  createFormRef: React.RefObject<BeneficiaryFormRef | null>
+  onClose: () => void
+}
+
+function CreateBeneficiaryDialogContent({
+  t,
+  containerVariant,
+  defaultName,
+  defaultMobileNumber,
+  defaultNationalId,
+  idTypes,
+  cities,
+  isCreating,
+  onCreateBeneficiary,
+  createFormRef,
+  onClose,
+}: CreateBeneficiaryDialogContentProps) {
+  return (
+    <DialogContent
+      className={cn(
+        'max-h-[95vh] overflow-hidden p-0 flex flex-col',
+        containerVariant === 'full' ? 'max-w-[98vw] w-full' : 'max-w-[1400px] w-[95vw]'
+      )}
+    >
+      <DialogTitle className="sr-only">
+        {t('createBeneficiary') || 'Create New Beneficiary'}
+      </DialogTitle>
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
+        <EditPageHeader
+          backUrl="#"
+          icon={Plus}
+          title={t('createBeneficiary') || 'Create New Beneficiary'}
+          description={t('createDescription') || 'Create a profile for recurring cases'}
+          showBackButton={false}
+          actions={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="flex items-center gap-2 hover:bg-gray-100 transition-all duration-200"
+            >
+              <X className="h-4 w-4" />
+              <span className="hidden sm:inline">Close</span>
+            </Button>
+          }
+        />
+
+        <div className="w-full mt-6">
+          <BeneficiaryForm
+            ref={createFormRef}
+            mode="create"
+            onSubmit={onCreateBeneficiary}
+            isSubmitting={isCreating}
+            idTypes={idTypes}
+            cities={cities}
+            showDocuments={false}
+            showFooter={false}
+            defaultValues={{
+              name: defaultName || '',
+              mobile_number: defaultMobileNumber || '',
+              national_id: defaultNationalId || '',
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="border-t bg-white px-4 sm:px-6 py-4">
+        <EditPageFooter
+          primaryAction={{
+            label: t('createBeneficiary') || 'Create Beneficiary',
+            onClick: () => createFormRef.current?.submit(),
+            disabled: isCreating,
+            loading: isCreating,
+            icon: <Save className="h-4 w-4 mr-2" />,
+          }}
+          secondaryActions={[
+            {
+              label: t('cancel') || 'Cancel',
+              onClick: onClose,
+              variant: 'outline',
+            },
+          ]}
+        />
+      </div>
+    </DialogContent>
+  )
 }
 
 export default function BeneficiarySelector({
@@ -57,7 +161,7 @@ export default function BeneficiarySelector({
   const [cities, setCities] = useState<City[]>([])
   const [loadingLookups, setLoadingLookups] = useState(true)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const createFormRef = useRef<BeneficiaryFormRef>(null)
+  const createFormRef = useRef<BeneficiaryFormRef | null>(null)
 
   // Load lookup data on component mount
   useEffect(() => {
@@ -70,7 +174,7 @@ export default function BeneficiarySelector({
         setIdTypes(idTypesData)
         setCities(citiesData)
       } catch (error) {
-        console.error('Error loading lookup data:', error)
+        logger.error('Error loading lookup data:', { error: error })
       } finally {
         setLoadingLookups(false)
       }
@@ -93,7 +197,7 @@ export default function BeneficiarySelector({
             setRecentBeneficiaries([])
           }
         } catch (error) {
-          console.error('Error loading recent beneficiaries:', error)
+          logger.error('Error loading recent beneficiaries:', { error: error })
           setRecentBeneficiaries([])
         } finally {
           setIsLoadingRecent(false)
@@ -126,7 +230,7 @@ export default function BeneficiarySelector({
         setSearchResults([])
       }
     } catch (error) {
-      console.error('Error searching beneficiary:', error)
+      logger.error('Error searching beneficiary:', { error: error })
     } finally {
       setIsSearching(false)
     }
@@ -160,7 +264,7 @@ export default function BeneficiarySelector({
         setSearchResults([])
       }
     } catch (error) {
-      console.error('Error searching beneficiaries:', error)
+      logger.error('Error searching beneficiaries:', { error: error })
       setSearchResults([])
     } finally {
       setIsSearching(false)
@@ -199,19 +303,14 @@ export default function BeneficiarySelector({
       // Cast to CreateBeneficiaryData for API call (create mode only)
       const createData = data as CreateBeneficiaryData
       
-      // Use API endpoint instead of direct service call to bypass RLS
-      const response = await fetch('/api/beneficiaries', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(createData),
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        const errorMessage = errorData.error || 'Failed to create beneficiary'
-        
+      let newBeneficiary
+      try {
+        // Centralized creation logic (POST /api/beneficiaries)
+        newBeneficiary = await createBeneficiaryClient(createData)
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to create beneficiary'
+
         // Check if it's a duplicate beneficiary error
         if (errorMessage.includes('already exists') && (createData.mobile_number || createData.national_id)) {
           // Try to find the existing beneficiary
@@ -239,16 +338,12 @@ export default function BeneficiarySelector({
               return // Don't throw error, just return early
             }
           } catch (searchError) {
-            // If we can't find the existing beneficiary, just show the error
-            console.error('Error searching for existing beneficiary:', searchError)
+            logger.error('Error searching for existing beneficiary:', { error: searchError })
           }
         }
-        
+
         throw new Error(errorMessage)
       }
-      
-      const result = await response.json()
-      const newBeneficiary = result.data
       
       // Upload documents if provided
       if (documents && documents.length > 0) {
@@ -281,7 +376,7 @@ export default function BeneficiarySelector({
               })
             }
           } catch (docError) {
-            console.error('Error uploading document:', docError)
+            logger.error('Error uploading document:', { error: docError })
             // Continue with other documents even if one fails
           }
         }
@@ -295,7 +390,7 @@ export default function BeneficiarySelector({
       setSearchQuery('')
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      console.error('Error creating beneficiary:', error)
+      logger.error('Error creating beneficiary:', { error: error })
       
       // Show toast notification instead of alert
       toast.error('Error', {
@@ -469,74 +564,19 @@ export default function BeneficiarySelector({
                         {t('createNew') || 'Create New'}
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className={cn(
-                      "max-h-[95vh] overflow-hidden p-0 flex flex-col",
-                      containerVariant === 'full' ? 'max-w-[98vw] w-full' : 'max-w-[1400px] w-[95vw]'
-                    )}>
-                      <DialogTitle className="sr-only">
-                        {t('createBeneficiary') || 'Create New Beneficiary'}
-                      </DialogTitle>
-                      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
-                        {/* Header */}
-                        <EditPageHeader
-                          backUrl="#"
-                          icon={Plus}
-                          title={t('createBeneficiary') || 'Create New Beneficiary'}
-                          description={t('createDescription') || 'Create a profile for recurring cases'}
-                          showBackButton={false}
-                          actions={
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowCreateDialog(false)}
-                              className="flex items-center gap-2 hover:bg-gray-100 transition-all duration-200"
-                            >
-                              <X className="h-4 w-4" />
-                              <span className="hidden sm:inline">Close</span>
-                            </Button>
-                          }
-                        />
-
-                        {/* Form Section */}
-                        <div className="w-full mt-6">
-                          <BeneficiaryForm
-                            ref={createFormRef}
-                            mode="create"
-                            onSubmit={handleCreateBeneficiary}
-                            isSubmitting={isCreating}
-                            idTypes={idTypes}
-                            cities={cities}
-                            showDocuments={true}
-                            showFooter={false}
-                            defaultValues={{
-                              name: defaultName || '',
-                              mobile_number: defaultMobileNumber || '',
-                              national_id: defaultNationalId || ''
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Footer */}
-                      <div className="border-t bg-white px-4 sm:px-6 py-4">
-                        <EditPageFooter
-                          primaryAction={{
-                            label: t('createBeneficiary') || 'Create Beneficiary',
-                            onClick: () => createFormRef.current?.submit(),
-                            disabled: isCreating,
-                            loading: isCreating,
-                            icon: <Save className="h-4 w-4 mr-2" />
-                          }}
-                          secondaryActions={[
-                            {
-                              label: t('cancel') || 'Cancel',
-                              onClick: () => setShowCreateDialog(false),
-                              variant: 'outline'
-                            }
-                          ]}
-                        />
-                      </div>
-                    </DialogContent>
+                    <CreateBeneficiaryDialogContent
+                      t={t}
+                      containerVariant={containerVariant}
+                      defaultName={defaultName}
+                      defaultMobileNumber={defaultMobileNumber}
+                      defaultNationalId={defaultNationalId}
+                      idTypes={idTypes}
+                      cities={cities}
+                      isCreating={isCreating}
+                      onCreateBeneficiary={handleCreateBeneficiary}
+                      createFormRef={createFormRef as React.RefObject<BeneficiaryFormRef>}
+                      onClose={() => setShowCreateDialog(false)}
+                    />
                   </Dialog>
                 </div>
                 
@@ -791,74 +831,19 @@ export default function BeneficiarySelector({
                 {t('createNew') || 'Create New'}
               </Button>
             </DialogTrigger>
-            <DialogContent className={cn(
-              "max-h-[95vh] overflow-hidden p-0 flex flex-col",
-              containerVariant === 'full' ? 'max-w-[98vw] w-full' : 'max-w-[1400px] w-[95vw]'
-            )}>
-              <DialogTitle className="sr-only">
-                {t('createBeneficiary') || 'Create New Beneficiary'}
-              </DialogTitle>
-              <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
-                {/* Header */}
-                <EditPageHeader
-                  backUrl="#"
-                  icon={Plus}
-                  title={t('createBeneficiary') || 'Create New Beneficiary'}
-                  description={t('createDescription') || 'Create a profile for recurring cases'}
-                  showBackButton={false}
-                  actions={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowCreateDialog(false)}
-                      className="flex items-center gap-2 hover:bg-gray-100 transition-all duration-200"
-                    >
-                      <X className="h-4 w-4" />
-                      <span className="hidden sm:inline">Close</span>
-                    </Button>
-                  }
-                />
-
-                {/* Form Section */}
-                <div className="w-full mt-6">
-                  <BeneficiaryForm
-                    ref={createFormRef}
-                    mode="create"
-                    onSubmit={handleCreateBeneficiary}
-                    isSubmitting={isCreating}
-                    idTypes={idTypes}
-                    cities={cities}
-                    showDocuments={true}
-                    showFooter={false}
-                    defaultValues={{
-                      name: defaultName || '',
-                      mobile_number: defaultMobileNumber || '',
-                      national_id: defaultNationalId || ''
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="border-t bg-white px-4 sm:px-6 py-4">
-                <EditPageFooter
-                  primaryAction={{
-                    label: t('createBeneficiary') || 'Create Beneficiary',
-                    onClick: () => createFormRef.current?.submit(),
-                    disabled: isCreating,
-                    loading: isCreating,
-                    icon: <Save className="h-4 w-4 mr-2" />
-                  }}
-                  secondaryActions={[
-                    {
-                      label: t('cancel') || 'Cancel',
-                      onClick: () => setShowCreateDialog(false),
-                      variant: 'outline'
-                    }
-                  ]}
-                />
-              </div>
-            </DialogContent>
+            <CreateBeneficiaryDialogContent
+              t={t}
+              containerVariant={containerVariant}
+              defaultName={defaultName}
+              defaultMobileNumber={defaultMobileNumber}
+              defaultNationalId={defaultNationalId}
+              idTypes={idTypes}
+              cities={cities}
+              isCreating={isCreating}
+              onCreateBeneficiary={handleCreateBeneficiary}
+              createFormRef={createFormRef}
+              onClose={() => setShowCreateDialog(false)}
+            />
           </Dialog>
         </div>
 

@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react'
 import { Heart, Users, DollarSign, Calendar, TrendingUp, ArrowRight, Stethoscope, GraduationCap, Home, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface CategoryImpact {
   name: string
   nameAr: string
@@ -43,7 +45,7 @@ export default function Stories() {
           setImpactData(data)
         }
       } catch (error) {
-        console.error('Error fetching impact data:', error)
+        logger.error('Error fetching impact data:', { error: error })
       } finally {
         setLoading(false)
       }

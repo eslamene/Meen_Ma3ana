@@ -1,54 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
+import { createPutHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  
-  try {
-    const supabase = await createClient()
-    const params = await context.params
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is admin
-    const { data: adminRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles!inner(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('admin_roles.name', ['admin', 'super_admin'])
-      .limit(1)
-
-    const isAdmin = (adminRoles?.length || 0) > 0
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
-    }
+  const { supabase, logger } = context
 
     const body = await request.json()
     const { action, reviewComment } = body
 
     if (!action || !['approve', 'reject'].includes(action)) {
-      return NextResponse.json(
-        { error: 'Invalid action. Must be "approve" or "reject"' },
-        { status: 400 }
-      )
+      throw new ApiError('VALIDATION_ERROR', 'Invalid action. Must be "approve" or "reject"', 400)
     }
 
     // Get sponsorship details first
@@ -60,14 +25,11 @@ export async function PUT(
 
     if (fetchError || !sponsorship) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching sponsorship:', fetchError)
-      return NextResponse.json(
-        { error: 'Sponsorship not found' },
-        { status: 404 }
-      )
+      throw new ApiError('NOT_FOUND', 'Sponsorship not found', 404)
     }
 
     // Update sponsorship status
-    const updateData: any = { status: action === 'approve' ? 'approved' : 'rejected' }
+    const updateData: { status: string; terms?: string } = { status: action === 'approve' ? 'approved' : 'rejected' }
     if (action === 'reject' && reviewComment) {
       updateData.terms = reviewComment
     }
@@ -79,10 +41,7 @@ export async function PUT(
 
     if (updateError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating sponsorship:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update sponsorship' },
-        { status: 500 }
-      )
+      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to update sponsorship', 500)
     }
 
     // Create notification for sponsor
@@ -112,12 +71,10 @@ export async function PUT(
       })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in admin sponsorships PUT API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const PUT = createPutHandlerWithParams(putHandler, { 
+  requireAdmin: true, 
+  loggerContext: 'api/admin/sponsorships/[id]' 
+})
 

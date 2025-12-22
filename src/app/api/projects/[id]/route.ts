@@ -2,27 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { projects, projectCycles } from '@/lib/db'
 import { eq, and, asc } from 'drizzle-orm'
-import { createClient } from '@/lib/supabase/server'
 import { RouteContext } from '@/types/next-api'
+import { createGetHandlerWithParams, createPutHandlerWithParams, createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     const projectId = id
 
@@ -34,7 +24,7 @@ export async function GET(
       .limit(1)
 
     if (projectData.length === 0) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Project not found', 404)
     }
 
     const project = projectData[0]
@@ -79,30 +69,15 @@ export async function GET(
     }
 
     return NextResponse.json(transformedProject)
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching project:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch project' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     const projectId = id
     const body = await request.json()
@@ -115,7 +90,7 @@ export async function PUT(
       .limit(1)
 
     if (existingProject.length === 0) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Project not found', 404)
     }
 
     // Only project creator or admin can edit
@@ -123,7 +98,7 @@ export async function PUT(
       // Check if user is admin
       const { data: userData } = await supabase.auth.getUser()
       if (userData.user?.user_metadata?.role !== 'admin') {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        throw new ApiError('FORBIDDEN', 'Forbidden', 403)
       }
     }
 
@@ -146,30 +121,15 @@ export async function PUT(
       .returning()
 
     return NextResponse.json(updatedProject)
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating project:', error)
-    return NextResponse.json(
-      { error: 'Failed to update project' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function DELETE(
+async function deleteHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const { supabase, logger, user } = context
+  const { id } = params
 
     const projectId = id
 
@@ -181,7 +141,7 @@ export async function DELETE(
       .limit(1)
 
     if (existingProject.length === 0) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      throw new ApiError('NOT_FOUND', 'Project not found', 404)
     }
 
     // Only project creator or admin can delete
@@ -189,7 +149,7 @@ export async function DELETE(
       // Check if user is admin
       const { data: userData } = await supabase.auth.getUser()
       if (userData.user?.user_metadata?.role !== 'admin') {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        throw new ApiError('FORBIDDEN', 'Forbidden', 403)
       }
     }
 
@@ -197,11 +157,8 @@ export async function DELETE(
     await db.delete(projects).where(eq(projects.id, projectId))
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting project:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete project' },
-      { status: 500 }
-    )
-  }
-} 
+}
+
+export const GET = createGetHandlerWithParams<{ id: string }>(getHandler, { requireAuth: true, loggerContext: 'api/projects/[id]' })
+export const PUT = createPutHandlerWithParams<{ id: string }>(putHandler, { requireAuth: true, loggerContext: 'api/projects/[id]' })
+export const DELETE = createDeleteHandlerWithParams<{ id: string }>(deleteHandler, { requireAuth: true, loggerContext: 'api/projects/[id]' }) 

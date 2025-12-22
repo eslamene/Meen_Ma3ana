@@ -9,25 +9,23 @@ import { Logger } from '@/lib/logger'
 import { getCorrelationId } from '@/lib/correlation'
 import { isValidUUID } from '@/lib/utils/uuid'
 
-export async function PATCH(
+import { NextRequest, NextResponse } from 'next/server'
+import { createPatchHandlerWithParams, createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
+import { createClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
+import { categoryDetectionRules } from '@/drizzle/schema'
+import { eq, and, desc } from 'drizzle-orm'
+import { isValidUUID } from '@/lib/utils/uuid'
+
+async function patchHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-    const body = await request.json()
+  const { supabase, user, logger } = context
+  const { id } = params
+  const body = await request.json()
 
     // Build update object dynamically based on what's provided
     const updateData: Record<string, unknown> = {
@@ -72,11 +70,8 @@ export async function PATCH(
         .insert(imageRecords)
 
       if (imagesError) {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting case files:', imagesError)
-        return NextResponse.json(
-          { error: 'Failed to save images', details: imagesError.message },
-          { status: 500 }
-        )
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error inserting case files', { error: imagesError })
+        throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to save images: ${imagesError.message}`, 500)
       }
     }
 
@@ -104,44 +99,28 @@ export async function PATCH(
         .eq('id', id)
 
       if (updateError) {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating case:', updateError)
-        return NextResponse.json(
-          { error: 'Failed to update case', details: updateError.message },
-          { status: 500 }
-        )
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating case', { error: updateError })
+        throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to update case: ${updateError.message}`, 500)
       }
     }
 
     return NextResponse.json({
       message: 'Case updated successfully'
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in case PATCH API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
 
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    
-    // Validate UUID format before making database queries
-    if (!isValidUUID(id)) {
-      return NextResponse.json(
-        { error: 'Invalid case ID format' },
-        { status: 404 }
-      )
-    }
-    
-    const supabase = await createClient()
+  const { supabase, logger } = context
+  const { id } = params
+  
+  // Validate UUID format before making database queries
+  if (!isValidUUID(id)) {
+    throw new ApiError('NOT_FOUND', 'Invalid case ID format', 404)
+  }
 
     const { data: caseData, error } = await supabase
       .from('cases')
@@ -169,11 +148,8 @@ export async function GET(
       .single()
 
     if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching case:', error)
-      return NextResponse.json(
-        { error: 'Case not found' },
-        { status: 404 }
-      )
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching case', { error })
+      throw new ApiError('NOT_FOUND', 'Case not found', 404)
     }
 
     // Fetch category detection rules if case has a category and filter by matches
@@ -223,12 +199,15 @@ export async function GET(
         detectionRules // Return matched keywords as array
       }
     })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in case GET API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
 }
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAuth: false, // Public endpoint
+  loggerContext: 'api/cases/[id]' 
+})
+
+export const PATCH = createPatchHandlerWithParams(patchHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/cases/[id]' 
+})
 

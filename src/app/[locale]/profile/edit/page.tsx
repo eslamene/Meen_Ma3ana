@@ -30,6 +30,8 @@ import { EditPageHeader, EditPageFooter } from '@/components/crud'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface UserProfile {
   id: string
   email: string
@@ -133,7 +135,7 @@ export default function EditProfilePage() {
         address: profile.address || '',
       })
     } catch (err) {
-      console.error('Error fetching user profile:', err)
+      logger.error('Error fetching user profile:', { error: err })
       setError('Failed to load profile')
     } finally {
       setLoading(false)
@@ -213,7 +215,7 @@ export default function EditProfilePage() {
         router.push(`/${params.locale}/profile`)
       }, 1500)
     } catch (err) {
-      console.error('Error updating profile:', err)
+      logger.error('Error updating profile:', { error: err })
       setError(err instanceof Error ? err.message : t('profileUpdateError'))
     } finally {
       setSaving(false)

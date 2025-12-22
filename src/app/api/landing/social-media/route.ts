@@ -1,9 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { systemConfig } from '@/drizzle/schema'
 import { inArray } from 'drizzle-orm'
+import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 
-export async function GET() {
+async function handler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
+
   try {
     // Fetch social media related config values
     // Expected keys: facebook_url, twitter_url, instagram_url, linkedin_url, youtube_url, email
@@ -34,7 +37,7 @@ export async function GET() {
       socialMedia,
     })
   } catch (error) {
-    console.error('Error fetching social media config:', error)
+    logger.error('Error fetching social media config:', { error: error })
     // Return empty object if there's an error
     return NextResponse.json(
       {
@@ -44,4 +47,6 @@ export async function GET() {
     )
   }
 }
+
+export const GET = withApiHandler(handler, { loggerContext: 'api/landing/social-media' })
 

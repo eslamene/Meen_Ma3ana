@@ -60,6 +60,8 @@ import { useLayout } from '@/components/layout/LayoutProvider'
 import type { Beneficiary } from '@/types/beneficiary'
 import { useAuth } from '@/components/auth/AuthProvider'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 interface Case {
   id: string
   title: string
@@ -339,7 +341,7 @@ export default function CaseDetailPage() {
         .eq('case_id', caseId)
 
       if (error) {
-        console.error('Error fetching total contributions:', error)
+        logger.error('Error fetching total contributions:', { error: error })
         return
       }
 
@@ -350,7 +352,7 @@ export default function CaseDetailPage() {
 
       setTotalContributions(total)
     } catch (error) {
-      console.error('Error calculating total contributions:', error)
+      logger.error('Error calculating total contributions:', { error: error })
     }
   }, [caseId])
 
@@ -397,7 +399,7 @@ export default function CaseDetailPage() {
       
       setBeneficiaryData(beneficiary)
     } catch (error) {
-      console.error('Error fetching beneficiary data:', error)
+      logger.error('Error fetching beneficiary data:', { error: error })
       setBeneficiaryData(null)
     } finally {
       setBeneficiaryLoading(false)
@@ -423,7 +425,7 @@ export default function CaseDetailPage() {
         setUpdates(data.updates || [])
       }
     } catch (error) {
-      console.error('Error fetching updates:', error)
+      logger.error('Error fetching updates:', { error: error })
     }
   }, [caseId])
 
@@ -444,7 +446,7 @@ export default function CaseDetailPage() {
         }
       }
     } catch (error) {
-      console.error('Error checking user permissions:', error)
+      logger.error('Error checking user permissions:', { error: error })
     }
   }, [caseData])
 
@@ -466,7 +468,7 @@ export default function CaseDetailPage() {
         } : null)
       },
       (error) => {
-        console.error('Realtime progress error:', error)
+        logger.error('Realtime progress error:', { error: error })
       }
     )
 
@@ -586,7 +588,7 @@ export default function CaseDetailPage() {
     } catch (error) {
       // Handle share cancellation or errors gracefully
       if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Error sharing:', error)
+        logger.error('Error sharing:', { error: error })
         // Fallback to clipboard
         try {
           if (navigator.clipboard && window.isSecureContext) {
@@ -601,7 +603,7 @@ export default function CaseDetailPage() {
             document.body.removeChild(textArea)
           }
         } catch (clipboardError) {
-          console.error('Error copying to clipboard:', clipboardError)
+          logger.error('Error copying to clipboard:', { error: clipboardError })
         }
       }
     }

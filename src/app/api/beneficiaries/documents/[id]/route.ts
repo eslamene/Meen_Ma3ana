@@ -1,144 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { RouteContext } from '@/types/next-api'
+import { createGetHandlerWithParams, createPutHandlerWithParams, createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-
-export async function GET(
+async function getHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
+  const { supabase, logger } = context
+  const { id } = params
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('beneficiary_documents')
+    .select('*')
+    .eq('id', id)
+    .single()
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+  if (error) {
+    if (error.code === 'PGRST116') {
+      throw new ApiError('NOT_FOUND', 'Document not found', 404)
     }
-
-    const { data, error } = await supabase
-      .from('beneficiary_documents')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { document: null },
-          { status: 404 }
-        )
-      }
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary document:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch document' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ document: data })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in beneficiary document GET API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary document', { error })
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch document', 500)
   }
+
+  return NextResponse.json({ document: data })
 }
 
-export async function PUT(
+async function putHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
+  const { supabase, logger } = context
+  const { id } = params
+  const body = await request.json()
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: document, error } = await supabase
+    .from('beneficiary_documents')
+    .update(body)
+    .eq('id', id)
+    .select()
+    .single()
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const body = await request.json()
-
-    const { data: document, error } = await supabase
-      .from('beneficiary_documents')
-      .update(body)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating beneficiary document:', error)
-      return NextResponse.json(
-        { error: 'Failed to update document' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ document })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in beneficiary document PUT API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  if (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating beneficiary document', { error })
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to update document', 500)
   }
+
+  return NextResponse.json({ document })
 }
 
-export async function DELETE(
+async function deleteHandler(
   request: NextRequest,
-  context: RouteContext<{ id: string }>
+  context: ApiHandlerContext,
+  params: { id: string }
 ) {
-  const correlationId = getCorrelationId(request)
-  const logger = new Logger(correlationId)
-  try {
-    const { id } = await context.params
-    const supabase = await createClient()
+  const { supabase, logger } = context
+  const { id } = params
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { error } = await supabase
+    .from('beneficiary_documents')
+    .delete()
+    .eq('id', id)
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const { error } = await supabase
-      .from('beneficiary_documents')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary document:', error)
-      return NextResponse.json(
-        { error: 'Failed to delete document' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ message: 'Document deleted successfully' })
-  } catch (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error in beneficiary document DELETE API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+  if (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary document', { error })
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to delete document', 500)
   }
+
+  return NextResponse.json({ message: 'Document deleted successfully' })
 }
+
+export const GET = createGetHandlerWithParams(getHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/beneficiaries/documents/[id]' 
+})
+
+export const PUT = createPutHandlerWithParams(putHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/beneficiaries/documents/[id]' 
+})
+
+export const DELETE = createDeleteHandlerWithParams(deleteHandler, { 
+  requireAuth: true, 
+  loggerContext: 'api/beneficiaries/documents/[id]' 
+})
 

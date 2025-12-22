@@ -7,6 +7,8 @@ import { db } from '@/lib/db'
 import { categoryDetectionRules, caseCategories } from '@/drizzle/schema'
 import { eq, and, desc } from 'drizzle-orm'
 
+import { defaultLogger as logger } from '@/lib/logger'
+
 let rulesCache: Array<{ category_id: string; keyword: string; priority: number }> | null = null
 let cacheTimestamp: number = 0
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
@@ -40,7 +42,7 @@ async function getActiveRules(): Promise<Array<{ category_id: string; keyword: s
 
     return rules
   } catch (error) {
-    console.error('Error fetching category detection rules:', error)
+    logger.error('Error fetching category detection rules:', { error: error })
     // Return empty array on error to prevent crashes
     return []
   }

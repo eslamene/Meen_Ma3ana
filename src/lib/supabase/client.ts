@@ -1,19 +1,21 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { CookieOptions } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { env } from '@/config/env'
 
 // Create a no-op client for SSR
-function createNoOpClient(): SupabaseClient<any, 'public', any> {
+// Using unknown for database schema types since we don't have a typed schema
+function createNoOpClient(): SupabaseClient<unknown, 'public', unknown> {
   return {
     auth: {
       getSession: async () => ({ data: { session: null }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       signOut: async () => ({ error: null }),
     },
-  } as any
+  } as SupabaseClient<unknown, 'public', unknown>
 }
 
-let clientInstance: SupabaseClient<any, 'public', any> | null = null
+let clientInstance: SupabaseClient<unknown, 'public', unknown> | null = null
 
 export function createClient() {
   // Guard against SSR - return no-op client during SSR
@@ -25,8 +27,8 @@ export function createClient() {
   }
 
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         get(name: string) {
