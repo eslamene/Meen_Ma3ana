@@ -53,7 +53,7 @@ export const recurringContributionSchema = z.object({
   projectId: commonSchemas.uuid.optional(),
   amount: commonSchemas.positiveNumber,
   frequency: z.enum(['weekly', 'monthly', 'quarterly', 'yearly'], {
-    errorMap: () => ({ message: 'Frequency must be one of: weekly, monthly, quarterly, yearly' })
+    message: 'Frequency must be one of: weekly, monthly, quarterly, yearly'
   }),
   startDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   endDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
@@ -78,7 +78,7 @@ export const caseSchema = z.object({
   targetAmount: commonSchemas.positiveNumber,
   category: z.string().min(1, 'Category is required'),
   priority: z.enum(['low', 'medium', 'high', 'urgent'], {
-    errorMap: () => ({ message: 'Priority must be one of: low, medium, high, urgent' })
+    message: 'Priority must be one of: low, medium, high, urgent'
   }),
   location: z.string().max(200, 'Location too long').optional(),
   beneficiaryName: z.string().max(200, 'Beneficiary name too long').optional(),
@@ -106,7 +106,7 @@ export const projectSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   targetAmount: commonSchemas.positiveNumber,
   cycleDuration: z.enum(['weekly', 'monthly', 'quarterly', 'yearly', 'custom'], {
-    errorMap: () => ({ message: 'Cycle duration must be one of: weekly, monthly, quarterly, yearly, custom' })
+    message: 'Cycle duration must be one of: weekly, monthly, quarterly, yearly, custom'
   }),
   cycleDurationDays: z.number().positive().optional(),
   totalCycles: z.number().positive().optional(),
@@ -147,7 +147,7 @@ export const translationSchema = z.object({
     .min(1, 'Text to translate is required')
     .max(5000, 'Text to translate is too long. Maximum length is 5000 characters'),
   direction: z.enum(['ar-to-en', 'en-to-ar'], {
-    errorMap: () => ({ message: 'Invalid translation direction. Must be "ar-to-en" or "en-to-ar"' })
+    message: 'Invalid translation direction. Must be "ar-to-en" or "en-to-ar"'
   }),
 })
 
@@ -169,7 +169,7 @@ export function validateRequestBody<T>(schema: z.ZodSchema<T>, body: unknown): T
   const result = schema.safeParse(body)
   
   if (!result.success) {
-    const errors = result.error.errors.map(err => ({
+    const errors = result.error.issues.map(err => ({
       path: err.path.join('.'),
       message: err.message,
     }))

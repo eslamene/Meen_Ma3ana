@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { contributions, contributionApprovalStatus } from '@/drizzle/schema'
 import { eq, and, sql, sum } from 'drizzle-orm'
@@ -19,7 +20,7 @@ async function getHandler(
   context: ApiHandlerContext,
   params: { id: string }
 ) {
-  const { supabase, logger } = context
+  const { logger } = context
   const { id: caseId } = params
   
   if (!caseId) {

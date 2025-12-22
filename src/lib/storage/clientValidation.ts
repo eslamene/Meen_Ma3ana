@@ -3,6 +3,8 @@
  * Validates files before upload using storage rules from the database
  */
 
+import { defaultLogger } from '@/lib/logger'
+
 export interface ValidationResult {
   valid: boolean
   error?: string
@@ -46,7 +48,7 @@ export async function fetchStorageRules(bucketName: string): Promise<StorageRule
     
     return rule
   } catch (error) {
-    logger.warn('Error fetching storage rules:', error)
+    defaultLogger.warn('Error fetching storage rules:', error)
     // Cache null result on error to prevent repeated failed requests
     storageRulesCache.set(bucketName, { rule: null, timestamp: Date.now() })
     return null

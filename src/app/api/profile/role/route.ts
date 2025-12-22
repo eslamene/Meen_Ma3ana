@@ -89,8 +89,7 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
     return NextResponse.json({
       user: {
         id: user.id,
-        email: user.email,
-        created_at: user.created_at
+        email: user.email
       },
       roles,
       permissions,

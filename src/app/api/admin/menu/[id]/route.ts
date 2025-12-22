@@ -47,7 +47,7 @@ async function putHandler(
     if (is_public_nav !== undefined) updateData.is_public_nav = is_public_nav || false
     if (nav_metadata !== undefined) updateData.nav_metadata = nav_metadata || {}
 
-    defaultLogger.info('Update data prepared:', {
+    logger.info('Update data prepared:', {
       menuItemId: params.id,
       updateData,
       updateDataKeys: Object.keys(updateData)
@@ -106,7 +106,7 @@ async function putHandler(
     // This can happen if RLS policies prevent selecting after update
     // (e.g., if is_active was set to false, RLS might block the SELECT)
     if (!data) {
-      defaultLogger.warn('Update returned no data, fetching item separately:', {
+      logger.warn('Update returned no data, fetching item separately:', {
         menuItemId: params.id,
         updateData,
         isActiveBeingSetToFalse: updateData.is_active === false

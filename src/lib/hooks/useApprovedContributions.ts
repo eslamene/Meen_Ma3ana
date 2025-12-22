@@ -196,7 +196,6 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
             ? { ...err }
             : { error: String(err) }
         
-        logger.error('Error fetching approved contributions:', { error: errorMessage, errorDetails })
         defaultLogger.error('Error fetching approved contributions', { errorMessage, errorDetails })
       } else {
         // Silently handle RLS errors - they're expected for public users

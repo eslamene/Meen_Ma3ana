@@ -20,6 +20,11 @@ export interface ApiHandlerOptions {
   requireAdmin?: boolean
   
   /**
+   * Require super_admin role
+   */
+  requireSuperAdmin?: boolean
+  
+  /**
    * Require specific permissions
    */
   requirePermissions?: string[]
@@ -87,7 +92,7 @@ export function withApiHandler(
       const supabase = await createClient()
 
       // Check authentication if required
-      if (options.requireAuth || options.requireAdmin || options.requirePermissions) {
+      if (options.requireAuth || options.requireAdmin || options.requireSuperAdmin || options.requirePermissions) {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
         if (authError || !user) {
@@ -110,6 +115,24 @@ export function withApiHandler(
           if (!isAdmin) {
             logger.warn('Forbidden: Admin access required', { userId: user.id })
             return handleApiError(createApiError.forbidden('Admin access required'), logger, correlationId)
+          }
+        }
+
+        // Check super_admin role if required
+        if (options.requireSuperAdmin) {
+          const { data: adminRoles } = await supabase
+            .from('admin_user_roles')
+            .select('admin_roles!inner(name)')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .eq('admin_roles.name', 'super_admin')
+            .limit(1)
+
+          const isSuperAdmin = (adminRoles?.length || 0) > 0
+
+          if (!isSuperAdmin) {
+            logger.warn('Forbidden: Super admin access required', { userId: user.id })
+            return handleApiError(createApiError.forbidden('Super admin access required'), logger, correlationId)
           }
         }
 
@@ -230,7 +253,7 @@ export function withApiHandlerWithParams<T extends Record<string, string> = Reco
 ): (request: NextRequest, routeContext: { params: Promise<T> }) => Promise<NextResponse> {
   return async (request: NextRequest, routeContext: { params: Promise<T> }) => {
     const correlationId = getCorrelationId(request)
-    const logger = new Logger(correlationId, options.loggerContext)
+    const logger = new Logger(correlationId)
 
     try {
       // Extract params from RouteContext
@@ -240,7 +263,7 @@ export function withApiHandlerWithParams<T extends Record<string, string> = Reco
       const supabase = await createClient()
 
       // Check authentication if required
-      if (options.requireAuth || options.requireAdmin || options.requirePermissions) {
+      if (options.requireAuth || options.requireAdmin || options.requireSuperAdmin || options.requirePermissions) {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
         if (authError || !user) {
@@ -263,6 +286,24 @@ export function withApiHandlerWithParams<T extends Record<string, string> = Reco
           if (!isAdmin) {
             logger.warn('Forbidden: Admin access required', { userId: user.id })
             return handleApiError(createApiError.forbidden('Admin access required'), logger, correlationId)
+          }
+        }
+
+        // Check super_admin role if required
+        if (options.requireSuperAdmin) {
+          const { data: adminRoles } = await supabase
+            .from('admin_user_roles')
+            .select('admin_roles!inner(name)')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .eq('admin_roles.name', 'super_admin')
+            .limit(1)
+
+          const isSuperAdmin = (adminRoles?.length || 0) > 0
+
+          if (!isSuperAdmin) {
+            logger.warn('Forbidden: Super admin access required', { userId: user.id })
+            return handleApiError(createApiError.forbidden('Super admin access required'), logger, correlationId)
           }
         }
 
@@ -347,6 +388,16 @@ export function createPostHandlerWithParams<T extends Record<string, string> = R
  * Helper to create PUT handler with RouteContext
  */
 export function createPutHandlerWithParams<T extends Record<string, string> = Record<string, string>>(
+  handler: ApiHandlerWithParams<T>,
+  options?: ApiHandlerOptions
+) {
+  return withApiHandlerWithParams(handler, options)
+}
+
+/**
+ * Helper to create PATCH handler with RouteContext
+ */
+export function createPatchHandlerWithParams<T extends Record<string, string> = Record<string, string>>(
   handler: ApiHandlerWithParams<T>,
   options?: ApiHandlerOptions
 ) {

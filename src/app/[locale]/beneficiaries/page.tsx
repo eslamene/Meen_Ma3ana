@@ -112,7 +112,13 @@ export default function BeneficiariesPage() {
       })
       
       if (!response.ok) {
-        let errorData: { error?: string; details?: string } = {}
+        type ErrorData = {
+          error?: string
+          details?: string | { assignedCasesCount?: number; assignedCases?: Array<{ id: string; title: string }> }
+          assignedCasesCount?: number
+          assignedCases?: Array<{ id: string; title: string }>
+        }
+        let errorData: ErrorData = {}
         try {
           errorData = await response.json()
         } catch (parseError) {
@@ -125,11 +131,15 @@ export default function BeneficiariesPage() {
         
         // Build detailed error message
         const errorMessage = errorData.error || 'Failed to delete beneficiary'
-        let errorDetails = errorData.details || ''
+        let errorDetails = typeof errorData.details === 'string' ? errorData.details : ''
+        
+        // Extract assignedCasesCount from details if it's an object, or from top level
+        const assignedCasesCount = errorData.assignedCasesCount ?? (typeof errorData.details === 'object' && errorData.details !== null && !Array.isArray(errorData.details) ? (errorData.details as { assignedCasesCount?: number }).assignedCasesCount : undefined)
+        const assignedCases = errorData.assignedCases ?? (typeof errorData.details === 'object' && errorData.details !== null && !Array.isArray(errorData.details) ? (errorData.details as { assignedCases?: Array<{ id: string; title: string }> }).assignedCases : undefined)
         
         // Add specific context based on error type
-        if (errorData.assignedCasesCount !== undefined && errorData.assignedCasesCount > 0) {
-          errorDetails = `This beneficiary is currently assigned to ${errorData.assignedCasesCount} case(s). Please remove the beneficiary from all cases before attempting to delete.`
+        if (assignedCasesCount !== undefined && assignedCasesCount > 0) {
+          errorDetails = `This beneficiary is currently assigned to ${assignedCasesCount} case(s). Please remove the beneficiary from all cases before attempting to delete.`
         } else if (response.status === 404) {
           errorDetails = 'The beneficiary may have already been deleted or does not exist.'
         } else if (response.status === 500) {
@@ -146,7 +156,7 @@ export default function BeneficiariesPage() {
             statusText: response.statusText,
             error: errorMessage,
             details: errorDetails,
-            assignedCasesCount: errorData.assignedCasesCount,
+            assignedCasesCount: assignedCasesCount,
             fullErrorData: errorData
           })
         } else if (response.status === 400) {
@@ -154,7 +164,7 @@ export default function BeneficiariesPage() {
           console.info('Beneficiary deletion blocked:', {
             status: response.status,
             reason: errorDetails || errorMessage,
-            assignedCasesCount: errorData.assignedCasesCount
+            assignedCasesCount: assignedCasesCount
           })
         }
         

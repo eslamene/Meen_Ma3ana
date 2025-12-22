@@ -167,7 +167,7 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
             <div className="mt-3">
               <p className="text-sm text-gray-600 mb-2">Additional Roles:</p>
               <div className="flex flex-wrap gap-2">
-                {roleData.roles.slice(1).map((role) => (
+                {roleData.roles.slice(1).map((role: { id: string; display_name: string }) => (
                   <Badge 
                     key={role.id} 
                     variant="outline" 
@@ -217,13 +217,13 @@ export default function UserRoleInfo({ showDetails = false, className = '' }: Us
                     {category}
                   </h5>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {categoryPermissions.map((permission: Permission) => (
+                    {(categoryPermissions as Array<{ id: string; name: string; description?: string; display_name?: string }>).map((permission) => (
                       <div 
                         key={permission.id} 
                         className="flex items-center gap-2 text-sm text-gray-700"
                       >
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>{permission.display_name}</span>
+                        <span>{permission.display_name || permission.name}</span>
                       </div>
                     ))}
                   </div>

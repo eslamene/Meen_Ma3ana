@@ -5,17 +5,17 @@ import { env } from '@/config/env'
 
 // Create a no-op client for SSR
 // Using unknown for database schema types since we don't have a typed schema
-function createNoOpClient(): SupabaseClient<unknown, 'public', unknown> {
+function createNoOpClient(): SupabaseClient<any, string, any> {
   return {
     auth: {
       getSession: async () => ({ data: { session: null }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       signOut: async () => ({ error: null }),
     },
-  } as SupabaseClient<unknown, 'public', unknown>
+  } as any as SupabaseClient<any, string, any>
 }
 
-let clientInstance: SupabaseClient<unknown, 'public', unknown> | null = null
+let clientInstance: SupabaseClient<any, string, any> | null = null
 
 export function createClient() {
   // Guard against SSR - return no-op client during SSR

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createGetHandlerWithParams, createPatchHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { createGetHandlerWithParams, createPatchHandlerWithParams, createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
 
 async function getHandler(

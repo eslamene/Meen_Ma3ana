@@ -82,10 +82,11 @@ export class StorageBucketService {
   static async updateBucket(name: string, data: UpdateBucketData): Promise<StorageBucket> {
     const supabase = this.getServiceClient()
 
-    const updateData: Partial<UpdateBucketData> = {}
-    if (data.public !== undefined) updateData.public = data.public
-    if (data.file_size_limit !== undefined) updateData.file_size_limit = data.file_size_limit
-    if (data.allowed_mime_types !== undefined) updateData.allowed_mime_types = data.allowed_mime_types
+    const updateData: { public: boolean; fileSizeLimit?: string | number | null; allowedMimeTypes?: string[] | null } = {
+      public: data.public ?? false
+    }
+    if (data.file_size_limit !== undefined) updateData.fileSizeLimit = data.file_size_limit
+    if (data.allowed_mime_types !== undefined) updateData.allowedMimeTypes = data.allowed_mime_types
 
     const { data: updated, error } = await supabase.storage.updateBucket(name, updateData)
 

@@ -91,19 +91,19 @@ export default function CreateBeneficiaryPage() {
     try {
       const insertData: Partial<CreateBeneficiaryData> = {
         name: name,
-        name_ar: formData.name_ar || null,
+        name_ar: formData.name_ar || undefined,
         mobile_number: mobileNumber,
-        additional_mobile_number: formData.additional_mobile_number?.trim() || null,
-        age: formData.age || null,
-        gender: formData.gender || null,
-        email: formData.email?.trim() || null,
-        national_id: formData.national_id?.trim() || null,
+        additional_mobile_number: formData.additional_mobile_number?.trim() || undefined,
+        age: formData.age || undefined,
+        gender: formData.gender || undefined,
+        email: formData.email?.trim() || undefined,
+        national_id: formData.national_id?.trim() || undefined,
         id_type: formData.id_type || 'national_id',
         country: formData.country || 'Egypt',
-        city: formData.city?.trim() || null,
-        address: formData.address?.trim() || null,
-        medical_condition: formData.medical_condition?.trim() || null,
-        notes: formData.notes?.trim() || null,
+        city: formData.city?.trim() || undefined,
+        address: formData.address?.trim() || undefined,
+        medical_condition: formData.medical_condition?.trim() || undefined,
+        notes: formData.notes?.trim() || undefined,
         risk_level: formData.risk_level || 'low',
       }
 
@@ -119,8 +119,8 @@ export default function CreateBeneficiaryPage() {
 
       // Remove undefined values
       Object.keys(insertData).forEach(key => {
-        if (insertData[key] === undefined) {
-          delete insertData[key]
+        if ((insertData as Record<string, unknown>)[key] === undefined) {
+          delete (insertData as Record<string, unknown>)[key]
         }
       })
 
@@ -230,8 +230,9 @@ export default function CreateBeneficiaryPage() {
 
           // Remove undefined values
           Object.keys(updateData).forEach(key => {
-            if (updateData[key] === undefined || updateData[key] === '') {
-              delete updateData[key]
+            const value = (updateData as Record<string, unknown>)[key]
+            if (value === undefined || value === '') {
+              delete (updateData as Record<string, unknown>)[key]
             }
           })
 
@@ -254,7 +255,7 @@ export default function CreateBeneficiaryPage() {
       // If we have a draft, update it via API; otherwise create new
       if (draftBeneficiaryId) {
         // Convert age to year_of_birth if provided
-        const updateData: Partial<CreateBeneficiaryData> = { ...data }
+        const updateData: Partial<CreateBeneficiaryData> & { year_of_birth?: number } = { ...data }
         if (data.age) {
           const currentYear = new Date().getFullYear()
           updateData.year_of_birth = currentYear - data.age
@@ -271,8 +272,8 @@ export default function CreateBeneficiaryPage() {
 
         // Remove undefined values
         Object.keys(updateData).forEach(key => {
-          if (updateData[key] === undefined) {
-            delete updateData[key]
+          if ((updateData as Record<string, unknown>)[key] === undefined) {
+            delete (updateData as Record<string, unknown>)[key]
           }
         })
 

@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { RouteContext } from '@/types/next-api'
 import { db } from '@/lib/db'
 import { categoryDetectionRules } from '@/drizzle/schema'
 import { eq, and, desc } from 'drizzle-orm'
-
-import { Logger } from '@/lib/logger'
-import { getCorrelationId } from '@/lib/correlation'
-import { isValidUUID } from '@/lib/utils/uuid'
-
-import { NextRequest, NextResponse } from 'next/server'
 import { createPatchHandlerWithParams, createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
-import { createClient } from '@/lib/supabase/server'
-import { db } from '@/lib/db'
-import { categoryDetectionRules } from '@/drizzle/schema'
-import { eq, and, desc } from 'drizzle-orm'
 import { isValidUUID } from '@/lib/utils/uuid'
 
 async function patchHandler(

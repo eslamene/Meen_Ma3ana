@@ -6,7 +6,7 @@ import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/ut
 import { ApiError } from '@/lib/utils/api-errors'
 
 async function getHandler(request: NextRequest, context: ApiHandlerContext) {
-  const { supabase, logger } = context
+  const { logger } = context
 
   const { searchParams } = new URL(request.url)
     
