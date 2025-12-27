@@ -30,6 +30,12 @@ const envSchema = z.object({
   
   // LibreTranslate (optional)
   LIBRETRANSLATE_URL: z.string().url().optional(),
+  
+  // Anthropic Claude API (for AI content generation)
+  ANTHROPIC_API_KEY: z.string().optional(),
+  
+  // Google Gemini API (alternative for AI content generation)
+  GOOGLE_GEMINI_API_KEY: z.string().optional(),
 })
 
 /**
@@ -47,6 +53,8 @@ function parseEnv() {
       NODE_ENV: process.env.NODE_ENV,
       LOG_LEVEL: process.env.LOG_LEVEL,
       LIBRETRANSLATE_URL: process.env.LIBRETRANSLATE_URL,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      GOOGLE_GEMINI_API_KEY: process.env.GOOGLE_GEMINI_API_KEY,
     })
   } catch (error) {
     if (error instanceof z.ZodError) {

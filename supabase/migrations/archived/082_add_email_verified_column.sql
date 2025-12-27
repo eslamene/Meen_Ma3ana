@@ -29,3 +29,4 @@ COMMENT ON COLUMN public.users.email_verified IS 'Indicates whether the user has
 
 
 
+

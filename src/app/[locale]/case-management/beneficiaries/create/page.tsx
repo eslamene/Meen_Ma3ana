@@ -300,7 +300,7 @@ export default function CreateBeneficiaryPage() {
         
         // Delay redirect to allow toast to be visible
         setTimeout(() => {
-          router.push(`/${locale}/beneficiaries/${draftBeneficiaryId}`)
+          router.push(`/${locale}/case-management/beneficiaries/${draftBeneficiaryId}`)
         }, 500)
       } else {
         // Create new beneficiary via API
@@ -329,7 +329,7 @@ export default function CreateBeneficiaryPage() {
         
         // Delay redirect to allow toast to be visible
         setTimeout(() => {
-          router.push(`/${locale}/beneficiaries/${newBeneficiary.id}`)
+          router.push(`/${locale}/case-management/beneficiaries/${newBeneficiary.id}`)
         }, 500)
       }
     } catch (error) {
@@ -346,7 +346,7 @@ export default function CreateBeneficiaryPage() {
 
   const handleBack = () => {
     cleanupDraftBeneficiary()
-    router.push(`/${locale}/beneficiaries`)
+    router.push(`/${locale}/case-management/beneficiaries`)
   }
 
   if (loading) {

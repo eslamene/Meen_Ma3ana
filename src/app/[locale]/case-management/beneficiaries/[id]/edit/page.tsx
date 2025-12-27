@@ -52,7 +52,7 @@ export default function EditBeneficiaryPage() {
           setBeneficiary(result.data)
         } else {
           logger.error('Error loading beneficiary:', { error: result.error })
-          router.push(`/${locale}/beneficiaries`)
+          router.push(`/${locale}/case-management/beneficiaries`)
         }
       } catch (error) {
         logger.error('Error loading beneficiary:', { error: error })
@@ -113,7 +113,7 @@ export default function EditBeneficiaryPage() {
       
       // Delay redirect to allow toast to be visible
       setTimeout(() => {
-        router.push(`/${locale}/beneficiaries/${updatedBeneficiary.id}`)
+        router.push(`/${locale}/case-management/beneficiaries/${updatedBeneficiary.id}`)
       }, 500)
     } catch (error) {
       logger.error('Error updating beneficiary:', { error: error })
@@ -278,7 +278,7 @@ export default function EditBeneficiaryPage() {
                 {t('beneficiaryNotFoundDescription') || 'The beneficiary you are looking for does not exist or may have been deleted.'}
             </p>
               <Button 
-                onClick={() => router.push(`/${locale}/beneficiaries`)}
+                onClick={() => router.push(`/${locale}/case-management/beneficiaries`)}
                 className="min-w-[200px]"
               >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -402,7 +402,7 @@ export default function EditBeneficiaryPage() {
           secondaryActions={[
             {
               label: t('cancel') || 'Cancel',
-              onClick: () => router.push(`/${locale}/beneficiaries/${beneficiaryId}`),
+              onClick: () => router.push(`/${locale}/case-management/beneficiaries/${beneficiaryId}`),
               variant: 'outline'
             },
             {

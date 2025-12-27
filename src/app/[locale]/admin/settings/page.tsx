@@ -35,7 +35,8 @@ import {
   Database,
   FolderTree,
   Edit,
-  FileText
+  FileText,
+  Sparkles
 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import StandardModal, { StandardFormField } from '@/components/ui/standard-modal'
@@ -73,6 +74,9 @@ const GROUP_DISPLAY_NAMES: { [key: string]: string } = {
   validation: 'Validation',
   pagination: 'Pagination',
   contact: 'Contact Information',
+  google: 'Google API Keys',
+  anthropic: 'Anthropic API Keys',
+  ai: 'AI Content Generation',
   general: 'General Settings',
 }
 
@@ -81,6 +85,9 @@ const GROUP_ICONS: { [key: string]: string } = {
   validation: '✓',
   pagination: '📄',
   contact: '📞',
+  google: '🔑',
+  anthropic: '🤖',
+  ai: '✨',
   general: '⚙️',
 }
 
@@ -110,6 +117,8 @@ export default function SystemSettingsPage() {
     description_ar: '',
     group_type: null,
   })
+  const [editingConfig, setEditingConfig] = useState<SystemConfig | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -126,7 +135,10 @@ export default function SystemSettingsPage() {
       }
 
       const data = await response.json()
-      const configs = data.configs || []
+      // Exclude AI settings - they have their own dedicated page
+      const configs = (data.configs || []).filter(
+        (c: SystemConfig) => c.group_type !== 'ai' && !c.config_key.startsWith('ai.')
+      )
       setConfigs(configs)
       setEditedConfigs(new Map())
       setHasChanges(false)
@@ -217,6 +229,23 @@ export default function SystemSettingsPage() {
     editedConfigs.set(configKey, edited)
     setEditedConfigs(new Map(editedConfigs))
     setHasChanges(true)
+  }
+
+  const handleOpenEditDialog = (config: SystemConfig) => {
+    const edited = editedConfigs.get(config.config_key) || config
+    setEditingConfig(edited)
+    setIsEditDialogOpen(true)
+  }
+
+  const handleSaveEditDialog = () => {
+    if (!editingConfig) return
+
+    const edited = { ...editingConfig }
+    editedConfigs.set(editingConfig.config_key, edited)
+    setEditedConfigs(new Map(editedConfigs))
+    setHasChanges(true)
+    setIsEditDialogOpen(false)
+    setEditingConfig(null)
   }
 
   const handleSave = async () => {
@@ -344,7 +373,7 @@ export default function SystemSettingsPage() {
     
     if (configKey.includes('.')) {
       const firstSegment = configKey.split('.')[0]
-      if (['auth', 'validation', 'pagination', 'contact', 'notification', 'email', 'storage'].includes(firstSegment)) {
+      if (['auth', 'validation', 'pagination', 'contact', 'notification', 'email', 'storage', 'google', 'anthropic', 'ai'].includes(firstSegment)) {
         return firstSegment
       }
       return firstSegment
@@ -389,6 +418,11 @@ export default function SystemSettingsPage() {
             title="System Settings"
             description="Manage all system configuration settings"
             menuActions={[
+              {
+                label: 'AI Settings',
+                onClick: () => router.push(`/${locale}/admin/settings/ai`),
+                icon: Sparkles,
+              },
               {
                 label: 'Add Config',
                 onClick: () => setIsCreateDialogOpen(true),
@@ -647,7 +681,7 @@ export default function SystemSettingsPage() {
                                         )}
                                       </div>
                                     </div>
-                                    <div className="col-span-12 sm:col-span-8">
+                                    <div className="col-span-12 sm:col-span-7">
                                       <Input
                                         type="text"
                                         value={getConfigValue(config.config_key)}
@@ -656,34 +690,49 @@ export default function SystemSettingsPage() {
                                           "h-9 sm:h-10 text-sm font-mono",
                                           isEdited && "border-amber-300 focus-visible:ring-amber-500"
                                         )}
+                                        placeholder="Enter value..."
                                       />
+                                    </div>
+                                    <div className="col-span-12 sm:col-span-1 flex justify-end">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleOpenEditDialog(config)}
+                                        className="h-8 w-8 p-0"
+                                        title="Edit descriptions"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
                                     </div>
                                   </div>
                                 )
                               })}
                             </div>
                           ) : (
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                               {groupConfigs.map((config) => {
                                 const isEdited = editedConfigs.has(config.config_key)
+                                const currentValue = getConfigValue(config.config_key)
+                                const hasDescription = getConfigDescription(config.config_key, 'en') || getConfigDescription(config.config_key, 'ar')
+                                
                                 return (
                                   <Card 
                                     key={config.config_key} 
                                     className={cn(
-                                      "border transition-all",
+                                      "border transition-all hover:shadow-md",
                                       isEdited 
                                         ? "border-amber-300 bg-amber-50/30 shadow-sm" 
-                                        : "border-gray-200 hover:border-indigo-200 hover:shadow-sm"
+                                        : "border-gray-200 hover:border-indigo-200"
                                     )}
                                   >
                                     <CardContent className="p-4 sm:p-5">
                                       <div className="space-y-4">
-                                        {/* Config Key and Badges */}
+                                        {/* Header: Key, Badges, and Edit Button */}
                                         <div className="flex items-start justify-between gap-3">
                                           <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
+                                            <div className="flex items-center gap-2 flex-wrap mb-2">
                                               <Label 
-                                                htmlFor={config.config_key} 
+                                                htmlFor={`value-${config.config_key}`} 
                                                 className="font-semibold text-sm sm:text-base font-mono text-gray-900 break-all"
                                               >
                                                 {config.config_key}
@@ -698,102 +747,42 @@ export default function SystemSettingsPage() {
                                                 </Badge>
                                               )}
                                             </div>
+                                            {hasDescription && (
+                                              <p className="text-xs text-gray-500 line-clamp-1">
+                                                {getConfigDescription(config.config_key, 'en') || getConfigDescription(config.config_key, 'ar')}
+                                              </p>
+                                            )}
                                           </div>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleOpenEditDialog(config)}
+                                            className="shrink-0 h-9"
+                                          >
+                                            <Edit className="h-4 w-4 mr-1.5" />
+                                            Edit
+                                          </Button>
                                         </div>
                                         
-                                        {/* Config Value */}
-                                        <div className="space-y-1">
-                                          <Label className="text-xs font-medium text-gray-700">Value</Label>
+                                        {/* Config Value - Prominent Input */}
+                                        <div className="space-y-1.5">
+                                          <Label 
+                                            htmlFor={`value-${config.config_key}`}
+                                            className="text-xs font-semibold text-gray-700"
+                                          >
+                                            Value
+                                          </Label>
                                           <Input
-                                            id={config.config_key}
+                                            id={`value-${config.config_key}`}
                                             type="text"
-                                            value={getConfigValue(config.config_key)}
+                                            value={currentValue}
                                             onChange={(e) => handleConfigChange(config.config_key, 'config_value', e.target.value)}
                                             className={cn(
-                                              "h-11 text-sm font-mono",
-                                              isEdited && "border-amber-300 focus-visible:ring-amber-500"
+                                              "h-11 text-sm font-mono bg-white",
+                                              isEdited && "border-amber-300 focus-visible:ring-amber-500 ring-amber-200"
                                             )}
-                                            placeholder="Config value"
+                                            placeholder="Enter configuration value..."
                                           />
-                                        </div>
-                                        
-                                        {/* Descriptions Preview */}
-                                        {(getConfigDescription(config.config_key, 'en') || getConfigDescription(config.config_key, 'ar')) && (
-                                          <div className="space-y-2 pt-2 border-t border-gray-200">
-                                            {getConfigDescription(config.config_key, 'en') && (
-                                              <div>
-                                                <p className="text-xs font-medium text-gray-500 mb-1">Description (EN)</p>
-                                                <p className="text-xs text-gray-600 leading-relaxed">
-                                                  {getConfigDescription(config.config_key, 'en')}
-                                                </p>
-                                              </div>
-                                            )}
-                                            {getConfigDescription(config.config_key, 'ar') && (
-                                              <div>
-                                                <p className="text-xs font-medium text-gray-500 mb-1">Description (AR)</p>
-                                                <p className="text-xs text-gray-600 leading-relaxed text-right" dir="rtl">
-                                                  {getConfigDescription(config.config_key, 'ar')}
-                                                </p>
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
-
-                                        {/* Description Editors */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-gray-200">
-                                          <div className="space-y-2">
-                                            <Label className="text-xs font-medium text-gray-700">Description (EN)</Label>
-                                            <div className="relative">
-                                              <Textarea
-                                                value={getConfigDescription(config.config_key, 'en') || ''}
-                                                onChange={(e) => handleConfigChange(config.config_key, 'description', e.target.value || null)}
-                                                className={cn(
-                                                  "h-24 text-sm resize-none pr-10",
-                                                  isEdited && "border-amber-300 focus-visible:ring-amber-500"
-                                                )}
-                                                placeholder="English description"
-                                              />
-                                              <div className="absolute bottom-2 right-2">
-                                                <TranslationButton
-                                                  sourceText={getConfigDescription(config.config_key, 'ar') || ''}
-                                                  direction="ar-to-en"
-                                                  onTranslate={(translated) => handleConfigChange(config.config_key, 'description', translated)}
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  iconOnly
-                                                  disabled={!getConfigDescription(config.config_key, 'ar')}
-                                                  className="h-7 w-7 p-0 bg-white hover:bg-gray-50 shadow-sm"
-                                                />
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="space-y-2">
-                                            <Label className="text-xs font-medium text-gray-700">Description (AR)</Label>
-                                            <div className="relative">
-                                              <Textarea
-                                                value={getConfigDescription(config.config_key, 'ar') || ''}
-                                                onChange={(e) => handleConfigChange(config.config_key, 'description_ar', e.target.value || null)}
-                                                className={cn(
-                                                  "h-24 text-sm resize-none pl-10",
-                                                  isEdited && "border-amber-300 focus-visible:ring-amber-500"
-                                                )}
-                                                placeholder="Arabic description"
-                                                dir="rtl"
-                                              />
-                                              <div className="absolute bottom-2 left-2">
-                                                <TranslationButton
-                                                  sourceText={getConfigDescription(config.config_key, 'en') || ''}
-                                                  direction="en-to-ar"
-                                                  onTranslate={(translated) => handleConfigChange(config.config_key, 'description_ar', translated)}
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  iconOnly
-                                                  disabled={!getConfigDescription(config.config_key, 'en')}
-                                                  className="h-7 w-7 p-0 bg-white hover:bg-gray-50 shadow-sm"
-                                                />
-                                              </div>
-                                            </div>
-                                          </div>
                                         </div>
                                       </div>
                                     </CardContent>
@@ -997,6 +986,150 @@ export default function SystemSettingsPage() {
               description_ar: '',
               group_type: null,
             })
+          }
+        }}
+        maxWidth="2xl"
+      />
+
+      {/* Edit Config Dialog */}
+      <StandardModal
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) setEditingConfig(null)
+        }}
+        title={editingConfig ? `Edit Configuration: ${editingConfig.config_key}` : 'Edit Configuration'}
+        description="Update the configuration value and descriptions. Changes will be saved when you click 'Save Changes' below."
+        sections={[
+          {
+            title: 'Configuration Value',
+            children: (
+              <StandardFormField
+                label="Value"
+                required
+                description="The actual configuration value"
+              >
+                <Input
+                  value={editingConfig?.config_value || ''}
+                  onChange={(e) => {
+                    if (editingConfig) {
+                      setEditingConfig({ ...editingConfig, config_value: e.target.value })
+                    }
+                  }}
+                  placeholder="Enter configuration value..."
+                  className="h-11 font-mono"
+                />
+              </StandardFormField>
+            )
+          },
+          {
+            title: 'Descriptions',
+            children: (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Description (EN)</Label>
+                  <div className="relative">
+                    <Textarea
+                      value={editingConfig?.description || ''}
+                      onChange={(e) => {
+                        if (editingConfig) {
+                          setEditingConfig({ ...editingConfig, description: e.target.value || null })
+                        }
+                      }}
+                      placeholder="English description..."
+                      className="h-32 text-sm resize-none pr-10"
+                    />
+                    <div className="absolute bottom-2 right-2">
+                      <TranslationButton
+                        sourceText={editingConfig?.description_ar || ''}
+                        direction="ar-to-en"
+                        onTranslate={(translated) => {
+                          if (editingConfig) {
+                            setEditingConfig({ ...editingConfig, description: translated })
+                          }
+                        }}
+                        size="sm"
+                        variant="ghost"
+                        iconOnly
+                        disabled={!editingConfig?.description_ar}
+                        className="h-7 w-7 p-0 bg-white hover:bg-gray-50 shadow-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Description (AR)</Label>
+                  <div className="relative">
+                    <Textarea
+                      value={editingConfig?.description_ar || ''}
+                      onChange={(e) => {
+                        if (editingConfig) {
+                          setEditingConfig({ ...editingConfig, description_ar: e.target.value || null })
+                        }
+                      }}
+                      placeholder="Arabic description..."
+                      className="h-32 text-sm resize-none pl-10"
+                      dir="rtl"
+                    />
+                    <div className="absolute bottom-2 left-2">
+                      <TranslationButton
+                        sourceText={editingConfig?.description || ''}
+                        direction="en-to-ar"
+                        onTranslate={(translated) => {
+                          if (editingConfig) {
+                            setEditingConfig({ ...editingConfig, description_ar: translated })
+                          }
+                        }}
+                        size="sm"
+                        variant="ghost"
+                        iconOnly
+                        disabled={!editingConfig?.description}
+                        className="h-7 w-7 p-0 bg-white hover:bg-gray-50 shadow-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          },
+          {
+            title: 'Metadata',
+            children: (
+              <div className="space-y-3">
+                <StandardFormField
+                  label="Config Key"
+                  description="This field cannot be changed"
+                >
+                  <Input
+                    value={editingConfig?.config_key || ''}
+                    disabled
+                    className="h-10 font-mono bg-gray-50"
+                  />
+                </StandardFormField>
+                <StandardFormField
+                  label="Group Type"
+                  description="Automatically determined from config key"
+                >
+                  <Input
+                    value={editingConfig?.group_type || 'general'}
+                    disabled
+                    className="h-10 bg-gray-50"
+                  />
+                </StandardFormField>
+              </div>
+            )
+          }
+        ]}
+        primaryAction={{
+          label: 'Save Changes',
+          onClick: handleSaveEditDialog,
+          disabled: !editingConfig?.config_value
+        }}
+        secondaryAction={{
+          label: 'Cancel',
+          onClick: () => {
+            setIsEditDialogOpen(false)
+            setEditingConfig(null)
           }
         }}
         maxWidth="2xl"

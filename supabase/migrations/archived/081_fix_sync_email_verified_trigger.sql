@@ -81,3 +81,4 @@ COMMENT ON FUNCTION sync_email_verified_on_insert() IS 'Syncs email_verified in 
 
 
 
+

@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
-import { Plus, Search, Filter, User, Phone, MapPin, Calendar, Eye, Edit, Trash2, Mail, CheckCircle, Users, LayoutDashboard } from 'lucide-react'
+import { Plus, Search, Filter, User, Phone, MapPin, Calendar, Eye, Edit, Trash2, Mail, CheckCircle, Users, LayoutDashboard, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +18,7 @@ import type { Beneficiary } from '@/types/beneficiary'
 import type { City, IdType } from '@/types/beneficiary'
 
 import { defaultLogger as logger } from '@/lib/logger'
+import BulkUploadModal from '@/components/beneficiaries/BulkUploadModal'
 
 export default function BeneficiariesPage() {
   const t = useTranslations('beneficiaries')
@@ -38,6 +39,25 @@ export default function BeneficiariesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [assignedCases, setAssignedCases] = useState<Array<{ id: string; title: string }>>([])
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false)
+
+  // Load beneficiaries function
+  const loadBeneficiaries = async () => {
+    try {
+      setLoading(true)
+      const beneficiariesResponse = await fetch('/api/beneficiaries?limit=1000').then(res => res.json())
+      
+      if (beneficiariesResponse.success && beneficiariesResponse.data) {
+        setBeneficiaries(beneficiariesResponse.data)
+        setFilteredBeneficiaries(beneficiariesResponse.data)
+      }
+    } catch (error) {
+      logger.error('Error loading beneficiaries:', error)
+      toast.error('Failed to load beneficiaries')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Load data
   useEffect(() => {
@@ -96,11 +116,11 @@ export default function BeneficiariesPage() {
   }
 
   const handleViewBeneficiary = (beneficiary: Beneficiary) => {
-    router.push(`/${locale}/beneficiaries/${beneficiary.id}`)
+    router.push(`/${locale}/case-management/beneficiaries/${beneficiary.id}`)
   }
 
   const handleEditBeneficiary = (beneficiary: Beneficiary) => {
-    router.push(`/${locale}/beneficiaries/${beneficiary.id}/edit`)
+    router.push(`/${locale}/case-management/beneficiaries/${beneficiary.id}/edit`)
   }
 
   const handleDeleteBeneficiary = async (beneficiary: Beneficiary) => {
@@ -324,14 +344,25 @@ export default function BeneficiariesPage() {
                 </p>
               </div>
             </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => setIsBulkUploadOpen(true)} 
+                className="text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-10 flex-shrink-0"
+              >
+                <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                <span className="hidden sm:inline">Bulk Upload</span>
+                <span className="sm:hidden">Upload</span>
+              </Button>
             <Button 
-              onClick={() => router.push(`/${locale}/beneficiaries/create`)} 
+                onClick={() => router.push(`/${locale}/case-management/beneficiaries/create`)} 
               className="bg-blue-600 hover:bg-blue-700 text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-10 flex-shrink-0"
             >
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
               <span className="hidden sm:inline">{t('addBeneficiary') || 'Add Beneficiary'}</span>
               <span className="sm:hidden">Add</span>
             </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -652,6 +683,13 @@ export default function BeneficiariesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        open={isBulkUploadOpen}
+        onOpenChange={setIsBulkUploadOpen}
+        onSuccess={loadBeneficiaries}
+      />
       </Container>
     </div>
   )

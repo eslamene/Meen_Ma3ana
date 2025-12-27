@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler, ApiHandlerContext, createPostHandler } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
-import { env } from '@/config/env'
+import { getGoogleTranslateApiKey } from '@/lib/utils/apiKeys'
 
 /**
  * Translation API Route
@@ -126,10 +126,11 @@ async function performTranslation(
   */
 
   // Use Google Translate API (requires API key)
-  const apiKey = env.GOOGLE_TRANSLATE_API_KEY
+  // Get from system_config first, then fallback to env
+  const apiKey = await getGoogleTranslateApiKey()
   
   if (!apiKey) {
-    throw new Error('Google Translate API key is not configured. Please set GOOGLE_TRANSLATE_API_KEY in your environment variables.')
+    throw new Error('Google Translate API key is not configured. Please set it in System Settings or GOOGLE_TRANSLATE_API_KEY in your environment variables.')
   }
 
   try {

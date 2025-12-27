@@ -675,34 +675,34 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
                     />
                   </div>
                 )}
-              </div>
-
-              {mode === 'edit' && (
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-sm font-semibold">
-                    <User className="h-4 w-4 text-gray-500" />
-                    {t('gender') || 'Gender'}
-                  </Label>
-                  <RadioGroup
-                    value={formData.gender || 'male'}
-                    onValueChange={(value) => handleChange('gender', value)}
-                    className="flex flex-wrap gap-4 sm:gap-6"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="male" id="gender_male" />
-                      <Label htmlFor="gender_male" className="cursor-pointer">{t('male') || 'Male'}</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="female" id="gender_female" />
-                      <Label htmlFor="gender_female" className="cursor-pointer">{t('female') || 'Female'}</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="other" id="gender_other" />
-                      <Label htmlFor="gender_other" className="cursor-pointer">{t('other') || 'Other'}</Label>
-                    </div>
-                  </RadioGroup>
                 </div>
-              )}
+
+                {mode === 'edit' && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2 text-sm font-semibold">
+                      <User className="h-4 w-4 text-gray-500" />
+                      {t('gender') || 'Gender'}
+                    </Label>
+                    <RadioGroup
+                      value={formData.gender || 'male'}
+                      onValueChange={(value) => handleChange('gender', value)}
+                      className="flex flex-wrap gap-4 sm:gap-6"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="male" id="gender_male" />
+                        <Label htmlFor="gender_male" className="cursor-pointer">{t('male') || 'Male'}</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="female" id="gender_female" />
+                        <Label htmlFor="gender_female" className="cursor-pointer">{t('female') || 'Female'}</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="other" id="gender_other" />
+                        <Label htmlFor="gender_other" className="cursor-pointer">{t('other') || 'Other'}</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">

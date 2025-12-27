@@ -44,11 +44,11 @@ export default function BeneficiaryDetailPage() {
           setBeneficiary(result.data)
         } else {
           logger.error('Error loading beneficiary:', { error: result.error })
-          router.push(`/${locale}/beneficiaries`)
+          router.push(`/${locale}/case-management/beneficiaries`)
         }
       } catch (error) {
         logger.error('Error loading beneficiary:', { error: error })
-        router.push(`/${locale}/beneficiaries`)
+        router.push(`/${locale}/case-management/beneficiaries`)
       } finally {
         setLoading(false)
       }
@@ -80,7 +80,7 @@ export default function BeneficiaryDetailPage() {
         { description: `Beneficiary "${beneficiary.name || 'Untitled'}" has been deleted successfully.` }
       )
       
-      router.push(`/${locale}/beneficiaries`)
+      router.push(`/${locale}/case-management/beneficiaries`)
     } catch (error) {
       logger.error('Error deleting beneficiary:', { error: error })
       toast.error(
@@ -154,7 +154,7 @@ export default function BeneficiaryDetailPage() {
               <p className="text-gray-600 mb-4">
                 {t('beneficiaryNotFoundDescription') || 'The beneficiary you are looking for does not exist.'}
               </p>
-              <Button onClick={() => router.push(`/${locale}/beneficiaries`)}>
+              <Button onClick={() => router.push(`/${locale}/case-management/beneficiaries`)}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 {t('backToBeneficiaries') || 'Back to Beneficiaries'}
               </Button>
@@ -199,7 +199,7 @@ export default function BeneficiaryDetailPage() {
             {
               label: t('edit') || 'Edit',
               icon: Edit,
-              onClick: () => router.push(`/${locale}/beneficiaries/${beneficiary.id}/edit`),
+              onClick: () => router.push(`/${locale}/case-management/beneficiaries/${beneficiary.id}/edit`),
             },
             {
               label: t('delete') || 'Delete',
@@ -505,7 +505,7 @@ export default function BeneficiaryDetailPage() {
               label: t('edit') || 'Edit',
               onClick: () => {
                 if (beneficiary.id) {
-                  router.push(`/${locale}/beneficiaries/${beneficiary.id}/edit`)
+                  router.push(`/${locale}/case-management/beneficiaries/${beneficiary.id}/edit`)
                 }
               },
               icon: <Edit className="h-4 w-4 mr-2" />

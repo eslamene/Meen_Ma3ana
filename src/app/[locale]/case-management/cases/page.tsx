@@ -933,7 +933,7 @@ export default function AdminCasesPage() {
                                       type="button"
                                       onClick={() => {
                                         if (beneficiary?.id) {
-                                          router.push(`/${params.locale}/beneficiaries/${beneficiary.id}`)
+                                          router.push(`/${params.locale}/case-management/beneficiaries/${beneficiary.id}`)
                                         } else if (case_.beneficiary_contact) {
                                           // If no beneficiary ID but we have contact, show toast
                                           toast('Beneficiary Profile', {
@@ -942,7 +942,7 @@ export default function AdminCasesPage() {
                                               label: 'View',
                                               onClick: () => {
                                                 // Try to find beneficiary by contact
-                                                router.push(`/${params.locale}/beneficiaries?search=${encodeURIComponent(case_.beneficiary_contact || '')}`)
+                                                router.push(`/${params.locale}/case-management/beneficiaries?search=${encodeURIComponent(case_.beneficiary_contact || '')}`)
                                               }
                                             }
                                           })
@@ -1420,23 +1420,21 @@ export default function AdminCasesPage() {
                   value={updateFormData.status}
                   onValueChange={(value) => setUpdateFormData(prev => ({ ...prev, status: value }))}
                 >
-                  <SelectTrigger id="quick-status" className="h-10">
-                    <SelectValue>
-                      <Badge 
-                        variant="outline" 
-                        className={
-                          updateFormData.status === 'published' ? 'bg-green-100 text-green-700 border-green-300' :
-                          updateFormData.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                          updateFormData.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                          updateFormData.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300' :
-                          'bg-gray-100 text-gray-700 border-gray-300'
-                        }
+                  <SelectTrigger 
+                    id="quick-status" 
+                    className={`h-10 ${
+                      updateFormData.status === 'published' ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' :
+                      updateFormData.status === 'active' ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200' :
+                      updateFormData.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200' :
+                      updateFormData.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200' :
+                      'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                    }`}
                       >
+                    <SelectValue>
                         {updateFormData.status.charAt(0).toUpperCase() + updateFormData.status.slice(1)}
-                      </Badge>
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[110]">
                     <SelectItem value="draft">Draft</SelectItem>
                     <SelectItem value="published">Published</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
@@ -1472,34 +1470,42 @@ export default function AdminCasesPage() {
                     }
                   }}
                 >
-                  <SelectTrigger id="quick-category" className="h-10">
+                  <SelectTrigger 
+                    id="quick-category" 
+                    className={`h-10 ${(() => {
+                      if (!updateFormData.category) return 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                      const selectedCategory = categories.find(cat => 
+                        cat.name === updateFormData.category || 
+                        (cat as any).name_en === updateFormData.category ||
+                        (cat as any).name_ar === updateFormData.category
+                      )
+                      const categoryColor = selectedCategory?.color || null
+                      return getCategoryBadgeClass(updateFormData.category, categoryColor) + ' hover:opacity-80'
+                    })()}`}
+                  >
                     <SelectValue placeholder="Not specified">
-                      {updateFormData.category ? (() => {
+                      {(() => {
+                        if (!updateFormData.category) return 'Not specified'
                         const selectedCategory = categories.find(cat => 
                           cat.name === updateFormData.category || 
                           (cat as any).name_en === updateFormData.category ||
                           (cat as any).name_ar === updateFormData.category
                         )
                         const iconValue = selectedCategory?.icon || null
-                        const categoryColor = selectedCategory?.color || null
                         return (
-                          <Badge variant="outline" className={getCategoryBadgeClass(updateFormData.category, categoryColor)}>
                             <div className="flex items-center gap-1.5">
                               {iconValue ? (
                                 <DynamicIcon name={iconValue} className="h-3 w-3" fallback="tag" />
                               ) : (
                                 <Tag className="h-3 w-3" />
                               )}
-                              {updateFormData.category}
+                            <span>{updateFormData.category}</span>
                             </div>
-                          </Badge>
                         )
-                      })() : (
-                        <span className="text-gray-500">Not specified</span>
-                      )}
+                      })()}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[110]">
                     <SelectItem value="__none__">
                       <span className="text-gray-500">Not specified</span>
                     </SelectItem>
@@ -1532,14 +1538,15 @@ export default function AdminCasesPage() {
                   value={updateFormData.priority}
                   onValueChange={(value) => setUpdateFormData(prev => ({ ...prev, priority: value }))}
                 >
-                  <SelectTrigger id="quick-priority" className="h-10">
+                  <SelectTrigger 
+                    id="quick-priority" 
+                    className={`h-10 ${getPriorityBadgeClass(updateFormData.priority)} hover:opacity-80`}
+                  >
                     <SelectValue>
-                      <Badge variant="outline" className={getPriorityBadgeClass(updateFormData.priority)}>
                         {updateFormData.priority.charAt(0).toUpperCase() + updateFormData.priority.slice(1)}
-                      </Badge>
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[110]">
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="high">High</SelectItem>

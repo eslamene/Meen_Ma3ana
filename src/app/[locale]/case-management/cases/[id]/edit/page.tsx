@@ -51,6 +51,7 @@ import {
   X
 } from 'lucide-react'
 import TranslationButton from '@/components/translation/TranslationButton'
+import AIGenerateButton from '@/components/ai/AIGenerateButton'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -498,14 +499,14 @@ export default function CaseEditPage() {
     setErrors(newErrors)
   }
 
-  const validateForm = (): boolean => {
-    if (!case_) return false
+  const validateForm = (): { isValid: boolean; errors: Record<string, string> } => {
+    if (!case_) return { isValid: false, errors: {} }
     
     // Validation settings must be loaded before validation
     if (!validationSettings) {
       logger.warn('Validation settings not loaded yet, cannot validate form')
       toast.error('Error', { description: 'Validation settings are loading. Please wait a moment and try again.' })
-      return false
+      return { isValid: false, errors: {} }
     }
 
     const settings = validationSettings
@@ -571,7 +572,8 @@ export default function CaseEditPage() {
     }
 
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const isValid = Object.keys(newErrors).length === 0
+    return { isValid, errors: newErrors }
   }
 
   const handleSave = async () => {
@@ -581,11 +583,36 @@ export default function CaseEditPage() {
     }
 
     // Validate form
-    if (!validateForm()) {
+    const validationResult = validateForm()
+    if (!validationResult.isValid) {
+      // Collect all validation error messages
+      const errorMessages = Object.values(validationResult.errors).filter(Boolean)
+      const errorCount = errorMessages.length
+      
+      // Build detailed error message for toast
+      let errorDescription = 'Please fix the validation errors before saving'
+      if (errorCount > 0) {
+        if (errorCount === 1) {
+          errorDescription = errorMessages[0]
+        } else {
+          // Show first 3 errors, then count if more
+          const displayedErrors = errorMessages.slice(0, 3)
+          const remainingCount = errorCount - 3
+          errorDescription = displayedErrors.join(' • ')
+          if (remainingCount > 0) {
+            errorDescription += ` • and ${remainingCount} more error${remainingCount > 1 ? 's' : ''}`
+          }
+        }
+      }
+      
       const errorMsg = 'Please fix the validation errors before saving'
       setError(errorMsg)
-      console.log('Showing validation error toast')
-      toast.error('Validation Failed', { description: errorMsg })
+      
+      // Show toast with specific validation errors
+      toast.error('Validation Failed', { 
+        description: errorDescription,
+        duration: 5000 // Show for 5 seconds to give user time to read
+      })
       setSaving(false)
       return
     }
@@ -1309,10 +1336,34 @@ export default function CaseEditPage() {
                       onChange={(e) => handleInputChange('title_en', e.target.value)}
                       placeholder="Enter case title in English"
                       dir="ltr"
-                        className={`h-11 pr-24 ${errors.title_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        className={`h-11 pr-32 ${errors.title_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         maxLength={validationSettings?.caseTitleMaxLength || 100}
                       />
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                        <AIGenerateButton
+                          type="title"
+                          language="en"
+                          inputs={{
+                            beneficiaryName: selectedBeneficiary?.name || undefined,
+                            beneficiarySituation: selectedBeneficiary?.social_situation || undefined,
+                            beneficiaryNeeds: selectedBeneficiary?.medical_condition || undefined,
+                            category: (case_ as any).category || undefined,
+                            location: case_.location || selectedBeneficiary?.city || undefined,
+                            targetAmount: case_.target_amount || undefined,
+                            caseType: (case_ as any).case_type || 'one-time',
+                            title_en: case_.title_en || undefined,
+                            title_ar: case_.title_ar || undefined,
+                          }}
+                          onGenerate={(result) => {
+                            if (result.title_en) {
+                              handleInputChange('title_en', result.title_en)
+                            }
+                          }}
+                          size="sm"
+                          variant="ghost"
+                          iconOnly
+                          className="h-6 w-6 p-0"
+                        />
                         <TranslationButton
                           sourceText={case_.title_ar || ''}
                           direction="ar-to-en"
@@ -1346,7 +1397,7 @@ export default function CaseEditPage() {
                       onChange={(e) => handleInputChange('title_ar', e.target.value)}
                       placeholder="أدخل عنوان الحالة بالعربية"
                       dir="rtl"
-                        className={`h-11 pl-24 ${errors.title_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                        className={`h-11 pl-32 ${errors.title_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                         maxLength={validationSettings?.caseTitleMaxLength || 100}
                     />
                       <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
@@ -1357,6 +1408,30 @@ export default function CaseEditPage() {
                           sourceText={case_.title_en || ''}
                           direction="en-to-ar"
                           onTranslate={(translated) => handleInputChange('title_ar', translated)}
+                          size="sm"
+                          variant="ghost"
+                          iconOnly
+                          className="h-6 w-6 p-0"
+                        />
+                        <AIGenerateButton
+                          type="title"
+                          language="ar"
+                          inputs={{
+                            beneficiaryName: selectedBeneficiary?.name || undefined,
+                            beneficiarySituation: selectedBeneficiary?.social_situation || undefined,
+                            beneficiaryNeeds: selectedBeneficiary?.medical_condition || undefined,
+                            category: (case_ as any).category || undefined,
+                            location: case_.location || selectedBeneficiary?.city || undefined,
+                            targetAmount: case_.target_amount || undefined,
+                            caseType: (case_ as any).case_type || 'one-time',
+                            title_en: case_.title_en || undefined,
+                            title_ar: case_.title_ar || undefined,
+                          }}
+                          onGenerate={(result) => {
+                            if (result.title_ar) {
+                              handleInputChange('title_ar', result.title_ar)
+                            }
+                          }}
                           size="sm"
                           variant="ghost"
                           iconOnly
@@ -1398,6 +1473,30 @@ export default function CaseEditPage() {
                         maxLength={validationSettings?.caseDescriptionMaxLength || 2000}
                       />
                       <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                        <AIGenerateButton
+                          type="description"
+                          language="en"
+                          inputs={{
+                            beneficiaryName: selectedBeneficiary?.name || undefined,
+                            beneficiarySituation: selectedBeneficiary?.social_situation || undefined,
+                            beneficiaryNeeds: selectedBeneficiary?.medical_condition || undefined,
+                            category: case_.category || undefined,
+                            location: case_.location || selectedBeneficiary?.city || undefined,
+                            targetAmount: case_.target_amount || undefined,
+                            caseType: (case_ as any).type || 'one-time',
+                            title_en: case_.title_en || undefined,
+                            title_ar: case_.title_ar || undefined,
+                          }}
+                          onGenerate={(result) => {
+                            if (result.description_en) {
+                              handleInputChange('description_en', result.description_en)
+                            }
+                          }}
+                          size="sm"
+                          variant="ghost"
+                          iconOnly
+                          className="h-6 w-6 p-0 bg-white"
+                        />
                         <TranslationButton
                           sourceText={case_.description_ar || ''}
                           direction="ar-to-en"
@@ -1443,6 +1542,30 @@ export default function CaseEditPage() {
                           sourceText={case_.description_en || ''}
                           direction="en-to-ar"
                           onTranslate={(translated) => handleInputChange('description_ar', translated)}
+                          size="sm"
+                          variant="ghost"
+                          iconOnly
+                          className="h-6 w-6 p-0 bg-white"
+                        />
+                        <AIGenerateButton
+                          type="description"
+                          language="ar"
+                          inputs={{
+                            beneficiaryName: selectedBeneficiary?.name || undefined,
+                            beneficiarySituation: selectedBeneficiary?.social_situation || undefined,
+                            beneficiaryNeeds: selectedBeneficiary?.medical_condition || undefined,
+                            category: case_.category || undefined,
+                            location: case_.location || selectedBeneficiary?.city || undefined,
+                            targetAmount: case_.target_amount || undefined,
+                            caseType: (case_ as any).type || 'one-time',
+                            title_en: case_.title_en || undefined,
+                            title_ar: case_.title_ar || undefined,
+                          }}
+                          onGenerate={(result) => {
+                            if (result.description_ar) {
+                              handleInputChange('description_ar', result.description_ar)
+                            }
+                          }}
                           size="sm"
                           variant="ghost"
                           iconOnly

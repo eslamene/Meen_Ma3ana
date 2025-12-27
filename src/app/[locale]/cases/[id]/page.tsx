@@ -1278,7 +1278,7 @@ export default function CaseDetailPage() {
                                         className="w-full"
                                         onClick={() => {
                                           setBeneficiaryPopoverOpen(false)
-                                          router.push(`/${locale}/beneficiaries/${beneficiaryData.id}`)
+                                          router.push(`/${locale}/case-management/beneficiaries/${beneficiaryData.id}`)
                                         }}
                                       >
                                         <ExternalLink className="h-4 w-4 mr-2" />

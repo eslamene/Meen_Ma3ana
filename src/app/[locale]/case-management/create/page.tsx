@@ -60,6 +60,7 @@ import {
   Gift
 } from 'lucide-react'
 import TranslationButton from '@/components/translation/TranslationButton'
+import AIGenerateButton from '@/components/ai/AIGenerateButton'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -492,14 +493,14 @@ export default function CreateCasePage() {
     return 'bg-gray-100 text-gray-700 border-gray-300'
   }
 
-  const validateForm = (): boolean => {
+  const validateForm = (): { isValid: boolean; errors: Record<string, string> } => {
     const newErrors: Record<string, string> = {}
 
     // Validation settings must be loaded before form validation
     if (!validationSettings) {
       logger.warn('Validation settings not loaded yet, cannot validate form')
       toast.error('Error', { description: 'Validation settings are loading. Please wait a moment and try again.' })
-      return false
+      return { isValid: false, errors: {} }
     }
 
     const settings = validationSettings
@@ -562,7 +563,8 @@ export default function CreateCasePage() {
     }
 
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const isValid = Object.keys(newErrors).length === 0
+    return { isValid, errors: newErrors }
   }
 
   // Check if form is valid enough to enable the submit button
@@ -574,26 +576,57 @@ export default function CreateCasePage() {
 
     const settings = validationSettings
 
-    // Check required fields
-    const finalTitle = formData.title_en || formData.title_ar
-    if (!finalTitle || !finalTitle.trim()) {
+    // Check required fields - at least one title must be provided
+    const hasTitleEn = formData.title_en && formData.title_en.trim()
+    const hasTitleAr = formData.title_ar && formData.title_ar.trim()
+    
+    if (!hasTitleEn && !hasTitleAr) {
       return false
+    }
+    
+    // If English title is provided, it must be within limits
+    if (hasTitleEn) {
+      const titleEnLength = formData.title_en.trim().length
+      if (titleEnLength < settings.caseTitleMinLength || titleEnLength > settings.caseTitleMaxLength) {
+        return false
+      }
+    }
+    
+    // If Arabic title is provided, it must be within limits
+    if (hasTitleAr) {
+      const titleArLength = formData.title_ar.trim().length
+      if (titleArLength < settings.caseTitleMinLength || titleArLength > settings.caseTitleMaxLength) {
+        return false
+      }
     }
     
     // Category is required
     if (!formData.category || !formData.category.trim() || formData.category === '__none__') {
       return false
     }
-    if (finalTitle.trim().length < settings.caseTitleMinLength || finalTitle.trim().length > settings.caseTitleMaxLength) {
-      return false
-    }
 
-    const finalDesc = formData.description_en || formData.description_ar
-    if (!finalDesc || !finalDesc.trim()) {
+    // Check descriptions - at least one description must be provided
+    const hasDescEn = formData.description_en && formData.description_en.trim()
+    const hasDescAr = formData.description_ar && formData.description_ar.trim()
+    
+    if (!hasDescEn && !hasDescAr) {
       return false
     }
-    if (finalDesc.trim().length < settings.caseDescriptionMinLength || finalDesc.trim().length > settings.caseDescriptionMaxLength) {
-      return false
+    
+    // If English description is provided, it must be within limits
+    if (hasDescEn) {
+      const descEnLength = formData.description_en.trim().length
+      if (descEnLength < settings.caseDescriptionMinLength || descEnLength > settings.caseDescriptionMaxLength) {
+        return false
+      }
+    }
+    
+    // If Arabic description is provided, it must be within limits
+    if (hasDescAr) {
+      const descArLength = formData.description_ar.trim().length
+      if (descArLength < settings.caseDescriptionMinLength || descArLength > settings.caseDescriptionMaxLength) {
+        return false
+      }
     }
 
     // Target amount is required
@@ -613,10 +646,36 @@ export default function CreateCasePage() {
 
   const handleSave = async () => {
     // Validate form first
-    if (!validateForm()) {
+    const validationResult = validateForm()
+    if (!validationResult.isValid) {
+      // Collect all validation error messages
+      const errorMessages = Object.values(validationResult.errors).filter(Boolean)
+      const errorCount = errorMessages.length
+      
+      // Build detailed error message for toast
+      let errorDescription = 'Please fix the validation errors before saving'
+      if (errorCount > 0) {
+        if (errorCount === 1) {
+          errorDescription = errorMessages[0]
+        } else {
+          // Show first 3 errors, then count if more
+          const displayedErrors = errorMessages.slice(0, 3)
+          const remainingCount = errorCount - 3
+          errorDescription = displayedErrors.join(' • ')
+          if (remainingCount > 0) {
+            errorDescription += ` • and ${remainingCount} more error${remainingCount > 1 ? 's' : ''}`
+          }
+        }
+      }
+      
       const errorMsg = 'Please fix the validation errors before saving'
       setError(errorMsg)
-      toast.error('Validation Failed', { description: errorMsg })
+      
+      // Show toast with specific validation errors
+      toast.error('Validation Failed', { 
+        description: errorDescription,
+        duration: 5000 // Show for 5 seconds to give user time to read
+      })
       setSaving(false)
       savingRef.current = false
       return
@@ -1357,10 +1416,32 @@ export default function CreateCasePage() {
                                 onChange={(e) => handleInputChange('title_en', e.target.value)}
                                 placeholder="Enter case title in English"
                                 dir="ltr"
-                                className={`h-11 pr-24 ${errors.title_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                                className={`h-11 pr-32 ${errors.title_en ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                                 maxLength={validationSettings?.caseTitleMaxLength || 100}
                                 />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                  <AIGenerateButton
+                                    type="title"
+                                    language="en"
+                                    inputs={{
+                                      beneficiaryName: selectedBeneficiary?.name || formData.beneficiary_name || undefined,
+                                      beneficiarySituation: selectedBeneficiary?.social_situation || undefined,
+                                      beneficiaryNeeds: selectedBeneficiary?.medical_condition || undefined,
+                                      category: formData.category || undefined,
+                                      location: formData.location || selectedBeneficiary?.city || undefined,
+                                      targetAmount: formData.target_amount || undefined,
+                                      caseType: formData.case_type,
+                                    }}
+                                    onGenerate={(result) => {
+                                      if (result.title_en) {
+                                        handleInputChange('title_en', result.title_en)
+                                      }
+                                    }}
+                                    size="sm"
+                                    variant="ghost"
+                                    iconOnly
+                                    className="h-6 w-6 p-0"
+                                  />
                                   <TranslationButton
                                     sourceText={formData.title_ar}
                                     direction="ar-to-en"
@@ -1394,7 +1475,7 @@ export default function CreateCasePage() {
                                 onChange={(e) => handleInputChange('title_ar', e.target.value)}
                                 placeholder="أدخل عنوان الحالة بالعربية"
                                 dir="rtl"
-                                className={`h-11 pl-24 ${errors.title_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                                className={`h-11 pl-32 ${errors.title_ar ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                                 maxLength={validationSettings?.caseTitleMaxLength || 100}
                               />
                                 <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
@@ -1405,6 +1486,28 @@ export default function CreateCasePage() {
                                     sourceText={formData.title_en}
                                     direction="en-to-ar"
                                     onTranslate={(translated) => handleInputChange('title_ar', translated)}
+                                    size="sm"
+                                    variant="ghost"
+                                    iconOnly
+                                    className="h-6 w-6 p-0"
+                                  />
+                                  <AIGenerateButton
+                                    type="title"
+                                    language="ar"
+                                    inputs={{
+                                      beneficiaryName: selectedBeneficiary?.name || formData.beneficiary_name || undefined,
+                                      beneficiarySituation: selectedBeneficiary?.social_situation || undefined,
+                                      beneficiaryNeeds: selectedBeneficiary?.medical_condition || undefined,
+                                      category: formData.category || undefined,
+                                      location: formData.location || selectedBeneficiary?.city || undefined,
+                                      targetAmount: formData.target_amount || undefined,
+                                      caseType: formData.case_type,
+                                    }}
+                                    onGenerate={(result) => {
+                                      if (result.title_ar) {
+                                        handleInputChange('title_ar', result.title_ar)
+                                      }
+                                    }}
                                     size="sm"
                                     variant="ghost"
                                     iconOnly
@@ -1446,6 +1549,30 @@ export default function CreateCasePage() {
                                   maxLength={validationSettings?.caseDescriptionMaxLength || 2000}
                                 />
                                 <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                                  <AIGenerateButton
+                                    type="description"
+                                    language="en"
+                                    inputs={{
+                                      beneficiaryName: selectedBeneficiary?.name || formData.beneficiary_name || undefined,
+                                      beneficiarySituation: selectedBeneficiary?.social_situation || undefined,
+                                      beneficiaryNeeds: selectedBeneficiary?.medical_condition || undefined,
+                                      category: formData.category || undefined,
+                                      location: formData.location || selectedBeneficiary?.city || undefined,
+                                      targetAmount: formData.target_amount || undefined,
+                                      caseType: formData.case_type,
+                                      title_en: formData.title_en || undefined,
+                                      title_ar: formData.title_ar || undefined,
+                                    }}
+                                    onGenerate={(result) => {
+                                      if (result.description_en) {
+                                        handleInputChange('description_en', result.description_en)
+                                      }
+                                    }}
+                                    size="sm"
+                                    variant="ghost"
+                                    iconOnly
+                                    className="h-6 w-6 p-0 bg-white"
+                                  />
                                   <TranslationButton
                                     sourceText={formData.description_ar}
                                     direction="ar-to-en"
@@ -1491,6 +1618,30 @@ export default function CreateCasePage() {
                                     sourceText={formData.description_en}
                                     direction="en-to-ar"
                                     onTranslate={(translated) => handleInputChange('description_ar', translated)}
+                                    size="sm"
+                                    variant="ghost"
+                                    iconOnly
+                                    className="h-6 w-6 p-0 bg-white"
+                                  />
+                                  <AIGenerateButton
+                                    type="description"
+                                    language="ar"
+                                    inputs={{
+                                      beneficiaryName: selectedBeneficiary?.name || formData.beneficiary_name || undefined,
+                                      beneficiarySituation: selectedBeneficiary?.social_situation || undefined,
+                                      beneficiaryNeeds: selectedBeneficiary?.medical_condition || undefined,
+                                      category: formData.category || undefined,
+                                      location: formData.location || selectedBeneficiary?.city || undefined,
+                                      targetAmount: formData.target_amount || undefined,
+                                      caseType: formData.case_type,
+                                      title_en: formData.title_en || undefined,
+                                      title_ar: formData.title_ar || undefined,
+                                    }}
+                                    onGenerate={(result) => {
+                                      if (result.description_ar) {
+                                        handleInputChange('description_ar', result.description_ar)
+                                      }
+                                    }}
                                     size="sm"
                                     variant="ghost"
                                     iconOnly

@@ -310,7 +310,7 @@ export default function BeneficiarySelector({
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Failed to create beneficiary'
-
+        
         // Check if it's a duplicate beneficiary error
         if (errorMessage.includes('already exists') && (createData.mobile_number || createData.national_id)) {
           // Try to find the existing beneficiary
@@ -341,7 +341,7 @@ export default function BeneficiarySelector({
             logger.error('Error searching for existing beneficiary:', { error: searchError })
           }
         }
-
+        
         throw new Error(errorMessage)
       }
       
@@ -570,13 +570,13 @@ export default function BeneficiarySelector({
                       defaultName={defaultName}
                       defaultMobileNumber={defaultMobileNumber}
                       defaultNationalId={defaultNationalId}
-                      idTypes={idTypes}
-                      cities={cities}
+                            idTypes={idTypes}
+                            cities={cities}
                       isCreating={isCreating}
                       onCreateBeneficiary={handleCreateBeneficiary}
                       createFormRef={createFormRef as React.RefObject<BeneficiaryFormRef>}
                       onClose={() => setShowCreateDialog(false)}
-                    />
+                        />
                   </Dialog>
                 </div>
                 
@@ -837,13 +837,13 @@ export default function BeneficiarySelector({
               defaultName={defaultName}
               defaultMobileNumber={defaultMobileNumber}
               defaultNationalId={defaultNationalId}
-              idTypes={idTypes}
-              cities={cities}
+                    idTypes={idTypes}
+                    cities={cities}
               isCreating={isCreating}
               onCreateBeneficiary={handleCreateBeneficiary}
               createFormRef={createFormRef}
               onClose={() => setShowCreateDialog(false)}
-            />
+                />
           </Dialog>
         </div>
 

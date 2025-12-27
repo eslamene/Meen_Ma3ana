@@ -378,13 +378,13 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
   
   if (!user) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
-  }
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
 
-  const body = await request.json()
+    const body = await request.json()
     const {
       title,
       title_en,
