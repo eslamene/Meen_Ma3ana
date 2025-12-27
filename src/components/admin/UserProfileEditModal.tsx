@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Loader2, User, Mail, Phone, MapPin, Globe, Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { Loader2, User, Mail, Phone, MapPin, Globe, Trash2, AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import StandardModal, { 
   StandardModalPreview, 
@@ -41,6 +41,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [updatingEmail, setUpdatingEmail] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [user, setUser] = useState<UserProfile | null>(null)
   const [formData, setFormData] = useState({
@@ -143,6 +144,67 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const formatPhoneForEmail = (phone: string): string => {
+    if (!phone) return ''
+    let phoneForEmail = phone.trim().replace(/[\s\-\(\)]/g, '')
+    
+    // Remove country code if present (+20, 0020, 20)
+    if (phoneForEmail.startsWith('+20')) {
+      phoneForEmail = phoneForEmail.substring(3)
+    } else if (phoneForEmail.startsWith('0020')) {
+      phoneForEmail = phoneForEmail.substring(4)
+    } else if (phoneForEmail.startsWith('20') && phoneForEmail.length > 10) {
+      phoneForEmail = phoneForEmail.substring(2)
+    }
+
+    // Ensure it starts with 0 if it's a 10-digit number starting with 1
+    if (phoneForEmail.length === 10 && phoneForEmail.startsWith('1')) {
+      phoneForEmail = '0' + phoneForEmail
+    }
+
+    return `${phoneForEmail}@ma3ana.org`
+  }
+
+  const handleUpdateEmailFromPhone = async () => {
+    if (!userId || updatingEmail || !formData.phone?.trim()) {
+      toast.error('Error', {
+        description: 'Phone number is required to update email'
+      })
+      return
+    }
+
+    try {
+      setUpdatingEmail(true)
+      const response = await fetch(`/api/admin/users/${userId}/update-email-from-phone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update email')
+      }
+
+      const data = await response.json()
+      
+      toast.success('Success', {
+        description: data.message || 'Email updated successfully'
+      })
+
+      // Refresh user data to show updated email
+      await fetchUser()
+    } catch (error) {
+      logger.error('Error updating email from phone:', { error: error })
+      toast.error('Error', {
+        description: error instanceof Error ? error.message : 'Failed to update email from phone'
+      })
+    } finally {
+      setUpdatingEmail(false)
     }
   }
 
@@ -294,16 +356,47 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
             title: "Basic Information",
             children: (
               <div className="space-y-4">
-                <StandardFormField label="Email" description="User email address (cannot be changed)">
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="email"
-                      type="email"
-                      value={user.email}
-                      disabled
-                      className="pl-10 h-10 bg-gray-50"
-                    />
+                <StandardFormField 
+                  label="Email" 
+                  description={formData.phone?.trim() 
+                    ? "User email address. Click 'Update from Phone' to set email based on phone number."
+                    : "User email address. Add a phone number to enable email update."
+                  }
+                >
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="email"
+                        type="email"
+                        value={user.email}
+                        disabled
+                        className="pl-10 h-10 bg-gray-50"
+                      />
+                    </div>
+                    {formData.phone?.trim() && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUpdateEmailFromPhone}
+                        disabled={updatingEmail}
+                        className="whitespace-nowrap"
+                        title={`Update email to ${formatPhoneForEmail(formData.phone)}`}
+                      >
+                        {updatingEmail ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Update from Phone
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </StandardFormField>
 

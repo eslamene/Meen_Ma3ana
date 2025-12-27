@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler, ApiHandlerContext, createGetHandler, createPutHandler } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { createClient } from '@supabase/supabase-js'
+import { env } from '@/config/env'
+import { normalizePhoneNumber } from '@/lib/utils/phone'
 
 async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
@@ -38,31 +41,56 @@ async function putHandler(request: NextRequest, context: ApiHandlerContext) {
       throw new ApiError('VALIDATION_ERROR', 'Invalid phone number format', 400)
     }
 
-    // Check if phone number is already in use by another user
+    // Normalize and check phone number uniqueness
+    let normalizedPhone: string | null = null
     if (phone && phone.trim()) {
-      const { data: existingUser, error: checkError } = await supabase
+      normalizedPhone = normalizePhoneNumber(phone.trim(), '+20')
+      
+      // Get all users with phone numbers to check normalized uniqueness
+      const { data: allUsersWithPhone, error: fetchError } = await supabase
+        .from('users')
+        .select('id, phone')
+        .neq('id', user.id)
+        .not('phone', 'is', null)
+
+      if (fetchError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users with phones:', fetchError)
+      } else if (allUsersWithPhone) {
+        // Check if normalized phone matches any existing normalized phone
+        for (const existingUser of allUsersWithPhone) {
+          if (existingUser.phone) {
+            const existingNormalized = normalizePhoneNumber(existingUser.phone, '+20')
+            if (existingNormalized === normalizedPhone) {
+              throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+            }
+          }
+        }
+      }
+
+      // Also check exact match
+      const { data: exactMatch, error: exactError } = await supabase
         .from('users')
         .select('id')
-        .eq('phone', phone.trim())
+        .eq('phone', normalizedPhone)
         .neq('id', user.id)
         .maybeSingle()
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking phone uniqueness:', checkError)
+      if (exactError && exactError.code !== 'PGRST116') {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking phone exact match:', exactError)
       }
 
-      if (existingUser) {
+      if (exactMatch) {
         throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
       }
     }
 
-    // Update user profile
+    // Update user profile with normalized phone
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
       .update({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        phone: phone?.trim() || null,
+        phone: normalizedPhone || null,
         address: address?.trim() || null,
         updated_at: new Date().toISOString(),
       })
@@ -71,9 +99,14 @@ async function putHandler(request: NextRequest, context: ApiHandlerContext) {
       .single()
 
     if (updateError) {
-      // Check if error is due to duplicate phone number
-      if (updateError.code === '23505' && updateError.message.includes('phone')) {
-        throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+      // Check if error is due to duplicate phone number (unique constraint violation)
+      if (updateError.code === '23505') {
+        if (updateError.message.includes('phone') || updateError.message.includes('users_phone_unique')) {
+          throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+        }
+        if (updateError.message.includes('email') || updateError.message.includes('users_email_unique')) {
+          throw new ApiError('VALIDATION_ERROR', 'Email is already in use by another account', 400)
+        }
       }
 
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating user profile:', updateError)

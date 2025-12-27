@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { defaultLogger as logger } from '@/lib/logger'
 import { safeFetch } from '@/lib/utils/safe-fetch'
 import { normalizePhoneNumber } from '@/lib/utils/phone'
+import { Sparkles, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface AddUserModalProps {
   open: boolean
@@ -25,6 +27,7 @@ export function AddUserModal({ open, onClose, onSuccess, availableRoles = [] }: 
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [generatingEmail, setGeneratingEmail] = useState(false)
 
   // Reset form when modal closes
   useEffect(() => {
@@ -116,6 +119,46 @@ export function AddUserModal({ open, onClose, onSuccess, availableRoles = [] }: 
     })
   }
 
+  const handleGenerateEmail = async () => {
+    try {
+      setGeneratingEmail(true)
+      
+      // Build URL with phone parameter if phone is provided
+      let url = '/api/admin/users/next-contributor-email'
+      if (phone && phone.trim()) {
+        url += `?phone=${encodeURIComponent(phone.trim())}`
+      }
+
+      const response = await safeFetch(url, {
+        method: 'GET'
+      })
+
+      if (!response.ok) {
+        throw new Error(response.error || 'Failed to generate email')
+      }
+
+      if (response.data?.email) {
+        setEmail(response.data.email)
+        // Clear any email errors
+        if (errors.email) {
+          setErrors(prev => ({ ...prev, email: '' }))
+        }
+        
+        const emailType = response.data.type === 'phone' ? 'phone-based' : 'contributor'
+        toast.success('Email generated', {
+          description: `Generated ${emailType} email: ${response.data.email}`
+        })
+      }
+    } catch (error) {
+      logger.error('Error generating email:', { error })
+      toast.error('Error', {
+        description: error instanceof Error ? error.message : 'Failed to generate email'
+      })
+    } finally {
+      setGeneratingEmail(false)
+    }
+  }
+
   return (
     <StandardModal
       open={open}
@@ -128,18 +171,37 @@ export function AddUserModal({ open, onClose, onSuccess, availableRoles = [] }: 
           children: (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <StandardFormField label="Email" required error={errors.email}>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value)
-                    if (errors.email) {
-                      setErrors(prev => ({ ...prev, email: '' }))
-                    }
-                  }}
-                  placeholder="user@example.com"
-                  className="h-10"
-                />
+                <div className="relative">
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value)
+                      if (errors.email) {
+                        setErrors(prev => ({ ...prev, email: '' }))
+                      }
+                    }}
+                    placeholder="user@example.com"
+                    className="h-10 pr-12"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleGenerateEmail}
+                    disabled={generatingEmail}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-indigo-50"
+                    title={phone && phone.trim() 
+                      ? "Generate email from phone number (phone@ma3ana.org)" 
+                      : "Generate contributor email (contributor####@ma3ana.org)"}
+                  >
+                    {generatingEmail ? (
+                      <Loader2 className="h-4 w-4 text-indigo-600 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 text-indigo-600" />
+                    )}
+                  </Button>
+                </div>
               </StandardFormField>
 
               <StandardFormField 

@@ -382,19 +382,40 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
       normalizedPhone = normalizePhoneNumber(phone.trim(), '+20')
     }
 
-    // Check if phone number is already in use
+    // Check if phone number is already in use (check normalized uniqueness)
     if (normalizedPhone) {
-      const { data: existingPhoneUser, error: phoneCheckError } = await supabase
+      // Get all users with phone numbers to check normalized uniqueness
+      const { data: allUsersWithPhone, error: fetchError } = await supabase
+        .from('users')
+        .select('id, phone')
+        .not('phone', 'is', null)
+
+      if (fetchError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users with phones:', fetchError)
+      } else if (allUsersWithPhone) {
+        // Check if normalized phone matches any existing normalized phone
+        for (const existingUser of allUsersWithPhone) {
+          if (existingUser.phone) {
+            const existingNormalized = normalizePhoneNumber(existingUser.phone, '+20')
+            if (existingNormalized === normalizedPhone) {
+              throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+            }
+          }
+        }
+      }
+
+      // Also check exact match
+      const { data: exactMatch, error: exactError } = await supabase
         .from('users')
         .select('id')
         .eq('phone', normalizedPhone)
         .maybeSingle()
 
-      if (phoneCheckError && phoneCheckError.code !== 'PGRST116') {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking phone uniqueness:', phoneCheckError)
+      if (exactError && exactError.code !== 'PGRST116') {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking phone exact match:', exactError)
       }
 
-      if (existingPhoneUser) {
+      if (exactMatch) {
         throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
       }
     }
@@ -445,7 +466,7 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
         email: email.trim(),
         first_name: first_name?.trim() || null,
         last_name: last_name?.trim() || null,
-        phone: normalizedPhone,
+        phone: normalizedPhone || null,
         role: 'donor', // Default role
         language: 'en'
       })
@@ -458,18 +479,43 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
         logger.error('Error cleaning up auth user after profile creation failure:', deleteError)
       }
 
-      // Check if error is due to duplicate phone number
-      if (profileError.code === '23505' && profileError.message.includes('phone')) {
-        throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+      // Check if error is due to duplicate phone or email (unique constraint violation)
+      if (profileError.code === '23505') {
+        if (profileError.message.includes('phone') || profileError.message.includes('users_phone_unique')) {
+          throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+        }
+        if (profileError.message.includes('email') || profileError.message.includes('users_email_unique')) {
+          throw new ApiError('VALIDATION_ERROR', 'Email is already in use by another account', 400)
+        }
       }
 
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating user profile:', profileError)
       throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to create user profile: ${profileError.message}`, 500)
     }
 
-    // Assign roles if provided
-    if (role_ids && Array.isArray(role_ids) && role_ids.length > 0) {
-      const roleAssignments = role_ids.map((roleId: string) => ({
+    // Assign roles - if provided, use them; otherwise assign donor role by default
+    let rolesToAssign = role_ids && Array.isArray(role_ids) && role_ids.length > 0 
+      ? role_ids 
+      : []
+
+    // If no roles provided, assign donor role by default
+    if (rolesToAssign.length === 0) {
+      const { data: donorRole, error: donorRoleError } = await supabase
+        .from('admin_roles')
+        .select('id')
+        .eq('name', 'donor')
+        .eq('is_active', true)
+        .single()
+
+      if (!donorRoleError && donorRole) {
+        rolesToAssign = [donorRole.id]
+      } else {
+        logger.warn('Donor role not found - user created without role assignment')
+      }
+    }
+
+    if (rolesToAssign.length > 0) {
+      const roleAssignments = rolesToAssign.map((roleId: string) => ({
         user_id: userId,
         role_id: roleId,
         assigned_by: adminUser.id,

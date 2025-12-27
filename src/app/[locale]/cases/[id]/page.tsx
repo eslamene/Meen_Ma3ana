@@ -59,6 +59,7 @@ import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import type { Beneficiary } from '@/types/beneficiary'
 import { useAuth } from '@/components/auth/AuthProvider'
+import { AdminContributionModal } from '@/components/admin/AdminContributionModal'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -158,6 +159,7 @@ export default function CaseDetailPage() {
   const [contributionsPage, setContributionsPage] = useState(1)
   const contributionsPerPage = 10
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
+  const [addContributionModalOpen, setAddContributionModalOpen] = useState(false)
   const { containerVariant } = useLayout()
 
   // Helper functions to get locale-aware title and description
@@ -1664,6 +1666,18 @@ export default function CaseDetailPage() {
                   </TabsContent>
 
                   <TabsContent value="contributions" className="space-y-4">
+                    {/* Admin Add Contribution Button */}
+                    {(hasPermission('contributions:create') || hasPermission('admin:contributions')) && (
+                      <div className="flex justify-end mb-4">
+                        <Button
+                          onClick={() => setAddContributionModalOpen(true)}
+                          className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white"
+                        >
+                          <Gift className="h-4 w-4 mr-2" />
+                          Add Contribution
+                        </Button>
+                      </div>
+                    )}
                     {getApprovedContributions().length === 0 ? (
                       <div className="text-center py-6 sm:py-8">
                         <Users className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
@@ -1828,12 +1842,22 @@ export default function CaseDetailPage() {
                       <Link href={`/${params.locale}/case-management/cases/${caseData.id}/edit`}>
                         <Button 
                           variant="ghost" 
-                          className="w-full h-11 text-amber-700 hover:text-amber-800 hover:bg-amber-50 border border-amber-200 hover:border-amber-300 transition-all duration-200 group justify-start px-6 bg-gradient-to-r from-amber-50 to-orange-50"
+                          className="w-full h-11 text-amber-700 hover:text-amber-800 hover:bg-amber-50 border border-amber-200 hover:border-amber-300 transition-all duration-200 group justify-start px-6 bg-gradient-to-r from-amber-50 to-orange-50 mb-2"
                         >
                           <Edit className="h-4 w-4 mr-3 text-amber-600 group-hover:text-amber-700 transition-colors" />
                           <span className="font-medium">{t('editCase')}</span>
                         </Button>
                       </Link>
+                      {(hasPermission('contributions:create') || hasPermission('admin:contributions')) && (
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => setAddContributionModalOpen(true)}
+                          className="w-full h-11 text-green-700 hover:text-green-800 hover:bg-green-50 border border-green-200 hover:border-green-300 transition-all duration-200 group justify-start px-6 bg-gradient-to-r from-green-50 to-emerald-50"
+                        >
+                          <Gift className="h-4 w-4 mr-3 text-green-600 group-hover:text-green-700 transition-colors" />
+                          <span className="font-medium">Add Contribution</span>
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1957,6 +1981,20 @@ export default function CaseDetailPage() {
 
 
       </Container>
+
+      {/* Admin Contribution Modal */}
+      {caseData && (
+        <AdminContributionModal
+          open={addContributionModalOpen}
+          onClose={() => setAddContributionModalOpen(false)}
+          onSuccess={() => {
+            // Refresh contributions
+            window.location.reload() // Simple refresh for now
+          }}
+          caseId={caseId}
+          caseTitle={getDisplayTitle(caseData)}
+        />
+      )}
     </div>
     </PermissionGuard>
   )

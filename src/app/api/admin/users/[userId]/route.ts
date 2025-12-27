@@ -4,6 +4,7 @@ import { ApiError } from '@/lib/utils/api-errors'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createClient } from '@supabase/supabase-js'
 import { env } from '@/config/env'
+import { normalizePhoneNumber } from '@/lib/utils/phone'
 
 /**
  * GET /api/admin/users/[userId]
@@ -174,20 +175,48 @@ async function putHandler(
 
     // Check if phone number is being updated and if it's already in use
     if (body.phone !== undefined && body.phone && body.phone.trim()) {
-      const { data: existingUser, error: checkError } = await supabase
+      // Normalize phone number before checking uniqueness and storing
+      const normalizedPhone = normalizePhoneNumber(body.phone.trim(), '+20')
+      
+      // Get all users with phone numbers to check normalized uniqueness
+      const { data: allUsersWithPhone, error: fetchError } = await supabase
+        .from('users')
+        .select('id, phone')
+        .neq('id', userId)
+        .not('phone', 'is', null)
+
+      if (fetchError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching users with phones:', fetchError)
+      } else if (allUsersWithPhone) {
+        // Check if normalized phone matches any existing normalized phone
+        for (const user of allUsersWithPhone) {
+          if (user.phone) {
+            const existingNormalized = normalizePhoneNumber(user.phone, '+20')
+            if (existingNormalized === normalizedPhone) {
+              throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+            }
+          }
+        }
+      }
+
+      // Also check exact match (in case phone is already normalized)
+      const { data: exactMatch, error: exactError } = await supabase
         .from('users')
         .select('id')
-        .eq('phone', body.phone.trim())
+        .eq('phone', normalizedPhone)
         .neq('id', userId)
         .maybeSingle()
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking phone uniqueness:', checkError)
+      if (exactError && exactError.code !== 'PGRST116') {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking phone exact match:', exactError)
       }
 
-      if (existingUser) {
+      if (exactMatch) {
         throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
       }
+
+      // Store normalized phone for update
+      body.phone = normalizedPhone
     }
 
     // Prepare update data for users table
@@ -213,18 +242,24 @@ async function putHandler(
       .single()
 
     if (profileError) {
-      // Check if error is due to duplicate phone number
-      if (profileError.code === '23505' && profileError.message.includes('phone')) {
-        throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+      // Check if error is due to duplicate phone number (unique constraint violation)
+      if (profileError.code === '23505') {
+        if (profileError.message.includes('phone') || profileError.message.includes('users_phone_unique')) {
+          throw new ApiError('VALIDATION_ERROR', 'Phone number is already in use by another account', 400)
+        }
+        if (profileError.message.includes('email') || profileError.message.includes('users_email_unique')) {
+          throw new ApiError('VALIDATION_ERROR', 'Email is already in use by another account', 400)
+        }
       }
 
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating user profile:', profileError)
       throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to update user profile: ${profileError.message}`, 500)
     }
 
-    // Update auth user metadata if email or other auth fields changed
+    // Update auth user email if email was explicitly changed
     const authUpdates: Record<string, unknown> = {}
     if (body.email !== undefined && body.email !== authUser.user.email) {
+      // Allow explicit email update
       authUpdates.email = body.email
     }
 

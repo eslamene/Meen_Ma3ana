@@ -18,6 +18,8 @@ import { useLayout } from '@/components/layout/LayoutProvider'
 import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination'
 import { theme, brandColors } from '@/lib/theme'
 import { defaultLogger as logger } from '@/lib/logger'
+import { AdminContributionModal } from '@/components/admin/AdminContributionModal'
+import { useAdmin } from '@/lib/admin/hooks'
 
 import { 
   Target, 
@@ -41,7 +43,8 @@ import {
   Tag,
   Flag,
   Info,
-  Save
+  Save,
+  Gift
 } from 'lucide-react'
 
 interface Beneficiary {
@@ -155,6 +158,16 @@ export default function AdminCasesPage() {
     category_id: null as string | null,
     priority: 'medium'
   })
+  const [addContributionModal, setAddContributionModal] = useState<{
+    open: boolean
+    caseId: string | null
+    caseTitle: string
+  }>({
+    open: false,
+    caseId: null,
+    caseTitle: ''
+  })
+  const { hasPermission } = useAdmin()
 
   const fetchCases = useCallback(async () => {
     try {
@@ -1112,6 +1125,33 @@ export default function AdminCasesPage() {
                               <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                               Quick Update
                             </Button>
+                            {(hasPermission('contributions:create') || hasPermission('admin:contributions')) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAddContributionModal({
+                                  open: true,
+                                  caseId: case_.id,
+                                  caseTitle: case_.title || case_.title_en || case_.title_ar || 'Untitled Case'
+                                })}
+                                className="flex-1 md:flex-none w-full md:w-auto border-2 text-xs sm:text-sm"
+                                style={{
+                                  borderColor: brandColors.meen[400],
+                                  color: brandColors.meen[700]
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = brandColors.meen[500]
+                                  e.currentTarget.style.backgroundColor = brandColors.meen[50]
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = brandColors.meen[400]
+                                  e.currentTarget.style.backgroundColor = 'transparent'
+                                }}
+                              >
+                                <Gift className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                Add Contribution
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -1584,6 +1624,28 @@ export default function AdminCasesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Admin Contribution Modal */}
+        {addContributionModal.caseId && (
+          <AdminContributionModal
+            open={addContributionModal.open}
+            onClose={() => setAddContributionModal({
+              open: false,
+              caseId: null,
+              caseTitle: ''
+            })}
+            onSuccess={() => {
+              fetchCases() // Refresh cases list
+              setAddContributionModal({
+                open: false,
+                caseId: null,
+                caseTitle: ''
+              })
+            }}
+            caseId={addContributionModal.caseId}
+            caseTitle={addContributionModal.caseTitle}
+          />
+        )}
       </PermissionGuard>
     </ProtectedRoute>
   )

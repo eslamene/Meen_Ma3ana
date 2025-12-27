@@ -41,7 +41,7 @@ export const users = pgTable('users', {
   role: text('role', { enum: userRoles }).notNull().default('donor'),
   first_name: text('first_name'),
   last_name: text('last_name'),
-  phone: text('phone'),
+  phone: text('phone'), // Unique constraint enforced via database index (allows NULL)
   address: text('address'),
   profile_image: text('profile_image'),
   is_active: boolean('is_active').notNull().default(true),
@@ -50,7 +50,11 @@ export const users = pgTable('users', {
   notifications: text('notifications'), // JSON string for notification preferences
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').notNull().defaultNow(),
-})
+}, (table) => [
+  // Email uniqueness is already enforced via .unique() above
+  // Phone uniqueness is enforced via partial unique index in migration 1010
+  // (allows multiple NULL values but ensures uniqueness for non-null phones)
+])
 
 // Payment methods lookup table
 export const paymentMethodsTable = pgTable('payment_methods', {
