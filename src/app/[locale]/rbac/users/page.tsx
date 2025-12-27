@@ -10,6 +10,7 @@ import { UserProfileEditModal } from '@/components/admin/UserProfileEditModal'
 import { PasswordResetModal } from '@/components/admin/PasswordResetModal'
 import { AccountMergeModal } from '@/components/admin/AccountMergeModal'
 import { UserRoleAssignmentModal } from '@/components/admin/rbac/UserRoleAssignmentModal'
+import { AddUserModal } from '@/components/admin/AddUserModal'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -39,7 +40,8 @@ import {
   Mail,
   Calendar,
   Phone,
-  User
+  User,
+  UserPlus
 } from 'lucide-react'
 
 // Types
@@ -100,6 +102,7 @@ export default function AdminUsersPage() {
   const [openMenuForId, setOpenMenuForId] = useState<string | null>(null)
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
   const [selectedUserForActions, setSelectedUserForActions] = useState<User | null>(null)
+  const [addUserModalOpen, setAddUserModalOpen] = useState(false)
   const { user: currentUser } = useAdmin()
 
   // Fetch users with pagination, search, and filtering
@@ -324,6 +327,14 @@ export default function AdminUsersPage() {
                   }
                 </CardDescription>
               </div>
+              <Button
+                onClick={() => setAddUserModalOpen(true)}
+                className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Add User</span>
+                <span className="sm:hidden">Add</span>
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -801,6 +812,17 @@ export default function AdminUsersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Add User Modal */}
+        <AddUserModal
+          open={addUserModalOpen}
+          onClose={() => setAddUserModalOpen(false)}
+          onSuccess={() => {
+            fetchUsers()
+            setAddUserModalOpen(false)
+          }}
+          availableRoles={availableRoles}
+        />
         </Container>
       </div>
     </PermissionGuard>
