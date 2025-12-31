@@ -100,15 +100,31 @@ export default async function proxy(request: NextRequest) {
     requestWithCorrelationId.headers.set('accept-language', normalizedAcceptLanguage);
   }
   
+  // Handle routes missing locale prefix - redirect to locale-prefixed version
+  const pathname = requestWithCorrelationId.nextUrl.pathname
+  const pathSegments = pathname.split('/').filter(Boolean);
+  const firstSegment = pathSegments[0] || '';
+  
+  // Check if the first segment is NOT a locale and the path is not an API route or static asset
+  const isNotLocale = !locales.includes(firstSegment as typeof locales[number]);
+  const isNotApiRoute = !pathname.startsWith('/api/');
+  const isNotStaticAsset = !pathname.startsWith('/_next/') && 
+                           !pathname.startsWith('/_static/') &&
+                           !pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff|woff2|ttf|eot)$/);
+  
+  // If route is missing locale prefix and is a valid app route, redirect with locale
+  if (isNotLocale && isNotApiRoute && isNotStaticAsset && pathname !== '/') {
+    const detectedLocale = detectUserLocale(requestWithCorrelationId);
+    const localePrefixedUrl = new URL(`/${detectedLocale}${pathname}`, requestWithCorrelationId.url);
+    // Preserve query parameters
+    localePrefixedUrl.search = requestWithCorrelationId.nextUrl.search;
+    return NextResponse.redirect(localePrefixedUrl);
+  }
+  
   // Prelaunch guard - block app routes if PRELAUNCH=true
   const isPrelaunch = process.env.PRELAUNCH === 'true'
   if (isPrelaunch) {
-    const pathname = requestWithCorrelationId.nextUrl.pathname
-    
     // Extract locale from pathname (first segment after /)
-    const pathSegments = pathname.split('/').filter(Boolean);
-    const firstSegment = pathSegments[0] || '';
-    // Use detected locale for prelaunch mode
     const locale = locales.includes(firstSegment as typeof locales[number]) 
       ? firstSegment 
       : detectUserLocale(requestWithCorrelationId);

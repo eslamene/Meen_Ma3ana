@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,6 +34,8 @@ interface Sponsorship {
 export default function SponsorDashboardPage() {
   const t = useTranslations('sponsorships')
   const router = useRouter()
+  const params = useParams()
+  const locale = (params?.locale as string) || 'en'
   const [user, setUser] = useState<User | null>(null)
   const [sponsorships, setSponsorships] = useState<Sponsorship[]>([])
   const [loading, setLoading] = useState(true)
@@ -234,7 +236,7 @@ function SponsorshipList({ sponsorships }: { sponsorships: Sponsorship[] }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push(`/cases/${sponsorship.case_id}`)}
+                  onClick={() => router.push(`/${locale}/cases/${sponsorship.case_id}`)}
                 >
                   View Case
                 </Button>

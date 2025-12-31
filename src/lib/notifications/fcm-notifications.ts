@@ -5,6 +5,7 @@
 
 import { env } from '@/config/env'
 import { defaultLogger as logger } from '@/lib/logger'
+import { defaultLocale } from '@/i18n/request'
 
 interface FCMNotificationPayload {
   title: string
@@ -203,7 +204,7 @@ export class FCMNotificationService {
         data: {
           type: 'case_created',
           caseId,
-          url: `/cases/${caseId}`,
+          url: `/${defaultLocale}/cases/${caseId}`,
         },
         tag: `case-${caseId}`,
         requireInteraction: true,
@@ -226,7 +227,7 @@ export class FCMNotificationService {
         data: {
           type: 'case_completed',
           caseId,
-          url: `/cases/${caseId}`,
+          url: `/${defaultLocale}/cases/${caseId}`,
         },
         tag: `case-completed-${caseId}`,
         requireInteraction: true,
@@ -260,7 +261,7 @@ export class FCMNotificationService {
         data: {
           type: 'case_updated',
           caseId,
-          url: `/cases/${caseId}`,
+          url: `/${defaultLocale}/cases/${caseId}`,
         },
         tag: `case-update-${caseId}`,
         requireInteraction: false,
@@ -321,7 +322,7 @@ export class FCMNotificationService {
           caseId,
           oldStatus,
           newStatus,
-          url: `/cases/${caseId}`,
+          url: `/${defaultLocale}/cases/${caseId}`,
         },
         tag: `case-status-${caseId}-${newStatus}`,
         requireInteraction: newStatus === 'published' || newStatus === 'closed',

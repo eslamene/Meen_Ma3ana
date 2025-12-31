@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
+import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -62,6 +63,8 @@ const formatRelativeDate = (date: Date) => {
 
 export default function NotificationCenter({ isOpen, onClose }: NotificationCenterProps) {
   const t = useTranslations('notifications')
+  const params = useParams()
+  const locale = (params?.locale as string) || 'en'
   const [notifications, setNotifications] = useState<CaseNotification[]>([])
   const [loading, setLoading] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -139,7 +142,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
 
     // Navigate to the case if it has a caseId
     if (notification.caseId) {
-      window.location.href = `/cases/${notification.caseId}`
+      window.location.href = `/${locale}/cases/${notification.caseId}`
     }
   }
 
