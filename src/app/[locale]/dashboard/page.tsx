@@ -215,9 +215,16 @@ export default function DashboardPage() {
     try {
       setLoading(true)
       const supabase = createClient()
-      const { data: { user: authUser } } = await supabase.auth.getUser()
       
-      if (!authUser) return
+      // Check if user is authenticated
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError || !authUser) {
+        // Session invalid, redirect to login
+        logger.warn('User not authenticated, redirecting to login', { error: authError })
+        router.push(`/${locale}/auth/login`)
+        return
+      }
 
       // Fetch dashboard statistics from API
       const response = await fetch('/api/dashboard/stats')
@@ -225,14 +232,25 @@ export default function DashboardPage() {
       if (!response.ok) {
         if (response.status === 401) {
           // User not authenticated, redirect to login
+          logger.warn('API returned 401, redirecting to login')
+          router.push(`/${locale}/auth/login`)
           return
         }
-        throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`)
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to fetch dashboard stats: ${response.statusText}`)
       }
 
       const data = await response.json()
       
-      if (data.stats) {
+      if (data.data?.stats) {
+        setStats({
+          totalContributions: data.data.stats.totalContributions || 0,
+          totalAmount: data.data.stats.totalAmount || 0,
+          activeCases: data.data.stats.activeCases || 0,
+          completedCases: data.data.stats.completedCases || 0
+        })
+      } else if (data.stats) {
+        // Fallback for old response format
         setStats({
           totalContributions: data.stats.totalContributions || 0,
           totalAmount: data.stats.totalAmount || 0,
@@ -242,10 +260,11 @@ export default function DashboardPage() {
       }
     } catch (error) {
       logger.error('Error fetching dashboard stats:', { error: error })
+      // Don't show error to user, just log it
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [locale, router])
 
   useEffect(() => {
     fetchDashboardStats()
