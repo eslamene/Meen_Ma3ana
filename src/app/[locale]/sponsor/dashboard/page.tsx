@@ -134,19 +134,19 @@ export default function SponsorDashboardPage() {
           </TabsList>
 
           <TabsContent value="all" className="mt-6">
-            <SponsorshipList sponsorships={sponsorships} />
+            <SponsorshipList sponsorships={sponsorships} locale={locale} />
           </TabsContent>
 
           <TabsContent value="pending" className="mt-6">
-            <SponsorshipList sponsorships={pendingSponsorships} />
+            <SponsorshipList sponsorships={pendingSponsorships} locale={locale} />
           </TabsContent>
 
           <TabsContent value="approved" className="mt-6">
-            <SponsorshipList sponsorships={approvedSponsorships} />
+            <SponsorshipList sponsorships={approvedSponsorships} locale={locale} />
           </TabsContent>
 
           <TabsContent value="rejected" className="mt-6">
-            <SponsorshipList sponsorships={rejectedSponsorships} />
+            <SponsorshipList sponsorships={rejectedSponsorships} locale={locale} />
           </TabsContent>
         </Tabs>
       </div>
@@ -154,7 +154,7 @@ export default function SponsorDashboardPage() {
   )
 }
 
-function SponsorshipList({ sponsorships }: { sponsorships: Sponsorship[] }) {
+function SponsorshipList({ sponsorships, locale }: { sponsorships: Sponsorship[]; locale: string }) {
   const router = useRouter()
 
   const getStatusBadge = (status: string) => {
