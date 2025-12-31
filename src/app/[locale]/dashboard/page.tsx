@@ -42,6 +42,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { theme, brandColors } from '@/lib/theme'
+import { PushNotificationButton } from '@/components/notifications/PushNotificationButton'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -929,6 +930,13 @@ export default function DashboardPage() {
                         <Badge variant="outline" className="bg-meen-100 text-meen-800 border-meen-200">
                           {t('enabled')}
                         </Badge>
+                      </div>
+                      <div className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className={isRTL ? 'text-right' : 'text-left'}>
+                          <p className="text-sm font-medium text-gray-900">Push Notifications</p>
+                          <p className="text-xs text-gray-600">Receive browser push notifications</p>
+                        </div>
+                        <PushNotificationButton />
                       </div>
                       <div className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <div className={isRTL ? 'text-right' : 'text-left'}>

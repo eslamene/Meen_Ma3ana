@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useTransition } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
@@ -94,6 +94,7 @@ export default function CaseEditPage() {
   const tProfile = useTranslations('profile')
   const router = useRouter()
   const params = useParams()
+  const [isPending, startTransition] = useTransition()
   const [case_, setCase] = useState<Case | null>(null)
   const [caseFiles, setCaseFiles] = useState<CaseFile[]>([])
   const [activeTab, setActiveTab] = useState<'details' | 'files'>('details')
@@ -576,13 +577,16 @@ export default function CaseEditPage() {
     return { isValid, errors: newErrors }
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!case_) {
-      toast.error('Error', { description: 'Case data not loaded. Please refresh the page.' })
+      // Defer toast to avoid blocking
+      queueMicrotask(() => {
+        toast.error('Error', { description: 'Case data not loaded. Please refresh the page.' })
+      })
       return
     }
 
-    // Validate form
+    // Quick validation - keep it synchronous but lightweight
     const validationResult = validateForm()
     if (!validationResult.isValid) {
       // Collect all validation error messages
@@ -605,103 +609,120 @@ export default function CaseEditPage() {
         }
       }
       
-      const errorMsg = 'Please fix the validation errors before saving'
-      setError(errorMsg)
-      
-      // Show toast with specific validation errors
-      toast.error('Validation Failed', { 
-        description: errorDescription,
-        duration: 5000 // Show for 5 seconds to give user time to read
+      // Defer non-critical state updates and toast
+      startTransition(() => {
+        setError('Please fix the validation errors before saving')
       })
-      setSaving(false)
+      
+      queueMicrotask(() => {
+        toast.error('Validation Failed', { 
+          description: errorDescription,
+          duration: 5000
+        })
+      })
       return
     }
 
-    try {
-      setSaving(true)
-      setError(null)
-      setSuccess(false)
+    // Set loading state immediately (batched by React)
+    setSaving(true)
+    setError(null)
+    setSuccess(false)
 
-      // Get category ID - prefer category_id from state, otherwise look up by name
-      let categoryId = case_.category_id
-      
-      // If we have a category name but no category_id, look it up
-      if (case_.category && !categoryId) {
-        // Try to find category by name, name_en, or name_ar
-        const selectedCategory = categories.find(cat => 
-          cat.name === case_.category || 
-          cat.name_en === case_.category ||
-          cat.name_ar === case_.category
-        )
-        if (selectedCategory) {
-          categoryId = selectedCategory.id
-        } else {
-          // Fallback: query database if not in local categories list
-          const { data: categoryData, error: categoryError } = await supabase
-            .from('case_categories')
-            .select('id')
-            .or(`name.eq.${case_.category},name_en.eq.${case_.category},name_ar.eq.${case_.category}`)
-            .single()
-          
-          if (categoryData && !categoryError) {
-            categoryId = categoryData.id
+    // Perform async work without blocking the event handler
+    // Using queueMicrotask ensures this runs after the current synchronous code
+    queueMicrotask(async () => {
+      try {
+        // Get category ID - prefer category_id from state, otherwise look up by name
+        let categoryId = case_.category_id
+        
+        // If we have a category name but no category_id, look it up
+        if (case_.category && !categoryId) {
+          // Try to find category by name, name_en, or name_ar
+          const selectedCategory = categories.find(cat => 
+            cat.name === case_.category || 
+            cat.name_en === case_.category ||
+            cat.name_ar === case_.category
+          )
+          if (selectedCategory) {
+            categoryId = selectedCategory.id
+          } else {
+            // Fallback: query database if not in local categories list
+            const { data: categoryData, error: categoryError } = await supabase
+              .from('case_categories')
+              .select('id')
+              .or(`name.eq.${case_.category},name_en.eq.${case_.category},name_ar.eq.${case_.category}`)
+              .single()
+            
+            if (categoryData && !categoryError) {
+              categoryId = categoryData.id
+            }
           }
         }
+
+        const response = await fetch(`/api/cases/${caseId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title_en: case_.title_en || '',
+            title_ar: case_.title_ar || '',
+            description_en: case_.description_en || '',
+            description_ar: case_.description_ar || '',
+            targetAmount: case_.target_amount || case_.goal_amount || 0,
+            status: case_.status || 'draft',
+            priority: case_.priority || case_.urgency_level || 'medium',
+            location: case_.location || '',
+            beneficiaryName: selectedBeneficiary?.name || case_.beneficiary_name || '',
+            beneficiaryContact: selectedBeneficiary?.mobile_number || case_.beneficiary_contact || null,
+            category_id: categoryId || null,
+            duration: case_.duration || null,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          const errorMsg = result.error || 'Failed to update case'
+          startTransition(() => {
+            setError(errorMsg)
+            setSaving(false)
+          })
+          queueMicrotask(() => {
+            toast.error('Update Failed', { description: errorMsg })
+          })
+          return
+        }
+
+        // Show success toast and update state
+        const caseTitle = case_.title_en || case_.title_ar || case_.title || 'Untitled'
+        startTransition(() => {
+          setSuccess(true)
+          setSaving(false)
+          // Clear success state after delay
+          setTimeout(() => setSuccess(false), 3000)
+        })
+        
+        queueMicrotask(() => {
+          toast.success('Case Updated Successfully', {
+            description: `Case "${caseTitle}" has been successfully updated.`
+          })
+        })
+      } catch (error) {
+        logger.error('Error updating case:', { error: error })
+        logger.error('Catch block error details:', { error: JSON.stringify(error, null, 2) })
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        startTransition(() => {
+          setError(`An unexpected error occurred: ${errorMessage}`)
+          setSaving(false)
+        })
+        queueMicrotask(() => {
+          toast.error('Update Failed', {
+            description: `An unexpected error occurred: ${errorMessage}`
+          })
+        })
       }
-
-      const response = await fetch(`/api/cases/${caseId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title_en: case_.title_en || '',
-          title_ar: case_.title_ar || '',
-          description_en: case_.description_en || '',
-          description_ar: case_.description_ar || '',
-          targetAmount: case_.target_amount || case_.goal_amount || 0,
-          status: case_.status || 'draft',
-          priority: case_.priority || case_.urgency_level || 'medium',
-          location: case_.location || '',
-          beneficiaryName: selectedBeneficiary?.name || case_.beneficiary_name || '',
-          beneficiaryContact: selectedBeneficiary?.mobile_number || case_.beneficiary_contact || null,
-          category_id: categoryId || null,
-          duration: case_.duration || null,
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        const errorMsg = result.error || 'Failed to update case'
-        toast.error('Update Failed', { description: errorMsg })
-        setError(errorMsg)
-        setSaving(false)
-        return
-      }
-
-      // Show success toast
-      const caseTitle = case_.title_en || case_.title_ar || case_.title || 'Untitled'
-      console.log('Showing success toast for case update')
-      toast.success('Case Updated Successfully', {
-        description: `Case "${caseTitle}" has been successfully updated.`
-      })
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
-      
-      // Ensure toast is visible by using a small delay
-      await new Promise(resolve => setTimeout(resolve, 100))
-    } catch (error) {
-      logger.error('Error updating case:', { error: error })
-      logger.error('Catch block error details:', { error: JSON.stringify(error, null, 2) })
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      toast.error('Update Failed', {
-        description: `An unexpected error occurred: ${errorMessage}`
-      })
-      setError(`An unexpected error occurred: ${errorMessage}`)
-    } finally {
-      setSaving(false)
-    }
+    })
   }
 
   const handleBack = () => {

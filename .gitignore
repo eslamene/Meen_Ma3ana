@@ -51,6 +51,12 @@ yarn-error.log*
 *.secrets
 DEPLOYMENT_NOTES.md
 
+# Firebase service account files (contain secrets)
+**/firebase-service-account*.json
+**/meenma3ana-*.json
+supabase/functions/**/*.json
+scripts/set-firebase-secret.sh
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

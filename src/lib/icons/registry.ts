@@ -1,29 +1,31 @@
 /**
  * Centralized Icon Registry
  * 
- * This file contains all icon mappings to eliminate duplication
- * across navigation components and ensure consistent icon usage.
+ * This file contains all icon mappings using Phosphor Icons
+ * Replaced from Lucide React to Phosphor Icons for better consistency
+ * @see https://phosphoricons.com/
  */
 
 import React from 'react'
+import type { IconProps as PhosphorIconProps } from '@phosphor-icons/react'
 import {
-  Settings,
+  Gear as Settings,
   Heart,
-  DollarSign,
+  CurrencyDollar as DollarSign,
   Users,
   Bell,
-  BarChart3,
+  ChartBar as BarChart3,
   FileText,
   CreditCard,
   User,
-  Home,
-  Menu,
+  House as Home,
+  List as Menu,
   X,
-  LogOut,
-  ChevronDown,
-  ChevronRight,
+  SignOut as LogOut,
+  CaretDown as ChevronDown,
+  CaretRight as ChevronRight,
   Shield,
-  TrendingUp,
+  TrendUp as TrendingUp,
   FolderOpen,
   Plus,
   Wallet,
@@ -35,111 +37,117 @@ import {
   Lock,
   Globe,
   Info,
-  Mail,
+  Envelope as Mail,
   UserPlus,
   Package,
   Circle,
-  FileCheck,
-  FolderKanban,
+  CheckSquare,
+  FolderDashed as FolderKanban,
   PlusCircle,
   Calendar,
   Repeat,
-  MessageSquare,
-  LineChart,
+  ChatCircle as MessageSquare,
+  ChartLine as LineChart,
   ShieldCheck,
   ShieldPlus,
-  UserCog,
+  UserGear as UserCog,
   GitBranch,
   Tag,
-  Search,
-  Edit,
-  Trash2,
+  MagnifyingGlass as Search,
+  PencilSimple as Edit,
+  Trash,
   ArrowLeft,
-  AlertTriangle,
+  Warning as AlertTriangle,
   Eye,
-  EyeOff,
+  EyeSlash as EyeOff,
   Palette,
-  Building2,
+  Building,
   ShoppingBag,
   Truck,
-  Store,
+  Storefront as Store,
   Gift,
   Star,
-  Award,
+  Trophy as Award,
   Target,
-  TrendingDown,
-  Activity,
-  Zap,
+  TrendDown as TrendingDown,
+  Pulse as Activity,
+  Lightning as Zap,
   Flame,
-  Droplet,
+  Drop as Droplet,
   Sun,
   Moon,
   Cloud,
   Umbrella,
   Coffee,
-  Utensils,
+  ForkKnife as Utensils,
   Car,
-  Plane,
+  Airplane as Plane,
   Train,
-  Bike,
-  Gamepad2,
-  Music,
-  Film,
+  Bicycle as Bike,
+  GameController as Gamepad2,
+  MusicNote as Music,
+  FilmStrip as Film,
   Book,
   GraduationCap,
   Briefcase,
   Stethoscope,
   Pill,
   Hospital,
-  Building,
-  Factory,
   Phone,
   MapPin,
-  Unlock,
+  LockOpen as Unlock,
   Key,
   UserCircle,
   UserSquare,
-  Users2,
-  UserX,
+  UsersThree as Users2,
+  UserMinus as UserX,
   CheckCircle,
   XCircle,
-  HelpCircle,
-  AlertCircle,
+  Question as HelpCircle,
+  WarningCircle as AlertCircle,
   Check,
   Minus,
-  MoreHorizontal,
-  MoreVertical,
-  ChevronUp,
-  ChevronLeft,
+  DotsThree as MoreHorizontal,
+  DotsThreeVertical as MoreVertical,
+  CaretUp as ChevronUp,
+  CaretLeft as ChevronLeft,
   ArrowUp,
   ArrowDown,
   ArrowRight,
-  Save,
-  RefreshCw,
-  RotateCw,
-  RotateCcw,
+  FloppyDisk as Save,
+  ArrowClockwise as RefreshCw,
+  ArrowClockwise as RotateCw,
+  ArrowCounterClockwise as RotateCcw,
   Copy,
   Clipboard,
   Scissors,
   Ambulance,
-  Shirt,
-  Refrigerator,
-  type LucideIcon
-} from 'lucide-react'
+  TShirt as Shirt,
+  Package as Refrigerator,
+  type Icon as PhosphorIcon
+} from '@phosphor-icons/react'
 
 /**
  * Icon component props interface
+ * Compatible with both Lucide and Phosphor icon props
  */
 export interface IconProps {
   className?: string
   size?: number | string
   color?: string
+  weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone'
+  [key: string]: any // Allow other props to pass through
 }
 
 /**
- * Type-safe icon registry mapping icon names to components
+ * Type for icon components (Phosphor icons)
  */
-export const ICON_REGISTRY: Record<string, LucideIcon> = {
+export type IconComponent = React.ComponentType<IconProps>
+
+/**
+ * Type-safe icon registry mapping icon names to Phosphor icon components
+ */
+export const ICON_REGISTRY: Record<string, IconComponent> = {
   // Core Navigation icons
   Home,
   Users,
@@ -156,7 +164,7 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
   LogOut,
   
   // File & Document icons
-  FileCheck,
+  FileCheck: CheckSquare,
   FolderOpen,
   Folder,
   FolderKanban,
@@ -177,7 +185,7 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
   Plus,
   PlusCircle,
   Edit,
-  Trash2,
+  Trash,
   Search,
   Save,
   Download,
@@ -227,9 +235,7 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
   ShieldPlus,
   
   // Business & Commerce icons
-  Building2,
   Building,
-  Factory,
   ShoppingBag,
   CreditCard,
   Store,
@@ -291,10 +297,10 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
   Circle,
   GitBranch,
   
-
   // Clothing & Fashion icons
   Shirt,
-  Refrigerator,
+  Refrigerator: Package,
+  
   // Aliases for backward compatibility
   'BarChart': BarChart3,
   'Files': FileText,
@@ -305,7 +311,11 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
   'Admin': Settings,
   'Profile': User,
   'Security': Lock,
-  'Analytics': TrendingUp
+  'Analytics': TrendingUp,
+  
+  // Additional Phosphor-specific aliases
+  'Trash2': Trash,
+  'Building2': Building,
 } as const
 
 /**
@@ -313,7 +323,7 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
  * @param iconName - The name of the icon
  * @returns The icon component or undefined if not found
  */
-export function getIcon(iconName: string): LucideIcon | undefined {
+export function getIcon(iconName: string): IconComponent | undefined {
   return ICON_REGISTRY[iconName]
 }
 
@@ -323,7 +333,7 @@ export function getIcon(iconName: string): LucideIcon | undefined {
  * @param iconName - The name of the icon
  * @returns The icon component or FileText as fallback
  */
-export function getIconComponent(iconName: string): LucideIcon {
+export function getIconComponent(iconName: string): IconComponent {
   return getIconWithFallback(iconName, FileText)
 }
 
@@ -340,8 +350,8 @@ export const ICON_MAP = ICON_REGISTRY
  */
 export function getIconWithFallback(
   iconName: string, 
-  fallback: LucideIcon = Settings
-): LucideIcon {
+  fallback: IconComponent = Settings
+): IconComponent {
   return ICON_REGISTRY[iconName] || fallback
 }
 
@@ -364,10 +374,11 @@ export function getAvailableIcons(): string[] {
 
 /**
  * Icon component wrapper with consistent props
+ * Handles Phosphor icon props including weight
  */
 export interface IconComponentProps extends IconProps {
   name: string
-  fallback?: LucideIcon
+  fallback?: IconComponent
 }
 
 export function IconComponent({ 
@@ -376,14 +387,16 @@ export function IconComponent({
   className = '', 
   size = 16, 
   color,
+  weight = 'regular',
   ...props 
 }: IconComponentProps) {
   const IconElement = getIconWithFallback(name, fallback)
   
   return React.createElement(IconElement, { 
     className,
-    size,
+    size: typeof size === 'string' ? parseInt(size) || 16 : size,
     color,
+    weight,
     ...props 
   })
 }

@@ -178,9 +178,12 @@ npm run i18n:unused
 
 - **dev.js** - Task Master CLI (AI-driven development task management)
 - **apply-email-templates.js** - Apply email templates
-- **test-activity-logging.js** - Test activity logging
-- **test-user-merge.js** - Test user merge functionality
 - **update-pages-layout.js** - Update pages layout
+- **set-firebase-secret.sh** - Set Firebase secret in Supabase
+
+## Archived Scripts
+
+One-time use scripts, temporary documentation, and SQL check files have been moved to `scripts/Archived/`. See `scripts/Archived/README.md` for details.
 
 ## Environment Requirements
 

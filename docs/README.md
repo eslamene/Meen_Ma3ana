@@ -19,7 +19,7 @@ Setup and configuration guides for getting started:
 - **[OAUTH_SETUP.md](./setup/OAUTH_SETUP.md)** - OAuth authentication setup
 - **[LANDING_PAGE_SETUP.md](./setup/LANDING_PAGE_SETUP.md)** - Marketing page configuration
 - **[EMAIL_CONFIRMATION_SETUP.md](./setup/EMAIL_CONFIRMATION_SETUP.md)** - Email verification setup
-- Additional troubleshooting guides for email, storage, and database issues
+- Additional setup guides for storage, database, and OAuth configuration
 
 ### 🚢 [Deployment](./deployment/)
 Production deployment guides:
@@ -29,14 +29,12 @@ Production deployment guides:
 Development guides and integration documentation:
 - **[integration-guide.md](./development/integration-guide.md)** - Third-party integrations
 - **[server-menu-system.md](./development/server-menu-system.md)** - Navigation system documentation
-- **[MISSING_API_ROUTES.md](./development/MISSING_API_ROUTES.md)** - API route migration guide
 
 ### ✨ [Features](./features/)
 Feature-specific documentation:
 - **Activity Logging:**
   - [ACTIVITY_LOGGING_SYSTEM.md](./features/ACTIVITY_LOGGING_SYSTEM.md) - Activity logging system overview
   - [ACTIVITY_LOGGING_TROUBLESHOOTING.md](./features/ACTIVITY_LOGGING_TROUBLESHOOTING.md) - Troubleshooting guide
-  - [LOGGING_IMPROVEMENTS.md](./features/LOGGING_IMPROVEMENTS.md) - Recent improvements
 - **Storage:**
   - [STORAGE_CONFIGURATION_MODULE.md](./features/STORAGE_CONFIGURATION_MODULE.md) - Storage configuration
   - [STORAGE_MIME_TYPES_MAPPING.md](./features/STORAGE_MIME_TYPES_MAPPING.md) - MIME type mappings
@@ -44,10 +42,9 @@ Feature-specific documentation:
 - **Permissions:**
   - [PERMISSIONS_GROUPED_BY_MODULES.md](./features/PERMISSIONS_GROUPED_BY_MODULES.md) - Permission organization
   - [DYNAMIC_PERMISSIONS_OPTIONS.md](./features/DYNAMIC_PERMISSIONS_OPTIONS.md) - Dynamic permission system
-  - [PERMISSIONS_RESOURCE_ACTION_FIX.md](./features/PERMISSIONS_RESOURCE_ACTION_FIX.md) - Permission fixes
-- **Performance:**
-  - [PERFORMANCE_OPTIMIZATION.md](./features/PERFORMANCE_OPTIMIZATION.md) - Performance best practices
-  - [ANALYTICS_PERFORMANCE_IMPROVEMENTS.md](./features/ANALYTICS_PERFORMANCE_IMPROVEMENTS.md) - Analytics optimizations
+- **Push Notifications:**
+  - [PUSH_NOTIFICATIONS.md](./features/PUSH_NOTIFICATIONS.md) - Push notification setup and usage
+  - [FCM_RLS_TROUBLESHOOTING.md](./features/FCM_RLS_TROUBLESHOOTING.md) - FCM troubleshooting
 - **Case Management:**
   - [CASE_FILE_MANAGEMENT.md](./features/CASE_FILE_MANAGEMENT.md) - File management for cases
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { createBilingualNotification, NOTIFICATION_TEMPLATES } from '@/lib/notifications/bilingual-helpers'
 
 async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
@@ -69,6 +70,105 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
         { error: 'Failed to fetch notifications' },
         { status: 500 }
       )
+    }
+
+    // Enhance notifications with case titles for old notifications that don't have them
+    if (notifications && notifications.length > 0) {
+      // Collect all case IDs that need lookup
+      const caseIdsToLookup = new Set<string>()
+      notifications.forEach((notification: any) => {
+        if (notification.data) {
+          const data = typeof notification.data === 'string' 
+            ? JSON.parse(notification.data) 
+            : notification.data
+          
+          // If notification has case_id but no case_title, we need to look it up
+          if (data.case_id && !data.case_title) {
+            caseIdsToLookup.add(data.case_id)
+          }
+        }
+      })
+
+      // Look up case titles for notifications that need them
+      if (caseIdsToLookup.size > 0) {
+        const { data: casesData } = await supabase
+          .from('cases')
+          .select('id, title_en, title_ar')
+          .in('id', Array.from(caseIdsToLookup))
+
+        // Create a map of case ID to case title
+        const caseTitleMap = new Map<string, string>()
+        if (casesData) {
+          casesData.forEach((caseItem: any) => {
+            const caseTitle = caseItem.title_en || caseItem.title_ar || 'Unknown Case'
+            caseTitleMap.set(caseItem.id, caseTitle)
+          })
+        }
+
+        // Update notifications with case titles and regenerate messages if needed
+        notifications.forEach((notification: any) => {
+          if (notification.data) {
+            const data = typeof notification.data === 'string' 
+              ? JSON.parse(notification.data) 
+              : notification.data
+            
+            // If we have a case_id but no case_title, add it from the lookup
+            if (data.case_id && !data.case_title) {
+              const caseTitle = caseTitleMap.get(data.case_id) || 'Unknown Case'
+              data.case_title = caseTitle
+              // Update the notification data
+              notification.data = data
+              
+              // Regenerate message text if it contains "Unknown Case"
+              if (caseTitle !== 'Unknown Case' && (notification.message_en?.includes('Unknown Case') || notification.message_ar?.includes('Unknown Case'))) {
+                // Determine which template to use based on notification type
+                let template
+                if (notification.type === 'contribution_pending') {
+                  // Check if it's an admin notification (newContributionSubmitted) or donor notification (contributionPending)
+                  if (notification.message_en?.includes('A new contribution')) {
+                    template = NOTIFICATION_TEMPLATES.newContributionSubmitted
+                  } else {
+                    template = NOTIFICATION_TEMPLATES.contributionPending
+                  }
+                } else if (notification.type === 'contribution_approved') {
+                  template = NOTIFICATION_TEMPLATES.contributionApproved
+                } else if (notification.type === 'contribution_rejected') {
+                  template = NOTIFICATION_TEMPLATES.contributionRejected
+                }
+                
+                // Regenerate messages if we have a template and the required data
+                if (template && data.amount) {
+                  const placeholders: Record<string, string | number> = {
+                    amount: data.amount,
+                    caseTitle: caseTitle
+                  }
+                  
+                  if (data.rejection_reason) {
+                    placeholders.reason = data.rejection_reason
+                  }
+                  
+                  const content = createBilingualNotification(
+                    template.title_en,
+                    template.title_ar,
+                    template.message_en,
+                    template.message_ar,
+                    placeholders
+                  )
+                  
+                  // Update the notification messages
+                  notification.message_en = content.message_en
+                  notification.message_ar = content.message_ar
+                  // Also update legacy fields for backward compatibility
+                  notification.message = content.message_en
+                  notification.title_en = content.title_en
+                  notification.title_ar = content.title_ar
+                  notification.title = content.title_en
+                }
+              }
+            }
+          }
+        })
+      }
     }
 
     // Get unread count (for all notifications, not filtered)

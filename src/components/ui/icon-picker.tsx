@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getIconComponent, ICON_MAP } from '@/lib/icons/registry'
-import { X, Search } from 'lucide-react'
+import { X, MagnifyingGlass as Search } from '@phosphor-icons/react'
 
 export interface IconPickerProps {
   /**
@@ -106,7 +106,7 @@ export default function IconPicker({
           >
             {value && IconComponent ? (
               <>
-                <IconComponent className="h-4 w-4 mr-2" />
+                <IconComponent className="h-4 w-4 mr-2" weight="regular" />
                 {value}
               </>
             ) : (
@@ -117,7 +117,7 @@ export default function IconPicker({
         <PopoverContent className="w-80 p-4">
           <div className="mb-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" weight="regular" />
               <Input
                 type="text"
                 placeholder="Search icons..."
@@ -139,7 +139,7 @@ export default function IconPicker({
                   }`}
                   title={iconName}
                 >
-                  <IconComponent className="h-5 w-5 mx-auto" />
+                  <IconComponent className="h-5 w-5 mx-auto" weight="regular" />
                 </button>
               ))}
             </div>
@@ -169,10 +169,9 @@ export default function IconPicker({
           size="icon"
           onClick={handleClear}
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" weight="regular" />
         </Button>
       )}
     </div>
   )
 }
-

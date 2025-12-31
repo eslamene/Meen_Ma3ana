@@ -636,6 +636,7 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
           data: {
             contribution_id: contribution.id,
             case_id: caseId,
+            case_title: caseTitle,
             amount: amount
           },
           read: false

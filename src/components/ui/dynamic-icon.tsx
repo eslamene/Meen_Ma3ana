@@ -1,13 +1,12 @@
 'use client'
 
 import React from 'react'
-import { getIconComponent } from '@/lib/icons/registry'
-import { FileText } from 'lucide-react'
-import type { LucideProps } from 'lucide-react'
+import { getIconComponent, type IconProps } from '@/lib/icons/registry'
+import { FileText } from '@phosphor-icons/react'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
-export interface DynamicIconProps extends LucideProps {
+export interface DynamicIconProps extends IconProps {
   /**
    * Icon name (e.g., "camera", "home", "user")
    * Must match the exact icon name from the icon registry (case-sensitive)
@@ -16,7 +15,7 @@ export interface DynamicIconProps extends LucideProps {
   
   /**
    * Fallback icon name if the requested icon is not found
-   * @default "file-text"
+   * @default "FileText"
    */
   fallback?: string
 }
@@ -24,21 +23,21 @@ export interface DynamicIconProps extends LucideProps {
 /**
  * Dynamic Icon Component
  * 
- * Renders lucide-react icons dynamically by name string.
+ * Renders Phosphor Icons dynamically by name string.
  * Useful when icon names are stored in a database.
  * 
  * This component uses the centralized icon registry to resolve
- * icon names to their corresponding Lucide React components.
+ * icon names to their corresponding Phosphor icon components.
  * 
  * @example
  * ```tsx
- * <DynamicIcon name="camera" size={24} color="red" />
+ * <DynamicIcon name="Camera" size={24} color="red" />
  * <DynamicIcon name={menuItem.icon} className="h-4 w-4" />
  * ```
  */
 export default function DynamicIcon({
   name,
-  fallback = 'file-text',
+  fallback = 'FileText',
   ...props
 }: DynamicIconProps) {
   // Get the icon component from the registry
@@ -56,4 +55,3 @@ export default function DynamicIcon({
   
   return <IconComponent {...props} />
 }
-

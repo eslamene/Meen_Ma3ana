@@ -8,7 +8,7 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
     // Parse query parameters for filtering
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
+    const statusParams = searchParams.getAll('status')
     const search = searchParams.get('search')
 
     // Fetch all cases with beneficiary and category information
@@ -42,9 +42,13 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
       `)
       .order('created_at', { ascending: false })
 
-    // Apply status filter if provided
-    if (status && status !== 'all') {
-      query = query.eq('status', status)
+    // Apply status filter if provided (support multiple statuses)
+    if (statusParams.length > 0) {
+      // Filter out 'all' if present
+      const validStatuses = statusParams.filter(s => s !== 'all')
+      if (validStatuses.length > 0) {
+        query = query.in('status', validStatuses)
+      }
     }
 
     // Apply search filter if provided

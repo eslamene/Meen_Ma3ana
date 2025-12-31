@@ -36,7 +36,8 @@ import {
   FolderTree,
   Edit,
   FileText,
-  Sparkles
+  Sparkles,
+  Bell
 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import StandardModal, { StandardFormField } from '@/components/ui/standard-modal'
@@ -422,6 +423,11 @@ export default function SystemSettingsPage() {
                 label: 'AI Settings',
                 onClick: () => router.push(`/${locale}/admin/settings/ai`),
                 icon: Sparkles,
+              },
+              {
+                label: 'Notification Rules',
+                onClick: () => router.push(`/${locale}/admin/notifications`),
+                icon: Bell,
               },
               {
                 label: 'Add Config',

@@ -19,12 +19,21 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   if (getAll) {
     // Return all menu items for admin management - requires admin role
     // Check if user is authenticated and is admin
+    let authenticatedUser = user
+    
+    // If user is anonymous, try to get the actual user from Supabase
     if (user.id === 'anonymous') {
-      throw new ApiError('UNAUTHORIZED', 'Authentication required', 401)
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError || !authUser) {
+        throw new ApiError('UNAUTHORIZED', 'Authentication required', 401)
+      }
+      
+      authenticatedUser = { id: authUser.id, email: authUser.email }
     }
 
-    const hasAdminRole = await adminService.hasRole(user.id, 'admin') || 
-                         await adminService.hasRole(user.id, 'super_admin')
+    const hasAdminRole = await adminService.hasRole(authenticatedUser.id, 'admin') || 
+                         await adminService.hasRole(authenticatedUser.id, 'super_admin')
 
     if (!hasAdminRole) {
       throw new ApiError('FORBIDDEN', 'Admin access required', 403)

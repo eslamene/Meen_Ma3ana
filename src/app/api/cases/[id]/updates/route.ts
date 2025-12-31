@@ -3,6 +3,7 @@ import { createGetHandlerWithParams, createPostHandlerWithParams, ApiHandlerCont
 import { ApiError } from '@/lib/utils/api-errors'
 import { caseUpdateService } from '@/lib/case-updates'
 import { caseNotificationService } from '@/lib/notifications/case-notifications'
+import { createClient } from '@/lib/supabase/server'
 
 async function getHandler(
   request: NextRequest,
@@ -58,6 +59,38 @@ async function postHandler(
         newUpdate.updateType,
         user.id
       )
+
+      // Send push notifications to contributing users
+      try {
+        const { createClient: createSupabaseClient } = await import('@/lib/supabase/server')
+        const supabaseClient = await createSupabaseClient()
+        
+        // Get case details
+        const { data: caseData } = await supabaseClient
+          .from('cases')
+          .select('title_en, title_ar')
+          .eq('id', id)
+          .single()
+
+        if (caseData) {
+          // Get contributing users
+          const contributorUserIds = await caseNotificationService.getContributingUsers(id)
+
+          if (contributorUserIds.length > 0) {
+            const { fcmNotificationService } = await import('@/lib/notifications/fcm-notifications')
+            await fcmNotificationService.notifyCaseUpdated(
+              id,
+              caseData.title_en || '',
+              caseData.title_ar || undefined,
+              newUpdate.title,
+              contributorUserIds
+            )
+          }
+        }
+      } catch (pushError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error sending push notifications for case update:', pushError)
+        // Don't fail the request if push notification fails
+      }
     } catch (notificationError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error sending notification:', notificationError)
       // Don't fail the request if notification fails

@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import DynamicIcon from '@/components/ui/dynamic-icon'
 import { toast } from 'sonner'
@@ -37,6 +39,7 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   User,
   Users,
   Zap,
@@ -111,7 +114,10 @@ export default function AdminCasesPage() {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  // Default: all statuses except 'completed'
+  const [statusFilter, setStatusFilter] = useState<string[]>(['published', 'closed', 'under_review', 'draft', 'submitted'])
+  const [tempStatusFilter, setTempStatusFilter] = useState<string[]>(['published', 'closed', 'under_review', 'draft', 'submitted'])
+  const [statusFilterOpen, setStatusFilterOpen] = useState(false)
   const [sortBy, setSortBy] = useState('created_at_desc')
   const [stats, setStats] = useState({
     total: 0,
@@ -175,8 +181,11 @@ export default function AdminCasesPage() {
       
       // Build query parameters
       const params = new URLSearchParams()
-      if (statusFilter !== 'all') {
-        params.append('status', statusFilter)
+      if (statusFilter.length > 0) {
+        // Append multiple status parameters
+        statusFilter.forEach(status => {
+          params.append('status', status)
+        })
       }
       if (searchTerm) {
         params.append('search', searchTerm)
@@ -223,6 +232,13 @@ export default function AdminCasesPage() {
   useEffect(() => {
     fetchCases()
   }, [fetchCases])
+
+  // Sync temp filter when popover opens
+  useEffect(() => {
+    if (statusFilterOpen) {
+      setTempStatusFilter(statusFilter)
+    }
+  }, [statusFilterOpen, statusFilter])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -307,7 +323,7 @@ export default function AdminCasesPage() {
                          (title && title.toLowerCase().includes(searchLower)) ||
                          (description && description.toLowerCase().includes(searchLower))
     
-    const matchesStatus = statusFilter === 'all' || case_.status === statusFilter
+    const matchesStatus = statusFilter.length === 0 || statusFilter.includes(case_.status || '')
     return matchesSearch && matchesStatus
   }).sort((a, b) => {
     // Apply sorting based on sortBy state
@@ -810,20 +826,107 @@ export default function AdminCasesPage() {
                       />
                     </div>
                   </div>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-48 text-sm sm:text-base">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="published">Published</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                      <SelectItem value="under_review">Under Review</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="submitted">Submitted</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover open={statusFilterOpen} onOpenChange={setStatusFilterOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full sm:w-48 text-sm sm:text-base justify-between"
+                      >
+                        <span className="truncate">
+                          {statusFilter.length === 0
+                            ? 'No statuses'
+                            : statusFilter.length === 6
+                            ? 'All Statuses'
+                            : `${statusFilter.length} selected`}
+                        </span>
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-0" align="start">
+                      <div className="p-2">
+                        <div className="space-y-1">
+                          {[
+                            { value: 'published', label: 'Published' },
+                            { value: 'completed', label: 'Completed' },
+                            { value: 'closed', label: 'Closed' },
+                            { value: 'under_review', label: 'Under Review' },
+                            { value: 'draft', label: 'Draft' },
+                            { value: 'submitted', label: 'Submitted' }
+                          ].map((status) => (
+                            <div
+                              key={status.value}
+                              className="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-50"
+                            >
+                              <Checkbox
+                                id={`status-${status.value}`}
+                                checked={tempStatusFilter.includes(status.value)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setTempStatusFilter((prev) => [...prev, status.value])
+                                  } else {
+                                    setTempStatusFilter((prev) => prev.filter((s) => s !== status.value))
+                                  }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <label
+                                htmlFor={`status-${status.value}`}
+                                className="text-sm font-medium leading-none cursor-pointer flex-1 select-none"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  setTempStatusFilter((prev) => {
+                                    if (prev.includes(status.value)) {
+                                      return prev.filter((s) => s !== status.value)
+                                    } else {
+                                      return [...prev, status.value]
+                                    }
+                                  })
+                                }}
+                              >
+                                {status.label}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2 pt-2 border-t space-y-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full text-xs"
+                            onClick={() => {
+                              setTempStatusFilter(['published', 'closed', 'under_review', 'draft', 'submitted'])
+                            }}
+                          >
+                            Clear Completed
+                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => {
+                                setTempStatusFilter(statusFilter)
+                                setStatusFilterOpen(false)
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => {
+                                setStatusFilter(tempStatusFilter)
+                                setStatusFilterOpen(false)
+                                pagination.actions.reset()
+                              }}
+                            >
+                              Apply
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   <Select value={pagination.state.itemsPerPage.toString()} onValueChange={(value) => {
                     pagination.actions.setItemsPerPage(Number(value))
                     pagination.actions.reset()
@@ -870,7 +973,7 @@ export default function AdminCasesPage() {
                   <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">No cases found</h3>
                   <p className="text-gray-600 mb-6">
-                    {searchTerm || statusFilter !== 'all' 
+                    {searchTerm || (statusFilter.length > 0 && statusFilter.length < 6)
                       ? 'Try adjusting your filters to see more results'
                       : 'No cases have been created yet'
                     }
@@ -899,7 +1002,7 @@ export default function AdminCasesPage() {
                 {/* Results Info */}
                 <div className="mb-2 sm:mb-3 text-xs sm:text-sm text-gray-600 break-words">
                   Showing {pagination.state.startIndex + 1} to {Math.min(pagination.state.endIndex, filteredCases.length)} of {filteredCases.length} cases
-                  {(searchTerm || statusFilter !== 'all') && (
+                  {(searchTerm || (statusFilter.length > 0 && statusFilter.length < 6)) && (
                     <span className="ml-1 sm:ml-2">
                       (filtered from {cases.length} total)
                     </span>

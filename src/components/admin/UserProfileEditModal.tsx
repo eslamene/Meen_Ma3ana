@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 import { defaultLogger as logger } from '@/lib/logger'
+import { normalizePhoneNumber, extractCountryCode } from '@/lib/utils/phone'
 
 interface UserProfile {
   id: string
@@ -94,9 +95,13 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         email_verified: data.user.email_verified ?? false
       })
     } catch (error) {
-      logger.error('Error fetching user:', { error: error })
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load user profile'
+      logger.error('Error fetching user:', { 
+        error: errorMessage,
+        userId 
+      })
       toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to load user profile',
+        description: errorMessage,
       })
     } finally {
       setFetching(false)
@@ -138,9 +143,13 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       onSuccess()
       onClose()
     } catch (error) {
-      logger.error('Error updating user:', { error: error })
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update user profile'
+      logger.error('Error updating user:', { 
+        error: errorMessage,
+        userId 
+      })
       toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to update user profile',
+        description: errorMessage,
       })
     } finally {
       setLoading(false)
@@ -149,20 +158,25 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
 
   const formatPhoneForEmail = (phone: string): string => {
     if (!phone) return ''
-    let phoneForEmail = phone.trim().replace(/[\s\-\(\)]/g, '')
     
-    // Remove country code if present (+20, 0020, 20)
-    if (phoneForEmail.startsWith('+20')) {
-      phoneForEmail = phoneForEmail.substring(3)
-    } else if (phoneForEmail.startsWith('0020')) {
-      phoneForEmail = phoneForEmail.substring(4)
-    } else if (phoneForEmail.startsWith('20') && phoneForEmail.length > 10) {
-      phoneForEmail = phoneForEmail.substring(2)
-    }
-
-    // Ensure it starts with 0 if it's a 10-digit number starting with 1
-    if (phoneForEmail.length === 10 && phoneForEmail.startsWith('1')) {
-      phoneForEmail = '0' + phoneForEmail
+    // Use the phone utility functions for proper international handling
+    const normalizedPhone = normalizePhoneNumber(phone.trim(), '+20')
+    const { countryCode, number } = extractCountryCode(phone.trim(), '+20')
+    
+    // Format phone for email based on country code
+    let phoneForEmail: string
+    
+    if (countryCode === '+20') {
+      // Egyptian number: ensure it starts with 0 (e.g., 01012345678)
+      phoneForEmail = number.length === 10 && number.startsWith('1') 
+        ? '0' + number 
+        : number.startsWith('0') 
+          ? number 
+          : '0' + number
+    } else {
+      // International number: use the number part without country code
+      phoneForEmail = normalizedPhone.replace(/^\+\d{1,3}/, '')
+      phoneForEmail = phoneForEmail.replace(/^0+/, '')
     }
 
     return `${phoneForEmail}@ma3ana.org`
@@ -199,9 +213,14 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       // Refresh user data to show updated email
       await fetchUser()
     } catch (error) {
-      logger.error('Error updating email from phone:', { error: error })
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update email from phone'
+      logger.error('Error updating email from phone:', { 
+        error: errorMessage,
+        userId,
+        phone: formData.phone 
+      })
       toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to update email from phone'
+        description: errorMessage
       })
     } finally {
       setUpdatingEmail(false)
@@ -231,9 +250,13 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       onSuccess()
       onClose()
     } catch (error) {
-      logger.error('Error deleting user:', { error: error })
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete user'
+      logger.error('Error deleting user:', { 
+        error: errorMessage,
+        userId 
+      })
       toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to delete user',
+        description: errorMessage,
       })
     } finally {
       setDeleting(false)

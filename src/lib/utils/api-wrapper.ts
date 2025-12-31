@@ -187,7 +187,22 @@ export function withApiHandler(
 
       return await handler(request, context)
     } catch (error) {
-      logger.error('API handler error', { error })
+      // Convert error to proper Error instance before logging
+      let errorToLog: Error
+      if (error instanceof Error) {
+        errorToLog = error
+      } else if (error && typeof error === 'object') {
+        const errorObj = error as Record<string, unknown>
+        const message = errorObj.message as string | undefined
+        const code = errorObj.code as string | undefined
+        errorToLog = new Error(message || code || 'Unknown API handler error')
+        if (code) {
+          (errorToLog as any).code = code
+        }
+      } else {
+        errorToLog = new Error('Unknown API handler error')
+      }
+      logger.error('API handler error', errorToLog)
       return handleApiError(error, logger, correlationId)
     }
   }
@@ -358,7 +373,22 @@ export function withApiHandlerWithParams<T extends Record<string, string> = Reco
 
       return await handler(request, context, params)
     } catch (error) {
-      logger.error('API handler error', { error })
+      // Convert error to proper Error instance before logging
+      let errorToLog: Error
+      if (error instanceof Error) {
+        errorToLog = error
+      } else if (error && typeof error === 'object') {
+        const errorObj = error as Record<string, unknown>
+        const message = errorObj.message as string | undefined
+        const code = errorObj.code as string | undefined
+        errorToLog = new Error(message || code || 'Unknown API handler error')
+        if (code) {
+          (errorToLog as any).code = code
+        }
+      } else {
+        errorToLog = new Error('Unknown API handler error')
+      }
+      logger.error('API handler error', errorToLog)
       return handleApiError(error, logger, correlationId)
     }
   }

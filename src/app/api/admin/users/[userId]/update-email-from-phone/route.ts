@@ -4,6 +4,7 @@ import { ApiError } from '@/lib/utils/api-errors'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createClient } from '@supabase/supabase-js'
 import { env } from '@/config/env'
+import { normalizePhoneNumber, extractCountryCode } from '@/lib/utils/phone'
 
 /**
  * POST /api/admin/users/[userId]/update-email-from-phone
@@ -71,21 +72,26 @@ async function postHandler(
     }
 
     // Generate email from phone number: {phone}@ma3ana.org
-    // Format phone for email (remove country code, ensure starts with 0)
-    let phoneForEmail = userProfile.phone.trim().replace(/[\s\-\(\)]/g, '')
+    // Normalize phone and extract number part for email
+    const normalizedPhone = normalizePhoneNumber(userProfile.phone.trim(), '+20')
+    const { countryCode, number } = extractCountryCode(userProfile.phone.trim(), '+20')
     
-    // Remove country code if present (+20, 0020, 20)
-    if (phoneForEmail.startsWith('+20')) {
-      phoneForEmail = phoneForEmail.substring(3)
-    } else if (phoneForEmail.startsWith('0020')) {
-      phoneForEmail = phoneForEmail.substring(4)
-    } else if (phoneForEmail.startsWith('20') && phoneForEmail.length > 10) {
-      phoneForEmail = phoneForEmail.substring(2)
-    }
-
-    // Ensure it starts with 0 if it's a 10-digit number starting with 1
-    if (phoneForEmail.length === 10 && phoneForEmail.startsWith('1')) {
-      phoneForEmail = '0' + phoneForEmail
+    // Format phone for email based on country code
+    let phoneForEmail: string
+    
+    if (countryCode === '+20') {
+      // Egyptian number: ensure it starts with 0 (e.g., 01012345678)
+      phoneForEmail = number.length === 10 && number.startsWith('1') 
+        ? '0' + number 
+        : number.startsWith('0') 
+          ? number 
+          : '0' + number
+    } else {
+      // International number: use the number part without country code
+      // Remove country code from normalized phone
+      phoneForEmail = normalizedPhone.replace(/^\+\d{1,3}/, '')
+      // Remove leading zeros for international numbers
+      phoneForEmail = phoneForEmail.replace(/^0+/, '')
     }
 
     const newEmail = `${phoneForEmail}@ma3ana.org`

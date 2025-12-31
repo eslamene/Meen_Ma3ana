@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/auth/AuthProvider'
 import LocaleProvider from '@/components/LocaleProvider'
 import { LayoutProvider } from '@/components/layout/LayoutProvider'
 import PageLayout from '@/components/layout/PageLayout'
+import { PushNotificationProvider } from '@/components/notifications/PushNotificationProvider'
 
 export const metadata: Metadata = {
   title: 'Meen Ma3ana - Charity Platform',
@@ -34,6 +35,7 @@ export default async function LocaleLayout({
             <PageLayout>
               {children}
             </PageLayout>
+            <PushNotificationProvider />
           </LayoutProvider>
         </AuthProvider>
       </LocaleProvider>

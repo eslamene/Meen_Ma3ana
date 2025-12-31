@@ -36,6 +36,10 @@ const envSchema = z.object({
   
   // Google Gemini API (alternative for AI content generation)
   GOOGLE_GEMINI_API_KEY: z.string().optional(),
+  
+  // Firebase Cloud Messaging (FCM)
+  FIREBASE_SERVER_KEY: z.string().optional(), // Firebase Server Key for FCM
+  NEXT_PUBLIC_FIREBASE_CONFIG: z.string().optional(), // Firebase config JSON string
 })
 
 /**
@@ -55,6 +59,8 @@ function parseEnv() {
       LIBRETRANSLATE_URL: process.env.LIBRETRANSLATE_URL,
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
       GOOGLE_GEMINI_API_KEY: process.env.GOOGLE_GEMINI_API_KEY,
+      FIREBASE_SERVER_KEY: process.env.FIREBASE_SERVER_KEY,
+      NEXT_PUBLIC_FIREBASE_CONFIG: process.env.NEXT_PUBLIC_FIREBASE_CONFIG,
     })
   } catch (error) {
     if (error instanceof z.ZodError) {

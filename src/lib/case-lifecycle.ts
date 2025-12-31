@@ -80,6 +80,22 @@ const STATUS_TRANSITIONS: StatusTransition[] = [
     allowedRoles: ['admin'],
     requiresReason: true,
     systemAllowed: false
+  },
+  // Closed -> Published (reopen case by admin)
+  {
+    from: 'closed',
+    to: 'published',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
+  },
+  // Closed -> Under Review (by admin)
+  {
+    from: 'closed',
+    to: 'under_review',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
   }
 ]
 
@@ -135,7 +151,7 @@ export class CaseLifecycleService {
     const { caseId, newStatus, changedBy, systemTriggered = false, changeReason } = params
 
     try {
-      // Get current case
+      // Get current case status from database FIRST (always get actual status)
       const [currentCase] = await db
         .select()
         .from(cases)
@@ -144,6 +160,24 @@ export class CaseLifecycleService {
       if (!currentCase) {
         return { success: false, error: 'Case not found' }
       }
+      
+      // Get the ACTUAL current status from database (not from request)
+      const actualCurrentStatus = currentCase.status
+      
+      // Normalize UI statuses to database statuses
+      // UI might send: "active", "completed", "cancelled"
+      // Database has: "draft", "submitted", "published", "closed", "under_review"
+      const statusMapping: Record<string, string> = {
+        'completed': 'closed',
+        'cancelled': 'closed',
+        'active': 'published', // "active" likely means published/active case
+      }
+      
+      // Normalize new status from UI to database status
+      const normalizedStatus = statusMapping[newStatus] || newStatus
+      
+      // Normalize current status if needed (shouldn't be necessary if DB is correct, but handle edge cases)
+      const normalizedCurrentStatus = statusMapping[actualCurrentStatus] || actualCurrentStatus
 
       // Get user role if provided
       let userRole: string | undefined
@@ -155,45 +189,45 @@ export class CaseLifecycleService {
         userRole = user?.role
       }
 
-      // Validate transition
+      // Validate transition (using normalized statuses)
       if (!this.isTransitionAllowed(
-        currentCase.status as CaseStatus,
-        newStatus,
+        normalizedCurrentStatus as CaseStatus,
+        normalizedStatus as CaseStatus,
         userRole,
         systemTriggered
       )) {
         return { success: false, error: 'Invalid status transition' }
       }
 
-      // Check if reason is required
-      if (this.requiresReason(currentCase.status as CaseStatus, newStatus) && !changeReason) {
+      // Check if reason is required (using normalized statuses)
+      if (this.requiresReason(normalizedCurrentStatus as CaseStatus, normalizedStatus as CaseStatus) && !changeReason) {
         return { success: false, error: 'Reason is required for this status change' }
       }
 
-      // Update case status
+      // Update case status (using normalized status)
       await db
         .update(cases)
         .set({
-          status: newStatus,
+          status: normalizedStatus as CaseStatus,
           updated_at: new Date()
         })
         .where(eq(cases.id, caseId))
 
-      // Record status change in history
+      // Record status change in history (store normalized statuses)
       await db.insert(caseStatusHistory).values({
         case_id: caseId,
-        previous_status: currentCase.status as CaseStatus,
-        new_status: newStatus,
+        previous_status: normalizedCurrentStatus as CaseStatus,
+        new_status: normalizedStatus as CaseStatus,
         changed_by: changedBy,
         system_triggered: systemTriggered,
         change_reason: changeReason
       })
 
-      // Create case update for status change
+      // Create case update for status change (use normalized statuses)
       try {
         const statusUpdateInfo = this.getStatusUpdateInfo(
-          currentCase.status as CaseStatus,
-          newStatus,
+          normalizedCurrentStatus as CaseStatus,
+          normalizedStatus as CaseStatus,
           systemTriggered,
           changeReason
         )
@@ -219,16 +253,149 @@ export class CaseLifecycleService {
         .from(cases)
         .where(eq(cases.id, caseId))
 
-      // Send notifications
-      await this.sendStatusChangeNotifications({
+      // Send push notifications based on notification rules
+      defaultLogger.info('Checking notification rules for status change', {
         caseId,
-        caseTitle: currentCase.title_en || currentCase.title_ar || 'Untitled',
-        oldStatus: currentCase.status as CaseStatus,
-        newStatus,
-        changedBy,
-        changeReason,
-        systemTriggered
+        originalStatus: newStatus,
+        normalizedStatus,
+        oldStatus: normalizedCurrentStatus,
       })
+      
+      try {
+        // Import notification services
+        const { fcmNotificationService } = await import('@/lib/notifications/fcm-notifications')
+        const { caseNotificationService } = await import('@/lib/notifications/case-notifications')
+        const { NotificationRulesService } = await import('@/lib/notifications/notification-rules')
+        
+        const caseTitle = currentCase.title_en || currentCase.title_ar || 'Untitled'
+        const caseTitleAr = currentCase.title_ar || currentCase.title_en || undefined
+        
+        // Get user role for context
+        let userRole: string | undefined
+        if (changedBy) {
+          const [user] = await db
+            .select({ role: users.role })
+            .from(users)
+            .where(eq(users.id, changedBy))
+          userRole = user?.role
+        }
+        
+        // Check for matching notification rules using new dynamic system
+        const matchingRules = await NotificationRulesService.getMatchingRules('field_changed', {
+          field: 'status',
+          fromValue: normalizedCurrentStatus,
+          toValue: normalizedStatus,
+          caseData: currentCase,
+          userRole,
+          userId: changedBy,
+        })
+        
+        // Also check for case_created event if status changed to published
+        if (normalizedStatus === 'published') {
+          const createdRules = await NotificationRulesService.getMatchingRules('case_created', {
+            caseData: currentCase,
+            userRole,
+            userId: changedBy,
+          })
+          matchingRules.push(...createdRules)
+        }
+        
+        if (matchingRules.length === 0) {
+          defaultLogger.info('No matching notification rules found, skipping notification', {
+            caseId,
+            statusFrom: normalizedCurrentStatus,
+            statusTo: normalizedStatus,
+          })
+        } else {
+          defaultLogger.info('Found matching notification rules', {
+            caseId,
+            ruleCount: matchingRules.length,
+            ruleIds: matchingRules.map(r => r.id),
+          })
+          
+          // Process each matching rule
+          for (const rule of matchingRules) {
+            const targets = NotificationRulesService.getNotificationTargets(rule)
+            
+            if (targets.notifyAllUsers) {
+              // Broadcast to all users
+              if (normalizedStatus === 'published') {
+                await fcmNotificationService.notifyCaseCreated(caseId, caseTitle, caseTitleAr)
+              } else if (normalizedStatus === 'closed') {
+                await fcmNotificationService.notifyCaseCompleted(caseId, caseTitle, caseTitleAr)
+              } else {
+                // For other status changes, use status changed notification
+                await fcmNotificationService.notifyCaseStatusChanged(
+                  caseId,
+                  caseTitle,
+                  caseTitleAr,
+                  normalizedCurrentStatus,
+                  normalizedStatus,
+                  currentCase.created_by,
+                  [] // Empty array means notify all (handled by service)
+                )
+              }
+            } else {
+              // Get specific user IDs based on targets
+              const allNotifyUserIds: string[] = []
+              
+              if (rule.targets.notifyCreator && currentCase.created_by) {
+                allNotifyUserIds.push(currentCase.created_by)
+              }
+              
+              if (rule.targets.notifyContributors) {
+                const contributorUserIds = await caseNotificationService.getContributingUsers(caseId)
+                allNotifyUserIds.push(...contributorUserIds)
+              }
+              
+              if (rule.targets.notifyChangeInitiator && changedBy) {
+                allNotifyUserIds.push(changedBy)
+              }
+              
+              if (rule.targets.notifyAssignedTo && currentCase.assigned_to) {
+                allNotifyUserIds.push(currentCase.assigned_to)
+              }
+              
+              if (rule.targets.notifySpecificUsers) {
+                allNotifyUserIds.push(...rule.targets.notifySpecificUsers)
+              }
+              
+              // Remove duplicates
+              const uniqueUserIds = [...new Set(allNotifyUserIds)].filter(
+                (id): id is string => id !== null && id !== undefined
+              )
+              
+              if (uniqueUserIds.length > 0) {
+                await fcmNotificationService.notifyCaseStatusChanged(
+                  caseId,
+                  caseTitle,
+                  caseTitleAr,
+                  normalizedCurrentStatus,
+                  normalizedStatus,
+                  currentCase.created_by,
+                  uniqueUserIds
+                )
+              }
+            }
+          }
+        }
+        
+        defaultLogger.info('FCM notification sent successfully', { caseId, originalStatus: newStatus, normalizedStatus })
+      } catch (pushError) {
+        // Log detailed error information
+        const errorMessage = pushError instanceof Error ? pushError.message : String(pushError)
+        const errorStack = pushError instanceof Error ? pushError.stack : undefined
+        defaultLogger.error('Error sending FCM notifications for status change:', {
+          error: pushError,
+          caseId,
+          originalStatus: newStatus,
+          normalizedStatus,
+          message: errorMessage,
+          stack: errorStack,
+          errorType: pushError instanceof Error ? pushError.constructor.name : typeof pushError,
+        })
+        // Don't fail the status change if push notification fails
+      }
 
       return { success: true, case: updatedCase }
     } catch (error) {

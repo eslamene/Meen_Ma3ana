@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { notifications, cases } from '@/drizzle/schema'
+import { notifications, cases, contributions } from '@/drizzle/schema'
 import { eq, and, desc } from 'drizzle-orm'
 
 import { defaultLogger } from '@/lib/logger'
@@ -160,30 +160,36 @@ export class CaseNotificationService {
   }
 
   /**
-   * Get users who should be notified about case updates
+   * Get users who should be notified about case updates (contributors only)
    */
-  private async getUsersToNotify(caseId: string): Promise<string[]> {
+  async getContributingUsers(caseId: string): Promise<string[]> {
     try {
-      // Get case creator
-      const [caseData] = await db
+      // Get all unique users who have contributed to this case
+      const contributors = await db
         .select({
-          created_by: cases.created_by,
+          donor_id: contributions.donor_id,
         })
-        .from(cases)
-        .where(eq(cases.id, caseId))
+        .from(contributions)
+        .where(eq(contributions.case_id, caseId))
 
-      if (!caseData) return []
+      // Filter out null values and return unique user IDs
+      const userIds = contributors
+        .map((c) => c.donor_id)
+        .filter((id): id is string => id !== null && id !== undefined)
 
-      const usersToNotify = [caseData.created_by]
-
-      // TODO: Add logic to get contributors and followers
-      // For now, just notify the case creator
-
-      return usersToNotify
+      return [...new Set(userIds)] // Remove duplicates
     } catch (error) {
-      defaultLogger.error('Error getting users to notify:', error)
+      defaultLogger.error('Error getting contributing users:', error)
       return []
     }
+  }
+
+  /**
+   * Get users who should be notified about case updates
+   * @deprecated Use getContributingUsers for case updates
+   */
+  private async getUsersToNotify(caseId: string): Promise<string[]> {
+    return this.getContributingUsers(caseId)
   }
 
   /**

@@ -3,6 +3,7 @@ import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
 import { createClient } from '@supabase/supabase-js'
 import { env } from '@/config/env'
+import { normalizePhoneNumber, extractCountryCode } from '@/lib/utils/phone'
 
 /**
  * GET /api/admin/users/next-contributor-email
@@ -66,21 +67,26 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
 
     // If phone is provided, generate phone-based email
     if (phone) {
-      // Clean phone number for email (remove spaces, dashes, parentheses, and country code)
-      let phoneForEmail = phone.replace(/[\s\-\(\)]/g, '')
+      // Normalize phone and extract number part for email
+      const normalizedPhone = normalizePhoneNumber(phone.trim(), '+20')
+      const { countryCode, number } = extractCountryCode(phone.trim(), '+20')
       
-      // Remove country code if present (+20, 0020, 20)
-      if (phoneForEmail.startsWith('+20')) {
-        phoneForEmail = phoneForEmail.substring(3)
-      } else if (phoneForEmail.startsWith('0020')) {
-        phoneForEmail = phoneForEmail.substring(4)
-      } else if (phoneForEmail.startsWith('20') && phoneForEmail.length > 10) {
-        phoneForEmail = phoneForEmail.substring(2)
-      }
-
-      // Ensure it starts with 0 if it's a 10-digit number starting with 1
-      if (phoneForEmail.length === 10 && phoneForEmail.startsWith('1')) {
-        phoneForEmail = '0' + phoneForEmail
+      // Format phone for email based on country code
+      let phoneForEmail: string
+      
+      if (countryCode === '+20') {
+        // Egyptian number: ensure it starts with 0 (e.g., 01012345678)
+        phoneForEmail = number.length === 10 && number.startsWith('1') 
+          ? '0' + number 
+          : number.startsWith('0') 
+            ? number 
+            : '0' + number
+      } else {
+        // International number: use the number part without country code
+        // Remove country code from normalized phone
+        phoneForEmail = normalizedPhone.replace(/^\+\d{1,3}/, '')
+        // Remove leading zeros for international numbers
+        phoneForEmail = phoneForEmail.replace(/^0+/, '')
       }
 
       const phoneEmail = `${phoneForEmail}@ma3ana.org`

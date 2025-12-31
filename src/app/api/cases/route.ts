@@ -477,6 +477,9 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
       // Don't fail the request if case update creation fails
     }
 
+    // Note: Push notifications are now sent when case status changes to "published" or "closed"
+    // instead of when the case is first created
+
     return NextResponse.json({
       case: {
         id: newCase.id,

@@ -91,15 +91,25 @@ export async function getPublicNavItemsFromDB(
       if (metadata.isHashLink) {
         // Hash links work on landing page, navigate to landing on other pages
         if (!isLandingPage) {
-          href = `/${locale}/landing${item.href}`
+          // Only prepend landing path if href doesn't already include it
+          // Hash links are like #features, #contact, etc.
+          if (href.startsWith('#')) {
+            href = `/${locale}/landing${href}`
+          } else if (!href.includes('/landing')) {
+            href = `/${locale}/landing${href}`
+          } else {
+            // Already has /landing, just ensure locale is correct
+            href = normalizeLandingPath(href, locale)
+          }
         }
       } else {
         // Regular links - add locale if not present
         if (!href.startsWith('/')) href = `/${href}`
         
-        // Only normalize landing page hrefs using utility function
-        // This handles cases like /, /landing, /landing/landing, /en/landing/landing, etc.
-        if (href.includes('/landing') || href === '/' || href === '') {
+        // Normalize landing page hrefs - handle /, /landing, /landing/landing, etc.
+        // Also handle cases where database has /landing but should be /{locale}/landing
+        if (href === '/' || href === '/landing' || href.includes('/landing')) {
+          // Use normalizeLandingPath to handle all edge cases
           href = normalizeLandingPath(href, locale)
         } else {
           // For other paths (like /cases), ensure locale is prepended if not already present

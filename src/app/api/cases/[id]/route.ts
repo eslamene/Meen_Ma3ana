@@ -6,6 +6,7 @@ import { eq, and, desc } from 'drizzle-orm'
 import { createPatchHandlerWithParams, createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
 import { isValidUUID } from '@/lib/utils/uuid'
+import { CaseLifecycleService } from '@/lib/case-lifecycle'
 
 async function patchHandler(
   request: NextRequest,
@@ -64,7 +65,68 @@ async function patchHandler(
       }
     }
 
-    // Handle other fields if provided
+    // Handle status changes separately using CaseLifecycleService to ensure proper notifications
+    let statusChanged = false
+    let statusChangeError: string | null = null
+    if (body.status !== undefined) {
+      // Always get current status from database first (don't trust request body)
+      const { data: currentCase } = await supabase
+        .from('cases')
+        .select('status')
+        .eq('id', id)
+        .single()
+
+      if (currentCase) {
+        // Normalize UI statuses to database statuses
+        const statusMapping: Record<string, string> = {
+          'completed': 'closed',
+          'cancelled': 'closed',
+          'active': 'published',
+        }
+        const normalizedNewStatus = statusMapping[body.status] || body.status
+        const normalizedCurrentStatus = statusMapping[currentCase.status] || currentCase.status
+        
+        // Only attempt status change if it's actually different
+        if (normalizedCurrentStatus !== normalizedNewStatus) {
+          logger.info('Status change detected, using CaseLifecycleService', {
+            caseId: id,
+            fromStatus: currentCase.status, // Log actual DB status
+            normalizedFromStatus: normalizedCurrentStatus,
+            toStatus: body.status, // Log UI status
+            normalizedToStatus: normalizedNewStatus,
+            userId: user.id
+          })
+          
+          // Use CaseLifecycleService for status changes to ensure proper push notifications
+          // Pass the normalized status
+          const statusResult = await CaseLifecycleService.changeCaseStatus({
+            caseId: id,
+            newStatus: normalizedNewStatus as any,
+            changedBy: user.id,
+            changeReason: 'Case updated via API',
+            systemTriggered: false,
+          })
+
+          if (!statusResult.success) {
+            // Log the error but don't fail the entire request - allow other fields to be updated
+            logger.logStableError('INTERNAL_SERVER_ERROR', 'Error changing case status', { 
+              error: statusResult.error,
+              caseId: id,
+              fromStatus: currentCase.status,
+              toStatus: body.status,
+              userId: user.id
+            })
+            statusChangeError = statusResult.error || 'Failed to change case status'
+            // Don't throw - allow other updates to proceed
+          } else {
+            statusChanged = true
+          }
+        }
+        // If status is the same, no need to do anything
+      }
+    }
+
+    // Handle other fields if provided (excluding status if it was already changed via lifecycle service)
     if (body.title_en !== undefined) updateData.title_en = body.title_en
     if (body.title_ar !== undefined) updateData.title_ar = body.title_ar
     if (body.description_en !== undefined) updateData.description_en = body.description_en
@@ -73,14 +135,19 @@ async function patchHandler(
     if (body.title !== undefined && body.title_en === undefined) updateData.title_en = body.title
     if (body.description !== undefined && body.description_en === undefined) updateData.description_en = body.description
     if (body.targetAmount !== undefined) updateData.target_amount = parseFloat(body.targetAmount)
-    if (body.status !== undefined) updateData.status = body.status
+    // Only include status in updateData if it wasn't changed via lifecycle service
+    // Also skip if status change was attempted but failed (to prevent bypassing validation)
+    if (body.status !== undefined && !statusChanged && !statusChangeError) {
+      // Status is the same as current, so it's safe to include (though it won't change anything)
+      updateData.status = body.status
+    }
     if (body.priority !== undefined) updateData.priority = body.priority
     if (body.location !== undefined) updateData.location = body.location
     if (body.beneficiaryName !== undefined) updateData.beneficiary_name = body.beneficiaryName
     if (body.beneficiaryContact !== undefined) updateData.beneficiary_contact = body.beneficiaryContact
     if (body.category_id !== undefined) updateData.category_id = body.category_id
 
-    // Update the case only if there are fields to update
+    // Update the case only if there are fields to update (excluding status if it was handled separately)
     if (Object.keys(updateData).length > 1) { // More than just updated_at
       const { error: updateError } = await supabase
         .from('cases')
@@ -91,6 +158,47 @@ async function patchHandler(
         logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating case', { error: updateError })
         throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to update case: ${updateError.message}`, 500)
       }
+
+      // Send push notifications to contributing users when a case is updated (but not for status changes, which are handled by lifecycle service)
+      if (!statusChanged) {
+        try {
+          // Get case details for notification
+          const { data: caseData } = await supabase
+            .from('cases')
+            .select('title_en, title_ar')
+            .eq('id', id)
+            .single()
+
+          if (caseData) {
+            // Get contributing users
+            const { caseNotificationService } = await import('@/lib/notifications/case-notifications')
+            const contributorUserIds = await caseNotificationService.getContributingUsers(id)
+
+            if (contributorUserIds.length > 0) {
+              const { fcmNotificationService } = await import('@/lib/notifications/fcm-notifications')
+              await fcmNotificationService.notifyCaseUpdated(
+                id,
+                caseData.title_en || '',
+                caseData.title_ar || undefined,
+                'Case has been updated',
+                contributorUserIds
+              )
+            }
+          }
+        } catch (notificationError) {
+          logger.logStableError('INTERNAL_SERVER_ERROR', 'Error sending push notifications for case update:', notificationError)
+          // Don't fail the request if push notification fails
+        }
+      }
+    }
+
+    // Return response with status change error if applicable
+    if (statusChangeError) {
+      return NextResponse.json({
+        message: 'Case updated successfully, but status change failed',
+        error: statusChangeError,
+        statusChangeFailed: true
+      }, { status: 200 }) // Return 200 but include error info
     }
 
     return NextResponse.json({

@@ -207,12 +207,25 @@ export class Logger {
       
       if (error instanceof Error) {
         const errorData: Record<string, unknown> = {}
-        if (error.name) errorData.name = error.name
-        if (error.message) errorData.message = error.message
-        if (error.stack) errorData.stack = error.stack
-        // Only add error object if it has at least one property
+        // Only extract non-empty properties
+        if (error.name && String(error.name).trim().length > 0) {
+          errorData.name = error.name
+        }
+        if (error.message && String(error.message).trim().length > 0) {
+          errorData.message = error.message
+        }
+        if (error.stack && String(error.stack).trim().length > 0) {
+          errorData.stack = error.stack
+        }
+        // Only add error object if it has at least one property with actual content
         if (Object.keys(errorData).length > 0) {
           logData.error = errorData
+        } else {
+          // Error instance has no meaningful properties - add a generic error message instead
+          logData.error = {
+            message: message || 'An error occurred but no error details were available',
+            note: 'Error object had no extractable properties'
+          }
         }
       } else if (error) {
         // Handle error-like objects (e.g., Supabase errors)
@@ -270,6 +283,49 @@ export class Logger {
         logData.message = message || 'Unknown error'
       }
       
+      // Final safety check: never log an empty object or object with only empty error
+      const hasValidMessage = logData.message && String(logData.message).trim().length > 0
+      const hasValidError = logData.error && 
+                            typeof logData.error === 'object' && 
+                            Object.keys(logData.error as Record<string, unknown>).length > 0
+      const hasOtherData = Object.keys(logData).some(key => 
+        key !== 'error' && 
+        key !== 'message' && 
+        logData[key] !== undefined && 
+        logData[key] !== null
+      )
+      
+      // Additional check: ensure error object is not empty
+      if (logData.error && typeof logData.error === 'object') {
+        const errorKeys = Object.keys(logData.error as Record<string, unknown>)
+        if (errorKeys.length === 0) {
+          delete logData.error
+        }
+      }
+      
+      if (!hasValidMessage && !hasValidError && !hasOtherData) {
+        // This should never happen, but if it does, log a safe fallback
+        logger.error({ 
+          message: message || 'Unknown error occurred', 
+          note: 'Empty logData prevented',
+          timestamp: new Date().toISOString()
+        })
+        return
+      }
+      
+      // Final check: ensure we never pass an empty object to console.error
+      const finalKeys = Object.keys(logData)
+      if (finalKeys.length === 0 || (finalKeys.length === 1 && !logData.message)) {
+        // Last resort: create a safe log entry
+        logData.message = message || 'An error occurred (empty log data prevented)'
+        logData.timestamp = new Date().toISOString()
+      }
+      
+      // Ensure message exists even if error doesn't
+      if (!hasValidMessage) {
+        logData.message = message || 'An error occurred'
+      }
+      
       logger.error(logData)
     } catch (loggerError) {
       // Fallback to console if logger worker fails
@@ -307,7 +363,34 @@ export class Logger {
   // Log stable error with correlation ID
   logStableError(errorType: keyof typeof Logger.ERROR_MESSAGES, error?: Error | unknown, data?: unknown): void {
     const stableMessage = Logger.ERROR_MESSAGES[errorType]
-    this.error(stableMessage, error, data)
+    
+    // Convert error to proper Error instance if needed
+    let errorToLog: Error | undefined = undefined
+    if (error instanceof Error) {
+      errorToLog = error
+    } else if (error && typeof error === 'object') {
+      const errorObj = error as Record<string, unknown>
+      const message = errorObj.message as string | undefined
+      const code = errorObj.code as string | undefined
+      
+      if (message && message.trim()) {
+        errorToLog = new Error(message)
+      } else if (code) {
+        errorToLog = new Error(`Error code: ${code}`)
+      } else if (Object.keys(errorObj).length > 0) {
+        // Has properties but no message/code - create error with stringified object
+        errorToLog = new Error(`Error: ${JSON.stringify(errorObj)}`)
+      }
+      // If errorObj is empty, errorToLog remains undefined
+    }
+    
+    // Only call error if we have a valid error to log
+    if (errorToLog) {
+      this.error(stableMessage, errorToLog, data)
+    } else {
+      // No valid error - just log the stable message with data
+      this.error(stableMessage, undefined, data)
+    }
   }
 }
 

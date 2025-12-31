@@ -9,9 +9,6 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@heroui/react', '@heroui/theme'],
   // Exclude packages that should only run on server
   serverExternalPackages: ['pino', 'pino-pretty', 'thread-stream'],
-  experimental: {
-    serverComponentsExternalPackages: ['pino', 'pino-pretty', 'thread-stream'],
-  },
   // Security headers
   async headers() {
     return [
