@@ -322,7 +322,7 @@ export default function ContributorsReport() {
                                       variant="outline"
                                       size="sm"
                                       onClick={() =>
-                                        router.push(`/${params.locale}/case-management/cases/${contribution.caseId}`)
+                                        router.push(`/${params.locale}/cases/${contribution.caseId}`)
                                       }
                                     >
                                       <Eye className="h-3 w-3 mr-1" />

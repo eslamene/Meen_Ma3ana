@@ -182,7 +182,7 @@ export default function CasePerformanceReport() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/${params.locale}/case-management/cases/${caseItem.caseId}`)}
+                      onClick={() => router.push(`/${params.locale}/cases/${caseItem.caseId}`)}
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       View
