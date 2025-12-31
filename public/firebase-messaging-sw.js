@@ -60,7 +60,7 @@ messaging.onBackgroundMessage((payload) => {
     console.error('❌ [SW] Error matching clients:', error)
   })
   
-  // Also show native notification (for when app is in background or no clients)
+  // Show native notification (browser will suppress if tab is active, but will show if tab is in background or closed)
   const notificationTitle = payload.notification?.title || 'Meen Ma3ana'
   const notificationOptions = {
     body: payload.notification?.body || '',
@@ -73,8 +73,16 @@ messaging.onBackgroundMessage((payload) => {
     silent: false,
   }
 
-  console.log('🔔 [SW] Showing native notification:', notificationTitle)
-  self.registration.showNotification(notificationTitle, notificationOptions)
+  console.log('🔔 [SW] Attempting to show native notification:', notificationTitle)
+  console.log('🔔 [SW] Note: Browser may suppress native notification if tab is active/focused')
+  console.log('🔔 [SW] Native notifications will appear when: tab is in background, browser is minimized, or tab is closed')
+  
+  // Always try to show native notification - browser will handle suppression
+  self.registration.showNotification(notificationTitle, notificationOptions).then(() => {
+    console.log('✅ [SW] Native notification shown successfully')
+  }).catch((error) => {
+    console.error('❌ [SW] Failed to show native notification:', error)
+  })
 })
 
 // Handle notification clicks
@@ -207,7 +215,7 @@ self.addEventListener('push', (event) => {
         console.log('🔔 [SW] No clients open, will show native notification only')
       }
       
-      // Also show notification
+      // Also show notification (browser will suppress if tab is active)
       const notificationTitle = payload.notification?.title || payload.data?.title || 'Meen Ma3ana'
       const notificationOptions = {
         body: payload.notification?.body || payload.data?.body || '',
@@ -220,8 +228,14 @@ self.addEventListener('push', (event) => {
         silent: false,
       }
       
-      console.log('🔔 [SW] Showing native notification from push event:', notificationTitle)
-      return self.registration.showNotification(notificationTitle, notificationOptions)
+      console.log('🔔 [SW] Attempting to show native notification from push event:', notificationTitle)
+      console.log('🔔 [SW] Note: Browser may suppress native notification if tab is active/focused')
+      
+      return self.registration.showNotification(notificationTitle, notificationOptions).then(() => {
+        console.log('✅ [SW] Native notification shown successfully from push event')
+      }).catch((error) => {
+        console.error('❌ [SW] Failed to show native notification from push event:', error)
+      })
     }).catch((error) => {
       console.error('❌ [SW] Error in push event handler:', error)
     })

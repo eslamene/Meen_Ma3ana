@@ -15,6 +15,8 @@ export default function TestPushPage() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [debugInfo, setDebugInfo] = useState<Record<string, any>>({})
   const [logs, setLogs] = useState<string[]>([])
+  const [diagnostics, setDiagnostics] = useState<Record<string, any> | null>(null)
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(false)
 
   // Collect debug information
   useEffect(() => {
@@ -340,6 +342,41 @@ export default function TestPushPage() {
               )}
             </div>
 
+            <Button
+              variant="outline"
+              onClick={async () => {
+                setLoadingDiagnostics(true)
+                try {
+                  const response = await fetch('/api/push/diagnostics')
+                  const data = await response.json()
+                  setDiagnostics(data)
+                  toast.success('Diagnostics Complete', {
+                    description: 'Check the Diagnostics section below for details',
+                  })
+                } catch (error: any) {
+                  toast.error('Diagnostics Failed', {
+                    description: error.message || 'Failed to run diagnostics',
+                  })
+                } finally {
+                  setLoadingDiagnostics(false)
+                }
+              }}
+              disabled={loadingDiagnostics}
+              className="flex items-center gap-2"
+            >
+              {loadingDiagnostics ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <Bug className="h-4 w-4" />
+                  Run Diagnostics
+                </>
+              )}
+            </Button>
+
             {testResult && (
               <div
                 className={`p-3 rounded-lg flex items-start gap-2 ${
@@ -380,6 +417,77 @@ export default function TestPushPage() {
           </CardContent>
         </Card>
 
+        {/* Diagnostics Card */}
+        {diagnostics && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bug className="h-5 w-5" />
+                Diagnostics Results
+              </CardTitle>
+              <CardDescription>System health check for push notifications</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Object.entries(diagnostics.checks || {}).map(([key, check]: [string, any]) => (
+                <div
+                  key={key}
+                  className={`p-3 rounded-lg border ${
+                    check.status === 'ok'
+                      ? 'bg-green-50 border-green-200'
+                      : check.status === 'warning'
+                      ? 'bg-yellow-50 border-yellow-200'
+                      : check.status === 'error'
+                      ? 'bg-red-50 border-red-200'
+                      : 'bg-blue-50 border-blue-200'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {check.status === 'ok' ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                    ) : check.status === 'warning' ? (
+                      <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    ) : check.status === 'error' ? (
+                      <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm mb-1">{key.replace(/([A-Z])/g, ' $1').trim()}</h4>
+                      <p className="text-sm text-gray-700">{check.message}</p>
+                      {check.count !== undefined && (
+                        <p className="text-xs text-gray-500 mt-1">Count: {check.count}</p>
+                      )}
+                      {check.tokens && check.tokens.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {check.tokens.map((token: any, idx: number) => (
+                            <div key={idx} className="text-xs bg-white p-2 rounded border">
+                              <div>Platform: {token.platform}</div>
+                              <div>Device: {token.deviceId || 'N/A'}</div>
+                              <div>Updated: {new Date(token.updatedAt).toLocaleString()}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {check.instructions && (
+                        <ul className="mt-2 space-y-1 text-xs text-gray-600">
+                          {check.instructions.map((instruction: string, idx: number) => (
+                            <li key={idx}>{instruction}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {check.response && (
+                        <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-auto max-h-40">
+                          {JSON.stringify(check.response, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Debug Info Card */}
         <Card>
           <CardHeader>
@@ -416,29 +524,66 @@ export default function TestPushPage() {
               </div>
             </div>
             
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                // Force trigger a direct notification
-                window.postMessage({
-                  type: 'PUSH_NOTIFICATION',
-                  title: 'Direct Test Notification',
-                  body: 'This notification was triggered directly via postMessage. If you see this, the UI component is working!',
-                  icon: '/logo.png',
-                  badge: '/logo.png',
-                  data: { type: 'test', url: '/test-push' },
-                  tag: 'direct-test',
-                }, '*')
-                toast.success('Direct notification sent', {
-                  description: 'Check top-right corner for the notification',
-                })
-              }}
-              className="w-full"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Send Direct UI Notification (Bypass Server)
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  setLoadingDiagnostics(true)
+                  try {
+                    const response = await fetch('/api/push/diagnostics')
+                    const data = await response.json()
+                    setDiagnostics(data)
+                    toast.success('Diagnostics Complete', {
+                      description: 'Check the Diagnostics section for details',
+                    })
+                  } catch (error: any) {
+                    toast.error('Diagnostics Failed', {
+                      description: error.message || 'Failed to run diagnostics',
+                    })
+                  } finally {
+                    setLoadingDiagnostics(false)
+                  }
+                }}
+                disabled={loadingDiagnostics}
+                className="flex-1"
+              >
+                {loadingDiagnostics ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Bug className="h-4 w-4 mr-2" />
+                    Run Diagnostics
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Force trigger a direct notification
+                  window.postMessage({
+                    type: 'PUSH_NOTIFICATION',
+                    title: 'Direct Test Notification',
+                    body: 'This notification was triggered directly via postMessage. If you see this, the UI component is working!',
+                    icon: '/logo.png',
+                    badge: '/logo.png',
+                    data: { type: 'test', url: '/test-push' },
+                    tag: 'direct-test',
+                  }, '*')
+                  toast.success('Direct notification sent', {
+                    description: 'Check top-right corner for the notification',
+                  })
+                }}
+                className="flex-1"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Direct UI Test
+              </Button>
+            </div>
 
             {logs.length > 0 && (
               <div className="mt-4">
