@@ -451,8 +451,15 @@ export default function AdminContributionsPage() {
       return
     }
 
+    const totalToProcess = getSelectionCount()
+    
     try {
       setBulkActionLoading(true)
+      setBulkActionProgress({
+        current: 0,
+        total: totalToProcess,
+        message: `Starting bulk approve for ${totalToProcess} contribution(s)...`
+      })
       
       // Prepare request body based on selection mode
       const requestBody: any = {
@@ -492,6 +499,14 @@ export default function AdminContributionsPage() {
         requestBody: JSON.stringify(requestBody, null, 2)
       })
 
+      // Show progress update
+      setBulkActionProgress({
+        current: 0,
+        total: totalToProcess,
+        message: `Processing ${totalToProcess} contribution(s)...`
+      })
+
+      const startTime = Date.now()
       const response = await fetch('/api/admin/contributions/batch', {
         method: 'POST',
         headers: {
@@ -501,6 +516,7 @@ export default function AdminContributionsPage() {
       })
 
       const data = await response.json()
+      const duration = Date.now() - startTime
 
       if (!response.ok) {
         const errorMessage = data.error || data.errorCode || data.message || `Failed to approve contributions (${response.status})`
@@ -564,9 +580,10 @@ export default function AdminContributionsPage() {
       return
     }
 
+    const totalToProcess = getSelectionCount()
+    
     try {
       setBulkActionLoading(true)
-      const totalToProcess = getSelectionCount()
       setBulkActionProgress({
         current: 0,
         total: totalToProcess,
@@ -605,6 +622,14 @@ export default function AdminContributionsPage() {
         requestBody.ids = idsArray
       }
 
+      // Show progress update
+      setBulkActionProgress({
+        current: 0,
+        total: totalToProcess,
+        message: `Processing ${totalToProcess} contribution(s)...`
+      })
+
+      const startTime = Date.now()
       const response = await fetch('/api/admin/contributions/batch', {
         method: 'POST',
         headers: {
@@ -614,6 +639,7 @@ export default function AdminContributionsPage() {
       })
 
       const data = await response.json()
+      const duration = Date.now() - startTime
 
       if (!response.ok) {
         const errorMessage = data.error || data.message || `Failed to reject contributions (${response.status})`
