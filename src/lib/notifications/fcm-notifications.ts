@@ -42,17 +42,27 @@ export class FCMNotificationService {
     notification: FCMNotificationPayload
   ): Promise<{ success: boolean; sent: number; failed: number; total: number }> {
     try {
+      // Check if service role key is available (preferred for edge functions)
+      const authToken = env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      
+      if (!authToken) {
+        const error = new Error('No Supabase authentication key available for FCM Edge Function')
+        logger.error('FCM Edge Function authentication error', error)
+        throw error
+      }
+
       logger.info('Calling FCM Edge Function', {
         url: this.edgeFunctionUrl,
         userIdCount: userIds?.length || 0,
         hasServiceRoleKey: !!env.SUPABASE_SERVICE_ROLE_KEY,
+        usingServiceRole: !!env.SUPABASE_SERVICE_ROLE_KEY,
       })
 
       const response = await fetch(this.edgeFunctionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           userIds,

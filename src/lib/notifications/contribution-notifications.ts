@@ -63,7 +63,14 @@ export class ContributionNotificationService {
 
       // Send push notification to donor
       try {
-        await fcmNotificationService.notifyUsers(
+        defaultLogger.info('Sending push notification for contribution approval', {
+          contributionId,
+          donorId,
+          amount,
+          caseTitle
+        })
+        
+        const sentCount = await fcmNotificationService.notifyUsers(
           [donorId],
           {
             title: content.title_en,
@@ -81,9 +88,28 @@ export class ContributionNotificationService {
             requireInteraction: false,
           }
         )
+        
+        if (sentCount > 0) {
+          defaultLogger.info('Push notification sent successfully for contribution approval', {
+            contributionId,
+            donorId,
+            sentCount
+          })
+        } else {
+          defaultLogger.warn('Push notification sent but no active FCM tokens found for user', {
+            contributionId,
+            donorId,
+            sentCount
+          })
+        }
       } catch (pushError) {
-        // Don't fail if push notification fails - database notification is more important
-        defaultLogger.warn('Failed to send push notification for contribution approval:', pushError)
+        // Log detailed error but don't fail the operation
+        defaultLogger.error('Failed to send push notification for contribution approval', pushError, {
+          contributionId,
+          donorId,
+          error: pushError instanceof Error ? pushError.message : String(pushError),
+          stack: pushError instanceof Error ? pushError.stack : undefined
+        })
       }
 
       return true
@@ -133,7 +159,15 @@ export class ContributionNotificationService {
 
       // Send push notification to donor
       try {
-        await fcmNotificationService.notifyUsers(
+        defaultLogger.info('Sending push notification for contribution rejection', {
+          contributionId,
+          donorId,
+          amount,
+          caseTitle,
+          reason
+        })
+        
+        const sentCount = await fcmNotificationService.notifyUsers(
           [donorId],
           {
             title: content.title_en,
@@ -152,9 +186,28 @@ export class ContributionNotificationService {
             requireInteraction: true, // Rejections are more important, require interaction
           }
         )
+        
+        if (sentCount > 0) {
+          defaultLogger.info('Push notification sent successfully for contribution rejection', {
+            contributionId,
+            donorId,
+            sentCount
+          })
+        } else {
+          defaultLogger.warn('Push notification sent but no active FCM tokens found for user', {
+            contributionId,
+            donorId,
+            sentCount
+          })
+        }
       } catch (pushError) {
-        // Don't fail if push notification fails - database notification is more important
-        defaultLogger.warn('Failed to send push notification for contribution rejection:', pushError)
+        // Log detailed error but don't fail the operation
+        defaultLogger.error('Failed to send push notification for contribution rejection', pushError, {
+          contributionId,
+          donorId,
+          error: pushError instanceof Error ? pushError.message : String(pushError),
+          stack: pushError instanceof Error ? pushError.stack : undefined
+        })
       }
 
       return true
