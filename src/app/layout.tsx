@@ -4,6 +4,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 import { Toaster } from 'sonner'
 import HeroUIProviderWrapper from '@/components/providers/HeroUIProviderWrapper'
+import { PushNotificationProvider } from '@/components/notifications/PushNotificationProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,6 +25,8 @@ export default function RootLayout({
         {children}
         <Toaster position="top-center" richColors />
         <SpeedInsights />
+        {/* Push notifications - available on all pages */}
+        <PushNotificationProvider />
         </HeroUIProviderWrapper>
       </body>
     </html>

@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 
 import { defaultLogger as logger } from '@/lib/logger'
+import { AutoSubscribePrompt } from '@/components/notifications/AutoSubscribePrompt'
 
 interface ConditionalLayoutProps {
   children: React.ReactNode
@@ -268,6 +269,12 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
         <main className="min-h-screen">
           {children}
         </main>
+        
+        {/* Auto-subscribe prompt for push notifications (shows on all pages) */}
+        <AutoSubscribePrompt 
+          delay={3000}
+          showOnce={true}
+        />
       </div>
     </div>
   )
