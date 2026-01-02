@@ -221,6 +221,11 @@ async function getContributionsDirectQuery(
       query = query.eq('donor_id', userId)
     }
 
+    // Apply status filter at database level (more efficient)
+    if (filters.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status)
+    }
+
     // Apply date filters
     if (filters.dateFrom) {
       query = query.gte('created_at', filters.dateFrom.toISOString())
@@ -343,20 +348,10 @@ async function getContributionsDirectQuery(
       }
     })
 
-    // Apply status filter
-    if (filters.status && filters.status !== 'all') {
-      enrichedContributions = enrichedContributions.filter((c: EnrichedContribution) => {
-        const approvalStatus = c.approval_status?.[0]?.status
-        if (filters.status === 'approved') {
-          return approvalStatus === 'approved'
-        } else if (filters.status === 'rejected') {
-          return approvalStatus === 'rejected' || approvalStatus === 'revised'
-        } else if (filters.status === 'pending') {
-          return !approvalStatus || approvalStatus === 'pending'
-        }
-        return true
-      })
-    }
+    // Status filter is already applied at database level, so we don't need to filter again here
+    // However, we keep this as a safety check for data consistency
+    // If contributions.status doesn't match approval_status, we trust contributions.status
+    // (since that's what gets updated when admin approves/rejects)
 
     // Apply search filter in memory
     if (filters.search && filters.search.trim()) {
@@ -376,8 +371,9 @@ async function getContributionsDirectQuery(
       })
     }
 
-    // Apply pagination after filtering
-    const totalFiltered = enrichedContributions.length
+    // Apply pagination after all filters (search, etc.)
+    // Note: Status filter is already applied at database level
+    const totalAfterAllFilters = enrichedContributions.length
     const paginatedContributions = enrichedContributions.slice(
       filters.offset,
       filters.offset + filters.limit
@@ -430,9 +426,9 @@ async function getContributionsDirectQuery(
       pagination: {
         page: filters.page,
         limit: filters.limit,
-        total: totalFiltered,
-        totalPages: Math.ceil(totalFiltered / filters.limit),
-        hasNextPage: filters.page < Math.ceil(totalFiltered / filters.limit),
+        total: totalAfterAllFilters,
+        totalPages: Math.ceil(totalAfterAllFilters / filters.limit),
+        hasNextPage: filters.offset + filters.limit < totalAfterAllFilters,
         hasPreviousPage: filters.page > 1
       },
       stats

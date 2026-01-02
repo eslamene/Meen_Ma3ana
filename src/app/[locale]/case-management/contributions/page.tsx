@@ -226,24 +226,46 @@ export default function AdminContributionsPage() {
       }
 
       const response = await fetch(`/api/contributions?${params.toString()}`)
-      const data = await response.json()
-
+      
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch contributions')
+        let errorMessage = `Failed to fetch contributions (${response.status})`
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorData.message || errorMessage
+        } catch (parseError) {
+          // If JSON parsing fails, use status text
+          errorMessage = `${errorMessage}: ${response.statusText}`
+        }
+        throw new Error(errorMessage)
       }
+
+      const data = await response.json()
 
       setContributions(data.contributions || [])
       setPagination(prev => ({
         ...prev,
-        total: data.pagination.total,
-        totalPages: data.pagination.totalPages,
-        hasNextPage: data.pagination.hasNextPage,
-        hasPrevPage: data.pagination.hasPreviousPage ?? data.pagination.hasPrevPage ?? false
+        total: data.pagination?.total ?? 0,
+        totalPages: data.pagination?.totalPages ?? 0,
+        hasNextPage: data.pagination?.hasNextPage ?? false,
+        hasPrevPage: data.pagination?.hasPreviousPage ?? data.pagination?.hasPrevPage ?? false
       }))
       setStats(data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 })
     } catch (err) {
-      logger.error('Error fetching contributions:', { error: err })
-      setError(err instanceof Error ? err.message : 'Failed to fetch contributions')
+      const errorMessage = err instanceof Error ? err.message : String(err) || 'Failed to fetch contributions'
+      const errorDetails = err instanceof Error ? {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      } : { error: String(err) }
+      
+      logger.error('Error fetching contributions:', {
+        error: errorMessage,
+        details: errorDetails,
+        filters,
+        page: pagination.page,
+        limit: pagination.limit
+      })
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
