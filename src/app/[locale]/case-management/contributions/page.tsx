@@ -128,6 +128,11 @@ export default function AdminContributionsPage() {
   const [selectAllMode, setSelectAllMode] = useState<'none' | 'all' | 'viewed' | 'searched'>('none')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
+  const [bulkActionProgress, setBulkActionProgress] = useState<{
+    current: number
+    total: number
+    message: string
+  } | null>(null)
   const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false)
   const [bulkRejectReason, setBulkRejectReason] = useState('')
   
@@ -511,14 +516,24 @@ export default function AdminContributionsPage() {
         throw new Error(errorMessage)
       }
 
+      setBulkActionProgress({
+        current: data.success || 0,
+        total: data.total || totalToProcess,
+        message: `Completed: ${data.success || 0} approved, ${data.failed || 0} failed`
+      })
+
+      // Small delay to show completion message
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       toast.success('Success', { 
-        description: `Approved ${data.success || 0} contribution(s)${data.failed > 0 ? `. ${data.failed} failed.` : ''}` 
+        description: `Approved ${data.success || 0} contribution(s)${data.failed > 0 ? `. ${data.failed} failed.` : ''} in ${(duration / 1000).toFixed(1)}s` 
       })
 
       // Refresh and clear selection
       await fetchContributions()
       setSelectedIds(new Set())
       setSelectAllMode('none')
+      setBulkActionProgress(null)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to approve contributions'
       logger.error('Error bulk approving contributions:', { 
@@ -551,6 +566,12 @@ export default function AdminContributionsPage() {
 
     try {
       setBulkActionLoading(true)
+      const totalToProcess = getSelectionCount()
+      setBulkActionProgress({
+        current: 0,
+        total: totalToProcess,
+        message: `Starting bulk reject for ${totalToProcess} contribution(s)...`
+      })
       
       // Prepare request body based on selection mode
       const requestBody: any = {
@@ -604,8 +625,17 @@ export default function AdminContributionsPage() {
         throw new Error(errorMessage)
       }
 
+      setBulkActionProgress({
+        current: data.success || 0,
+        total: data.total || totalToProcess,
+        message: `Completed: ${data.success || 0} rejected, ${data.failed || 0} failed`
+      })
+
+      // Small delay to show completion message
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       toast.success('Success', { 
-        description: `Rejected ${data.success || 0} contribution(s)${data.failed > 0 ? `. ${data.failed} failed.` : ''}` 
+        description: `Rejected ${data.success || 0} contribution(s)${data.failed > 0 ? `. ${data.failed} failed.` : ''} in ${(duration / 1000).toFixed(1)}s` 
       })
 
       // Refresh and clear selection
@@ -614,6 +644,7 @@ export default function AdminContributionsPage() {
       setSelectAllMode('none')
       setBulkRejectReason('')
       setShowBulkRejectDialog(false)
+      setBulkActionProgress(null)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to reject contributions'
       logger.error('Error bulk rejecting contributions:', { 
@@ -778,6 +809,7 @@ export default function AdminContributionsPage() {
                         size="sm"
                         onClick={handleDeselectAll}
                         className="h-7 text-xs text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
+                        disabled={bulkActionLoading}
                       >
                         Clear
                       </Button>
@@ -794,7 +826,7 @@ export default function AdminContributionsPage() {
                         {bulkActionLoading ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Processing...
+                            {bulkActionProgress ? bulkActionProgress.message : 'Processing...'}
                           </>
                         ) : (
                           <>
@@ -811,11 +843,37 @@ export default function AdminContributionsPage() {
                         className="bg-red-600/90 hover:bg-red-600 text-white font-medium shadow-md backdrop-blur-sm border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         title={!areAllSelectedPending() ? 'Only pending contributions can be rejected' : ''}
                       >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Reject Selected
+                        {bulkActionLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            {bulkActionProgress ? `${bulkActionProgress.message}` : 'Processing...'}
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Reject Selected
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
+                  {/* Progress Bar */}
+                  {bulkActionProgress && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs text-slate-300">
+                        <span>{bulkActionProgress.message}</span>
+                        <span>{bulkActionProgress.current} / {bulkActionProgress.total}</span>
+                      </div>
+                      <div className="w-full bg-slate-700/50 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300 ease-out"
+                          style={{ 
+                            width: `${Math.min(100, (bulkActionProgress.current / bulkActionProgress.total) * 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

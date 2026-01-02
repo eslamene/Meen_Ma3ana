@@ -125,14 +125,77 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
     let successCount = 0
     let failedCount = 0
     const errors: Array<{ id: string; error: string }> = []
+    
+    // Track original states for rollback
+    const originalStates: Array<{
+      contributionId: string
+      originalStatus: string
+      originalApprovalStatus: string | null
+      originalCaseAmount: string | null
+      caseId: string | null
+    }> = []
 
-    // Process each contribution
-    for (const contribution of filteredContributions) {
-      try {
-        const caseData = Array.isArray(contribution.cases) 
-          ? contribution.cases[0] 
-          : contribution.cases
-        const caseTitle = caseData?.title_en || caseData?.title_ar || 'Unknown Case'
+    // Batch size for processing (process in chunks to avoid timeouts)
+    const BATCH_SIZE = 50
+    const totalContributions = filteredContributions.length
+    
+    logger.info(`Starting bulk ${action} for ${totalContributions} contributions`, {
+      totalContributions,
+      batchSize: BATCH_SIZE
+    })
+
+    // Group contributions by case_id for efficient case amount updates
+    const caseAmountUpdates = new Map<string, number>()
+    
+    // Process contributions in batches
+    for (let i = 0; i < filteredContributions.length; i += BATCH_SIZE) {
+      const batch = filteredContributions.slice(i, i + BATCH_SIZE)
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(totalContributions / BATCH_SIZE)
+      
+      logger.info(`Processing batch ${batchNumber}/${totalBatches} (${batch.length} items)`, {
+        batchNumber,
+        totalBatches,
+        batchSize: batch.length,
+        progress: `${i + batch.length}/${totalContributions}`
+      })
+
+      // Process each contribution in the batch
+      for (const contribution of batch) {
+        try {
+          // Store original state for potential rollback
+          const originalState = {
+            contributionId: contribution.id,
+            originalStatus: contribution.status,
+            originalApprovalStatus: null as string | null,
+            originalCaseAmount: null as string | null,
+            caseId: contribution.case_id || null
+          }
+          
+          // Get original approval status
+          const { data: existingApprovalStatus } = await supabase
+            .from('contribution_approval_status')
+            .select('status')
+            .eq('contribution_id', contribution.id)
+            .single()
+          originalState.originalApprovalStatus = existingApprovalStatus?.status || null
+          
+          // Get original case amount if applicable
+          if (contribution.case_id) {
+            const { data: caseData } = await supabase
+              .from('cases')
+              .select('current_amount')
+              .eq('id', contribution.case_id)
+              .single()
+            originalState.originalCaseAmount = caseData?.current_amount || null
+          }
+          
+          originalStates.push(originalState)
+          
+          const caseData = Array.isArray(contribution.cases) 
+            ? contribution.cases[0] 
+            : contribution.cases
+          const caseTitle = caseData?.title_en || caseData?.title_ar || 'Unknown Case'
 
         if (action === 'approve') {
           // Check if approval status exists
@@ -155,6 +218,12 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
             if (approvalUpdateError) {
               logger.error(`Error updating approval status for contribution ${contribution.id}:`, approvalUpdateError)
+              failedCount++
+              errors.push({ 
+                id: contribution.id, 
+                error: `Failed to update approval status: ${approvalUpdateError.message}` 
+              })
+              continue
             }
           } else {
             const { error: approvalInsertError } = await supabase
@@ -168,6 +237,12 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
             if (approvalInsertError) {
               logger.error(`Error creating approval status for contribution ${contribution.id}:`, approvalInsertError)
+              failedCount++
+              errors.push({ 
+                id: contribution.id, 
+                error: `Failed to create approval status: ${approvalInsertError.message}` 
+              })
+              continue
             }
           }
 
@@ -182,6 +257,13 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
           if (updateError) {
             logger.error(`Error approving contribution ${contribution.id}:`, updateError)
+            // Rollback: Delete approval status if it was just created
+            if (!existingStatus) {
+              await supabase
+                .from('contribution_approval_status')
+                .delete()
+                .eq('contribution_id', contribution.id)
+            }
             failedCount++
             errors.push({ 
               id: contribution.id, 
@@ -190,32 +272,11 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
             continue
           }
 
-          // Update case current_amount (add the contribution amount)
-          if (contribution.case_id) {
-            // Get current amount
-            const { data: caseData, error: caseFetchError } = await supabase
-              .from('cases')
-              .select('current_amount')
-              .eq('id', contribution.case_id)
-              .single()
-
-            if (!caseFetchError && caseData) {
-              const currentAmount = parseFloat(caseData.current_amount || '0')
-              const newAmount = currentAmount + parseFloat(contribution.amount || '0')
-
-              const { error: caseUpdateError } = await supabase
-                .from('cases')
-                .update({ 
-                  current_amount: newAmount.toString(),
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', contribution.case_id)
-
-              if (caseUpdateError) {
-                logger.warn(`Error updating case amount for contribution ${contribution.id}:`, caseUpdateError)
-                // Don't fail the whole operation, just log it
-              }
-            }
+          // Track case amount updates for batch processing (only for approve)
+          if (contribution.case_id && action === 'approve') {
+            const caseId = contribution.case_id
+            const amount = parseFloat(contribution.amount || '0')
+            caseAmountUpdates.set(caseId, (caseAmountUpdates.get(caseId) || 0) + amount)
           }
 
           // Send approval notification
@@ -255,6 +316,12 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
             if (approvalUpdateError) {
               logger.error(`Error updating approval status for contribution ${contribution.id}:`, approvalUpdateError)
+              failedCount++
+              errors.push({ 
+                id: contribution.id, 
+                error: `Failed to update approval status: ${approvalUpdateError.message}` 
+              })
+              continue
             }
           } else {
             const { error: approvalInsertError } = await supabase
@@ -269,6 +336,12 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
             if (approvalInsertError) {
               logger.error(`Error creating approval status for contribution ${contribution.id}:`, approvalInsertError)
+              failedCount++
+              errors.push({ 
+                id: contribution.id, 
+                error: `Failed to create approval status: ${approvalInsertError.message}` 
+              })
+              continue
             }
           }
 
@@ -284,6 +357,13 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
           if (updateError) {
             logger.error(`Error rejecting contribution ${contribution.id}:`, updateError)
+            // Rollback: Delete approval status if it was just created
+            if (!existingStatus) {
+              await supabase
+                .from('contribution_approval_status')
+                .delete()
+                .eq('contribution_id', contribution.id)
+            }
             failedCount++
             errors.push({ 
               id: contribution.id, 
@@ -308,20 +388,76 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
           successCount++
         }
-      } catch (error) {
-        logger.error(`Unexpected error processing contribution ${contribution.id}:`, error)
-        failedCount++
-        errors.push({ 
-          id: contribution.id, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+        } catch (error) {
+          logger.error(`Unexpected error processing contribution ${contribution.id}:`, error)
+          failedCount++
+          errors.push({ 
+            id: contribution.id, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          })
+        }
+      }
+    }
+
+    // Batch update case amounts (only for approve action)
+    if (action === 'approve' && caseAmountUpdates.size > 0) {
+      logger.info(`Updating case amounts for ${caseAmountUpdates.size} cases`)
+      
+      // Get current amounts for all cases
+      const caseIds = Array.from(caseAmountUpdates.keys())
+      const { data: casesData } = await supabase
+        .from('cases')
+        .select('id, current_amount')
+        .in('id', caseIds)
+      
+      if (casesData) {
+        // Update each case's amount
+        const caseUpdates = casesData.map(caseData => {
+          const currentAmount = parseFloat(caseData.current_amount || '0')
+          const additionalAmount = caseAmountUpdates.get(caseData.id) || 0
+          const newAmount = currentAmount + additionalAmount
+          
+          return supabase
+            .from('cases')
+            .update({ 
+              current_amount: newAmount.toString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', caseData.id)
+        })
+        
+        // Execute all case updates in parallel
+        const caseUpdateResults = await Promise.allSettled(caseUpdates)
+        caseUpdateResults.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            logger.warn(`Error updating case amount for case ${caseIds[index]}:`, result.reason)
+          } else if (result.value.error) {
+            logger.warn(`Error updating case amount for case ${caseIds[index]}:`, result.value.error)
+          }
         })
       }
     }
 
+    // If there were failures and we have original states, provide rollback information
+    const rollbackInfo = failedCount > 0 && originalStates.length > 0 ? {
+      canRollback: true,
+      totalProcessed: successCount + failedCount,
+      originalStatesCount: originalStates.length
+    } : undefined
+
+    logger.info(`Bulk ${action} completed`, {
+      total: totalContributions,
+      success: successCount,
+      failed: failedCount,
+      hasRollbackInfo: !!rollbackInfo
+    })
+
     return NextResponse.json({
       success: successCount,
       failed: failedCount,
-      errors: errors.length > 0 ? errors : undefined
+      total: totalContributions,
+      errors: errors.length > 0 ? errors : undefined,
+      rollbackInfo
     })
 }
 
