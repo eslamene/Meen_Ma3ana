@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { defaultLogger } from '@/lib/logger'
 import { createBilingualNotification, NOTIFICATION_TEMPLATES } from './bilingual-helpers'
+import { fcmNotificationService } from './fcm-notifications'
 
 export interface ContributionNotification {
   id: string
@@ -15,6 +16,14 @@ export interface ContributionNotification {
 
 export class ContributionNotificationService {
   constructor(private supabase: SupabaseClient) {}
+
+  /**
+   * Get locale from user preferences or default to 'en'
+   */
+  private getLocale(): string {
+    // Default to 'en' - can be enhanced to get from user preferences
+    return 'en'
+  }
 
   async sendApprovalNotification(contributionId: string, donorId: string, amount: number, caseTitle: string) {
     try {
@@ -50,6 +59,31 @@ export class ContributionNotificationService {
       if (error) {
         defaultLogger.logStableError('INTERNAL_SERVER_ERROR', error)
         return false
+      }
+
+      // Send push notification to donor
+      try {
+        await fcmNotificationService.notifyUsers(
+          [donorId],
+          {
+            title: content.title_en,
+            body: content.message_en,
+            icon: '/logo.png',
+            badge: '/logo.png',
+            data: {
+              type: 'contribution_approved',
+              contribution_id: contributionId,
+              case_title: caseTitle,
+              amount: amount.toString(),
+              url: `/${this.getLocale()}/contributions/${contributionId}`,
+            },
+            tag: `contribution-${contributionId}`,
+            requireInteraction: false,
+          }
+        )
+      } catch (pushError) {
+        // Don't fail if push notification fails - database notification is more important
+        defaultLogger.warn('Failed to send push notification for contribution approval:', pushError)
       }
 
       return true
@@ -95,6 +129,32 @@ export class ContributionNotificationService {
       if (error) {
         defaultLogger.logStableError('INTERNAL_SERVER_ERROR', error)
         return false
+      }
+
+      // Send push notification to donor
+      try {
+        await fcmNotificationService.notifyUsers(
+          [donorId],
+          {
+            title: content.title_en,
+            body: content.message_en,
+            icon: '/logo.png',
+            badge: '/logo.png',
+            data: {
+              type: 'contribution_rejected',
+              contribution_id: contributionId,
+              case_title: caseTitle,
+              amount: amount.toString(),
+              rejection_reason: reason,
+              url: `/${this.getLocale()}/contributions/${contributionId}`,
+            },
+            tag: `contribution-${contributionId}`,
+            requireInteraction: true, // Rejections are more important, require interaction
+          }
+        )
+      } catch (pushError) {
+        // Don't fail if push notification fails - database notification is more important
+        defaultLogger.warn('Failed to send push notification for contribution rejection:', pushError)
       }
 
       return true

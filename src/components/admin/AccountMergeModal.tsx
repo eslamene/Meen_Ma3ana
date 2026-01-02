@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
-import { Loader2, Users, AlertTriangle, ArrowRight, Trash2, Eye, CheckCircle, Shield, RefreshCw, Search, X } from 'lucide-react'
+import { Loader2, Users, AlertTriangle, ArrowRight, Trash2, Eye, CheckCircle, Shield, RefreshCw, Search, X, Filter, ChevronDown, ChevronUp } from 'lucide-react'
 import { safeFetch } from '@/lib/utils/safe-fetch'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -16,6 +16,14 @@ import StandardModal, {
 } from '@/components/ui/standard-modal'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -25,6 +33,19 @@ interface User {
   first_name?: string | null
   last_name?: string | null
   contribution_count?: number
+  phone?: string | null
+  role?: string | null
+  created_at?: string | null
+  roles?: Array<{ name: string; display_name: string }>
+}
+
+interface AdvancedSearchFilters {
+  role: string
+  minContributions: string
+  maxContributions: string
+  sortBy: string
+  sortOrder: string
+  phone: string
 }
 
 interface MergePreview {
@@ -62,6 +83,16 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [searching, setSearching] = useState(false)
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
+  const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([])
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>({
+    role: 'all',
+    minContributions: '',
+    maxContributions: '',
+    sortBy: 'created_at',
+    sortOrder: 'desc',
+    phone: ''
+  })
   const [preview, setPreview] = useState<MergePreview | null>(null)
   const [previewSummary, setPreviewSummary] = useState<MergeSummary | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -89,7 +120,33 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
     setShowPreview(false)
     setMergeId(null)
     setBackupId(null)
+    setShowAdvancedSearch(false)
+    setAdvancedFilters({
+      role: 'all',
+      minContributions: '',
+      maxContributions: '',
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+      phone: ''
+    })
   }
+
+  // Fetch available roles for filter
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const response = await safeFetch('/api/admin/roles')
+        if (response.ok && response.data?.roles) {
+          setAvailableRoles(response.data.roles || [])
+        }
+      } catch (error) {
+        logger.error('Error fetching roles:', { error })
+      }
+    }
+    if (open) {
+      fetchRoles()
+    }
+  }, [open])
 
   const fetchSourceUser = async () => {
     if (!sourceUserId) return
@@ -138,28 +195,70 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
     }
   }
 
-  const searchUsers = async (query: string) => {
-    if (!query.trim() || query.length < 2) {
+  const searchUsers = useCallback(async (query: string, filters: AdvancedSearchFilters) => {
+    // Allow search with just filters even if query is empty
+    const hasQuery = query.trim().length >= 2
+    const hasFilters = filters.role !== 'all' || 
+                      filters.minContributions || 
+                      filters.maxContributions || 
+                      filters.phone ||
+                      filters.sortBy !== 'created_at' ||
+                      filters.sortOrder !== 'desc'
+
+    if (!hasQuery && !hasFilters) {
       setSearchResults([])
       return
     }
 
     try {
       setSearching(true)
-      const response = await safeFetch('/api/admin/users')
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '20', // Increased limit for better results
+        ...(hasQuery && { search: query }),
+        ...(filters.role && filters.role !== 'all' && { role: filters.role }),
+        ...(filters.sortBy && { sortBy: filters.sortBy }),
+        ...(filters.sortOrder && { sortOrder: filters.sortOrder })
+      })
+
+      const response = await safeFetch(`/api/admin/users?${params.toString()}`)
       
       if (response.ok && response.data?.users) {
-        const users = response.data.users || []
-        const filtered = users.filter((user: User) => 
-          user.id !== sourceUserId &&
-          (
-            user.email.toLowerCase().includes(query.toLowerCase()) ||
-            (user.first_name && user.first_name.toLowerCase().includes(query.toLowerCase())) ||
-            (user.last_name && user.last_name.toLowerCase().includes(query.toLowerCase()))
-          )
-        ).slice(0, 10) // Limit to 10 results
+        let users = (response.data.users || []) as User[]
         
-        setSearchResults(filtered)
+        // Filter out source user
+        users = users.filter((user: User) => user.id !== sourceUserId)
+        
+        // Apply client-side filters that aren't supported by API
+        if (filters.minContributions) {
+          const minContrib = parseInt(filters.minContributions)
+          if (!isNaN(minContrib)) {
+            users = users.filter((user: User) => 
+              (user.contribution_count || 0) >= minContrib
+            )
+          }
+        }
+        
+        if (filters.maxContributions) {
+          const maxContrib = parseInt(filters.maxContributions)
+          if (!isNaN(maxContrib)) {
+            users = users.filter((user: User) => 
+              (user.contribution_count || 0) <= maxContrib
+            )
+          }
+        }
+        
+        if (filters.phone) {
+          const phoneLower = filters.phone.toLowerCase()
+          users = users.filter((user: User) => 
+            user.phone?.toLowerCase().includes(phoneLower)
+          )
+        }
+        
+        // Limit results
+        setSearchResults(users.slice(0, 20))
       } else {
         // Only log unexpected errors (not auth/permission errors)
         if (response.status >= 500 || response.status === 0) {
@@ -176,19 +275,15 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
     } finally {
       setSearching(false)
     }
-  }
+  }, [sourceUserId])
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (searchTerm) {
-        searchUsers(searchTerm)
-      } else {
-        setSearchResults([])
-      }
+      searchUsers(searchTerm, advancedFilters)
     }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm])
+  }, [searchTerm, advancedFilters, searchUsers])
 
   const handleSelectTarget = (user: User) => {
     setTargetUserId(user.id)
@@ -425,17 +520,185 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
                 <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Target Account (to)</p>
                 {!targetUser ? (
                   <>
-                    <StandardFormField label="Search for target user" description="Search by email or name">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="target-search"
-                          placeholder="Search by email or name..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          disabled={loading}
-                          className="pl-10 h-10"
-                        />
+                    <StandardFormField label="Search for target user" description="Search by email, name, phone, or use advanced filters">
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            id="target-search"
+                            placeholder="Search by email, name, or phone..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            disabled={loading}
+                            className="pl-10 h-10"
+                          />
+                        </div>
+
+                        {/* Advanced Search Toggle */}
+                        <Collapsible open={showAdvancedSearch} onOpenChange={setShowAdvancedSearch}>
+                          <CollapsibleTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-between h-9 text-xs"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Filter className="h-3.5 w-3.5" />
+                                <span>Advanced Search</span>
+                              </div>
+                              {showAdvancedSearch ? (
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="space-y-3 pt-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              {/* Role Filter */}
+                              <div className="space-y-1.5">
+                                <Label htmlFor="filter-role" className="text-xs font-medium text-gray-700">
+                                  Role
+                                </Label>
+                                <Select
+                                  value={advancedFilters.role}
+                                  onValueChange={(value) => 
+                                    setAdvancedFilters(prev => ({ ...prev, role: value }))
+                                  }
+                                >
+                                  <SelectTrigger id="filter-role" className="h-9 text-xs">
+                                    <SelectValue placeholder="All roles" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All roles</SelectItem>
+                                    <SelectItem value="no-roles">No roles</SelectItem>
+                                    {availableRoles.map((role) => (
+                                      <SelectItem key={role.id} value={role.name}>
+                                        {role.display_name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {/* Phone Filter */}
+                              <div className="space-y-1.5">
+                                <Label htmlFor="filter-phone" className="text-xs font-medium text-gray-700">
+                                  Phone Number
+                                </Label>
+                                <Input
+                                  id="filter-phone"
+                                  placeholder="Search by phone..."
+                                  value={advancedFilters.phone}
+                                  onChange={(e) => 
+                                    setAdvancedFilters(prev => ({ ...prev, phone: e.target.value }))
+                                  }
+                                  className="h-9 text-xs"
+                                />
+                              </div>
+
+                              {/* Contribution Count Range */}
+                              <div className="space-y-1.5">
+                                <Label htmlFor="filter-min-contrib" className="text-xs font-medium text-gray-700">
+                                  Min Contributions
+                                </Label>
+                                <Input
+                                  id="filter-min-contrib"
+                                  type="number"
+                                  placeholder="0"
+                                  value={advancedFilters.minContributions}
+                                  onChange={(e) => 
+                                    setAdvancedFilters(prev => ({ ...prev, minContributions: e.target.value }))
+                                  }
+                                  className="h-9 text-xs"
+                                  min="0"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <Label htmlFor="filter-max-contrib" className="text-xs font-medium text-gray-700">
+                                  Max Contributions
+                                </Label>
+                                <Input
+                                  id="filter-max-contrib"
+                                  type="number"
+                                  placeholder="No limit"
+                                  value={advancedFilters.maxContributions}
+                                  onChange={(e) => 
+                                    setAdvancedFilters(prev => ({ ...prev, maxContributions: e.target.value }))
+                                  }
+                                  className="h-9 text-xs"
+                                  min="0"
+                                />
+                              </div>
+
+                              {/* Sort Options */}
+                              <div className="space-y-1.5">
+                                <Label htmlFor="filter-sort-by" className="text-xs font-medium text-gray-700">
+                                  Sort By
+                                </Label>
+                                <Select
+                                  value={advancedFilters.sortBy}
+                                  onValueChange={(value) => 
+                                    setAdvancedFilters(prev => ({ ...prev, sortBy: value }))
+                                  }
+                                >
+                                  <SelectTrigger id="filter-sort-by" className="h-9 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="created_at">Created Date</SelectItem>
+                                    <SelectItem value="email">Email</SelectItem>
+                                    <SelectItem value="display_name">Name</SelectItem>
+                                    <SelectItem value="last_sign_in_at">Last Sign In</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <Label htmlFor="filter-sort-order" className="text-xs font-medium text-gray-700">
+                                  Order
+                                </Label>
+                                <Select
+                                  value={advancedFilters.sortOrder}
+                                  onValueChange={(value) => 
+                                    setAdvancedFilters(prev => ({ ...prev, sortOrder: value }))
+                                  }
+                                >
+                                  <SelectTrigger id="filter-sort-order" className="h-9 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="desc">Descending</SelectItem>
+                                    <SelectItem value="asc">Ascending</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            {/* Clear Filters Button */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setAdvancedFilters({
+                                  role: 'all',
+                                  minContributions: '',
+                                  maxContributions: '',
+                                  sortBy: 'created_at',
+                                  sortOrder: 'desc',
+                                  phone: ''
+                                })
+                                setSearchTerm('')
+                              }}
+                              className="w-full h-8 text-xs"
+                            >
+                              Clear All Filters
+                            </Button>
+                          </CollapsibleContent>
+                        </Collapsible>
                       </div>
                     </StandardFormField>
 

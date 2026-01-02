@@ -317,7 +317,7 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
 
   try {
     const body = await request.json()
-    const { email, password, first_name, last_name, phone, role_ids } = body
+    const { email, password, first_name, last_name, phone, notes, tags, role_ids } = body
 
     // Validate required fields
     if (!email || !email.trim()) {
@@ -379,7 +379,9 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
     // Normalize phone number if provided
     let normalizedPhone: string | null = null
     if (phone && phone.trim()) {
-      normalizedPhone = normalizePhoneNumber(phone.trim(), '+20')
+      // Remove all spaces from phone number before processing
+      const phoneWithoutSpaces = phone.trim().replace(/\s/g, '')
+      normalizedPhone = normalizePhoneNumber(phoneWithoutSpaces, '+20')
     }
 
     // Check if phone number is already in use (check normalized uniqueness)
@@ -467,6 +469,8 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
         first_name: first_name?.trim() || null,
         last_name: last_name?.trim() || null,
         phone: normalizedPhone || null,
+        notes: notes?.trim() || null,
+        tags: tags && Array.isArray(tags) && tags.length > 0 ? tags : [],
         role: 'donor', // Default role
         language: 'en'
       })

@@ -22,6 +22,7 @@ import { theme, brandColors } from '@/lib/theme'
 import { defaultLogger as logger } from '@/lib/logger'
 import { AdminContributionModal } from '@/components/admin/AdminContributionModal'
 import { useAdmin } from '@/lib/admin/hooks'
+import BatchCaseUploadModal from '@/components/cases/BatchCaseUploadModal'
 
 import { 
   Target, 
@@ -47,7 +48,8 @@ import {
   Flag,
   Info,
   Save,
-  Gift
+  Gift,
+  Upload
 } from 'lucide-react'
 
 interface Beneficiary {
@@ -173,6 +175,7 @@ export default function AdminCasesPage() {
     caseId: null,
     caseTitle: ''
   })
+  const [batchUploadModalOpen, setBatchUploadModalOpen] = useState(false)
   const { hasPermission } = useAdmin()
 
   const fetchCases = useCallback(async () => {
@@ -717,6 +720,7 @@ export default function AdminCasesPage() {
                   <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Case Management</h1>
                   <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">Manage all charity cases in the system</p>
                 </div>
+                <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   onClick={() => router.push(`/${params.locale}/case-management/create`)}
                   className="w-full sm:w-auto text-sm sm:text-base text-white"
@@ -735,6 +739,16 @@ export default function AdminCasesPage() {
                   <span className="hidden sm:inline">Create New Case</span>
                   <span className="sm:hidden">Create Case</span>
                 </Button>
+                  <Button
+                    onClick={() => setBatchUploadModalOpen(true)}
+                    variant="outline"
+                    className="w-full sm:w-auto text-sm sm:text-base"
+                  >
+                    <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Batch Upload</span>
+                    <span className="sm:hidden">Upload</span>
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -1749,6 +1763,14 @@ export default function AdminCasesPage() {
             caseTitle={addContributionModal.caseTitle}
           />
         )}
+        <BatchCaseUploadModal
+          open={batchUploadModalOpen}
+          onOpenChange={setBatchUploadModalOpen}
+          onSuccess={() => {
+            fetchCases() // Refresh cases list
+            setBatchUploadModalOpen(false)
+          }}
+        />
       </PermissionGuard>
     </ProtectedRoute>
   )

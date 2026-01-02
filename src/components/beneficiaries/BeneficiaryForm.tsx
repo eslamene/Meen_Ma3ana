@@ -715,7 +715,11 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
                     type="tel"
                     required
                     value={formData.mobile_number || ''}
-                    onChange={(e) => handleChange('mobile_number', e.target.value)}
+                    onChange={(e) => {
+                      // Remove all spaces from phone number
+                      const cleaned = e.target.value.replace(/\s/g, '')
+                      handleChange('mobile_number', cleaned)
+                    }}
                     placeholder="+20 XXX XXX XXXX"
                     className="h-11"
                   />
@@ -729,7 +733,11 @@ const BeneficiaryForm = forwardRef<BeneficiaryFormRef, BeneficiaryFormProps>(({
                     id="additional_mobile_number"
                     type="tel"
                     value={formData.additional_mobile_number || ''}
-                    onChange={(e) => handleChange('additional_mobile_number', e.target.value)}
+                    onChange={(e) => {
+                      // Remove all spaces from phone number
+                      const cleaned = e.target.value.replace(/\s/g, '')
+                      handleChange('additional_mobile_number', cleaned)
+                    }}
                     placeholder="+20 XXX XXX XXXX"
                     className="h-11"
                   />

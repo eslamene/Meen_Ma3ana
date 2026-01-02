@@ -36,15 +36,21 @@ async function putHandler(request: NextRequest, context: ApiHandlerContext) {
       throw new ApiError('VALIDATION_ERROR', 'First name and last name are required', 400)
     }
 
+    // Remove all spaces from phone number before validation and processing
+    let phoneWithoutSpaces: string | null = null
+    if (phone && phone.trim()) {
+      phoneWithoutSpaces = phone.trim().replace(/\s/g, '')
+    }
+
     // Validate phone format if provided
-    if (phone && !/^[\+]?[1-9][\d]{0,15}$/.test(phone)) {
+    if (phoneWithoutSpaces && !/^[\+]?[1-9][\d]{0,15}$/.test(phoneWithoutSpaces)) {
       throw new ApiError('VALIDATION_ERROR', 'Invalid phone number format', 400)
     }
 
     // Normalize and check phone number uniqueness
     let normalizedPhone: string | null = null
-    if (phone && phone.trim()) {
-      normalizedPhone = normalizePhoneNumber(phone.trim(), '+20')
+    if (phoneWithoutSpaces) {
+      normalizedPhone = normalizePhoneNumber(phoneWithoutSpaces, '+20')
       
       // Get all users with phone numbers to check normalized uniqueness
       const { data: allUsersWithPhone, error: fetchError } = await supabase

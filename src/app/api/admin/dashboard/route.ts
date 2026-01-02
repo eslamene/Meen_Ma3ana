@@ -35,96 +35,155 @@ interface AdminDashboardStats {
 
 export const GET = createGetHandler(
   async (request, { user, supabase, logger }) => {
+    try {
+      // Fetch all system-wide statistics
+      const [
+        usersResult,
+        contributionsResult,
+        casesResult,
+        projectsResult
+      ] = await Promise.all([
+        supabase.from('users').select('id, created_at, role'),
+        // Try to get approval status, but fallback to just contributions if join fails
+        supabase.from('contributions').select(`
+          id, 
+          amount, 
+          status, 
+          created_at,
+          approval_status:contribution_approval_status!contribution_id(status)
+        `).limit(10000), // Add limit to prevent timeout
+        supabase.from('cases').select('id, status, created_at'),
+        supabase.from('projects').select('id, created_at')
+      ])
 
-    // Fetch all system-wide statistics
-    const [
-      { data: users },
-      { data: contributions },
-      { data: cases },
-      { data: projects }
-    ] = await Promise.all([
-      supabase.from('users').select('id, created_at, role'),
-      supabase.from('contributions').select(`
-        id, 
-        amount, 
-        status, 
-        created_at,
-        approval_status:contribution_approval_status!contribution_id(status)
-      `),
-      supabase.from('cases').select('id, status, created_at'),
-      supabase.from('projects').select('id, created_at')
-    ])
+      // Check for errors
+      if (usersResult.error) {
+        logger.error('Error fetching users:', usersResult.error)
+      }
+      if (contributionsResult.error) {
+        logger.error('Error fetching contributions:', contributionsResult.error)
+      }
+      if (casesResult.error) {
+        logger.error('Error fetching cases:', casesResult.error)
+      }
+      if (projectsResult.error) {
+        logger.error('Error fetching projects:', projectsResult.error)
+      }
 
-    // Calculate statistics based on approval status
-    const totalUsers = users?.length || 0
-    const totalContributions = contributions?.length || 0
-    
-    // Calculate total amount from approved contributions only
-    const totalAmount = contributions?.reduce((sum, c: ContributionWithApproval) => {
-      const approvalStatus = Array.isArray(c.approval_status) 
-        ? c.approval_status[0]?.status 
-        : c.approval_status?.status || 'pending'
-      return approvalStatus === 'approved' ? sum + (c.amount || 0) : sum
-    }, 0) || 0
-    
-    const activeCases = cases?.filter(c => c.status === 'active').length || 0
-    const completedCases = cases?.filter(c => c.status === 'completed').length || 0
-    
-    // Calculate contribution counts based on approval status
-    const pendingContributions = contributions?.filter((c: ContributionWithApproval) => {
-      const approvalStatus = Array.isArray(c.approval_status) 
-        ? c.approval_status[0]?.status 
-        : c.approval_status?.status || 'pending'
-      return approvalStatus === 'pending'
-    }).length || 0
-    
-    const approvedContributions = contributions?.filter((c: ContributionWithApproval) => {
-      const approvalStatus = Array.isArray(c.approval_status) 
-        ? c.approval_status[0]?.status 
-        : c.approval_status?.status || 'pending'
-      return approvalStatus === 'approved'
-    }).length || 0
-    
-    const rejectedContributions = contributions?.filter((c: ContributionWithApproval) => {
-      const approvalStatus = Array.isArray(c.approval_status) 
-        ? c.approval_status[0]?.status 
-        : c.approval_status?.status || 'pending'
-      return approvalStatus === 'rejected'
-    }).length || 0
-    
-    const totalProjects = projects?.length || 0
+      const users = usersResult.data || []
+      const contributions = contributionsResult.data || []
+      const cases = casesResult.data || []
+      const projects = projectsResult.data || []
 
-    // Get recent activity (last 10 approved contributions)
-    const recentActivity = contributions
-      ?.filter((c: ContributionWithApproval) => {
-        const approvalStatus = Array.isArray(c.approval_status) 
-          ? c.approval_status[0]?.status 
-          : c.approval_status?.status || 'pending'
-        return approvalStatus === 'approved'
-      })
-      .slice(0, 10)
-      .map((c: ContributionWithApproval) => ({
-        id: c.id,
-        type: 'contribution',
-        status: c.status,
-        amount: c.amount,
-        date: c.created_at
-      })) || []
+      // Calculate statistics based on approval status
+      const totalUsers = users.length
+      const totalContributions = contributions.length
+      
+      // Calculate total amount from approved contributions only
+      // If approval_status join failed, use all contributions (fallback)
+      const totalAmount = contributions.reduce((sum, c: ContributionWithApproval) => {
+        // Check if approval_status exists (join succeeded)
+        if (c.approval_status !== undefined && c.approval_status !== null) {
+          const approvalStatus = Array.isArray(c.approval_status) 
+            ? c.approval_status[0]?.status 
+            : c.approval_status?.status || 'pending'
+          return approvalStatus === 'approved' ? sum + parseFloat(String(c.amount || 0)) : sum
+        }
+        // Fallback: if no approval_status, count all contributions
+        return sum + parseFloat(String(c.amount || 0))
+      }, 0)
+      
+      // Case statuses: 'draft', 'submitted', 'published', 'closed', 'under_review'
+      // Active cases = published cases
+      // Completed cases = closed cases
+      const activeCases = cases.filter(c => c.status === 'published').length
+      const completedCases = cases.filter(c => c.status === 'closed').length
+    
+      // Calculate contribution counts based on approval status
+      // If approval_status join failed, use contribution status as fallback
+      const pendingContributions = contributions.filter((c: ContributionWithApproval) => {
+        if (c.approval_status !== undefined && c.approval_status !== null) {
+          const approvalStatus = Array.isArray(c.approval_status) 
+            ? c.approval_status[0]?.status 
+            : c.approval_status?.status || 'pending'
+          return approvalStatus === 'pending'
+        }
+        // Fallback: use contribution status
+        return c.status === 'pending'
+      }).length
+      
+      const approvedContributions = contributions.filter((c: ContributionWithApproval) => {
+        if (c.approval_status !== undefined && c.approval_status !== null) {
+          const approvalStatus = Array.isArray(c.approval_status) 
+            ? c.approval_status[0]?.status 
+            : c.approval_status?.status || 'pending'
+          return approvalStatus === 'approved'
+        }
+        // Fallback: use contribution status
+        return c.status === 'approved' || c.status === 'completed'
+      }).length
+      
+      const rejectedContributions = contributions.filter((c: ContributionWithApproval) => {
+        if (c.approval_status !== undefined && c.approval_status !== null) {
+          const approvalStatus = Array.isArray(c.approval_status) 
+            ? c.approval_status[0]?.status 
+            : c.approval_status?.status || 'pending'
+          return approvalStatus === 'rejected'
+        }
+        // Fallback: use contribution status
+        return c.status === 'rejected'
+      }).length
+      
+      const totalProjects = projects.length
 
-    return NextResponse.json({
-      data: {
+      // Get recent activity (last 10 approved contributions)
+      const recentActivity = contributions
+        .filter((c: ContributionWithApproval) => {
+          if (c.approval_status !== undefined && c.approval_status !== null) {
+            const approvalStatus = Array.isArray(c.approval_status) 
+              ? c.approval_status[0]?.status 
+              : c.approval_status?.status || 'pending'
+            return approvalStatus === 'approved'
+          }
+          // Fallback: use contribution status
+          return c.status === 'approved' || c.status === 'completed'
+        })
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 10)
+        .map((c: ContributionWithApproval) => ({
+          id: c.id,
+          type: 'contribution',
+          status: c.status,
+          amount: parseFloat(String(c.amount || 0)),
+          date: c.created_at
+        }))
+
+      logger.info('Dashboard stats calculated', {
         totalUsers,
         totalContributions,
         totalAmount,
         activeCases,
-        completedCases,
-        pendingContributions,
-        approvedContributions,
-        rejectedContributions,
-        totalProjects,
-        recentActivity
-      }
-    })
+        completedCases
+      })
+
+      return NextResponse.json({
+        data: {
+          totalUsers,
+          totalContributions,
+          totalAmount,
+          activeCases,
+          completedCases,
+          pendingContributions,
+          approvedContributions,
+          rejectedContributions,
+          totalProjects,
+          recentActivity
+        }
+      })
+    } catch (error) {
+      logger.error('Error calculating dashboard stats:', { error })
+      throw error
+    }
   },
   { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/dashboard' }
 )

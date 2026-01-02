@@ -207,7 +207,9 @@ export default function AdminPage() {
         throw new Error(`Failed to fetch system stats: ${response.statusText}`)
       }
 
-      const data = await response.json()
+      const responseData = await response.json()
+      // API returns { data: { ... } }
+      const data = responseData.data || responseData
       setStats({
         totalUsers: data.totalUsers || 0,
         totalContributions: data.totalContributions || 0,

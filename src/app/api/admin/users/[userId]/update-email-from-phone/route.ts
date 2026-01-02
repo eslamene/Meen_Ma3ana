@@ -19,6 +19,20 @@ async function postHandler(
   const { userId } = params
 
   try {
+    // Get email from request body (user can edit it)
+    const body = await request.json()
+    const providedEmail = body.email?.trim()
+
+    if (!providedEmail) {
+      throw new ApiError('VALIDATION_ERROR', 'Email is required', 400)
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(providedEmail)) {
+      throw new ApiError('VALIDATION_ERROR', 'Invalid email format', 400)
+    }
+
     // Log the admin action
     const { ipAddress, userAgent } = extractRequestInfo(request)
     await AuditService.logAdminAction(
@@ -26,7 +40,7 @@ async function postHandler(
       'admin_user_update_email_from_phone',
       'user',
       userId,
-      {},
+      { newEmail: providedEmail },
       ipAddress,
       userAgent
     )
@@ -55,7 +69,7 @@ async function postHandler(
       throw new ApiError('NOT_FOUND', 'User not found', 404)
     }
 
-    // Get user profile to get phone number
+    // Get user profile to get current email
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .select('phone, email')
@@ -67,34 +81,7 @@ async function postHandler(
       throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch user profile', 500)
     }
 
-    if (!userProfile.phone || !userProfile.phone.trim()) {
-      throw new ApiError('VALIDATION_ERROR', 'User does not have a phone number. Please add a phone number first.', 400)
-    }
-
-    // Generate email from phone number: {phone}@ma3ana.org
-    // Normalize phone and extract number part for email
-    const normalizedPhone = normalizePhoneNumber(userProfile.phone.trim(), '+20')
-    const { countryCode, number } = extractCountryCode(userProfile.phone.trim(), '+20')
-    
-    // Format phone for email based on country code
-    let phoneForEmail: string
-    
-    if (countryCode === '+20') {
-      // Egyptian number: ensure it starts with 0 (e.g., 01012345678)
-      phoneForEmail = number.length === 10 && number.startsWith('1') 
-        ? '0' + number 
-        : number.startsWith('0') 
-          ? number 
-          : '0' + number
-    } else {
-      // International number: use the number part without country code
-      // Remove country code from normalized phone
-      phoneForEmail = normalizedPhone.replace(/^\+\d{1,3}/, '')
-      // Remove leading zeros for international numbers
-      phoneForEmail = phoneForEmail.replace(/^0+/, '')
-    }
-
-    const newEmail = `${phoneForEmail}@ma3ana.org`
+    const newEmail = providedEmail
 
     // Check if this email already exists (for another user)
     const { data: existingEmailUser, error: emailCheckError } = await supabase

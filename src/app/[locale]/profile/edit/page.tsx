@@ -443,7 +443,11 @@ export default function EditProfilePage() {
                     <Input
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      onChange={(e) => {
+                        // Remove all spaces from phone number
+                        const cleaned = e.target.value.replace(/\s/g, '')
+                        handleInputChange('phone', cleaned)
+                      }}
                       placeholder={t('phonePlaceholder')}
                       className={`border-2 border-gray-200 focus:border-blue-500 h-11 ${
                         errors.phone ? 'border-red-500' : ''

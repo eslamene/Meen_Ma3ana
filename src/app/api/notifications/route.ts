@@ -8,6 +8,8 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
   
   try {
+    // Log for debugging
+    logger.debug('Fetching notifications for user:', { userId: user.id, email: user.email })
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
@@ -19,6 +21,18 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
     const offset = (page - 1) * limit
+
+    // First, check if there are ANY notifications for this user (for debugging)
+    const { count: totalCount, error: countError } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('recipient_id', user.id)
+    
+    logger.debug('Total notifications count for user:', { 
+      userId: user.id, 
+      totalCount: totalCount || 0,
+      countError: countError?.message 
+    })
 
     // Build query
     let query = supabase
@@ -66,11 +80,25 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
 
     if (error) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching notifications:', error)
+      logger.error('Query error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
       return NextResponse.json(
-        { error: 'Failed to fetch notifications' },
+        { error: 'Failed to fetch notifications', details: error.message },
         { status: 500 }
       )
     }
+
+    logger.debug('Notifications query result:', {
+      userId: user.id,
+      notificationsCount: notifications?.length || 0,
+      totalCount: count || 0,
+      page,
+      limit
+    })
 
     // Enhance notifications with case titles for old notifications that don't have them
     if (notifications && notifications.length > 0) {

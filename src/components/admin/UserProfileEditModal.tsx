@@ -3,10 +3,14 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Loader2, User, Mail, Phone, MapPin, Globe, Trash2, AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
+import { Loader2, User, Mail, Phone, MapPin, Globe, Trash2, AlertTriangle, CheckCircle, XCircle, RefreshCw, X, Tag, ChevronDown, ChevronUp } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import StandardModal, { 
   StandardModalPreview, 
   StandardFormField, 
@@ -44,6 +48,9 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
   const [deleting, setDeleting] = useState(false)
   const [updatingEmail, setUpdatingEmail] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showEmailUpdateDialog, setShowEmailUpdateDialog] = useState(false)
+  const [proposedEmail, setProposedEmail] = useState('')
+  const [notesTagsExpanded, setNotesTagsExpanded] = useState(false)
   const [user, setUser] = useState<UserProfile | null>(null)
   const [formData, setFormData] = useState({
     first_name: '',
@@ -52,8 +59,12 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
     address: '',
     language: 'ar',
     is_active: true,
-    email_verified: false
+    email_verified: false,
+    notes: '',
+    tags: [] as string[]
   })
+  const [tagInput, setTagInput] = useState('')
+  const [isEditingNotes, setIsEditingNotes] = useState(false)
 
   useEffect(() => {
     if (open && userId) {
@@ -67,8 +78,12 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         address: '',
         language: 'ar',
         is_active: true,
-        email_verified: false
+        email_verified: false,
+        notes: '',
+        tags: []
       })
+      setIsEditingNotes(false)
+      setTagInput('')
     }
   }, [open, userId])
 
@@ -92,8 +107,11 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         address: data.user.address || '',
         language: data.user.language || 'ar',
         is_active: data.user.is_active ?? true,
-        email_verified: data.user.email_verified ?? false
+        email_verified: data.user.email_verified ?? false,
+        notes: data.user.notes || '',
+        tags: Array.isArray(data.user.tags) ? data.user.tags : []
       })
+      setTagInput('')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load user profile'
       logger.error('Error fetching user:', { 
@@ -126,7 +144,9 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
           phone: formData.phone.trim() || null,
           address: formData.address.trim() || null,
           language: formData.language,
-          is_active: formData.is_active
+          is_active: formData.is_active,
+          notes: formData.notes.trim() || null,
+          tags: formData.tags.length > 0 ? formData.tags : null
           // email_verified is read-only and synced from auth.users.email_confirmed_at
         })
       })
@@ -159,33 +179,85 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
   const formatPhoneForEmail = (phone: string): string => {
     if (!phone) return ''
     
-    // Use the phone utility functions for proper international handling
-    const normalizedPhone = normalizePhoneNumber(phone.trim(), '+20')
-    const { countryCode, number } = extractCountryCode(phone.trim(), '+20')
+    // Remove all spaces first
+    const cleanedPhone = phone.trim().replace(/\s/g, '')
     
-    // Format phone for email based on country code
+    // Extract all digits from the phone number
+    const digitsOnly = cleanedPhone.replace(/[^\d]/g, '')
+    
+    // For Egyptian numbers, we expect 12-13 digits total (+20 + 10-11 digit number)
+    // Or 11 digits if already in local format (0 + 10 digits)
     let phoneForEmail: string
     
-    if (countryCode === '+20') {
-      // Egyptian number: ensure it starts with 0 (e.g., 01012345678)
-      phoneForEmail = number.length === 10 && number.startsWith('1') 
-        ? '0' + number 
-        : number.startsWith('0') 
-          ? number 
-          : '0' + number
+    if (cleanedPhone.startsWith('+20')) {
+      // Egyptian number with +20 prefix: +201006332934
+      // Extract everything after +20
+      const afterCountryCode = cleanedPhone.substring(3) // Gets '1006332934'
+      // Ensure it starts with 0
+      phoneForEmail = afterCountryCode.startsWith('0') ? afterCountryCode : '0' + afterCountryCode
+    } else if (cleanedPhone.startsWith('0020')) {
+      // Egyptian number with 0020 prefix
+      const afterCountryCode = cleanedPhone.substring(4)
+      phoneForEmail = afterCountryCode.startsWith('0') ? afterCountryCode : '0' + afterCountryCode
+    } else if (cleanedPhone.startsWith('0') && digitsOnly.length === 11) {
+      // Already in local Egyptian format: 01006332934
+      phoneForEmail = cleanedPhone
+    } else if (digitsOnly.length >= 10) {
+      // Extract from digits: for Egyptian, use last 11 digits (0 + 10 digits)
+      // Or if we have 12-13 digits (country code + number), use last 11
+      if (digitsOnly.length >= 12) {
+        // Has country code: use last 11 digits (0 + 10 digit number)
+        phoneForEmail = '0' + digitsOnly.slice(-10)
+      } else if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+        // Already 11 digits starting with 0
+        phoneForEmail = digitsOnly
+      } else if (digitsOnly.length === 10) {
+        // 10 digits: add 0 prefix
+        phoneForEmail = '0' + digitsOnly
+      } else {
+        // Use all digits
+        phoneForEmail = digitsOnly.startsWith('0') ? digitsOnly : '0' + digitsOnly
+      }
     } else {
-      // International number: use the number part without country code
-      phoneForEmail = normalizedPhone.replace(/^\+\d{1,3}/, '')
-      phoneForEmail = phoneForEmail.replace(/^0+/, '')
+      // Fallback: use all digits
+      phoneForEmail = digitsOnly || cleanedPhone
+    }
+
+    // Ensure minimum length
+    if (!phoneForEmail || phoneForEmail.length < 4) {
+      phoneForEmail = digitsOnly || cleanedPhone
     }
 
     return `${phoneForEmail}@ma3ana.org`
   }
 
-  const handleUpdateEmailFromPhone = async () => {
-    if (!userId || updatingEmail || !formData.phone?.trim()) {
+  const handleUpdateEmailFromPhoneClick = () => {
+    if (!formData.phone?.trim()) {
       toast.error('Error', {
         description: 'Phone number is required to update email'
+      })
+      return
+    }
+
+    // Generate proposed email and show confirmation dialog
+    const email = formatPhoneForEmail(formData.phone)
+    setProposedEmail(email)
+    setShowEmailUpdateDialog(true)
+  }
+
+  const handleConfirmEmailUpdate = async () => {
+    if (!userId || updatingEmail || !proposedEmail.trim()) {
+      toast.error('Error', {
+        description: 'Email is required'
+      })
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(proposedEmail.trim())) {
+      toast.error('Error', {
+        description: 'Invalid email format'
       })
       return
     }
@@ -196,7 +268,10 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          email: proposedEmail.trim()
+        })
       })
 
       if (!response.ok) {
@@ -210,14 +285,17 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         description: data.message || 'Email updated successfully'
       })
 
-      // Refresh user data to show updated email
+      // Close dialog and refresh user data
+      setShowEmailUpdateDialog(false)
+      setProposedEmail('')
       await fetchUser()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update email from phone'
       logger.error('Error updating email from phone:', { 
         error: errorMessage,
         userId,
-        phone: formData.phone 
+        phone: formData.phone,
+        proposedEmail
       })
       toast.error('Error', {
         description: errorMessage
@@ -238,12 +316,25 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || error.error || 'Failed to delete user')
+        const errorData = await response.json()
+        const errorMessage = errorData.message || errorData.error || 'Failed to delete user'
+        
+        // Check if it's a validation error (user has activities that cannot be removed)
+        if (response.status === 400 && errorMessage.includes('related activities')) {
+          // Show a more user-friendly error message
+          toast.error('Cannot Delete User', {
+            description: errorMessage,
+            duration: 6000,
+          })
+        } else {
+          throw new Error(errorMessage)
+        }
+        
+        return
       }
 
       toast.success('Success', {
-        description: 'User deleted successfully'
+        description: 'User deleted successfully. Role assignments were automatically removed if present.'
       })
 
       setShowDeleteDialog(false)
@@ -281,6 +372,25 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
       return `${user.first_name || ''} ${user.last_name || ''}`.trim()
     }
     return user?.email?.split('@')[0] || 'User'
+  }
+
+  const handleAddTag = () => {
+    const trimmed = tagInput.trim()
+    if (trimmed && !formData.tags.includes(trimmed)) {
+      setFormData({ ...formData, tags: [...formData.tags, trimmed] })
+      setTagInput('')
+    }
+  }
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) })
+  }
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddTag()
+    }
   }
 
   if (fetching) {
@@ -402,7 +512,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handleUpdateEmailFromPhone}
+                        onClick={handleUpdateEmailFromPhoneClick}
                         disabled={updatingEmail}
                         className="whitespace-nowrap"
                         title={`Update email to ${formatPhoneForEmail(formData.phone)}`}
@@ -451,6 +561,131 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                   </StandardFormField>
                 </div>
 
+                {/* Notes & Tags - Collapsible section */}
+                <Collapsible open={notesTagsExpanded} onOpenChange={setNotesTagsExpanded}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between h-10 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4" />
+                        <span>Notes & Tags</span>
+                        {formData.notes || formData.tags.length > 0 ? (
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                            {[formData.notes && 'Note', formData.tags.length > 0 && `${formData.tags.length} tag${formData.tags.length > 1 ? 's' : ''}`].filter(Boolean).join(', ')}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {notesTagsExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 pt-4">
+                    <StandardFormField 
+                      label="Tags" 
+                      description="Add tags to categorize this user (press Enter to add)"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={handleTagInputKeyDown}
+                            placeholder="Type a tag and press Enter"
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleAddTag}
+                            disabled={!tagInput.trim()}
+                          >
+                            <Tag className="h-4 w-4 mr-2" />
+                            Add
+                          </Button>
+                        </div>
+                        {formData.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200 min-h-[60px]">
+                            {formData.tags.map((tag, index) => (
+                              <Badge
+                                key={index}
+                                variant="secondary"
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-sm"
+                              >
+                                {tag}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveTag(tag)}
+                                  className="ml-1 hover:bg-gray-300 rounded-full p-0.5 transition-colors"
+                                  aria-label={`Remove tag ${tag}`}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {formData.tags.length === 0 && (
+                          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-500 text-center">
+                            No tags added yet
+                          </div>
+                        )}
+                      </div>
+                    </StandardFormField>
+
+                    <StandardFormField 
+                      label="Notes" 
+                      description="Admin notes (click to edit)"
+                    >
+                      {isEditingNotes ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={formData.notes}
+                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                            placeholder="Add notes about this user..."
+                            className="min-h-[80px] resize-y text-sm"
+                            rows={3}
+                            autoFocus
+                            onBlur={() => setIsEditingNotes(false)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setIsEditingNotes(false)
+                              }
+                            }}
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsEditingNotes(false)}
+                              className="h-7 text-xs"
+                            >
+                              Done
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => setIsEditingNotes(true)}
+                          className="min-h-[40px] p-3 bg-gray-50 border border-gray-200 rounded-lg cursor-text hover:bg-gray-100 transition-colors text-sm"
+                        >
+                          {formData.notes ? (
+                            <p className="text-gray-700 whitespace-pre-wrap">{formData.notes}</p>
+                          ) : (
+                            <p className="text-gray-400 italic">Click to add notes...</p>
+                          )}
+                        </div>
+                      )}
+                    </StandardFormField>
+                  </CollapsibleContent>
+                </Collapsible>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <StandardFormField label="Phone">
                     <div className="relative">
@@ -459,7 +694,11 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                         id="phone"
                         type="tel"
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onChange={(e) => {
+                          // Remove all spaces from phone number
+                          const cleaned = e.target.value.replace(/\s/g, '')
+                          setFormData({ ...formData, phone: cleaned })
+                        }}
                         className="pl-10 h-10"
                         placeholder="Phone number"
                       />
@@ -541,7 +780,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
                   <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-amber-800">
-                      This user has contributions and cannot be deleted.
+                      This user has contributions. Users with any related activities (contributions, cases, role assignments, etc.) cannot be deleted to maintain data integrity.
                     </p>
                   </div>
                 )}
@@ -629,7 +868,7 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         onOpenChange={setShowDeleteDialog}
         onConfirm={handleDelete}
         title="Delete User"
-        description={`Are you sure you want to delete ${user?.email}? This action cannot be undone. The user account will be permanently removed from the system.${user && (!user.contribution_count || user.contribution_count === 0) ? ' This user has no contributions and can be safely deleted.' : ''}`}
+        description={`Are you sure you want to delete ${user?.email}? This action cannot be undone. The user account will be permanently removed from the system. Users can only be deleted if they have no related activities (contributions, cases, role assignments, etc.).`}
         confirmText={deleting ? 'Deleting...' : 'Delete User'}
         cancelText="Cancel"
         variant="destructive"
@@ -637,6 +876,70 @@ export function UserProfileEditModal({ open, userId, onClose, onSuccess }: UserP
         disabled={deleting}
         autoClose={false}
       />
+
+      {/* Email Update Confirmation Dialog */}
+      <Dialog open={showEmailUpdateDialog} onOpenChange={setShowEmailUpdateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Update Email from Phone
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <div>
+                  Update email address based on phone number. You can edit the email before confirming.
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Current phone: <strong>{formData.phone}</strong>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="proposed-email">New Email Address</Label>
+              <Input
+                id="proposed-email"
+                type="email"
+                value={proposedEmail}
+                onChange={(e) => setProposedEmail(e.target.value)}
+                placeholder="email@ma3ana.org"
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                The email will be updated in both the user profile and authentication system.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEmailUpdateDialog(false)
+                setProposedEmail('')
+              }}
+              disabled={updatingEmail}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmEmailUpdate}
+              disabled={updatingEmail || !proposedEmail.trim()}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {updatingEmail ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Email'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

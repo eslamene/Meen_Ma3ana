@@ -117,6 +117,8 @@ async function getHandler(
         language: profile?.language || 'ar',
         is_active: profile?.is_active ?? true,
         email_verified: emailVerified, // Use auth.users.email_confirmed_at as source of truth
+        notes: profile?.notes || null,
+        tags: profile?.tags || [],
         // Additional data
         roles,
         contribution_count: contributionCount || 0
@@ -175,8 +177,10 @@ async function putHandler(
 
     // Check if phone number is being updated and if it's already in use
     if (body.phone !== undefined && body.phone && body.phone.trim()) {
+      // Remove all spaces from phone number before processing
+      const phoneWithoutSpaces = body.phone.trim().replace(/\s/g, '')
       // Normalize phone number before checking uniqueness and storing
-      const normalizedPhone = normalizePhoneNumber(body.phone.trim(), '+20')
+      const normalizedPhone = normalizePhoneNumber(phoneWithoutSpaces, '+20')
       
       // Get all users with phone numbers to check normalized uniqueness
       const { data: allUsersWithPhone, error: fetchError } = await supabase
@@ -230,6 +234,8 @@ async function putHandler(
     if (body.address !== undefined) profileUpdates.address = body.address || null
     if (body.language !== undefined) profileUpdates.language = body.language
     if (body.is_active !== undefined) profileUpdates.is_active = body.is_active
+    if (body.notes !== undefined) profileUpdates.notes = body.notes || null
+    if (body.tags !== undefined) profileUpdates.tags = body.tags || []
     // email_verified is read-only and synced from auth.users.email_confirmed_at
     // Do not allow manual updates to email_verified field
 
@@ -366,7 +372,9 @@ async function deleteHandler(
       supabase.from('system_content').select('*', { count: 'exact', head: true }).eq('updated_by', userId),
       // Contribution approval status - admin_id
       supabase.from('contribution_approval_status').select('*', { count: 'exact', head: true }).eq('admin_id', userId),
-      // Admin user roles - assigned_by
+      // Admin user roles - user has roles assigned (user_id)
+      supabase.from('admin_user_roles').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+      // Admin user roles - user assigned roles to others (assigned_by)
       supabase.from('admin_user_roles').select('*', { count: 'exact', head: true }).eq('assigned_by', userId),
     ])
 
@@ -393,7 +401,8 @@ async function deleteHandler(
       { name: 'system config updated', field: 'updated_by' },
       { name: 'system content updated', field: 'updated_by' },
       { name: 'contribution approvals', field: 'admin_id' },
-      { name: 'role assignments', field: 'assigned_by' },
+      { name: 'role assignments', field: 'user_id' },
+      { name: 'role assignments made', field: 'assigned_by' },
     ]
 
     // Check for any activities
@@ -404,12 +413,61 @@ async function deleteHandler(
       }))
       .filter(activity => activity.count > 0)
 
-    if (activities.length > 0) {
+    // Separate critical activities (cannot be auto-removed) from removable activities (role assignments)
+    const criticalActivities = activities.filter(a => 
+      !a.type.includes('role assignments')
+    )
+    const roleAssignmentActivities = activities.filter(a => 
+      a.type.includes('role assignments')
+    )
+
+    // If there are critical activities, block deletion
+    if (criticalActivities.length > 0) {
       const activitySummary = activities
         .map(a => `${a.count} ${a.type}`)
         .join(', ')
       
       throw new ApiError('VALIDATION_ERROR', `User has related activities: ${activitySummary}. Users with activities cannot be deleted to maintain data integrity.`, 400)
+    }
+
+    // If only role assignments exist, automatically remove them before deletion
+    if (roleAssignmentActivities.length > 0) {
+      logger.info('Removing role assignments before user deletion', {
+        userId,
+        roleAssignments: roleAssignmentActivities
+      })
+
+      // Remove all role assignments for this user (both where user_id = userId and where assigned_by = userId)
+      const { error: removeUserRolesError } = await supabase
+        .from('admin_user_roles')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+
+      if (removeUserRolesError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error removing user roles:', removeUserRolesError)
+        throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to remove user role assignments: ${removeUserRolesError.message}`, 500)
+      }
+
+      // Also remove role assignments where this user assigned roles to others
+      const { error: removeAssignedRolesError } = await supabase
+        .from('admin_user_roles')
+        .update({ is_active: false })
+        .eq('assigned_by', userId)
+
+      if (removeAssignedRolesError) {
+        logger.logStableError('INTERNAL_SERVER_ERROR', 'Error removing assigned roles:', removeAssignedRolesError)
+        // Log but don't throw - this is less critical
+        logger.warn('Some role assignments may not have been removed', {
+          userId,
+          error: removeAssignedRolesError
+        })
+      }
+
+      logger.info('Role assignments removed successfully', {
+        userId,
+        removedUserRoles: roleAssignmentActivities.find(a => a.type === 'role assignments')?.count || 0,
+        removedAssignedRoles: roleAssignmentActivities.find(a => a.type === 'role assignments made')?.count || 0
+      })
     }
 
     // Log the admin action before deletion

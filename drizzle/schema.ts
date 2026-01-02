@@ -48,6 +48,8 @@ export const users = pgTable('users', {
   email_verified: boolean('email_verified').notNull().default(false),
   language: text('language').notNull().default('en'),
   notifications: text('notifications'), // JSON string for notification preferences
+  notes: text('notes'), // Admin notes about the user
+  tags: jsonb('tags').$type<string[]>(), // Array of tags for categorizing users
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
@@ -120,6 +122,7 @@ export const cases = pgTable('cases', {
   sponsored_by: uuid('sponsored_by').references(() => users.id),
   beneficiary_id: uuid('beneficiary_id').references(() => beneficiaries.id, { onDelete: 'set null' }),
   supporting_documents: text('supporting_documents'), // JSON array of document URLs (legacy, use case_files instead)
+  batch_id: uuid('batch_id').references((): AnyPgColumn => batchUploads.id, { onDelete: 'set null' }), // Reference to batch upload if created from batch
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 })
@@ -220,6 +223,7 @@ export const contributions = pgTable('contributions', {
   revision_explanation: text('revision_explanation'),
   message: text('message'),
   proof_url: text('proof_url'),
+  batch_id: uuid('batch_id').references((): AnyPgColumn => batchUploads.id, { onDelete: 'set null' }), // Reference to batch upload if created from batch
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 })
@@ -554,6 +558,52 @@ export const adminMenuItems = pgTable('admin_menu_items', {
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 })
 
+// Batch upload management tables
+export const batchUploads = pgTable('batch_uploads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  source_file: text('source_file'),
+  status: text('status').notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed', 'cancelled'
+  total_items: integer('total_items').notNull().default(0),
+  processed_items: integer('processed_items').notNull().default(0),
+  successful_items: integer('successful_items').notNull().default(0),
+  failed_items: integer('failed_items').notNull().default(0),
+  error_summary: jsonb('error_summary'),
+  metadata: jsonb('metadata'),
+  created_by: uuid('created_by').references(() => users.id).notNull(),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+  completed_at: timestamp('completed_at'),
+})
+
+export const batchUploadItems = pgTable('batch_upload_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  batch_id: uuid('batch_id').references(() => batchUploads.id, { onDelete: 'cascade' }).notNull(),
+  row_number: integer('row_number').notNull(),
+  case_number: text('case_number').notNull(),
+  case_title: text('case_title').notNull(),
+  contributor_nickname: text('contributor_nickname').notNull(),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  month: text('month').notNull(),
+  user_id: uuid('user_id').references(() => users.id),
+  case_id: uuid('case_id').references(() => cases.id),
+  contribution_id: uuid('contribution_id').references(() => contributions.id),
+  status: text('status').notNull().default('pending'), // 'pending', 'mapped', 'case_created', 'contribution_created', 'failed'
+  error_message: text('error_message'),
+  mapping_notes: text('mapping_notes'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+})
+
+export const nicknameMappings = pgTable('nickname_mappings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  nickname: text('nickname').notNull().unique(),
+  user_id: uuid('user_id').references(() => users.id).notNull(),
+  created_by: uuid('created_by').references(() => users.id).notNull(),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+})
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   cases: many(cases),
@@ -800,6 +850,44 @@ export const adminMenuItemsRelations = relations(adminMenuItems, ({ one, many })
   }),
 }))
 
+export const batchUploadsRelations = relations(batchUploads, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [batchUploads.created_by],
+    references: [users.id],
+  }),
+  items: many(batchUploadItems),
+}))
+
+export const batchUploadItemsRelations = relations(batchUploadItems, ({ one }) => ({
+  batch: one(batchUploads, {
+    fields: [batchUploadItems.batch_id],
+    references: [batchUploads.id],
+  }),
+  user: one(users, {
+    fields: [batchUploadItems.user_id],
+    references: [users.id],
+  }),
+  case: one(cases, {
+    fields: [batchUploadItems.case_id],
+    references: [cases.id],
+  }),
+  contribution: one(contributions, {
+    fields: [batchUploadItems.contribution_id],
+    references: [contributions.id],
+  }),
+}))
+
+export const nicknameMappingsRelations = relations(nicknameMappings, ({ one }) => ({
+  user: one(users, {
+    fields: [nicknameMappings.user_id],
+    references: [users.id],
+  }),
+  createdBy: one(users, {
+    fields: [nicknameMappings.created_by],
+    references: [users.id],
+  }),
+}))
+
 // Export schema object
 export const schema = {
   users,
@@ -831,4 +919,7 @@ export const schema = {
   adminRolePermissions,
   adminUserRoles,
   adminMenuItems,
+  batchUploads,
+  batchUploadItems,
+  nicknameMappings,
 }

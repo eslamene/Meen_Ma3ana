@@ -127,7 +127,10 @@ export default function AdminUsersPage() {
         toast.error('Error', { description: usersRes.error || 'Failed to fetch users' })
       }
     } catch (error) {
-      logger.error('Fetch error:', { error: error })
+      const errorDetails = error instanceof Error 
+        ? { message: error.message, name: error.name }
+        : { error: String(error) }
+      logger.error('Fetch error:', error instanceof Error ? error : undefined, errorDetails)
       toast.error('Error', { description: 'Failed to fetch users' })
     } finally {
       setLoading(false)
@@ -158,7 +161,10 @@ export default function AdminUsersPage() {
         })))
       }
     } catch (error) {
-      logger.error('Error fetching roles:', { error: error })
+      const errorDetails = error instanceof Error 
+        ? { message: error.message, name: error.name }
+        : { error: String(error) }
+      logger.error('Error fetching roles:', error instanceof Error ? error : undefined, errorDetails)
       toast.error('Error', { description: 'Failed to fetch roles' })
     }
   }, [toast])
@@ -183,7 +189,10 @@ export default function AdminUsersPage() {
         setUserCurrentRoles([])
       }
     } catch (error) {
-      logger.error('Error fetching user roles:', { error: error })
+      const errorDetails = error instanceof Error 
+        ? { message: error.message, name: error.name, userId }
+        : { error: String(error), userId }
+      logger.error('Error fetching user roles:', error instanceof Error ? error : undefined, errorDetails)
       toast.error('Error', { description: 'Failed to fetch user roles' })
       setUserCurrentRoles([])
     } finally {
@@ -223,7 +232,10 @@ export default function AdminUsersPage() {
       // Close modal
       setRoleAssignmentModal({ open: false, userId: null, userEmail: null })
     } catch (error) {
-      logger.error('Error saving roles:', { error: error })
+      const errorDetails = error instanceof Error 
+        ? { message: error.message, name: error.name, userId }
+        : { error: String(error), userId }
+      logger.error('Error saving roles:', error instanceof Error ? error : undefined, errorDetails)
       toast.error('Error', {
         description: error instanceof Error ? error.message : 'Failed to assign roles'
       })
@@ -261,20 +273,47 @@ export default function AdminUsersPage() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || error.error || 'Failed to delete user')
+        const errorData = await response.json()
+        const errorMessage = errorData.message || errorData.error || 'Failed to delete user'
+        
+        // Check if it's a validation error (user has activities that cannot be removed)
+        if (response.status === 400 && errorMessage.includes('related activities')) {
+          // Show a more user-friendly error message
+          toast.error('Cannot Delete User', {
+            description: errorMessage,
+            duration: 6000,
+          })
+        } else {
+          throw new Error(errorMessage)
+        }
+        
+        return
       }
 
       toast.success('Success', {
-        description: 'User deleted successfully'
+        description: 'User deleted successfully. Role assignments were automatically removed if present.'
       })
 
       setDeleteDialog({ open: false, userId: null, userEmail: null })
       await fetchUsers()
     } catch (error) {
-      logger.error('Error deleting user:', { error: error })
+      // Properly extract error information for logging
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete user'
+      const errorDetails = error instanceof Error 
+        ? { 
+            message: error.message,
+            name: error.name,
+            stack: error.stack,
+            userId: deleteDialog.userId 
+          }
+        : { 
+            error: String(error),
+            userId: deleteDialog.userId 
+          }
+      
+      logger.error('Error deleting user:', error instanceof Error ? error : undefined, errorDetails)
       toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to delete user',
+        description: errorMessage,
       })
     } finally {
       setDeleting(false)
@@ -779,17 +818,17 @@ export default function AdminUsersPage() {
                 <AlertTriangle className="h-5 w-5" />
                 Delete User
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription asChild>
                 <div className="space-y-2">
-                  <p>
+                  <div>
                     Are you sure you want to delete <strong>{deleteDialog.userEmail}</strong>?
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    This action will permanently delete the user account. Users can only be deleted if they have no related activities (contributions, cases, projects, messages, etc.).
-                  </p>
-                  <p className="text-sm font-medium text-red-600 mt-2">
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    This action will permanently delete the user account. Users can only be deleted if they have no related activities (contributions, cases, projects, role assignments, messages, notifications, etc.).
+                  </div>
+                  <div className="text-sm font-medium text-red-600 mt-2">
                     This action cannot be undone!
-                  </p>
+                  </div>
                 </div>
               </DialogDescription>
             </DialogHeader>

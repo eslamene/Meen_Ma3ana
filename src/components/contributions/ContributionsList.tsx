@@ -23,6 +23,7 @@ import {
   ExternalLink,
   ArrowLeft
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import ContributionRejectionModal from '@/components/contributions/ContributionRejectionModal'
 import ContributionDetailsModal from '@/components/contributions/ContributionDetailsModal'
@@ -97,6 +98,9 @@ interface ContributionsListProps {
   error?: string | null
   onPageChange?: (page: number) => void
   onRefresh?: () => void
+  selectedIds?: Set<string>
+  onToggleSelection?: (id: string) => void
+  selectAllMode?: 'none' | 'all' | 'viewed' | 'searched'
 }
 
 // Status configuration inspired by the provided code
@@ -148,6 +152,8 @@ interface ContributionItemProps {
   onViewProof: (contribution: Contribution) => void
   isAdmin?: boolean
   isHighlighted?: boolean
+  isSelected?: boolean
+  onToggleSelection?: (id: string) => void
 }
 
 const ContributionItem = ({
@@ -160,6 +166,8 @@ const ContributionItem = ({
   onViewProof,
   isAdmin = false,
   isHighlighted = false,
+  isSelected = false,
+  onToggleSelection,
 }: ContributionItemProps) => {
   const params = useParams()
   const router = useRouter()
@@ -235,6 +243,18 @@ const ContributionItem = ({
       >
         <CardContent className="p-3 sm:p-4 md:p-5">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+            {/* Selection Checkbox */}
+            {isAdmin && onToggleSelection && (
+              <div className="flex items-start pt-1">
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => onToggleSelection(contribution.id)}
+                  disabled={contribution.status !== 'pending'}
+                  className="mt-0.5 border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={contribution.status !== 'pending' ? 'Only pending contributions can be selected' : ''}
+                />
+              </div>
+            )}
             {/* Main Content - Enhanced */}
             <div className="flex-1 min-w-0 w-full sm:w-auto">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
@@ -481,6 +501,9 @@ interface ContributionThreadProps {
   onViewProof: (contribution: Contribution) => void
   isAdmin?: boolean
   highlightedTxId?: string
+  selectedIds?: Set<string>
+  onToggleSelection?: (id: string) => void
+  selectAllMode?: 'none' | 'all' | 'viewed' | 'searched'
 }
 
 const ContributionThread = ({
@@ -491,6 +514,9 @@ const ContributionThread = ({
   onViewProof,
   isAdmin = false,
   highlightedTxId,
+  selectedIds = new Set(),
+  onToggleSelection,
+  selectAllMode = 'none',
 }: ContributionThreadProps) => {
   const childrenArray = Array.isArray(children) ? children : [children]
   
@@ -516,6 +542,13 @@ const ContributionThread = ({
               onViewProof={onViewProof}
               isAdmin={isAdmin}
               isHighlighted={highlightedTxId === parent.id}
+              isSelected={
+                selectAllMode === 'viewed' || 
+                selectAllMode === 'all' || 
+                selectAllMode === 'searched' ||
+                selectedIds.has(parent.id)
+              }
+              onToggleSelection={onToggleSelection}
             />
             {childrenArray.map((child: Contribution) => (
               <div key={child.id}>
@@ -527,6 +560,13 @@ const ContributionThread = ({
                   onViewProof={onViewProof}
                   isAdmin={isAdmin}
                   isHighlighted={highlightedTxId === child.id}
+                  isSelected={
+                    selectAllMode === 'viewed' || 
+                    selectAllMode === 'all' || 
+                    selectAllMode === 'searched' ||
+                    selectedIds.has(child.id)
+                  }
+                  onToggleSelection={onToggleSelection}
                 />
               </div>
             ))}
@@ -551,7 +591,7 @@ const ContributionThread = ({
   )
 }
 
-export default function ContributionsList({
+function ContributionsList({
   contributions,
   loading = false,
   onStatusUpdate,
@@ -561,6 +601,9 @@ export default function ContributionsList({
   error,
   onPageChange,
   onRefresh,
+  selectedIds = new Set(),
+  onToggleSelection,
+  selectAllMode = 'none',
 }: ContributionsListProps) {
   const [openMenuForId, setOpenMenuForId] = useState<string | null>(null)
   const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null)
@@ -801,6 +844,9 @@ export default function ContributionsList({
                 onViewProof={handleViewProof}
                 isAdmin={isAdmin}
                 highlightedTxId={highlightedTxId}
+                selectedIds={selectedIds}
+                onToggleSelection={onToggleSelection}
+                selectAllMode={selectAllMode}
               >
                 {g.children as React.ReactNode}
               </ContributionThread>
@@ -832,6 +878,13 @@ export default function ContributionsList({
                   onViewProof={handleViewProof}
                   isAdmin={isAdmin}
                   isHighlighted={highlightedTxId === item.contribution.id}
+                  isSelected={
+                    selectAllMode === 'viewed' || 
+                    selectAllMode === 'all' || 
+                    selectAllMode === 'searched' ||
+                    selectedIds.has(item.contribution.id)
+                  }
+                  onToggleSelection={onToggleSelection}
                 />
               </div>
             </motion.div>
@@ -877,3 +930,5 @@ export default function ContributionsList({
     </div>
   )
 }
+
+export default ContributionsList
