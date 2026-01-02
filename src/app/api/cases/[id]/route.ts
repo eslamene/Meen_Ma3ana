@@ -194,11 +194,13 @@ async function patchHandler(
 
     // Return response with status change error if applicable
     if (statusChangeError) {
+      // Return 200 but include error info so frontend can handle it
+      // Other fields may have been updated successfully
       return NextResponse.json({
-        message: 'Case updated successfully, but status change failed',
+        message: 'Case updated, but status change failed',
         error: statusChangeError,
         statusChangeFailed: true
-      }, { status: 200 }) // Return 200 but include error info
+      }, { status: 200 })
     }
 
     return NextResponse.json({

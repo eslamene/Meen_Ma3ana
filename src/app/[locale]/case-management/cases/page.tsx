@@ -112,6 +112,7 @@ interface Case {
 export default function AdminCasesPage() {
   const router = useRouter()
   const params = useParams()
+  const locale = (params?.locale as string) || 'en'
   const { containerVariant } = useLayout()
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,6 +129,9 @@ export default function AdminCasesPage() {
     closed: 0,
     under_review: 0
   })
+  const [totalItems, setTotalItems] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean
     caseId: string | null
@@ -193,6 +197,11 @@ export default function AdminCasesPage() {
       if (searchTerm) {
         params.append('search', searchTerm)
       }
+      // Add pagination parameters
+      params.append('page', currentPage.toString())
+      params.append('limit', itemsPerPage.toString())
+      // Add sorting parameter
+      params.append('sortBy', sortBy)
       
       const queryString = params.toString()
       const url = `/api/admin/cases/stats${queryString ? `?${queryString}` : ''}`
@@ -211,11 +220,6 @@ export default function AdminCasesPage() {
       
       const loadedCases = data.cases || []
       
-      // Warn if dataset is large (this view loads all cases into memory)
-      if (loadedCases.length > 1000) {
-        logger.warn(`Large dataset detected: ${loadedCases.length} cases loaded. This view may experience performance issues with very large datasets. Consider implementing server-side pagination.`)
-      }
-      
       setCases(loadedCases)
       setStats(data.stats || {
         total: 0,
@@ -224,13 +228,18 @@ export default function AdminCasesPage() {
         closed: 0,
         under_review: 0
       })
+      
+      // Update total items from API response
+      if (data.pagination) {
+        setTotalItems(data.pagination.total)
+      }
     } catch (error) {
       logger.error('Error fetching cases:', { error: error })
       toast.error('Error', { description: 'Failed to load cases. Please try again.' })
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, searchTerm])
+  }, [statusFilter, searchTerm, currentPage, itemsPerPage, sortBy])
 
   useEffect(() => {
     fetchCases()
@@ -316,49 +325,43 @@ export default function AdminCasesPage() {
     return Math.min((current / target) * 100, 100)
   }
 
-  const filteredCases = cases.filter(case_ => {
-    // Handle search with null/undefined checks and bilingual fields
-    const searchLower = searchTerm.toLowerCase()
-    const title = case_.title || case_.title_en || case_.title_ar || ''
-    const description = case_.description || case_.description_en || case_.description_ar || ''
-    
-    const matchesSearch = !searchTerm || 
-                         (title && title.toLowerCase().includes(searchLower)) ||
-                         (description && description.toLowerCase().includes(searchLower))
-    
-    const matchesStatus = statusFilter.length === 0 || statusFilter.includes(case_.status || '')
-    return matchesSearch && matchesStatus
-  }).sort((a, b) => {
-    // Apply sorting based on sortBy state
-    switch (sortBy) {
-      case 'contributors_high':
-        return (b.contributor_count || 0) - (a.contributor_count || 0)
-      case 'contributors_low':
-        return (a.contributor_count || 0) - (b.contributor_count || 0)
-      case 'amount_high':
-        return (b.approved_amount || 0) - (a.approved_amount || 0)
-      case 'amount_low':
-        return (a.approved_amount || 0) - (b.approved_amount || 0)
-      case 'created_at_desc':
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      case 'created_at_asc':
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      default:
-        return 0
+  // Helper functions to get locale-aware title and description
+  const getCaseTitle = (case_: Case): string => {
+    if (locale === 'ar') {
+      return case_.title_ar || case_.title_en || case_.title || 'Untitled Case'
     }
-  })
+    return case_.title_en || case_.title_ar || case_.title || 'Untitled Case'
+  }
 
-  // Use pagination hook for client-side pagination with Load More button
+  const getCaseDescription = (case_: Case): string => {
+    if (locale === 'ar') {
+      return case_.description_ar || case_.description_en || case_.description || 'No description'
+    }
+    return case_.description_en || case_.description_ar || case_.description || 'No description'
+  }
+
+  // Cases are already filtered and paginated by the API
+  // No need for client-side filtering
+  const filteredCases = cases
+
+  // Use pagination hook for server-side pagination
+  // totalItems will update automatically when state changes
   const pagination = useInfiniteScrollPagination({
-    totalItems: filteredCases.length,
-    initialPage: 1,
-    initialItemsPerPage: 10,
+    totalItems: totalItems, // Set from API response, updates automatically
+    initialPage: currentPage,
+    initialItemsPerPage: itemsPerPage,
     resetDependencies: [searchTerm, statusFilter, sortBy],
-    useLoadMoreButton: true // Use Load More button instead of infinite scroll
+    useLoadMoreButton: false // Use page navigation instead
   })
+  
+  // Sync local state with pagination state (for API calls)
+  useEffect(() => {
+    setCurrentPage(pagination.state.currentPage)
+    setItemsPerPage(pagination.state.itemsPerPage)
+  }, [pagination.state.currentPage, pagination.state.itemsPerPage])
 
-  // Calculate paginated cases based on hook state
-  const paginatedCases = filteredCases.slice(0, pagination.state.endIndex)
+  // Cases are already paginated from API
+  const paginatedCases = cases
 
   const handlePageChange = (page: number) => {
     pagination.actions.setCurrentPage(Math.max(1, Math.min(page, pagination.state.totalPages)))
@@ -548,7 +551,7 @@ export default function AdminCasesPage() {
     setQuickUpdateDialog({
       isOpen: true,
       caseId: case_.id,
-      caseTitle: case_.title || case_.title_en || case_.title_ar || 'Untitled Case',
+      caseTitle: getCaseTitle(case_),
       currentStatus: case_.status || 'draft',
       currentCategory: caseCategory,
       currentCategoryId: caseCategoryId,
@@ -614,20 +617,29 @@ export default function AdminCasesPage() {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to update case')
+        const errorMsg = result.error || result.message || 'Failed to update case'
+        throw new Error(errorMsg)
       }
 
-      // Update local state
-      setCases(prev => prev.map(c => 
-        c.id === quickUpdateDialog.caseId 
-          ? { 
-              ...c, 
-              status: updateFormData.status as 'draft' | 'submitted' | 'published' | 'closed' | 'under_review',
-              priority: updateFormData.priority as 'low' | 'medium' | 'high' | 'urgent',
-              category_id: categoryId || undefined
-            }
-          : c
-      ))
+      // Check if status change failed (API may return 200 but with error flag)
+      if (result.statusChangeFailed) {
+        const errorMsg = result.error || 'Failed to update case status. This status transition may not be allowed or may require additional information.'
+        throw new Error(errorMsg)
+      }
+
+      // Update local state only if status change succeeded
+      if (updateFormData.status) {
+        setCases(prev => prev.map(c => 
+          c.id === quickUpdateDialog.caseId 
+            ? { 
+                ...c, 
+                status: updateFormData.status as 'draft' | 'submitted' | 'published' | 'closed' | 'under_review',
+                priority: updateFormData.priority as 'low' | 'medium' | 'high' | 'urgent',
+                category_id: categoryId || undefined
+              }
+            : c
+        ))
+      }
 
       // Refresh cases to get updated data
       await fetchCases()
@@ -1015,11 +1027,17 @@ export default function AdminCasesPage() {
               <>
                 {/* Results Info */}
                 <div className="mb-2 sm:mb-3 text-xs sm:text-sm text-gray-600 break-words">
-                  Showing {pagination.state.startIndex + 1} to {Math.min(pagination.state.endIndex, filteredCases.length)} of {filteredCases.length} cases
-                  {(searchTerm || (statusFilter.length > 0 && statusFilter.length < 6)) && (
-                    <span className="ml-1 sm:ml-2">
-                      (filtered from {cases.length} total)
-                    </span>
+                  {totalItems > 0 ? (
+                    <>
+                      Showing {pagination.state.startIndex + 1} to {Math.min(pagination.state.endIndex, totalItems)} of {totalItems} cases
+                      {(searchTerm || (statusFilter.length > 0 && statusFilter.length < 6)) && stats.total > 0 && (
+                        <span className="ml-1 sm:ml-2">
+                          (filtered from {stats.total} total)
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>No cases found</>
                   )}
                 </div>
 
@@ -1041,7 +1059,7 @@ export default function AdminCasesPage() {
                             <div className="flex-shrink-0 md:w-48 w-full h-48 md:h-auto">
                               <Image
                                 src={case_.image_url}
-                                alt={case_.title || case_.title_en || case_.title_ar || 'Case image'}
+                                alt={getCaseTitle(case_)}
                                 className="w-full h-full object-cover"
                                 width={192}
                                 height={192}
@@ -1055,7 +1073,7 @@ export default function AdminCasesPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
                                   <h3 className="text-lg sm:text-xl font-bold text-gray-900 line-clamp-2 sm:line-clamp-1 break-words">
-                                    {case_.title || case_.title_en || case_.title_ar || 'Untitled Case'}
+                                    {getCaseTitle(case_)}
                                   </h3>
                                   {/* Beneficiary Icon - Clickable Action */}
                                   {beneficiaryName && (
@@ -1095,7 +1113,7 @@ export default function AdminCasesPage() {
                                   )}
                                 </div>
                                 <p className="text-gray-600 text-xs sm:text-sm line-clamp-2 mb-2 sm:mb-3 break-words">
-                                  {case_.description || case_.description_en || case_.description_ar || 'No description'}
+                                  {getCaseDescription(case_)}
                                 </p>
                               </div>
                               <div className="flex-shrink-0">
@@ -1249,7 +1267,7 @@ export default function AdminCasesPage() {
                                 onClick={() => setAddContributionModal({
                                   open: true,
                                   caseId: case_.id,
-                                  caseTitle: case_.title || case_.title_en || case_.title_ar || 'Untitled Case'
+                                  caseTitle: getCaseTitle(case_)
                                 })}
                                 className="flex-1 md:flex-none w-full md:w-auto border-2 text-xs sm:text-sm"
                                 style={{
@@ -1272,7 +1290,7 @@ export default function AdminCasesPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteClick(case_.id, case_.title || case_.title_en || case_.title_ar || 'Untitled Case')}
+                              onClick={() => handleDeleteClick(case_.id, getCaseTitle(case_))}
                               className="flex-1 md:flex-none w-full md:w-auto border-2 text-xs sm:text-sm"
                               style={{
                                 borderColor: brandColors.ma3ana[200],
@@ -1458,9 +1476,9 @@ export default function AdminCasesPage() {
                 )}
                 
                 {/* Mobile pagination info - always visible on mobile */}
-                {pagination.state.totalPages > 1 && (
+                {pagination.state.totalPages > 1 && totalItems > 0 && (
                   <div className="sm:hidden mt-4 text-center text-xs text-gray-600">
-                    Showing {paginatedCases.length} of {filteredCases.length} cases
+                    Showing {paginatedCases.length} of {totalItems} cases
                   </div>
                 )}
               </>

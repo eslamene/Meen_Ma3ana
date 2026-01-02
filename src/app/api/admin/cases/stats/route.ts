@@ -6,12 +6,17 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
   
   try {
 
-    // Parse query parameters for filtering
+    // Parse query parameters for filtering and pagination
     const { searchParams } = new URL(request.url)
     const statusParams = searchParams.getAll('status')
     const search = searchParams.get('search')
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = parseInt(searchParams.get('limit') || '10', 10)
+    const sortBy = searchParams.get('sortBy') || 'created_at_desc'
+    
+    const offset = (page - 1) * limit
 
-    // Fetch all cases with beneficiary and category information
+    // Fetch cases with beneficiary and category information
     let query = supabase
       .from('cases')
       .select(`
@@ -39,8 +44,7 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
           icon,
           color
         )
-      `)
-      .order('created_at', { ascending: false })
+      `, { count: 'exact' })
 
     // Apply status filter if provided (support multiple statuses)
     if (statusParams.length > 0) {
@@ -56,7 +60,28 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
       query = query.or(`title_en.ilike.%${search}%,title_ar.ilike.%${search}%,description_en.ilike.%${search}%,description_ar.ilike.%${search}%`)
     }
 
-    const { data: cases, error: casesError } = await query
+    // Apply sorting
+    switch (sortBy) {
+      case 'contributors_high':
+      case 'contributors_low':
+      case 'amount_high':
+      case 'amount_low':
+        // These require post-processing, so we'll sort by created_at first
+        query = query.order('created_at', { ascending: false })
+        break
+      case 'created_at_asc':
+        query = query.order('created_at', { ascending: true })
+        break
+      case 'created_at_desc':
+      default:
+        query = query.order('created_at', { ascending: false })
+        break
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1)
+
+    const { data: cases, error: casesError, count } = await query
 
     if (casesError) {
       logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching cases:', casesError)
@@ -150,7 +175,7 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
     })
 
     // Merge stats back into cases array
-    const casesWithStats = (cases || []).map(case_ => {
+    let casesWithStats = (cases || []).map(case_ => {
       const stats = contributionStats.get(case_.id) || { approved_amount: 0, total_contributions: 0, contributor_count: 0, approved_contributors: new Set() }
       return {
         ...case_,
@@ -160,15 +185,61 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
       }
     })
 
-    // Calculate overall statistics
-    const total = casesWithStats.length
-    const published = casesWithStats.filter(c => c.status === 'published').length
-    const completed = casesWithStats.filter(c => c.status === 'completed').length
-    const closed = casesWithStats.filter(c => c.status === 'closed').length
-    const under_review = casesWithStats.filter(c => c.status === 'under_review').length
+    // Apply sorting that requires post-processing (contributors and amount)
+    if (sortBy === 'contributors_high' || sortBy === 'contributors_low' || 
+        sortBy === 'amount_high' || sortBy === 'amount_low') {
+      casesWithStats = casesWithStats.sort((a, b) => {
+        switch (sortBy) {
+          case 'contributors_high':
+            return (b.contributor_count || 0) - (a.contributor_count || 0)
+          case 'contributors_low':
+            return (a.contributor_count || 0) - (b.contributor_count || 0)
+          case 'amount_high':
+            return (b.approved_amount || 0) - (a.approved_amount || 0)
+          case 'amount_low':
+            return (a.approved_amount || 0) - (b.approved_amount || 0)
+          default:
+            return 0
+        }
+      })
+    }
+
+    // Get total count for statistics (need to fetch all filtered cases for stats)
+    let statsQuery = supabase
+      .from('cases')
+      .select('id, status', { count: 'exact', head: false })
+
+    // Apply the same filters to stats query
+    if (statusParams.length > 0) {
+      const validStatuses = statusParams.filter(s => s !== 'all')
+      if (validStatuses.length > 0) {
+        statsQuery = statsQuery.in('status', validStatuses)
+      }
+    }
+
+    if (search) {
+      statsQuery = statsQuery.or(`title_en.ilike.%${search}%,title_ar.ilike.%${search}%,description_en.ilike.%${search}%,description_ar.ilike.%${search}%`)
+    }
+
+    const { data: allFilteredCases, count: totalCount } = await statsQuery
+
+    // Calculate overall statistics from all filtered cases
+    const total = totalCount || 0
+    const published = allFilteredCases?.filter(c => c.status === 'published').length || 0
+    const completed = allFilteredCases?.filter(c => c.status === 'completed').length || 0
+    const closed = allFilteredCases?.filter(c => c.status === 'closed').length || 0
+    const under_review = allFilteredCases?.filter(c => c.status === 'under_review').length || 0
 
     return NextResponse.json({
       cases: casesWithStats,
+      pagination: {
+        page,
+        limit,
+        total: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit),
+        hasNextPage: page < Math.ceil((totalCount || 0) / limit),
+        hasPreviousPage: page > 1
+      },
       stats: {
         total,
         published,

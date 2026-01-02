@@ -8,7 +8,7 @@ import PermissionGuard from '@/components/auth/PermissionGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Heart, Clock, CheckCircle, XCircle, Search, Filter, X, CheckSquare, Square, Loader2 } from 'lucide-react'
+import { Heart, Clock, CheckCircle, XCircle, Search, Filter, X, CheckSquare, Square, Loader2, LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import ContributionsList from '@/components/contributions/ContributionsList'
@@ -93,9 +93,6 @@ export default function AdminContributionsPage() {
   const searchParams = useSearchParams()
   const { containerVariant } = useLayout()
   
-  // Get status from URL query parameter
-  const urlStatus = searchParams.get('status') || 'all'
-  
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -108,7 +105,7 @@ export default function AdminContributionsPage() {
     hasPrevPage: false
   })
   const [filters, setFilters] = useState<Filters>({
-    status: urlStatus, // Initialize from URL
+    status: 'all', // Always default to 'all', no URL reading
     search: '',
     dateFrom: '',
     dateTo: '',
@@ -118,12 +115,78 @@ export default function AdminContributionsPage() {
     donorName: '',
     paymentMethod: ''
   })
-  const [stats, setStats] = useState({
+  // Define status widget configuration dynamically
+  const statusWidgets = [
+    {
+      key: 'all',
+      label: 'Total',
+      statusValue: 'all',
+      icon: Heart,
+      color: {
+        bg: 'bg-blue-100',
+        bgHover: 'bg-blue-200',
+        text: 'text-blue-600',
+        border: 'border-blue-300',
+        borderHover: 'border-blue-200',
+        bgActive: 'bg-blue-50/50'
+      },
+      getValue: (stats: typeof initialStats) => stats.total
+    },
+    {
+      key: 'pending',
+      label: 'Pending',
+      statusValue: 'pending',
+      icon: Clock,
+      color: {
+        bg: 'bg-yellow-100',
+        bgHover: 'bg-yellow-200',
+        text: 'text-yellow-600',
+        border: 'border-yellow-300',
+        borderHover: 'border-yellow-200',
+        bgActive: 'bg-yellow-50/50'
+      },
+      getValue: (stats: typeof initialStats) => stats.pending
+    },
+    {
+      key: 'approved',
+      label: 'Approved',
+      statusValue: 'approved',
+      icon: CheckCircle,
+      color: {
+        bg: 'bg-green-100',
+        bgHover: 'bg-green-200',
+        text: 'text-green-600',
+        border: 'border-green-300',
+        borderHover: 'border-green-200',
+        bgActive: 'bg-green-50/50'
+      },
+      getValue: (stats: typeof initialStats) => stats.approved
+    },
+    {
+      key: 'rejected',
+      label: 'Rejected',
+      statusValue: 'rejected',
+      icon: XCircle,
+      color: {
+        bg: 'bg-red-100',
+        bgHover: 'bg-red-200',
+        text: 'text-red-600',
+        border: 'border-red-300',
+        borderHover: 'border-red-200',
+        bgActive: 'bg-red-50/50'
+      },
+      getValue: (stats: typeof initialStats) => stats.rejected
+    }
+  ] as const
+
+  const initialStats = {
     total: 0,
     pending: 0,
     approved: 0,
     rejected: 0
-  })
+  }
+
+  const [stats, setStats] = useState(initialStats)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectAllMode, setSelectAllMode] = useState<'none' | 'all' | 'viewed' | 'searched'>('none')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
@@ -185,11 +248,7 @@ export default function AdminContributionsPage() {
     }
   }
 
-  // Update filter when URL changes
-  useEffect(() => {
-    const statusFromUrl = searchParams.get('status') || 'all'
-    setFilters(prev => ({ ...prev, status: statusFromUrl }))
-  }, [searchParams])
+  // No longer reading status from URL - removed
 
   const fetchContributions = useCallback(async () => {
     try {
@@ -254,7 +313,15 @@ export default function AdminContributionsPage() {
         hasNextPage: data.pagination?.hasNextPage ?? false,
         hasPrevPage: data.pagination?.hasPreviousPage ?? data.pagination?.hasPrevPage ?? false
       }))
-      setStats(data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 })
+      // Stats should always be calculated from ALL contributions, not filtered
+      // This ensures widgets show correct counts regardless of current filter
+      const receivedStats = data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 }
+      logger.debug('Received stats from API:', {
+        stats: receivedStats,
+        currentFilter: filters.status,
+        contributionsCount: data.contributions?.length || 0
+      })
+      setStats(receivedStats)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err) || 'Failed to fetch contributions'
       const errorDetails = err instanceof Error ? {
@@ -283,18 +350,7 @@ export default function AdminContributionsPage() {
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }))
     setPagination(prev => ({ ...prev, page: 1 }))
-    
-    // Update URL when status filter changes
-    if (key === 'status') {
-      const newSearchParams = new URLSearchParams(searchParams.toString())
-      if (value === 'all') {
-        newSearchParams.delete('status')
-      } else {
-        newSearchParams.set('status', value)
-      }
-      const newUrl = `/${params.locale}/case-management/contributions${newSearchParams.toString() ? '?' + newSearchParams.toString() : ''}`
-      router.push(newUrl, { scroll: false })
-    }
+    // No longer updating URL - removed
   }
 
   const handlePageChange = (page: number) => {
@@ -507,28 +563,73 @@ export default function AdminContributionsPage() {
       })
 
       const startTime = Date.now()
-      const response = await fetch('/api/admin/contributions/batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
+      let response: Response
+      let data: any
+      
+      try {
+        response = await fetch('/api/admin/contributions/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        })
 
-      const data = await response.json()
+        // Handle timeout or invalid JSON responses
+        const contentType = response.headers.get('content-type')
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text()
+          logger.error('Bulk approve failed - non-JSON response:', { 
+            status: response.status,
+            statusText: response.statusText,
+            contentType,
+            responseText: text.substring(0, 500) // First 500 chars
+          })
+          
+          if (response.status === 504 || response.status === 408) {
+            throw new Error('Request timed out. The operation may still be processing. Please refresh the page to check the status.')
+          }
+          throw new Error(`Server error (${response.status}): ${response.statusText}`)
+        }
+
+        try {
+          data = await response.json()
+        } catch (jsonError) {
+          logger.error('Bulk approve failed - invalid JSON response:', { 
+            status: response.status,
+            statusText: response.statusText,
+            error: jsonError
+          })
+          throw new Error('Invalid response from server. The operation may have timed out.')
+        }
+      } catch (fetchError) {
+        if (fetchError instanceof Error) {
+          // Check if it's a timeout or network error
+          if (fetchError.message.includes('timeout') || fetchError.message.includes('aborted')) {
+            throw new Error('Request timed out. The operation may still be processing. Please refresh the page to check the status.')
+          }
+          throw fetchError
+        }
+        throw new Error('Network error occurred. Please try again.')
+      }
+
       const duration = Date.now() - startTime
 
       if (!response.ok) {
-        const errorMessage = data.error || data.errorCode || data.message || `Failed to approve contributions (${response.status})`
+        const errorMessage = data?.error || data?.errorCode || data?.message || `Failed to approve contributions (${response.status})`
         logger.error('Bulk approve failed:', { 
           status: response.status, 
           statusText: response.statusText,
           error: errorMessage,
-          errorCode: data.errorCode,
-          details: data.details,
+          errorCode: data?.errorCode,
+          details: data?.details,
           requestBody: JSON.stringify(requestBody, null, 2),
           responseData: JSON.stringify(data, null, 2)
         })
+        
+        if (response.status === 504 || response.status === 408) {
+          throw new Error('Request timed out. The operation may still be processing. Please refresh the page to check the status.')
+        }
         throw new Error(errorMessage)
       }
 
@@ -630,24 +731,69 @@ export default function AdminContributionsPage() {
       })
 
       const startTime = Date.now()
-      const response = await fetch('/api/admin/contributions/batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
+      let response: Response
+      let data: any
+      
+      try {
+        response = await fetch('/api/admin/contributions/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        })
 
-      const data = await response.json()
+        // Handle timeout or invalid JSON responses
+        const contentType = response.headers.get('content-type')
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text()
+          logger.error('Bulk reject failed - non-JSON response:', { 
+            status: response.status,
+            statusText: response.statusText,
+            contentType,
+            responseText: text.substring(0, 500) // First 500 chars
+          })
+          
+          if (response.status === 504 || response.status === 408) {
+            throw new Error('Request timed out. The operation may still be processing. Please refresh the page to check the status.')
+          }
+          throw new Error(`Server error (${response.status}): ${response.statusText}`)
+        }
+
+        try {
+          data = await response.json()
+        } catch (jsonError) {
+          logger.error('Bulk reject failed - invalid JSON response:', { 
+            status: response.status,
+            statusText: response.statusText,
+            error: jsonError
+          })
+          throw new Error('Invalid response from server. The operation may have timed out.')
+        }
+      } catch (fetchError) {
+        if (fetchError instanceof Error) {
+          // Check if it's a timeout or network error
+          if (fetchError.message.includes('timeout') || fetchError.message.includes('aborted')) {
+            throw new Error('Request timed out. The operation may still be processing. Please refresh the page to check the status.')
+          }
+          throw fetchError
+        }
+        throw new Error('Network error occurred. Please try again.')
+      }
+
       const duration = Date.now() - startTime
 
       if (!response.ok) {
-        const errorMessage = data.error || data.message || `Failed to reject contributions (${response.status})`
+        const errorMessage = data?.error || data?.message || `Failed to reject contributions (${response.status})`
         logger.error('Bulk reject failed:', { 
           status: response.status, 
           error: errorMessage,
           requestBody 
         })
+        
+        if (response.status === 504 || response.status === 408) {
+          throw new Error('Request timed out. The operation may still be processing. Please refresh the page to check the status.')
+        }
         throw new Error(errorMessage)
       }
 
@@ -686,6 +832,7 @@ export default function AdminContributionsPage() {
   const clearAdvancedFilters = () => {
     setFilters(prev => ({
       ...prev,
+      status: 'all',
       dateFrom: '',
       dateTo: '',
       amountMin: '',
@@ -693,9 +840,10 @@ export default function AdminContributionsPage() {
       donorName: '',
       paymentMethod: ''
     }))
+    setPagination(prev => ({ ...prev, page: 1 }))
   }
 
-  const hasAdvancedFilters = filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax || filters.donorName || filters.paymentMethod
+  const hasAdvancedFilters = filters.status !== 'all' || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax || filters.donorName || filters.paymentMethod
 
   return (
     <ProtectedRoute>
@@ -716,95 +864,32 @@ export default function AdminContributionsPage() {
               }}
             />
 
-            {/* Statistics */}
+            {/* Statistics - Dynamic Widgets (Non-clickable, display only) */}
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
-              <Card 
-                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-[1.02] sm:hover:scale-105 group ${
-                  filters.status === 'all' 
-                    ? 'border-2 border-blue-300 bg-blue-50/50' 
-                    : 'hover:border-2 hover:border-blue-200'
-                }`}
-                style={{ boxShadow: filters.status === 'all' ? theme.shadows.primary : theme.shadows.primary }}
-                onClick={() => handleFilterChange('status', 'all')}
-              >
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
-                    </div>
-                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 bg-blue-100 group-hover:bg-blue-200 transition-colors">
-                      <Heart className="h-4 w-4 sm:h-6 sm:w-6 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-[1.02] sm:hover:scale-105 group ${
-                  filters.status === 'pending' 
-                    ? 'border-2 border-yellow-300 bg-yellow-50/50' 
-                    : 'hover:border-2 hover:border-yellow-200'
-                }`}
-                style={{ boxShadow: filters.status === 'pending' ? theme.shadows.primary : theme.shadows.primary }}
-                onClick={() => handleFilterChange('status', 'pending')}
-              >
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Pending</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.pending}</p>
-                    </div>
-                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 bg-yellow-100 group-hover:bg-yellow-200 transition-colors">
-                      <Clock className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-[1.02] sm:hover:scale-105 group ${
-                  filters.status === 'approved' 
-                    ? 'border-2 border-green-300 bg-green-50/50' 
-                    : 'hover:border-2 hover:border-green-200'
-                }`}
-                style={{ boxShadow: filters.status === 'approved' ? theme.shadows.primary : theme.shadows.primary }}
-                onClick={() => handleFilterChange('status', 'approved')}
-              >
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Approved</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.approved}</p>
-                    </div>
-                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 bg-green-100 group-hover:bg-green-200 transition-colors">
-                      <CheckCircle className="h-4 w-4 sm:h-6 sm:w-6 text-green-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className={`bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-white/95 hover:scale-[1.02] sm:hover:scale-105 group ${
-                  filters.status === 'rejected' 
-                    ? 'border-2 border-red-300 bg-red-50/50' 
-                    : 'hover:border-2 hover:border-red-200'
-                }`}
-                style={{ boxShadow: filters.status === 'rejected' ? theme.shadows.primary : theme.shadows.primary }}
-                onClick={() => handleFilterChange('status', 'rejected')}
-              >
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Rejected</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{stats.rejected}</p>
-                    </div>
-                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 bg-red-100 group-hover:bg-red-200 transition-colors">
-                      <XCircle className="h-4 w-4 sm:h-6 sm:w-6 text-red-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {statusWidgets.map((widget) => {
+                const Icon = widget.icon
+                const value = widget.getValue(stats)
+                
+                return (
+                  <Card 
+                    key={widget.key}
+                    className="bg-white/90 backdrop-blur-sm border-0 shadow-lg transition-all duration-300 group"
+                    style={{ boxShadow: theme.shadows.primary }}
+                  >
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{widget.label}</p>
+                          <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{value}</p>
+                        </div>
+                        <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ml-2 ${widget.color.bg} transition-colors`}>
+                          <Icon className={`h-4 w-4 sm:h-6 sm:w-6 ${widget.color.text}`} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
 
             {/* Bulk Actions Toolbar */}
@@ -926,7 +1011,7 @@ export default function AdminContributionsPage() {
                           Advanced Filters
                           {hasAdvancedFilters && (
                             <span className="ml-2 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                              {[filters.dateFrom, filters.dateTo, filters.amountMin, filters.amountMax, filters.donorName, filters.paymentMethod].filter(Boolean).length}
+                              {[filters.status !== 'all' ? filters.status : '', filters.dateFrom, filters.dateTo, filters.amountMin, filters.amountMax, filters.donorName, filters.paymentMethod].filter(Boolean).length}
                             </span>
                           )}
                         </Button>
@@ -945,6 +1030,25 @@ export default function AdminContributionsPage() {
                                 Clear All
                               </Button>
                             )}
+                          </div>
+                          
+                          {/* Status Filter */}
+                          <div className="space-y-2">
+                            <Label className="text-xs font-medium">Status</Label>
+                            <Select
+                              value={filters.status || 'all'}
+                              onValueChange={(value) => handleFilterChange('status', value)}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="All statuses" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All statuses</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="approved">Approved</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           
                           {/* Date Range */}

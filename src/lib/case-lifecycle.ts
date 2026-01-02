@@ -96,6 +96,70 @@ const STATUS_TRANSITIONS: StatusTransition[] = [
     allowedRoles: ['admin'],
     requiresReason: true,
     systemAllowed: false
+  },
+  // Draft -> Published (by admin - direct publish)
+  {
+    from: 'draft',
+    to: 'published',
+    allowedRoles: ['admin'],
+    requiresReason: false,
+    systemAllowed: false
+  },
+  // Draft -> Under Review (by admin)
+  {
+    from: 'draft',
+    to: 'under_review',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
+  },
+  // Draft -> Closed (by admin)
+  {
+    from: 'draft',
+    to: 'closed',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
+  },
+  // Submitted -> Closed (by admin)
+  {
+    from: 'submitted',
+    to: 'closed',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
+  },
+  // Under Review -> Draft (by admin - revert to draft)
+  {
+    from: 'under_review',
+    to: 'draft',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
+  },
+  // Published -> Draft (by admin - revert to draft)
+  {
+    from: 'published',
+    to: 'draft',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
+  },
+  // Closed -> Draft (by admin - revert to draft)
+  {
+    from: 'closed',
+    to: 'draft',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
+  },
+  // Submitted -> Draft (by admin - revert to draft)
+  {
+    from: 'submitted',
+    to: 'draft',
+    allowedRoles: ['admin'],
+    requiresReason: true,
+    systemAllowed: false
   }
 ]
 
@@ -180,6 +244,7 @@ export class CaseLifecycleService {
       const normalizedCurrentStatus = statusMapping[actualCurrentStatus] || actualCurrentStatus
 
       // Get user role if provided
+      // Check both users.role and admin_user_roles to determine if user is admin
       let userRole: string | undefined
       if (changedBy) {
         const [user] = await db
@@ -187,6 +252,20 @@ export class CaseLifecycleService {
           .from(users)
           .where(eq(users.id, changedBy))
         userRole = user?.role
+        
+        // Check if user is admin via admin_user_roles table
+        try {
+          const { isAdminUser } = await import('@/lib/security/rls')
+          const isAdmin = await isAdminUser(changedBy)
+          
+          if (isAdmin) {
+            // User is an admin, override role
+            userRole = 'admin'
+          }
+        } catch (adminCheckError) {
+          // Log but don't fail - fallback to users.role
+          defaultLogger.warn('Error checking admin role, using users.role', { error: adminCheckError })
+        }
       }
 
       // Validate transition (using normalized statuses)

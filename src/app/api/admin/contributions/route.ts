@@ -1,8 +1,98 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { createGetHandler, createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
 import { AuditService, extractRequestInfo } from '@/lib/services/auditService'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
+
+/**
+ * GET /api/admin/contributions
+ * Get contributions with filters - uses /api/contributions API internally
+ */
+async function getHandler(request: NextRequest, context: ApiHandlerContext) {
+  const { logger } = context
+
+  try {
+    // Extract query parameters from the request
+    const { searchParams } = new URL(request.url)
+    
+    // Build the URL for the internal API call
+    // Use the request URL to construct the base URL reliably
+    const requestUrl = new URL(request.url)
+    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`
+    
+    // Build query parameters for the internal API call
+    const internalParams = new URLSearchParams()
+    
+    // Copy all query parameters from the admin request
+    searchParams.forEach((value, key) => {
+      internalParams.append(key, value)
+    })
+    
+    // Ensure admin=true is set for admin-level access
+    internalParams.set('admin', 'true')
+    
+    // Construct the internal API URL
+    const internalApiUrl = `${baseUrl}/api/contributions?${internalParams.toString()}`
+    
+    logger.info('Forwarding admin contributions request to internal API', {
+      internalUrl: internalApiUrl,
+      queryParams: Object.fromEntries(internalParams)
+    })
+    
+    // Make internal API call
+    const response = await fetch(internalApiUrl, {
+      method: 'GET',
+      headers: {
+        // Forward authorization header if present
+        ...(request.headers.get('authorization') && {
+          'authorization': request.headers.get('authorization')!
+        }),
+        // Forward cookie header for session
+        ...(request.headers.get('cookie') && {
+          'cookie': request.headers.get('cookie')!
+        }),
+      },
+      // Disable caching for internal API calls
+      cache: 'no-store'
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ 
+        error: `Internal API returned ${response.status}` 
+      }))
+      
+      logger.error('Internal API call failed', {
+        status: response.status,
+        error: errorData
+      })
+      
+      throw new ApiError(
+        'INTERNAL_SERVER_ERROR',
+        errorData.error || errorData.message || 'Failed to fetch contributions',
+        response.status
+      )
+    }
+    
+    const data = await response.json()
+    
+    logger.debug('Successfully forwarded admin contributions request', {
+      contributionsCount: data.contributions?.length || 0,
+      pagination: data.pagination
+    })
+    
+    // Return the response from the internal API
+    return NextResponse.json(data)
+    
+  } catch (error) {
+    // Re-throw ApiError as-is
+    if (error instanceof ApiError) {
+      throw error
+    }
+    // Wrap other errors
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Admin contributions fetch error:', error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch contributions', 500)
+  }
+}
 
 /**
  * POST /api/admin/contributions
@@ -175,6 +265,11 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
     throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create contribution', 500)
   }
 }
+
+export const GET = createGetHandler(getHandler, {
+  requireAdmin: true,
+  loggerContext: 'api/admin/contributions'
+})
 
 export const POST = createPostHandler(postHandler, {
   requireAdmin: true,

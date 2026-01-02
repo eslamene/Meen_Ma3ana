@@ -13,12 +13,16 @@ import type { ContributionRow } from '@/types/contribution'
 async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
   
-  // Parse query parameters
+  // Parse query parameters - including all advanced filters
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const search = searchParams.get('search')
   const dateFrom = searchParams.get('dateFrom')
   const dateTo = searchParams.get('dateTo')
+  const amountMin = searchParams.get('amountMin')
+  const amountMax = searchParams.get('amountMax')
+  const donorName = searchParams.get('donorName')
+  const paymentMethod = searchParams.get('paymentMethod')
   const page = parseInt(searchParams.get('page') || '1', 10)
   const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 100) // Max 100 per page
   const sortBy = searchParams.get('sortBy') || 'created_at'
@@ -65,7 +69,42 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
       parsedDateTo.setHours(23, 59, 59, 999)
     }
 
-    // Use database function for efficient search
+    // Check if we have filters that the RPC function doesn't support
+    // If so, use direct query method which handles all filters properly
+    const hasAdvancedFilters = !!(amountMin || amountMax || donorName || paymentMethod)
+    
+    if (hasAdvancedFilters) {
+      // Use direct query method for advanced filters
+      logger.info('Using direct query method due to advanced filters')
+      try {
+        return await getContributionsDirectQuery(
+          supabase,
+          user.id,
+          isActuallyAdmin,
+          { 
+            status, 
+            search, 
+            dateFrom: parsedDateFrom, 
+            dateTo: parsedDateTo,
+            amountMin: amountMin ? parseFloat(amountMin) : null,
+            amountMax: amountMax ? parseFloat(amountMax) : null,
+            donorName: donorName || null,
+            paymentMethod: paymentMethod || null,
+            sortBy, 
+            sortOrder, 
+            page, 
+            limit, 
+            offset 
+          },
+          logger
+        )
+      } catch (fallbackError) {
+        logger.error('Direct query failed:', fallbackError)
+        throw fallbackError
+      }
+    }
+
+    // Use database function for efficient search (only when no advanced filters)
     const { data: contributions, error: searchError } = await supabase.rpc('search_contributions', {
       p_user_id: user.id,
       p_is_admin: isActuallyAdmin,
@@ -96,7 +135,21 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
           supabase,
           user.id,
           isActuallyAdmin,
-          { status, search, dateFrom: parsedDateFrom, dateTo: parsedDateTo, sortBy, sortOrder, page, limit, offset },
+          { 
+            status, 
+            search, 
+            dateFrom: parsedDateFrom, 
+            dateTo: parsedDateTo,
+            amountMin: amountMin ? parseFloat(amountMin) : null,
+            amountMax: amountMax ? parseFloat(amountMax) : null,
+            donorName: donorName || null,
+            paymentMethod: paymentMethod || null,
+            sortBy, 
+            sortOrder, 
+            page, 
+            limit, 
+            offset 
+          },
           logger
         )
       } catch (fallbackError) {
@@ -105,7 +158,7 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
       }
     }
 
-    // Get total count for pagination
+    // Get total count for pagination (only for filters supported by RPC)
     const { data: totalCount, error: countError } = await supabase.rpc('count_contributions', {
       p_user_id: user.id,
       p_is_admin: isActuallyAdmin,
@@ -193,6 +246,10 @@ async function getContributionsDirectQuery(
     search?: string | null
     dateFrom?: Date | null
     dateTo?: Date | null
+    amountMin?: number | null
+    amountMax?: number | null
+    donorName?: string | null
+    paymentMethod?: string | null
     sortBy: string
     sortOrder: string
     page: number
@@ -202,7 +259,59 @@ async function getContributionsDirectQuery(
   logger: Logger
 ) {
   try {
-    // Start with a simple query - fetch contributions with payment methods
+    logger.info('Building contributions query with filters:', {
+      status: filters.status,
+      dateFrom: filters.dateFrom?.toISOString(),
+      dateTo: filters.dateTo?.toISOString(),
+      amountMin: filters.amountMin,
+      amountMax: filters.amountMax,
+      donorName: filters.donorName,
+      paymentMethod: filters.paymentMethod,
+      search: filters.search
+    })
+
+    // Step 1: If filtering by status, get contribution IDs from approval_status
+    // We'll apply this filter after other filters to avoid fetching too many IDs
+    let statusFilterApplied = false
+    let statusFilteredIds: Set<string> | null = null
+    
+    if (filters.status && filters.status !== 'all') {
+      const statusFilter = filters.status.toLowerCase().trim()
+      
+      if (statusFilter === 'pending') {
+        // Pending = contributions that don't have approved/rejected status
+        // Get IDs of contributions with approved/rejected status to exclude them
+        const { data: excludedStatuses } = await supabase
+          .from('contribution_approval_status')
+          .select('contribution_id')
+          .in('status', ['approved', 'rejected'])
+        
+        const excludedIds = new Set((excludedStatuses || []).map((a: any) => a.contribution_id))
+        statusFilteredIds = excludedIds
+        statusFilterApplied = true
+        
+        logger.debug('Pending filter: excluding contributions with approved/rejected status', {
+          excludedCount: excludedIds.size
+        })
+      } else {
+        // For approved/rejected: get contribution IDs with matching status
+        const { data: matchingStatuses } = await supabase
+          .from('contribution_approval_status')
+          .select('contribution_id')
+          .eq('status', statusFilter)
+        
+        const matchingIds = new Set((matchingStatuses || []).map((a: any) => a.contribution_id))
+        statusFilteredIds = matchingIds
+        statusFilterApplied = true
+        
+        logger.debug('Status filter result:', {
+          status: filters.status,
+          matchingCount: matchingIds.size
+        })
+      }
+    }
+
+    // Step 2: Build main query with all filters applied at database level
     let query = supabase
       .from('contributions')
       .select(`
@@ -221,10 +330,8 @@ async function getContributionsDirectQuery(
       query = query.eq('donor_id', userId)
     }
 
-    // Apply status filter at database level (more efficient)
-    if (filters.status && filters.status !== 'all') {
-      query = query.eq('status', filters.status)
-    }
+    // Note: Status filter will be applied after fetching, since it requires checking approval_status
+    // Other filters (date, amount, donorName, paymentMethod) are applied at DB level
 
     // Apply date filters
     if (filters.dateFrom) {
@@ -234,11 +341,83 @@ async function getContributionsDirectQuery(
       query = query.lte('created_at', filters.dateTo.toISOString())
     }
 
+    // Apply amount filters
+    if (filters.amountMin !== null && filters.amountMin !== undefined) {
+      query = query.gte('amount', filters.amountMin.toString())
+    }
+    if (filters.amountMax !== null && filters.amountMax !== undefined) {
+      query = query.lte('amount', filters.amountMax.toString())
+    }
+
+    // Apply payment method filter
+    if (filters.paymentMethod) {
+      // First, try to find payment method by code or ID
+      const { data: paymentMethodData } = await supabase
+        .from('payment_methods')
+        .select('id')
+        .or(`code.eq.${filters.paymentMethod},id.eq.${filters.paymentMethod}`)
+        .limit(1)
+      
+      if (paymentMethodData && paymentMethodData.length > 0) {
+        query = query.eq('payment_method_id', paymentMethodData[0].id)
+      } else {
+        // No matching payment method, return empty
+        return NextResponse.json({
+          contributions: [],
+          pagination: {
+            page: filters.page,
+            limit: filters.limit,
+            total: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPreviousPage: false
+          },
+          stats: await calculateStats(supabase, userId, isAdmin, logger)
+        })
+      }
+    }
+
+    // Apply donor name filter - need to join with users
+    if (filters.donorName) {
+      // Get user IDs matching the donor name
+      const { data: matchingUsers } = await supabase
+        .from('users')
+        .select('id')
+        .or(`first_name.ilike.%${filters.donorName}%,last_name.ilike.%${filters.donorName}%,email.ilike.%${filters.donorName}%`)
+      
+      if (matchingUsers && matchingUsers.length > 0) {
+        const userIds = matchingUsers.map((u: any) => u.id)
+        query = query.in('donor_id', userIds)
+      } else {
+        // No matching users, return empty
+        return NextResponse.json({
+          contributions: [],
+          pagination: {
+            page: filters.page,
+            limit: filters.limit,
+            total: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPreviousPage: false
+          },
+          stats: await calculateStats(supabase, userId, isAdmin, logger)
+        })
+      }
+    }
+
     // Apply sorting
     query = query.order(filters.sortBy, { ascending: filters.sortOrder === 'asc' })
 
-    // Fetch all data (we'll join and filter in memory to avoid join issues)
-    const { data: contributions, error, count } = await query
+    // Check if we need to apply in-memory filters (status filter or search filter)
+    // If so, we need to fetch all results first to get accurate count, then paginate
+    const needsInMemoryFiltering = statusFilterApplied || (filters.search && filters.search.trim())
+    
+    // Fetch data - if we need in-memory filtering, fetch all results first
+    const fetchQuery = needsInMemoryFiltering 
+      ? query  // Fetch all for in-memory filtering
+      : query.range(filters.offset, filters.offset + filters.limit - 1)  // Fetch paginated
+    
+    const { data: contributions, error, count } = await fetchQuery
 
     if (error) {
       logger.error('Error in direct query fallback:', error, {
@@ -255,18 +434,12 @@ async function getContributionsDirectQuery(
         pagination: {
           page: filters.page,
           limit: filters.limit,
-          total: 0,
+          total: count || 0,
           totalPages: 0,
           hasNextPage: false,
           hasPreviousPage: false
         },
-        stats: {
-          total: 0,
-          pending: 0,
-          approved: 0,
-          rejected: 0,
-          totalAmount: 0
-        }
+        stats: await calculateStats(supabase, userId, isAdmin, logger)
       })
     }
 
@@ -303,26 +476,56 @@ async function getContributionsDirectQuery(
     // Fetch approval statuses (only if we have contribution IDs)
     let approvalStatuses: Array<{ contribution_id: string; status: string; [key: string]: unknown }> = []
     if (contributionIds.length > 0) {
-      const { data: approvalData } = await supabase
+      const { data: approvalData, error: approvalError } = await supabase
         .from('contribution_approval_status')
         .select('*')
         .in('contribution_id', contributionIds)
         .order('created_at', { ascending: false })
-      approvalStatuses = approvalData || []
+      
+      if (approvalError) {
+        logger.error('Error fetching approval statuses:', approvalError)
+      } else {
+        approvalStatuses = approvalData || []
+        logger.debug('Fetched approval statuses:', {
+          count: approvalStatuses.length,
+          contributionIds: contributionIds.length,
+          sample: approvalStatuses.slice(0, 3).map(a => ({
+            contribution_id: a.contribution_id,
+            status: a.status
+          }))
+        })
+      }
     }
 
     // Create lookup maps
     const casesMap = new Map(cases.map((c) => [c.id, c]))
     const usersMap = new Map(users.map((u) => [u.id, u]))
-    const approvalMap = new Map<string, Array<{ status: string; [key: string]: unknown }>>()
     
     // Group approval statuses by contribution_id
+    // Keep only the latest status for each contribution (already sorted by created_at desc)
+    const latestStatusMap = new Map<string, { status: string; [key: string]: unknown }>()
     approvalStatuses.forEach((approval) => {
       const contribId = approval.contribution_id
-      if (!approvalMap.has(contribId)) {
-        approvalMap.set(contribId, [])
+      // Only keep the first (latest) status for each contribution
+      if (!latestStatusMap.has(contribId)) {
+        latestStatusMap.set(contribId, approval)
       }
-      approvalMap.get(contribId)!.push(approval)
+    })
+    
+    // Convert to array format for compatibility with existing code
+    const approvalMap = new Map<string, Array<{ status: string; [key: string]: unknown }>>()
+    latestStatusMap.forEach((approval, contribId) => {
+      approvalMap.set(contribId, [approval])
+    })
+    
+    logger.debug('Approval status mapping:', {
+      totalContributions: contributions.length,
+      contributionsWithApprovalStatus: approvalMap.size,
+      contributionsWithoutApprovalStatus: contributions.length - approvalMap.size,
+      sampleMappings: Array.from(approvalMap.entries()).slice(0, 5).map(([id, statuses]) => ({
+        contributionId: id,
+        status: statuses[0]?.status || 'none'
+      }))
     })
 
     // Combine data and apply filters
@@ -348,12 +551,30 @@ async function getContributionsDirectQuery(
       }
     })
 
-    // Status filter is already applied at database level, so we don't need to filter again here
-    // However, we keep this as a safety check for data consistency
-    // If contributions.status doesn't match approval_status, we trust contributions.status
-    // (since that's what gets updated when admin approves/rejects)
+    // Apply status filter in memory (requires approval_status check)
+    if (statusFilterApplied && statusFilteredIds !== null) {
+      const statusFilter = filters.status!.toLowerCase().trim()
+      
+      if (statusFilter === 'pending') {
+        // Exclude contributions with approved/rejected status
+        enrichedContributions = enrichedContributions.filter((c: EnrichedContribution) => {
+          return !statusFilteredIds!.has(c.id)
+        })
+      } else {
+        // Include only contributions with matching status
+        enrichedContributions = enrichedContributions.filter((c: EnrichedContribution) => {
+          return statusFilteredIds!.has(c.id)
+        })
+      }
+      
+      logger.info('Status filter applied in memory:', {
+        status: filters.status,
+        beforeFilter: contributions.length,
+        afterFilter: enrichedContributions.length
+      })
+    }
 
-    // Apply search filter in memory
+    // Apply search filter in memory (searches across case titles and donor names)
     if (filters.search && filters.search.trim()) {
       const searchLower = filters.search.toLowerCase()
       enrichedContributions = enrichedContributions.filter((c: EnrichedContribution) => {
@@ -371,13 +592,21 @@ async function getContributionsDirectQuery(
       })
     }
 
-    // Apply pagination after all filters (search, etc.)
-    // Note: Status filter is already applied at database level
-    const totalAfterAllFilters = enrichedContributions.length
-    const paginatedContributions = enrichedContributions.slice(
-      filters.offset,
-      filters.offset + filters.limit
-    )
+    // Calculate total after all filters are applied
+    // If we applied in-memory filters, use the filtered count
+    // Otherwise, use the database count (which should be accurate for DB-level filters)
+    const totalAfterAllFilters = needsInMemoryFiltering 
+      ? enrichedContributions.length 
+      : (count || 0)
+    
+    // Apply pagination if we fetched all results for in-memory filtering
+    let paginatedContributions = enrichedContributions
+    if (needsInMemoryFiltering) {
+      const startIndex = filters.offset
+      const endIndex = startIndex + filters.limit
+      paginatedContributions = enrichedContributions.slice(startIndex, endIndex)
+    }
+    // Otherwise, pagination was already applied at database level
 
     // Normalize contributions
     const normalizedContributions = paginatedContributions.map((c: EnrichedContribution) => {
@@ -442,6 +671,11 @@ async function getContributionsDirectQuery(
 /**
  * Calculate contribution statistics
  */
+/**
+ * Calculate contribution statistics dynamically
+ * Always fetches ALL contributions regardless of filters
+ * Groups by status dynamically to handle any status values
+ */
 async function calculateStats(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -449,50 +683,134 @@ async function calculateStats(
   logger: Logger
 ) {
   try {
+    // Fetch ALL contributions with their approval status
+    // Use contribution_approval_status.status as the source of truth
+    // This ensures stats always show overall counts regardless of current filter
     let statsQuery = supabase
       .from('contributions')
       .select(`
         id,
         amount,
-        approval_status:contribution_approval_status!contribution_id(status)
+        status,
+        contribution_approval_status(
+          status,
+          created_at
+        )
       `)
     
+    // Only filter by user if not admin (for user's own contributions)
     if (!isAdmin) {
       statsQuery = statsQuery.eq('donor_id', userId)
     }
     
-    const { data: statsData } = await statsQuery
+    const { data: statsData, error: statsError } = await statsQuery
 
-    const stats = {
-      total: 0,
-      pending: 0,
-      approved: 0,
-      rejected: 0,
-      totalAmount: 0
+    if (statsError) {
+      logger.error('Error fetching stats data:', statsError)
+      throw statsError
     }
+
+    // Initialize stats with all possible status values
+    // Use a dynamic map to count all status types
+    const statusCounts = new Map<string, number>()
+    let totalAmount = 0
 
     interface StatsContribution {
       amount?: string | number
-      approval_status?: Array<{ status?: string }> | { status?: string }
+      status?: string | null
+      contribution_approval_status?: Array<{ status?: string; created_at?: string }> | { status?: string; created_at?: string } | null
     }
-    statsData?.forEach((contribution: StatsContribution) => {
-      const approvalStatusArray = contribution.approval_status
-      const approvalStatus = Array.isArray(approvalStatusArray) && approvalStatusArray.length > 0 
-        ? approvalStatusArray[0]?.status || 'pending'
-        : 'pending'
+    
+    // Simple helper to get status from approval_status or default to pending
+    const getStatusFromContribution = (c: StatsContribution): string => {
+      // Check if there's an approval_status
+      if (c.contribution_approval_status) {
+        const approvalStatusArray = Array.isArray(c.contribution_approval_status) 
+          ? c.contribution_approval_status 
+          : [c.contribution_approval_status]
+        
+        // Get the latest approval status (sorted by created_at desc)
+        const latestApproval = approvalStatusArray
+          .filter(a => a && a.status && typeof a.status === 'string')
+          .sort((a, b) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+            return dateB - dateA
+          })[0]
+        
+        if (latestApproval && latestApproval.status) {
+          return String(latestApproval.status).toLowerCase().trim()
+        }
+      }
       
-      if (approvalStatus === 'approved') {
-        stats.approved++
-        const amountValue = typeof contribution.amount === 'number' ? contribution.amount : parseFloat(String(contribution.amount || '0'))
-        stats.totalAmount += amountValue
-      } else if (approvalStatus === 'rejected' || approvalStatus === 'revised') {
-        stats.rejected++
-      } else {
-        stats.pending++
+      // No approval_status = pending
+      return 'pending'
+    }
+    
+    // Count contributions by status - simple and consistent
+    statsData?.forEach((contribution: StatsContribution) => {
+      const status = getStatusFromContribution(contribution)
+      
+      // Increment count for this status
+      statusCounts.set(status, (statusCounts.get(status) || 0) + 1)
+      
+      // Sum amounts for approved contributions only
+      if (status === 'approved') {
+        const amountValue = typeof contribution.amount === 'number' 
+          ? contribution.amount 
+          : parseFloat(String(contribution.amount || '0'))
+        totalAmount += amountValue
+      }
+    })
+    
+    // Log all unique statuses found for debugging
+    const uniqueStatuses = Array.from(statusCounts.keys())
+    
+    // Also get a sample of actual status values to verify
+    const statusSamples = new Map<string, number>()
+    statsData?.slice(0, 100).forEach((c: StatsContribution) => {
+      const s = (c.status || 'null').toLowerCase()
+      statusSamples.set(s, (statusSamples.get(s) || 0) + 1)
+    })
+    
+    logger.info('Status distribution found:', {
+      uniqueStatuses,
+      statusCounts: Object.fromEntries(statusCounts),
+      totalContributions: statsData?.length || 0,
+      sampleStatusDistribution: Object.fromEntries(statusSamples),
+      calculatedStats: {
+        total: statsData?.length || 0,
+        pending: statusCounts.get('pending') || 0,
+        approved: statusCounts.get('approved') || 0,
+        rejected: statusCounts.get('rejected') || 0
       }
     })
 
-    stats.total = stats.approved + stats.pending + stats.rejected
+    // Build stats object with standard statuses
+    // This ensures compatibility with frontend expectations
+    const stats = {
+      total: statsData?.length || 0,
+      pending: statusCounts.get('pending') || 0,
+      approved: statusCounts.get('approved') || 0,
+      rejected: statusCounts.get('rejected') || 0,
+      totalAmount,
+      // Include any other status types found (for future extensibility)
+      ...Object.fromEntries(
+        Array.from(statusCounts.entries())
+          .filter(([status]) => !['pending', 'approved', 'rejected'].includes(status))
+          .map(([status, count]) => [status, count])
+      )
+    }
+
+    logger.debug('Calculated stats:', {
+      total: stats.total,
+      pending: stats.pending,
+      approved: stats.approved,
+      rejected: stats.rejected,
+      totalAmount: stats.totalAmount,
+      contributionsCount: statsData?.length || 0,
+      allStatusCounts: Object.fromEntries(statusCounts)
+    })
 
     return stats
   } catch (error) {
