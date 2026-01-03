@@ -157,6 +157,7 @@ interface SystemStats {
   totalAmount: number
   activeCases: number
   completedCases: number
+  underReviewCases: number
   pendingContributions: number
   approvedContributions: number
   rejectedContributions: number
@@ -186,6 +187,7 @@ export default function AdminPage() {
     totalAmount: 0,
     activeCases: 0,
     completedCases: 0,
+    underReviewCases: 0,
     pendingContributions: 0,
     approvedContributions: 0,
     rejectedContributions: 0,
@@ -217,6 +219,7 @@ export default function AdminPage() {
         totalAmount: data.totalAmount || 0,
         activeCases: data.activeCases || 0,
         completedCases: data.completedCases || 0,
+        underReviewCases: data.underReviewCases || 0,
         pendingContributions: data.pendingContributions || 0,
         approvedContributions: data.approvedContributions || 0,
         rejectedContributions: data.rejectedContributions || 0,
@@ -410,9 +413,9 @@ export default function AdminPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Pending Reviews</p>
+                      <p className="text-sm font-medium text-gray-600">Under Review</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {loading ? '...' : stats.pendingContributions}
+                        {loading ? '...' : stats.underReviewCases}
                       </p>
                     </div>
                     <div className="p-3 rounded-full" style={{ backgroundColor: brandColors.ma3ana[100] }}>

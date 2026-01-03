@@ -117,9 +117,9 @@ export default function AdminCasesPage() {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  // Default: all statuses except 'completed'
-  const [statusFilter, setStatusFilter] = useState<string[]>(['published', 'closed', 'under_review', 'draft', 'submitted'])
-  const [tempStatusFilter, setTempStatusFilter] = useState<string[]>(['published', 'closed', 'under_review', 'draft', 'submitted'])
+  // Default: all statuses
+  const [statusFilter, setStatusFilter] = useState<string[]>(['draft', 'submitted', 'published', 'closed', 'under_review'])
+  const [tempStatusFilter, setTempStatusFilter] = useState<string[]>(['draft', 'submitted', 'published', 'closed', 'under_review'])
   const [statusFilterOpen, setStatusFilterOpen] = useState(false)
   const [sortBy, setSortBy] = useState('created_at_desc')
   const [stats, setStats] = useState({
@@ -808,20 +808,6 @@ export default function AdminCasesPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.secondary }}>
-                <CardContent className="p-3 sm:p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Closed</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.closed}</p>
-                    </div>
-                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: brandColors.ma3ana[100] }}>
-                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.ma3ana[600] }} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
               <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
@@ -861,7 +847,7 @@ export default function AdminCasesPage() {
                         <span className="truncate">
                           {statusFilter.length === 0
                             ? 'No statuses'
-                            : statusFilter.length === 6
+                            : statusFilter.length === 5
                             ? 'All Statuses'
                             : `${statusFilter.length} selected`}
                         </span>
@@ -872,12 +858,11 @@ export default function AdminCasesPage() {
                       <div className="p-2">
                         <div className="space-y-1">
                           {[
-                            { value: 'published', label: 'Published' },
-                            { value: 'completed', label: 'Completed' },
-                            { value: 'closed', label: 'Closed' },
-                            { value: 'under_review', label: 'Under Review' },
                             { value: 'draft', label: 'Draft' },
-                            { value: 'submitted', label: 'Submitted' }
+                            { value: 'submitted', label: 'Submitted' },
+                            { value: 'published', label: 'Published' },
+                            { value: 'closed', label: 'Closed' },
+                            { value: 'under_review', label: 'Under Review' }
                           ].map((status) => (
                             <div
                               key={status.value}
@@ -920,10 +905,10 @@ export default function AdminCasesPage() {
                             size="sm"
                             className="w-full text-xs"
                             onClick={() => {
-                              setTempStatusFilter(['published', 'closed', 'under_review', 'draft', 'submitted'])
+                              setTempStatusFilter(['draft', 'submitted', 'published', 'closed', 'under_review'])
                             }}
                           >
-                            Clear Completed
+                            Select All
                           </Button>
                           <div className="flex gap-2">
                             <Button

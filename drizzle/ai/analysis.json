@@ -1,0 +1,196 @@
+{
+  "totalRules": 57,
+  "uniqueBaseKeys": 29,
+  "withAR": 29,
+  "withEN": 28,
+  "withBoth": 28,
+  "missingAR": [],
+  "missingEN": [
+    {
+      "baseKey": "description.egyptian_colloquial",
+      "category": "description",
+      "priority": 2,
+      "arInstruction": "CRITICAL: When generating content in Arabic, you MUST use Egyptian Colloquial Arabic (المصرية العامي"
+    }
+  ],
+  "byCategory": {
+    "description": [
+      {
+        "baseKey": "description.egyptian_colloquial",
+        "hasAR": true,
+        "hasEN": false,
+        "priority": 2
+      },
+      {
+        "baseKey": "description.avoid_ordering_slang",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 3
+      },
+      {
+        "baseKey": "description.max_length",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 10
+      },
+      {
+        "baseKey": "description.min_length",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 10
+      },
+      {
+        "baseKey": "description.structure",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 20
+      },
+      {
+        "baseKey": "description.style",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 20
+      },
+      {
+        "baseKey": "description.tone",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 20
+      },
+      {
+        "baseKey": "description.charity_appropriate",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 30
+      },
+      {
+        "baseKey": "description.explain_situation",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 30
+      },
+      {
+        "baseKey": "description.inspire_donation",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 30
+      },
+      {
+        "baseKey": "description.well_structured",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 30
+      },
+      {
+        "baseKey": "description.avoid_long_stories",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 40
+      },
+      {
+        "baseKey": "description.emphasize_impact",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 40
+      },
+      {
+        "baseKey": "description.focus_on_needs",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 40
+      },
+      {
+        "baseKey": "description.include_cta",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 40
+      }
+    ],
+    "title": [
+      {
+        "baseKey": "title.use_only_hint",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 1
+      },
+      {
+        "baseKey": "title.egyptian_colloquial",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 2
+      },
+      {
+        "baseKey": "title.avoid_ordering_slang",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 3
+      },
+      {
+        "baseKey": "title.descriptive_language",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 3
+      },
+      {
+        "baseKey": "title.max_length",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 10
+      },
+      {
+        "baseKey": "title.min_length",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 10
+      },
+      {
+        "baseKey": "title.style",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 20
+      },
+      {
+        "baseKey": "title.tone",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 20
+      },
+      {
+        "baseKey": "title.attention_grabbing",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 30
+      },
+      {
+        "baseKey": "title.charity_appropriate",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 30
+      },
+      {
+        "baseKey": "title.communicate_need",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 30
+      },
+      {
+        "baseKey": "title.inspire_donation",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 30
+      },
+      {
+        "baseKey": "title.emphasize_impact",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 40
+      },
+      {
+        "baseKey": "title.focus_on_needs",
+        "hasAR": true,
+        "hasEN": true,
+        "priority": 40
+      }
+    ]
+  }
+}

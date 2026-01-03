@@ -20,6 +20,7 @@ interface AdminDashboardStats {
   totalAmount: number
   activeCases: number
   completedCases: number
+  underReviewCases: number
   pendingContributions: number
   approvedContributions: number
   rejectedContributions: number
@@ -93,11 +94,13 @@ export const GET = createGetHandler(
         return sum + parseFloat(String(c.amount || 0))
       }, 0)
       
-      // Case statuses: 'draft', 'submitted', 'published', 'closed', 'under_review'
+      // Case statuses: 'draft', 'submitted', 'published', 'closed', 'under_review', 'completed'
       // Active cases = published cases
-      // Completed cases = closed cases
+      // Completed cases = cases with status 'completed'
+      // Under Review = draft cases (cases that need review before publishing)
       const activeCases = cases.filter(c => c.status === 'published').length
-      const completedCases = cases.filter(c => c.status === 'closed').length
+      const completedCases = cases.filter(c => c.status === 'completed').length
+      const underReviewCases = cases.filter(c => c.status === 'draft').length
     
       // Calculate contribution counts based on approval status
       // If approval_status join failed, use contribution status as fallback
@@ -173,6 +176,7 @@ export const GET = createGetHandler(
           totalAmount,
           activeCases,
           completedCases,
+          underReviewCases,
           pendingContributions,
           approvedContributions,
           rejectedContributions,
