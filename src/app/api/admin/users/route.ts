@@ -96,11 +96,11 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
 
     // Fetch user profile data from users table
     const userIds = allUsers.map(u => u.id)
-    let userProfiles: Array<{ id: string; first_name: string | null; last_name: string | null; phone: string | null }> | null = null
+    let userProfiles: Array<{ id: string; first_name: string | null; last_name: string | null; phone: string | null; notes: string | null; tags: string[] | null }> | null = null
     if (userIds.length > 0) {
       const { data, error: profilesError } = await supabase
         .from('users')
-        .select('id, first_name, last_name, phone')
+        .select('id, first_name, last_name, phone, notes, tags')
         .in('id', userIds)
       
       if (profilesError) {
@@ -112,13 +112,15 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
     }
 
     // Create a map of user profiles by id
-    const profilesByUserId = new Map<string, { first_name: string | null, last_name: string | null, phone: string | null }>()
+    const profilesByUserId = new Map<string, { first_name: string | null, last_name: string | null, phone: string | null, notes: string | null, tags: string[] | null }>()
     if (userProfiles) {
       userProfiles.forEach((profile) => {
         profilesByUserId.set(profile.id, {
           first_name: profile.first_name,
           last_name: profile.last_name,
-          phone: profile.phone
+          phone: profile.phone,
+          notes: profile.notes,
+          tags: profile.tags || []
         })
       })
     }
@@ -197,7 +199,7 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
 
     // Sanitize user data and attach roles and profile data
     let sanitizedUsers = allUsers.map(user => {
-      const profile = profilesByUserId.get(user.id) || { first_name: null, last_name: null, phone: null }
+      const profile = profilesByUserId.get(user.id) || { first_name: null, last_name: null, phone: null, notes: null, tags: [] }
       return {
       id: user.id,
       email: user.email,
@@ -205,6 +207,8 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
         first_name: profile.first_name,
         last_name: profile.last_name,
         phone: profile.phone,
+        notes: profile.notes,
+        tags: profile.tags || [],
       created_at: user.created_at,
       updated_at: user.updated_at,
       email_confirmed_at: user.email_confirmed_at,

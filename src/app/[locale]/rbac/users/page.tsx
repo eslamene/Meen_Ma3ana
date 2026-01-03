@@ -41,7 +41,8 @@ import {
   Calendar,
   Phone,
   User,
-  UserPlus
+  UserPlus,
+  Info
 } from 'lucide-react'
 
 // Types
@@ -52,6 +53,8 @@ interface User {
   first_name?: string | null
   last_name?: string | null
   phone?: string | null
+  notes?: string | null
+  tags?: string[]
   roles: RoleAssignment[]
   created_at?: string
   last_sign_in_at?: string
@@ -487,14 +490,53 @@ export default function AdminUsersPage() {
                             {/* User Info */}
                             <div className="flex-1 min-w-0 w-full">
                               <div className="flex items-start justify-between gap-2 mb-1">
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-semibold text-xs sm:text-sm text-gray-900 truncate break-words">
-                                    {user.first_name || user.last_name
-                                      ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-                                      : user.display_name && user.display_name !== user.email.split('@')[0]
-                                      ? user.display_name
-                                      : user.email.split('@')[0]}
+                                <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <div className="font-semibold text-xs sm:text-sm text-gray-900 truncate">
+                                      {user.first_name || user.last_name
+                                        ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                                        : user.display_name && user.display_name !== user.email.split('@')[0]
+                                        ? user.display_name
+                                        : user.email.split('@')[0]}
+                                    </div>
+                                    {user.notes && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          toast.info('User Notes', {
+                                            description: user.notes,
+                                            duration: 5000,
+                                          })
+                                        }}
+                                        className="flex-shrink-0 p-0.5 hover:bg-gray-100 rounded transition-colors"
+                                        title="View notes"
+                                      >
+                                        <Info className="h-3 w-3 text-gray-400 hover:text-indigo-600" />
+                                      </button>
+                                    )}
                                   </div>
+                                  {/* Tags */}
+                                  {user.tags && user.tags.length > 0 && (
+                                    <div className="flex items-center gap-1 flex-wrap flex-shrink-0">
+                                      {user.tags.slice(0, 2).map((tag, idx) => (
+                                        <Badge 
+                                          key={idx} 
+                                          variant="outline" 
+                                          className="text-[9px] px-1.5 py-0 h-4 bg-indigo-50 text-indigo-700 border-indigo-200"
+                                        >
+                                          {tag}
+                                        </Badge>
+                                      ))}
+                                      {user.tags.length > 2 && (
+                                        <Badge 
+                                          variant="outline" 
+                                          className="text-[9px] px-1.5 py-0 h-4 bg-gray-50 text-gray-600 border-gray-200"
+                                        >
+                                          +{user.tags.length - 2}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-1.5 sm:gap-2 md:gap-3 text-[10px] sm:text-xs text-gray-500 mb-1">
