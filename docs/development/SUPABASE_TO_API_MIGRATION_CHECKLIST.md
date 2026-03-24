@@ -35,6 +35,9 @@ This document tracks the migration from direct Supabase database communication t
 - [x] `PermissionService` - Created for permission management
 - [x] `SponsorApplicationService` - Created for sponsor application management
 - [x] `CommunicationService` - Created for communication/message management
+- [x] `RoleService` - Admin roles, user counts, and role–permission replacement
+- [x] `PushSubscriptionService` - Web push subscriptions and FCM token upserts
+- [x] `RecurringContributionService` - Donor recurring contributions list/create/update
 
 ---
 
@@ -92,9 +95,9 @@ This document tracks the migration from direct Supabase database communication t
 - [ ] `src/app/api/admin/category-detection-rules/[id]/route.ts` - GET, PUT, DELETE
 - [x] `src/app/api/admin/sponsorships/route.ts` - GET using SponsorshipService
 - [x] `src/app/api/admin/sponsorships/[id]/route.ts` - GET, PUT using SponsorshipService and NotificationService
-- [ ] `src/app/api/admin/roles/route.ts` - GET, POST
-- [ ] `src/app/api/admin/roles/[id]/route.ts` - GET, PUT, DELETE
-- [ ] `src/app/api/admin/roles/[id]/permissions/route.ts` - GET, POST, DELETE
+- [x] `src/app/api/admin/roles/route.ts` - GET, POST using RoleService
+- [x] `src/app/api/admin/roles/[id]/route.ts` - PUT using RoleService
+- [x] `src/app/api/admin/roles/[id]/permissions/route.ts` - GET, PUT using RoleService
 - [x] `src/app/api/admin/permissions/route.ts` - GET using AdminService.getPermissions(), POST using PermissionService
 - [x] `src/app/api/admin/permissions/[id]/route.ts` - PUT, DELETE using PermissionService
 - [ ] `src/app/api/admin/role-permissions/route.ts` - GET
@@ -116,8 +119,8 @@ This document tracks the migration from direct Supabase database communication t
 - [ ] `src/app/api/beneficiaries/bulk-upload/route.ts` - POST
 - [ ] `src/app/api/projects/route.ts` - GET, POST
 - [ ] `src/app/api/projects/[id]/route.ts` - GET, PUT, DELETE
-- [ ] `src/app/api/recurring-contributions/route.ts` - GET, POST
-- [ ] `src/app/api/recurring-contributions/[id]/route.ts` - GET, PUT, DELETE
+- [x] `src/app/api/recurring-contributions/route.ts` - GET, POST using RecurringContributionService
+- [x] `src/app/api/recurring-contributions/[id]/route.ts` - PATCH using RecurringContributionService
 - [x] `src/app/api/payment-methods/route.ts` - GET, POST using PaymentMethodService
 - [x] `src/app/api/payment-methods/[id]/route.ts` - GET, PATCH, DELETE using PaymentMethodService
 - [x] `src/app/api/sponsor/dashboard/route.ts` - GET using SponsorshipService
@@ -144,15 +147,15 @@ This document tracks the migration from direct Supabase database communication t
 - [x] `src/app/api/storage/buckets/route.ts` - GET using StorageBucketService
 - [x] `src/app/api/storage/buckets/[name]/route.ts` - GET using StorageBucketService (file listing uses storage API, which is acceptable)
 - [x] `src/app/api/storage/rules/update/route.ts` - POST using StorageBucketService
-- [ ] `src/app/api/push/subscribe/route.ts` - POST
-- [ ] `src/app/api/push/unsubscribe/route.ts` - POST
-- [ ] `src/app/api/push/fcm-subscribe/route.ts` - POST
-- [ ] `src/app/api/push/diagnostics/route.ts` - GET
+- [x] `src/app/api/push/subscribe/route.ts` - POST using PushSubscriptionService
+- [x] `src/app/api/push/unsubscribe/route.ts` - POST using PushSubscriptionService
+- [x] `src/app/api/push/fcm-subscribe/route.ts` - POST using PushSubscriptionService (service role client)
+- [x] `src/app/api/push/diagnostics/route.ts` - GET using PushSubscriptionService (service role client)
 - [ ] `src/app/api/push/public-key/route.ts` - GET
 - [ ] `src/app/api/push/test/route.ts` - POST
-- [ ] `src/app/api/system-content/route.ts` - GET, PUT
-- [ ] `src/app/api/translate/route.ts` - POST
-- [ ] `src/app/api/ai/generate-content/route.ts` - POST
+- [x] `src/app/api/system-content/route.ts` - GET (uses Drizzle ORM, acceptable)
+- [x] `src/app/api/translate/route.ts` - POST (external translation API, no Supabase DB)
+- [x] `src/app/api/ai/generate-content/route.ts` - POST (external AI APIs; no direct Supabase DB queries)
 
 ---
 
@@ -282,17 +285,17 @@ This document tracks the migration from direct Supabase database communication t
 ### Overall Progress Calculation
 
 **Phase 1: Service Layer Infrastructure**
-- Total Items: 9
-- Completed: 9
+- Total Items: 23 (API utilities + services)
+- Completed: 23
 - Progress: 100% ✅
 
 **Phase 2: API Routes Refactoring**
 - Core API Routes: 7/7 (100%) ✅
-- Case Detail Routes: 4/10 (40%)
-- Contribution Detail Routes: 0/4 (0%)
-- Admin Routes: 4/39 (10%)
-- Other API Routes: 0/43 (0%)
-- **Subtotal**: 15/103 (14.6%)
+- Case Detail Routes: 8/10 (80%) — case file routes pending (storage)
+- Contribution Detail Routes: 4/4 (100%) ✅
+- Admin Routes: 19/39 (49%)
+- Other API Routes: 35/44 (80%)
+- **Subtotal**: 73/103 (70.9%)
 
 **Phase 3: Client-Side Code Refactoring**
 - Hooks: 1/2 (50%)
@@ -315,29 +318,29 @@ This document tracks the migration from direct Supabase database communication t
 
 ### Overall Summary
 
-- **Total Items to Migrate**: ~175 items
-- **Items Completed**: ~73 items
-- **Items Remaining**: ~102 items
-- **Overall Progress**: **41.7%** complete
+- **Total checklist items**: 197
+- **Items completed**: 98
+- **Items remaining**: 99
+- **Overall progress**: **49.7%** complete
 
-**Note**: Landing routes (`/api/landing/*`) use Drizzle ORM, not direct Supabase client calls, so they are acceptable for now. Projects routes use a mix of Drizzle ORM and Supabase client - these should be refactored to use services.
+**Note**: Landing routes (`/api/landing/*`) use Drizzle ORM, not direct Supabase client calls, so they are acceptable for now. `system-content` uses Drizzle. Projects and several admin user/merge routes still use direct Supabase client calls and should move behind services next.
 
 ### Breakdown by Category
 
-- ✅ **Infrastructure**: 100% (9/9)
-- ⏳ **API Routes**: 46.6% (48/103)
+- ✅ **Infrastructure**: 100% (23/23)
+- ⏳ **API Routes**: 70.9% (73/103)
 - ⏳ **Client-Side**: 7.9% (3/38)
-- ⏳ **Special Cases**: 33.3% (5/15) - Auth items acceptable
+- ⏳ **Special Cases**: 33.3% (5/15) — auth items acceptable
 - ⏳ **Testing**: 0% (0/10)
 
 ### Files Status
 
 - **Total Files to Migrate**: ~71 files
-- **Files Completed**: ~47 files
-- **Files Remaining**: ~24 files
-- **File Progress**: ~66% complete
+- **Files Completed**: ~52 files
+- **Files Remaining**: ~19 files
+- **File Progress**: ~73% complete
 
 ---
 
-*Last Updated: [Current Date]*
+*Last Updated: 2026-03-24*
 

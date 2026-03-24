@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { env } from '@/config/env'
+import { PushSubscriptionService } from '@/lib/services/pushSubscriptionService'
 
 async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   const { user, logger } = context
@@ -11,101 +12,94 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   }
 
   try {
-    const diagnostics: Record<string, any> = {
+    const diagnostics: Record<string, unknown> = {
       timestamp: new Date().toISOString(),
       userId: user.id,
-      checks: {},
+      checks: {}
     }
 
-    // Check 1: FCM tokens in database
     try {
       if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-        diagnostics.checks.fcmTokens = {
+        ;(diagnostics.checks as Record<string, unknown>).fcmTokens = {
           status: 'error',
-          message: 'SUPABASE_SERVICE_ROLE_KEY not configured',
+          message: 'SUPABASE_SERVICE_ROLE_KEY not configured'
         }
       } else {
-        const supabaseClient = createSupabaseClient(
-          env.NEXT_PUBLIC_SUPABASE_URL,
-          env.SUPABASE_SERVICE_ROLE_KEY,
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false,
-            },
+        const supabaseClient = createSupabaseClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
           }
-        )
+        })
 
-        const { data: userTokens, error: tokensError } = await supabaseClient
-          .from('fcm_tokens')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('active', true)
+        try {
+          const userTokens = await PushSubscriptionService.getActiveFCMTokensByUserId(supabaseClient, user.id)
 
-        if (tokensError) {
-          diagnostics.checks.fcmTokens = {
-            status: 'error',
-            message: tokensError.message,
-            error: tokensError,
-          }
-        } else {
-          diagnostics.checks.fcmTokens = {
+          ;(diagnostics.checks as Record<string, unknown>).fcmTokens = {
             status: userTokens && userTokens.length > 0 ? 'ok' : 'warning',
             count: userTokens?.length || 0,
-            tokens: userTokens?.map((t) => ({
-              id: t.id,
-              platform: t.platform,
-              deviceId: t.device_id,
-              createdAt: t.created_at,
-              updatedAt: t.updated_at,
-            })) || [],
+            tokens:
+              userTokens?.map((t) => ({
+                id: t.id,
+                platform: t.platform,
+                deviceId: t.device_id,
+                createdAt: t.created_at,
+                updatedAt: t.updated_at
+              })) || [],
             message:
               userTokens && userTokens.length > 0
                 ? `Found ${userTokens.length} active token(s)`
-                : 'No active FCM tokens found. Please subscribe to push notifications.',
+                : 'No active FCM tokens found. Please subscribe to push notifications.'
+          }
+        } catch (tokensError: unknown) {
+          const message = tokensError instanceof Error ? tokensError.message : 'Unknown error'
+          ;(diagnostics.checks as Record<string, unknown>).fcmTokens = {
+            status: 'error',
+            message,
+            error: tokensError
           }
         }
 
-        // Check total active tokens
-        const { data: allTokens, error: allTokensError } = await supabaseClient
-          .from('fcm_tokens')
-          .select('user_id')
-          .eq('active', true)
-
-        diagnostics.checks.totalActiveTokens = {
-          status: allTokensError ? 'error' : 'ok',
-          count: allTokens?.length || 0,
-          message: allTokensError
-            ? allTokensError.message
-            : `Total active tokens in system: ${allTokens?.length || 0}`,
+        try {
+          const allTokens = await PushSubscriptionService.getAllActiveFCMTokenUserIds(supabaseClient)
+          ;(diagnostics.checks as Record<string, unknown>).totalActiveTokens = {
+            status: 'ok',
+            count: allTokens?.length || 0,
+            message: `Total active tokens in system: ${allTokens?.length || 0}`
+          }
+        } catch (allTokensError: unknown) {
+          const message = allTokensError instanceof Error ? allTokensError.message : 'Unknown error'
+          ;(diagnostics.checks as Record<string, unknown>).totalActiveTokens = {
+            status: 'error',
+            message
+          }
         }
       }
-    } catch (error: any) {
-      diagnostics.checks.fcmTokens = {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error checking FCM tokens'
+      ;(diagnostics.checks as Record<string, unknown>).fcmTokens = {
         status: 'error',
-        message: error.message || 'Unknown error checking FCM tokens',
+        message
       }
     }
 
-    // Check 2: Edge Function configuration (we can't directly check secrets, but we can test the function)
-    diagnostics.checks.edgeFunction = {
+    ;(diagnostics.checks as Record<string, unknown>).edgeFunction = {
       status: 'info',
       message: 'Edge Function secret check requires manual verification',
       instructions: [
         '1. Run: supabase secrets list',
         '2. Verify FIREBASE_SERVICE_ACCOUNT_JSON is set',
-        '3. Check Edge Function logs: supabase functions logs push-fcm',
-      ],
+        '3. Check Edge Function logs: supabase functions logs push-fcm'
+      ]
     }
 
-    // Check 3: Test Edge Function call
     try {
       const edgeFunctionUrl = `${env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/push-fcm`
       const testResponse = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           userIds: [user.id],
@@ -113,35 +107,35 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
             title: 'Diagnostic Test',
             body: 'This is a diagnostic test notification',
             icon: '/logo.png',
-            badge: '/logo.png',
+            badge: '/logo.png'
           },
           data: {
             type: 'diagnostic',
-            timestamp: new Date().toISOString(),
-          },
-        }),
+            timestamp: new Date().toISOString()
+          }
+        })
       })
 
       const testResult = await testResponse.json().catch(() => ({ error: 'Failed to parse response' }))
 
-      diagnostics.checks.edgeFunctionTest = {
+      ;(diagnostics.checks as Record<string, unknown>).edgeFunctionTest = {
         status: testResponse.ok ? 'ok' : 'error',
         httpStatus: testResponse.status,
         response: testResult,
         message: testResponse.ok
           ? 'Edge Function responded successfully'
-          : `Edge Function error: ${testResult.error || testResult.message || 'Unknown error'}`,
+          : `Edge Function error: ${(testResult as { error?: string }).error || (testResult as { message?: string }).message || 'Unknown error'}`
       }
-    } catch (error: any) {
-      diagnostics.checks.edgeFunctionTest = {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to test Edge Function'
+      ;(diagnostics.checks as Record<string, unknown>).edgeFunctionTest = {
         status: 'error',
-        message: error.message || 'Failed to test Edge Function',
-        error: error.toString(),
+        message,
+        error: String(error)
       }
     }
 
-    // Check 4: Environment variables
-    diagnostics.checks.environment = {
+    ;(diagnostics.checks as Record<string, unknown>).environment = {
       status: 'ok',
       variables: {
         hasSupabaseUrl: !!env.NEXT_PUBLIC_SUPABASE_URL,
@@ -149,18 +143,18 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
         hasAnonKey: !!env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
         supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL
           ? `${env.NEXT_PUBLIC_SUPABASE_URL.substring(0, 30)}...`
-          : 'not set',
+          : 'not set'
       },
-      message: 'Environment variables check',
+      message: 'Environment variables check'
     }
 
     return NextResponse.json(diagnostics)
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.logStableError('INTERNAL_SERVER_ERROR', 'Error running diagnostics:', error)
     return NextResponse.json(
       {
         error: 'Failed to run diagnostics',
-        message: error.message || 'Unknown error',
+        message: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     )
@@ -169,6 +163,5 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
 
 export const GET = withApiHandler(getHandler, {
   requireAuth: true,
-  loggerContext: 'api/push/diagnostics',
+  loggerContext: 'api/push/diagnostics'
 })
-

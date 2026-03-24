@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createPatchHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { RecurringContributionService } from '@/lib/services/recurringContributionService'
 
 /**
  * PATCH /api/recurring-contributions/[id]
@@ -14,64 +15,47 @@ async function patchHandler(
   const { supabase, user, logger } = context
   const { id } = params
 
-    const body = await request.json()
-    const { status, action } = body
+  const body = await request.json()
+  const { status, action } = body
 
-    // Verify the contribution belongs to the user
-    const { data: existingContrib, error: fetchError } = await supabase
-      .from('recurring_contributions')
-      .select('donor_id, status')
-      .eq('id', id)
-      .single()
+  const existingContrib = await RecurringContributionService.getByIdForDonor(supabase, id, user.id)
 
-    if (fetchError || !existingContrib) {
-      throw new ApiError('NOT_FOUND', 'Recurring contribution not found', 404)
-    }
+  if (!existingContrib) {
+    throw new ApiError('NOT_FOUND', 'Recurring contribution not found', 404)
+  }
 
-    if (existingContrib.donor_id !== user.id) {
-      throw new ApiError('FORBIDDEN', 'You can only update your own recurring contributions', 403)
-    }
+  let newStatus = status
+  if (action === 'pause') {
+    newStatus = 'paused'
+  } else if (action === 'resume') {
+    newStatus = 'active'
+  } else if (action === 'cancel') {
+    newStatus = 'cancelled'
+  }
 
-    // Determine new status based on action or direct status
-    let newStatus = status
-    if (action === 'pause') {
-      newStatus = 'paused'
-    } else if (action === 'resume') {
-      newStatus = 'active'
-    } else if (action === 'cancel') {
-      newStatus = 'cancelled'
-    }
+  if (!newStatus) {
+    throw new ApiError('VALIDATION_ERROR', 'Status or action is required', 400)
+  }
 
-    if (!newStatus) {
-      throw new ApiError('VALIDATION_ERROR', 'Status or action is required', 400)
-    }
+  const validStatuses = ['active', 'paused', 'cancelled', 'completed']
+  if (!validStatuses.includes(newStatus)) {
+    throw new ApiError('VALIDATION_ERROR', `Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400)
+  }
 
-    // Validate status values
-    const validStatuses = ['active', 'paused', 'cancelled', 'completed']
-    if (!validStatuses.includes(newStatus)) {
-      throw new ApiError('VALIDATION_ERROR', `Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400)
-    }
-
-    // Update the contribution
-    const { data: updatedContrib, error: updateError } = await supabase
-      .from('recurring_contributions')
-      .update({ 
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (updateError) {
-      logger.error('Error updating recurring contribution', { error: updateError })
-      throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to update recurring contribution: ${updateError.message}`, 500)
-    }
-
+  try {
+    const updatedContrib = await RecurringContributionService.updateStatus(supabase, id, newStatus)
     return NextResponse.json(updatedContrib)
+  } catch (e) {
+    logger.error('Error updating recurring contribution', { error: e })
+    throw new ApiError(
+      'INTERNAL_SERVER_ERROR',
+      `Failed to update recurring contribution: ${e instanceof Error ? e.message : String(e)}`,
+      500
+    )
+  }
 }
 
-export const PATCH = createPatchHandlerWithParams(patchHandler, { 
-  requireAuth: true, 
-  loggerContext: 'api/recurring-contributions/[id]' 
+export const PATCH = createPatchHandlerWithParams(patchHandler, {
+  requireAuth: true,
+  loggerContext: 'api/recurring-contributions/[id]'
 })
