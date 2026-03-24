@@ -22,33 +22,27 @@ async function putHandler(
   const body = await request.json()
   const { display_name, display_name_ar, description, description_ar } = body
 
-  // Check if permission is system (can't update system permissions)
-  const { data: existingPermission } = await supabase
-    .from('admin_permissions')
-    .select('is_system')
-    .eq('id', id)
-    .single()
-
-  if (existingPermission?.is_system) {
-    throw new ApiError('VALIDATION_ERROR', 'Cannot update system permissions', 400)
-  }
-
-  const { data, error } = await supabase
-    .from('admin_permissions')
-    .update({
+  try {
+    const { PermissionService } = await import('@/lib/services/permissionService')
+    
+    const permission = await PermissionService.update(supabase, id, {
       display_name,
-      display_name_ar,
-      description,
-      description_ar,
-      updated_at: new Date().toISOString()
+      display_name_ar: display_name_ar || null,
+      description: description || null,
+      description_ar: description_ar || null,
     })
-    .eq('id', id)
-    .select()
-    .single()
 
-  if (error) throw error
-
-  return NextResponse.json({ permission: data })
+    return NextResponse.json({ permission })
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('system permissions')) {
+      throw new ApiError('VALIDATION_ERROR', error.message, 400)
+    }
+    if (error instanceof Error && error.message.includes('not found')) {
+      throw new ApiError('NOT_FOUND', error.message, 404)
+    }
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating permission:', error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', error instanceof Error ? error.message : 'Failed to update permission', 500)
+  }
 }
 
 async function deleteHandler(
@@ -59,25 +53,22 @@ async function deleteHandler(
   const { supabase, logger, user } = context
   const { id } = params
 
-  // Check if permission is system (can't delete system permissions)
-  const { data: existingPermission } = await supabase
-    .from('admin_permissions')
-    .select('is_system')
-    .eq('id', id)
-    .single()
+  try {
+    const { PermissionService } = await import('@/lib/services/permissionService')
+    
+    await PermissionService.delete(supabase, id)
 
-  if (existingPermission?.is_system) {
-    throw new ApiError('VALIDATION_ERROR', 'Cannot delete system permissions', 400)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('system permissions')) {
+      throw new ApiError('VALIDATION_ERROR', error.message, 400)
+    }
+    if (error instanceof Error && error.message.includes('not found')) {
+      throw new ApiError('NOT_FOUND', error.message, 404)
+    }
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting permission:', error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', error instanceof Error ? error.message : 'Failed to delete permission', 500)
   }
-
-  const { error } = await supabase
-    .from('admin_permissions')
-    .delete()
-    .eq('id', id)
-
-  if (error) throw error
-
-  return NextResponse.json({ success: true })
 }
 
 export const PUT = createPutHandlerWithParams<{ id: string }>(putHandler, { requireAuth: true, requireSuperAdmin: true, loggerContext: 'api/admin/permissions/[id]' })

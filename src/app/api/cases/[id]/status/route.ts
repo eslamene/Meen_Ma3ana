@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createGetHandlerWithParams, createPatchHandlerWithParams, createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
 import { CaseLifecycleService } from '@/lib/case-lifecycle'
-import { db } from '@/lib/db'
-import { cases, contributions } from '@/drizzle/schema'
-import { eq, sum } from 'drizzle-orm'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 async function getHandler(
   request: NextRequest,
@@ -55,18 +53,18 @@ async function postHandler(
   context: ApiHandlerContext,
   params: { id: string }
 ) {
-  const { logger } = context
+  const { supabase, logger } = context
   const { id: caseId } = params
   const body = await request.json()
   const { action } = body
 
   if (action === 'check-automatic-closure') {
     // Check if case should be automatically closed
-    const result = await checkAndCloseCaseIfFullyFunded(caseId)
+    const result = await checkAndCloseCaseIfFullyFunded(supabase, caseId)
     return NextResponse.json(result)
   }
 
-    throw new ApiError('VALIDATION_ERROR', 'Invalid action', 400)
+  throw new ApiError('VALIDATION_ERROR', 'Invalid action', 400)
 }
 
 export const GET = createGetHandlerWithParams(getHandler, { 
@@ -84,13 +82,13 @@ export const POST = createPostHandlerWithParams(postHandler, {
   loggerContext: 'api/cases/[id]/status' 
 })
 
-async function checkAndCloseCaseIfFullyFunded(caseId: string) {
+async function checkAndCloseCaseIfFullyFunded(supabase: SupabaseClient, caseId: string) {
   try {
+    const { CaseService } = await import('@/lib/services/caseService')
+    const { ContributionService } = await import('@/lib/services/contributionService')
+
     // Get case details
-    const [caseData] = await db
-      .select()
-      .from(cases)
-      .where(eq(cases.id, caseId))
+    const caseData = await CaseService.getById(supabase, caseId)
 
     if (!caseData) {
       return { success: false, error: 'Case not found' }
@@ -101,13 +99,20 @@ async function checkAndCloseCaseIfFullyFunded(caseId: string) {
       return { success: false, error: 'Case is not eligible for automatic closure' }
     }
 
-    // Calculate total contributions
-    const [totalContributions] = await db
-      .select({ total: sum(contributions.amount) })
-      .from(contributions)
-      .where(eq(contributions.case_id, caseId))
+    // Get all contributions for this case to calculate total
+    const contributionsResult = await ContributionService.getContributions(supabase, {
+      limit: 10000, // Get all contributions
+      page: 1,
+      offset: 0
+    })
 
-    const totalAmount = parseFloat(totalContributions?.total || '0')
+    // Filter contributions for this case and sum amounts
+    const caseContributions = contributionsResult.contributions.filter(c => c.caseId === caseId || c.case_id === caseId)
+    const totalAmount = caseContributions.reduce((sum, c) => {
+      const amount = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0)
+      return sum + amount
+    }, 0)
+
     const targetAmount = parseFloat(caseData.target_amount?.toString() || '0')
 
     // Check if case is fully funded

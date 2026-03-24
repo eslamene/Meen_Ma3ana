@@ -8,21 +8,37 @@ import { normalizePhoneNumber } from '@/lib/utils/phone'
 async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
 
-    // Fetch user profile data - only editable fields
-    const { data: userProfile, error: profileError } = await supabase
-      .from('users')
-      .select('id, first_name, last_name, phone, address, profile_image, language, updated_at')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user profile:', profileError)
-      throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch user profile', 500)
+  const { UserService } = await import('@/lib/services/userService')
+  
+  try {
+    const userProfile = await UserService.getById(supabase, user.id)
+    
+    if (!userProfile) {
+      throw new ApiError('NOT_FOUND', 'User profile not found', 404)
     }
 
+    // Return only editable fields
+    const { id, first_name, last_name, phone, address, profile_image, language, updated_at } = userProfile
+    
     return NextResponse.json({
-      user: userProfile
+      user: {
+        id,
+        first_name,
+        last_name,
+        phone,
+        address,
+        profile_image,
+        language,
+        updated_at
+      }
     })
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user profile:', { error })
+    throw new ApiError('INTERNAL_SERVER_ERROR', error instanceof Error ? error.message : 'Failed to fetch user profile', 500)
+  }
 }
 
 async function putHandler(request: NextRequest, context: ApiHandlerContext) {

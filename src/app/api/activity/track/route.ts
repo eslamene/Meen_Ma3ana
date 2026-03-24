@@ -111,4 +111,3 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 }
 
 export const POST = createPostHandler(handler, { loggerContext: 'api/activity/track' })
-

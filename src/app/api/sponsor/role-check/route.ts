@@ -5,26 +5,33 @@ import { ApiError } from '@/lib/utils/api-errors'
 async function handler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
 
-  // Check if user is already a sponsor
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  try {
+    // Get user's roles using AdminService to check for sponsor role
+    const { AdminService } = await import('@/lib/admin/service')
+    const { roles } = await AdminService.getUserRolesAndPermissions(supabase, user.id)
+    
+    // Check if user has sponsor role (check both role name and user role field)
+    const hasSponsorRole = roles.some(r => r.name === 'sponsor')
+    
+    // Also check the user's base role field
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+    
+    const baseRole = userData?.role || null
+    const isSponsor = hasSponsorRole || baseRole === 'sponsor'
+    const role = baseRole
 
-  if (userError) {
-    logger.error('Error fetching user role:', userError)
-    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch user role', 500)
+    return NextResponse.json({
+      isSponsor,
+      role
+    })
+  } catch (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking sponsor role:', error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', error instanceof Error ? error.message : 'Failed to check sponsor role', 500)
   }
-
-  const isSponsor = userData?.role === 'sponsor'
-  const role = userData?.role || null
-
-  return NextResponse.json({
-    isSponsor,
-    role
-  })
 }
 
 export const GET = createGetHandler(handler, { requireAuth: true, loggerContext: 'api/sponsor/role-check' })
-

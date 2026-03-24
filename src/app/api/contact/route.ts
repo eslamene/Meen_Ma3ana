@@ -30,21 +30,15 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
   // Store in Supabase (gracefully handle missing table)
   try {
+    const { ContactService } = await import('@/lib/services/contactService')
     
     // Try to insert into landing_contacts table
     // If table doesn't exist, we'll log it but still return success
-    const { error } = await supabase.from('landing_contacts').insert({
+    await ContactService.createGraceful(supabase, {
       name,
       email,
-      message,
-      created_at: new Date().toISOString(),
+      message
     })
-
-    if (error) {
-      // Log error but don't fail the request
-      // In production, you might want to use a fallback storage method
-      logger.warn('Error saving contact (table may not exist)', { error })
-    }
   } catch (dbError) {
     // If Supabase client creation fails or table doesn't exist, log it
     logger.warn('Contact storage error (may need to create landing_contacts table)', { error: dbError })

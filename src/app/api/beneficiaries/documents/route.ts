@@ -28,4 +28,3 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 }
 
 export const POST = createPostHandler(handler, { requireAuth: true, loggerContext: 'api/beneficiaries/documents' })
-

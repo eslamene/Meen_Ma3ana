@@ -1,43 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import { ApiError } from '@/lib/utils/api-errors'
 
 async function handler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
   
   try {
+    const { UserService } = await import('@/lib/services/userService')
+    const { ContributionService } = await import('@/lib/services/contributionService')
 
     // Fetch user profile data
-    const { data: userProfile, error: profileError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching user profile:', profileError)
-      return NextResponse.json(
-        { error: 'Failed to fetch user profile' },
-        { status: 500 }
-      )
+    const userProfile = await UserService.getById(supabase, user.id)
+    
+    if (!userProfile) {
+      throw new ApiError('NOT_FOUND', 'User profile not found', 404)
     }
 
-    // Fetch contribution history with case information (left join to include contributions without cases)
-    const { data: contributions, error: contributionsError } = await supabase
-      .from('contributions')
-      .select('id, amount, created_at, case_id, status, cases(title_en, title_ar, status)')
-      .eq('donor_id', user.id)
-      .in('status', ['pending', 'approved', 'rejected'])
-      .order('created_at', { ascending: false })
+    // Fetch contribution history with case information
+    const contributionsResult = await ContributionService.getContributions(supabase, {
+      userId: user.id,
+      isAdmin: false,
+      limit: 1000, // Get all contributions for stats
+      page: 1,
+      offset: 0,
+      sortBy: 'created_at',
+      sortOrder: 'desc'
+    })
 
-    if (contributionsError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching contributions:', contributionsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch contributions' },
-        { status: 500 }
-      )
-    }
+    const contributions = contributionsResult.contributions || []
 
-    // Calculate statistics
+    // Calculate statistics from contributions
     let stats = {
       totalContributions: 0,
       totalAmount: 0,
@@ -51,88 +43,49 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
         created_at: string
         case_id: string | null
         status: string
-        cases: {
-          title_en?: string
-          title_ar?: string
-          status: string
-        } | null
+        caseTitle?: string
+        caseTitleAr?: string
       } | null
     }
 
     if (contributions && contributions.length > 0) {
-      // Helper function to safely parse amount, defaulting to 0 for null/undefined/invalid
+      // Helper function to safely parse amount
       const parseAmount = (amount: unknown): number => {
-        if (amount === null || amount === undefined) {
-          return 0
-        }
+        if (amount === null || amount === undefined) return 0
         if (typeof amount === 'string') {
           const parsed = parseFloat(amount)
           return isNaN(parsed) ? 0 : parsed
         }
-        if (typeof amount === 'number') {
-          return isNaN(amount) ? 0 : amount
-        }
+        if (typeof amount === 'number') return isNaN(amount) ? 0 : amount
         return 0
-      }
-
-      // Helper function to validate case object shape
-      const isValidCaseObject = (caseObj: unknown): caseObj is { title_en?: string; title_ar?: string; status: string } => {
-        if (!caseObj || typeof caseObj !== 'object') {
-          return false
-        }
-        const obj = caseObj as Record<string, unknown>
-        // Must have at least status property and either title_en or title_ar
-        return typeof obj.status === 'string' && (typeof obj.title_en === 'string' || typeof obj.title_ar === 'string')
-      }
-
-      // Helper function to extract valid case object from various forms
-      const extractCaseObject = (cases: unknown): { title_en?: string; title_ar?: string; status: string } | null => {
-        if (!cases) {
-          return null
-        }
-        
-        // Handle array form
-        if (Array.isArray(cases)) {
-          const firstCase = cases[0]
-          return isValidCaseObject(firstCase) ? firstCase : null
-        }
-        
-        // Handle object form
-        if (typeof cases === 'object') {
-          return isValidCaseObject(cases) ? cases : null
-        }
-        
-        // Invalid type
-        return null
       }
 
       const totalAmount = contributions.reduce((sum, c) => sum + parseAmount(c.amount), 0)
       
-      // Get unique cases and their statuses
-      const uniqueCases = new Map()
+      // Get unique cases and their statuses from normalized contributions
+      const uniqueCases = new Map<string, { status: string }>()
       contributions.forEach((c) => {
-        if (!uniqueCases.has(c.case_id)) {
-          const caseData = extractCaseObject(c.cases)
-          // Only add to uniqueCases if we have a valid case object
-          if (caseData) {
-            uniqueCases.set(c.case_id, caseData)
-          }
+        if (c.caseId && !uniqueCases.has(c.caseId)) {
+          // Normalized contributions have caseStatus
+          const caseStatus = (c as any).caseStatus || 'published'
+          uniqueCases.set(c.caseId, { status: caseStatus })
         }
       })
       
       const activeCases = Array.from(uniqueCases.values()).filter((c) => c.status === 'published').length
       const completedCases = Array.from(uniqueCases.values()).filter((c) => c.status === 'closed').length
-      const lastContribution = contributions[0]?.created_at || null
+      const lastContribution = contributions[0]?.createdAt || null
 
-      // Normalize the latest contribution
+      // Get latest contribution (already normalized)
       const latestContributionData = contributions[0]
       const normalizedLatestContribution = latestContributionData ? {
         id: latestContributionData.id,
-        amount: latestContributionData.amount,
-        created_at: latestContributionData.created_at,
-        case_id: latestContributionData.case_id,
+        amount: parseAmount(latestContributionData.amount),
+        created_at: latestContributionData.createdAt || latestContributionData.created_at,
+        case_id: latestContributionData.caseId || latestContributionData.case_id || null,
         status: latestContributionData.status,
-        cases: extractCaseObject(latestContributionData.cases)
+        caseTitle: (latestContributionData as any).caseTitle,
+        caseTitleAr: (latestContributionData as any).caseTitleAr
       } : null
 
       stats = {
@@ -140,7 +93,7 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
         totalAmount,
         activeCases,
         completedCases,
-        averageContribution: totalAmount / contributions.length,
+        averageContribution: contributions.length > 0 ? totalAmount / contributions.length : 0,
         lastContribution,
         latestContribution: normalizedLatestContribution
       }
@@ -160,4 +113,3 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 }
 
 export const GET = withApiHandler(handler, { requireAuth: true, loggerContext: 'api/profile/stats' })
-

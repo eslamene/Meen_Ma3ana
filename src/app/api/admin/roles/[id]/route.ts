@@ -51,4 +51,3 @@ async function handler(
 }
 
 export const PUT = createPutHandlerWithParams<{ id: string }>(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/roles/[id]' })
-

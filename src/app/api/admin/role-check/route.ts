@@ -5,30 +5,37 @@ import { ApiError } from '@/lib/utils/api-errors'
 async function handler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
 
-  // Check if user is admin
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  try {
+    // Use UserService to get user data
+    const { UserService } = await import('@/lib/services/userService')
+    const userData = await UserService.getById(supabase, user.id)
 
-  if (userError) {
-    logger.error('Error fetching user role:', userError)
-    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch user role', 500)
+    if (!userData) {
+      throw new ApiError('NOT_FOUND', 'User not found', 404)
+    }
+
+    // Check if user is admin using AdminService
+    const { AdminService } = await import('@/lib/admin/service')
+    const isAdmin = await AdminService.hasAdminRole(user.id)
+    
+    // Get base role from user data (fallback for legacy role field)
+    const role = userData.role || null
+
+    if (!isAdmin) {
+      throw new ApiError('FORBIDDEN', 'Forbidden', 403)
+    }
+
+    return NextResponse.json({
+      isAdmin,
+      role
+    })
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error checking admin role:', error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', error instanceof Error ? error.message : 'Failed to check admin role', 500)
   }
-
-  const isAdmin = userData?.role === 'admin'
-  const role = userData?.role || null
-
-  if (!isAdmin) {
-    throw new ApiError('FORBIDDEN', 'Forbidden', 403)
-  }
-
-  return NextResponse.json({
-    isAdmin,
-    role
-  })
 }
 
 export const GET = createGetHandler(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/admin/role-check' })
-

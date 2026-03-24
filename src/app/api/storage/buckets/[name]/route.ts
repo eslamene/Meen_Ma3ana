@@ -23,28 +23,26 @@ async function getHandler(
 
   logger.info('Fetching bucket details', { userId: context.user.id, bucketName, includeCount })
 
-    // Create admin client
-    const supabase = createStorageAdminClient()
-
+    // Use StorageBucketService to get bucket and rules
+    const { StorageBucketService } = await import('@/lib/services/storageBucketService')
+    const { createStorageAdminClient } = await import('@/lib/storage/server')
+    
     // Get storage rules FIRST (this is what the uploader needs, and it's fast)
-    const { data: rule } = await supabase
-      .from('storage_rules')
-      .select('*')
-      .eq('bucket_name', bucketName)
-      .maybeSingle()
+    const rule = await StorageBucketService.getStorageRule(bucketName)
 
     // Get bucket metadata
-    const { data: bucket, error: bucketError } = await supabase.storage.getBucket(bucketName)
+    const bucket = await StorageBucketService.getBucket(bucketName)
 
-    if (bucketError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching bucket', { error: bucketError })
-      throw new ApiError('NOT_FOUND', `Bucket not found: ${bucketError.message}`, 404)
+    if (!bucket) {
+      throw new ApiError('NOT_FOUND', `Bucket not found: ${bucketName}`, 404)
     }
 
     // Get object count ONLY if requested (this is slow, so skip for file uploader)
     let objectCount: number | undefined
     if (includeCount) {
       try {
+        // Use storage admin client for listing files (storage operation, not database query)
+        const supabase = createStorageAdminClient()
         const { data: files } = await supabase.storage
           .from(bucketName)
           .list('', {

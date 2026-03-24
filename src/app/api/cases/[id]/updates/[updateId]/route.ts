@@ -25,13 +25,14 @@ async function putHandler(
   }
 
   // Check if user is admin or the creator of the update
-  const { data: userProfile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const { UserService } = await import('@/lib/services/userService')
+  const userProfile = await UserService.getById(supabase, user.id)
 
-  if (userProfile?.role !== 'admin' && existingUpdate.createdBy !== user.id) {
+  if (!userProfile) {
+    throw new ApiError('NOT_FOUND', 'User not found', 404)
+  }
+
+  if (userProfile.role !== 'admin' && existingUpdate.createdBy !== user.id) {
     throw new ApiError('FORBIDDEN', 'You can only edit your own updates', 403)
   }
 
@@ -68,13 +69,14 @@ async function deleteHandler(
   }
 
   // Check if user is admin or the creator of the update
-  const { data: userProfile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const { UserService } = await import('@/lib/services/userService')
+  const userProfile = await UserService.getById(supabase, user.id)
 
-  if (userProfile?.role !== 'admin' && existingUpdate.createdBy !== user.id) {
+  if (!userProfile) {
+    throw new ApiError('NOT_FOUND', 'User not found', 404)
+  }
+
+  if (userProfile.role !== 'admin' && existingUpdate.createdBy !== user.id) {
     throw new ApiError('FORBIDDEN', 'You can only delete your own updates', 403)
   }
 

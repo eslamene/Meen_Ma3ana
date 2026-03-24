@@ -42,46 +42,23 @@ async function postHandler(
     allowed_extensions
   })
 
-    // Create admin client
-    const supabase = createStorageAdminClient()
+    // Use StorageBucketService to verify bucket exists and update rules
+    const { StorageBucketService } = await import('@/lib/services/storageBucketService')
+    const { createStorageAdminClient } = await import('@/lib/storage/server')
 
     // Verify bucket exists
-    const { data: bucket, error: bucketError } = await supabase.storage.getBucket(bucket_name)
+    const bucket = await StorageBucketService.getBucket(bucket_name)
 
-    if (bucketError) {
-      logger.warn('Bucket not found', { bucket_name, error: bucketError.message })
-      throw new ApiError('NOT_FOUND', `Bucket not found: ${bucketError.message}`, 404)
+    if (!bucket) {
+      logger.warn('Bucket not found', { bucket_name })
+      throw new ApiError('NOT_FOUND', `Bucket not found: ${bucket_name}`, 404)
     }
 
-    // Normalize extensions: lowercase, trim whitespace, remove duplicates
-    const normalizedExtensions = Array.from(
-      new Set(
-        allowed_extensions
-          .map(ext => ext.toLowerCase().trim())
-          .filter(ext => ext.length > 0)
-      )
-    )
-
-    // Upsert storage rule
-    const { data: rule, error: upsertError } = await supabase
-      .from('storage_rules')
-      .upsert(
-        {
-          bucket_name,
-          max_file_size_mb,
-          allowed_extensions: normalizedExtensions
-        },
-        {
-          onConflict: 'bucket_name'
-        }
-      )
-      .select()
-      .single()
-
-    if (upsertError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error upserting storage rule', { error: upsertError })
-      throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to update storage rule: ${upsertError.message}`, 500)
-    }
+    // Upsert storage rule using StorageBucketService
+    const rule = await StorageBucketService.upsertStorageRule(bucket_name, {
+      max_file_size_mb,
+      allowed_extensions
+    })
 
     const response: StorageRuleResponse = {
       rule

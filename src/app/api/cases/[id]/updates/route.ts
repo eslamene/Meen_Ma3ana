@@ -3,7 +3,6 @@ import { createGetHandlerWithParams, createPostHandlerWithParams, ApiHandlerCont
 import { ApiError } from '@/lib/utils/api-errors'
 import { caseUpdateService } from '@/lib/case-updates'
 import { caseNotificationService } from '@/lib/notifications/case-notifications'
-import { createClient } from '@/lib/supabase/server'
 
 async function getHandler(
   request: NextRequest,
@@ -62,15 +61,11 @@ async function postHandler(
 
       // Send push notifications to contributing users
       try {
-        const { createClient: createSupabaseClient } = await import('@/lib/supabase/server')
-        const supabaseClient = await createSupabaseClient()
+        const { CaseService } = await import('@/lib/services/caseService')
+        const { supabase } = context
         
-        // Get case details
-        const { data: caseData } = await supabaseClient
-          .from('cases')
-          .select('title_en, title_ar')
-          .eq('id', id)
-          .single()
+        // Get case details using CaseService
+        const caseData = await CaseService.getById(supabase, id)
 
         if (caseData) {
           // Get contributing users

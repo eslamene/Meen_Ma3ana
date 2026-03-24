@@ -17,26 +17,18 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
     throw new ApiError('VALIDATION_ERROR', 'Invalid request body', 400)
   }
 
-  // Update all items
-  const updates = await Promise.all(
-    items.map((item: { id: string; sort_order: number }) =>
-      supabase
-        .from('admin_menu_items')
-        .update({ sort_order: item.sort_order, updated_at: new Date().toISOString() })
-        .eq('id', item.id)
-        .select()
-        .single()
-    )
-  )
+  const { MenuService } = await import('@/lib/services/menuService')
 
-  // Check for errors
-  const errors = updates.filter(result => result.error)
-  if (errors.length > 0) {
-    logger.error('Error updating menu items:', errors)
-    throw new ApiError('INTERNAL_SERVER_ERROR', 'Some items failed to update', 500)
+  try {
+    await MenuService.reorder(supabase, items)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    if (error instanceof Error) {
+      logger.error('Error reordering menu items:', { error })
+      throw new ApiError('INTERNAL_SERVER_ERROR', error.message, 500)
+    }
+    throw error
   }
-
-  return NextResponse.json({ success: true })
 }
 
 export const PUT = createPutHandler(handler, { requireAuth: true, requireSuperAdmin: true, loggerContext: 'api/admin/menu/reorder' })

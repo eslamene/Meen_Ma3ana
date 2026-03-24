@@ -49,4 +49,3 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 }
 
 export const GET = withApiHandler(handler, { loggerContext: 'api/landing/social-media' })
-

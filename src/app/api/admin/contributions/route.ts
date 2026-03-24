@@ -128,28 +128,6 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
 
     logger.info('Admin creating contribution', { caseId, donorId, amount, adminUserId: adminUser.id })
 
-    // Verify case exists
-    const { data: caseData, error: caseError } = await supabase
-      .from('cases')
-      .select('id, title_en, title_ar, status, current_amount')
-      .eq('id', caseId)
-      .single()
-
-    if (caseError || !caseData) {
-      throw new ApiError('NOT_FOUND', 'Case not found', 404)
-    }
-
-    // Verify donor exists
-    const { data: donorData, error: donorError } = await supabase
-      .from('users')
-      .select('id, email, first_name, last_name')
-      .eq('id', donorId)
-      .single()
-
-    if (donorError || !donorData) {
-      throw new ApiError('NOT_FOUND', 'Donor not found', 404)
-    }
-
     // Convert payment method code to UUID if needed
     let paymentMethodId: string | null = null
     
@@ -173,63 +151,26 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
       paymentMethodId = paymentMethodData.id
     }
 
-    // Create contribution with approved status (already paid)
-    const { data: contribution, error: insertError } = await supabase
-      .from('contributions')
-      .insert({
-        type: 'donation',
-        amount: amount,
-        payment_method_id: paymentMethodId,
-        status: 'approved', // Admin-created contributions are already paid
-        proof_of_payment: proofOfPayment || null,
-        anonymous: anonymous || false,
-        donor_id: donorId,
-        case_id: caseId,
-        notes: notes || null,
-        created_by_admin: true,
-        admin_id: adminUser.id
-      })
-      .select()
-      .single()
+    // Use ContributionService to create admin contribution
+    const { ContributionService } = await import('@/lib/services/contributionService')
+    const { contribution, approvalStatusCreated } = await ContributionService.createAdminContribution(supabase, {
+      caseId,
+      donorId,
+      amount: parseFloat(amount),
+      paymentMethodId,
+      proofOfPayment: proofOfPayment || null,
+      anonymous: anonymous || false,
+      notes: notes || null,
+      adminId: adminUser.id
+    })
 
-    if (insertError) {
-      logger.error('Error inserting contribution:', insertError)
-      throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to create contribution: ${insertError.message}`, 500)
+    if (!approvalStatusCreated) {
+      logger.warn('Approval status was not created (non-critical)')
     }
 
-    // Create approval status record (approved by admin)
-    const { error: approvalError } = await supabase
-      .from('contribution_approval_status')
-      .insert({
-        contribution_id: contribution.id,
-        status: 'approved',
-        admin_id: adminUser.id,
-        admin_comment: 'Contribution created and approved by admin',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-
-    if (approvalError) {
-      logger.error('Error creating approval status:', approvalError)
-      // Don't fail the request, but log the error
-    }
-
-    // Update case amount
-    try {
-      const currentAmount = parseFloat(caseData.current_amount || '0')
-      const newAmount = currentAmount + parseFloat(amount)
-      
-      const { error: updateError } = await supabase
-        .from('cases')
-        .update({ current_amount: newAmount.toString() })
-        .eq('id', caseId)
-
-      if (updateError) {
-        logger.warn('Error updating case amount (non-critical):', updateError)
-      }
-    } catch (updateError) {
-      logger.warn('Error updating case amount (non-critical):', updateError)
-    }
+    // Get case data for notifications
+    const { CaseService } = await import('@/lib/services/caseService')
+    const caseData = await CaseService.getById(supabase, caseId)
 
     // Send approval notification to donor
     try {

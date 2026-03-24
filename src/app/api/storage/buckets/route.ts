@@ -17,24 +17,14 @@ async function getHandler(
 
   logger.info('Fetching storage buckets', { userId: context.user.id })
 
-    // Create admin client for storage operations
-    const supabase = createStorageAdminClient()
-
-    // List all buckets
-    const { data: buckets, error } = await supabase.storage.listBuckets()
-
-    if (error) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error listing buckets', { error })
-      throw new ApiError('INTERNAL_SERVER_ERROR', `Failed to fetch buckets: ${error.message}`, 500)
-    }
-
-    // Fetch storage rules for each bucket to include in response
-    const { data: rules } = await supabase
-      .from('storage_rules')
-      .select('*')
+    // Use StorageBucketService to list buckets and get rules
+    const { StorageBucketService } = await import('@/lib/services/storageBucketService')
+    
+    const buckets = await StorageBucketService.listBuckets()
+    const rules = await StorageBucketService.getStorageRules()
 
     const rulesMap = new Map(
-      rules?.map(rule => [rule.bucket_name, rule]) ?? []
+      rules.map(rule => [rule.bucket_name, rule])
     )
 
     // Map buckets to our format and include rules

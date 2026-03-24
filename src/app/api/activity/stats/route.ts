@@ -32,4 +32,3 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 }
 
 export const GET = createGetHandler(handler, { requireAuth: true, requireAdmin: true, loggerContext: 'api/activity/stats' })
-

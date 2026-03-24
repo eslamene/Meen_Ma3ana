@@ -1,39 +1,50 @@
+'use client'
+
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { defaultLogger as logger } from '@/lib/logger'
 
-import { defaultLogger } from '@/lib/logger'
-import { isValidUUID } from '@/lib/utils/uuid'
-
-interface Contribution {
+export interface Contribution {
   id: string
   amount: number
   donorName: string
   message?: string
   createdAt: string
   anonymous: boolean
-  status: string
+  status?: string
   approval_status?: {
-    status: string
-  } | Array<{ status: string }>
+    id: string
+    status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
+    rejection_reason?: string
+    admin_comment?: string
+    donor_reply?: string
+    donor_reply_date?: string
+    payment_proof_url?: string
+    resubmission_count: number
+  }
 }
 
-interface UseApprovedContributionsResult {
+export interface UseApprovedContributionsReturn {
   contributions: Contribution[]
   totalAmount: number
   isLoading: boolean
-  error: string | null
-  refetch: () => Promise<void>
+  error: Error | null
 }
 
-export function useApprovedContributions(caseId: string): UseApprovedContributionsResult {
+/**
+ * Hook to fetch approved contributions for a specific case
+ * @param caseId - The ID of the case to fetch contributions for
+ * @returns Object containing contributions array, total amount, loading state, and error
+ */
+export function useApprovedContributions(caseId: string): UseApprovedContributionsReturn {
   const [contributions, setContributions] = useState<Contribution[]>([])
-  const [totalAmount, setTotalAmount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [totalAmount, setTotalAmount] = useState<number>(0)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<Error | null>(null)
 
   const fetchApprovedContributions = useCallback(async () => {
-    // Don't fetch if caseId is not a valid UUID
-    if (!isValidUUID(caseId)) {
+    // Don't fetch if caseId is empty or invalid
+    if (!caseId || caseId.trim() === '') {
       setContributions([])
       setTotalAmount(0)
       setIsLoading(false)
@@ -46,11 +57,9 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
       setError(null)
 
       const supabase = createClient()
-      
-      // Check if user is authenticated first
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      const { data, error: fetchError } = await supabase
+
+      // Fetch contributions for this case with approval status
+      const { data: contributionsData, error: contributionsError } = await supabase
         .from('contributions')
         .select(`
           id,
@@ -59,184 +68,122 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
           anonymous,
           notes,
           status,
-          approval_status:contribution_approval_status!contribution_id(status),
-          users:donor_id(first_name, last_name, email)
+          users:donor_id(
+            first_name,
+            last_name,
+            email
+          ),
+          approval_status:contribution_approval_status!contribution_id(
+            id,
+            status,
+            rejection_reason,
+            admin_comment,
+            donor_reply,
+            donor_reply_date,
+            payment_proof_url,
+            resubmission_count
+          )
         `)
         .eq('case_id', caseId)
         .order('created_at', { ascending: false })
 
-      if (fetchError) {
-        // For public users, RLS errors are expected - try API fallback
-        // Check for various RLS/permission error indicators
-        const isRLSError = !user && (
-          fetchError.code === 'PGRST116' || 
-          fetchError.code === '42501' ||
-          fetchError.message?.toLowerCase().includes('permission') || 
-          fetchError.message?.toLowerCase().includes('policy') ||
-          fetchError.message?.toLowerCase().includes('row-level security') ||
-          fetchError.message?.toLowerCase().includes('new row violates')
-        )
-        
-        if (isRLSError) {
-          // Try to fetch from API endpoint as fallback
-          try {
-            const response = await fetch(`/api/cases/${caseId}/progress`)
-            if (response.ok) {
-              const apiData = await response.json()
-              // Set total amount from API, but contributions list will be empty for public users
-              setTotalAmount(apiData.approvedTotal || 0)
-              setContributions([]) // Public users don't see individual contributions
-              setError(null) // Clear error since API fallback succeeded
-              setIsLoading(false)
-              return // Successfully fetched from API, exit early
-            } else {
-              // API returned error, but don't throw - just set empty state
-              setTotalAmount(0)
-              setContributions([])
-              setError(null) // Don't show error for public users
-              setIsLoading(false)
-              return
-            }
-          } catch (apiError) {
-            // API also failed, but for public users we'll just set empty state
-            setTotalAmount(0)
-            setContributions([])
-            setError(null) // Don't show error for public users
-            setIsLoading(false)
-            return // Exit early for RLS errors even if API fails
-          }
-        }
-        throw fetchError
+      if (contributionsError) {
+        throw new Error(`Failed to fetch contributions: ${contributionsError.message}`)
       }
 
       // Filter to only include approved contributions
-      const approvedContributions = (data || []).filter(contribution => {
-        const approvalStatus = contribution.approval_status
-        // Handle both array and object formats from Supabase
-        if (Array.isArray(approvalStatus)) {
-          return approvalStatus.length > 0 && approvalStatus[0]?.status === 'approved'
-        }
-        return approvalStatus && (approvalStatus as { status: string }).status === 'approved'
-      })
+      // A contribution is approved if:
+      // 1. It has an approval_status with status === 'approved', OR
+      // 2. The main status field is 'approved' (fallback)
+      const approvedContributions = (contributionsData || [])
+        .filter((contribution: any) => {
+          const approvalStatus = contribution.approval_status
+          
+          // Check approval_status array
+          if (Array.isArray(approvalStatus) && approvalStatus.length > 0) {
+            return approvalStatus[0]?.status === 'approved'
+          }
+          
+          // Check single approval_status object
+          if (approvalStatus && !Array.isArray(approvalStatus)) {
+            return approvalStatus.status === 'approved'
+          }
+          
+          // Fallback to main status field
+          return contribution.status === 'approved'
+        })
+        .map((contribution: any) => {
+          // Get donor name
+          const donor = contribution.users
+          let donorName = 'Anonymous'
+          
+          if (!contribution.anonymous && donor) {
+            const firstName = donor.first_name || ''
+            const lastName = donor.last_name || ''
+            donorName = `${firstName} ${lastName}`.trim() || donor.email || 'Unknown Donor'
+          }
 
-      // Format contributions
-      const formattedContributions: Contribution[] = approvedContributions.map(contribution => {
-        // Build donor name from joined user data
-        const user = contribution.users
-        const donorName = contribution.anonymous 
-          ? 'Anonymous Donor' 
-          : user && Array.isArray(user) && user[0]?.first_name && user[0]?.last_name
-            ? `${user[0].first_name} ${user[0].last_name}`
-            : Array.isArray(user) && user[0]
-              ? (user[0].first_name || user[0].last_name || user[0].email || 'Unknown Donor')
-              : 'Unknown Donor'
+          // Get approval status
+          const approvalStatus = contribution.approval_status
+          let approvalStatusObj = undefined
+          
+          if (Array.isArray(approvalStatus) && approvalStatus.length > 0) {
+            approvalStatusObj = approvalStatus[0]
+          } else if (approvalStatus && !Array.isArray(approvalStatus)) {
+            approvalStatusObj = approvalStatus
+          }
 
-        return {
-          id: contribution.id,
-          amount: parseFloat(contribution.amount),
-          donorName,
-          message: contribution.notes,
-          createdAt: contribution.created_at,
-          anonymous: contribution.anonymous || false,
-          status: contribution.status,
-          approval_status: contribution.approval_status
-        }
-      })
+          return {
+            id: contribution.id,
+            amount: parseFloat(contribution.amount || '0'),
+            donorName,
+            message: contribution.notes || undefined,
+            createdAt: contribution.created_at,
+            anonymous: contribution.anonymous || false,
+            status: contribution.status || 'approved',
+            approval_status: approvalStatusObj ? {
+              id: approvalStatusObj.id,
+              status: approvalStatusObj.status,
+              rejection_reason: approvalStatusObj.rejection_reason || undefined,
+              admin_comment: approvalStatusObj.admin_comment || undefined,
+              donor_reply: approvalStatusObj.donor_reply || undefined,
+              donor_reply_date: approvalStatusObj.donor_reply_date || undefined,
+              payment_proof_url: approvalStatusObj.payment_proof_url || undefined,
+              resubmission_count: approvalStatusObj.resubmission_count || 0
+            } : undefined
+          } as Contribution
+        })
 
-      setContributions(formattedContributions)
-      
       // Calculate total amount
-      const total = formattedContributions.reduce((sum, contribution) => sum + contribution.amount, 0)
-      setTotalAmount(total)
+      const total = approvedContributions.reduce((sum, contrib) => sum + contrib.amount, 0)
 
-    } catch (err: unknown) {
-      // Check if this is an RLS/permission error for public users
-      let isRLSError = false
-      
-      if (err && typeof err === 'object') {
-        const errorObj = err as Record<string, unknown>
-        
-        // Check for RLS error codes
-        if ('code' in errorObj) {
-          const code = errorObj.code
-          isRLSError = code === 'PGRST116' || code === '42501' || code === 'PGRST301'
-        }
-        
-        // Check for RLS-related messages
-        if (!isRLSError && 'message' in errorObj && typeof errorObj.message === 'string') {
-          const message = errorObj.message.toLowerCase()
-          isRLSError = message.includes('permission') || 
-                      message.includes('policy') ||
-                      message.includes('row-level security') ||
-                      message.includes('new row violates') ||
-                      message.includes('insufficient privileges')
-        }
-        
-        // Check for Supabase PostgREST errors
-        if (!isRLSError && 'hint' in errorObj && typeof errorObj.hint === 'string') {
-          const hint = errorObj.hint.toLowerCase()
-          isRLSError = hint.includes('policy') || hint.includes('permission')
-        }
-      }
-      
-      // Only log non-RLS errors to avoid console noise for expected public user restrictions
-      if (!isRLSError) {
-        // Format error for better logging
-        const errorMessage = err instanceof Error
-          ? err.message
-          : (err && typeof err === 'object' && 'message' in err)
-            ? String((err as { message: unknown }).message)
-            : (err && typeof err === 'object' && 'code' in err)
-              ? `Error code: ${String((err as { code: unknown }).code)}`
-              : 'Unknown error occurred'
-        
-        const errorDetails = err instanceof Error
-          ? { message: err.message, name: err.name, stack: err.stack }
-          : err && typeof err === 'object'
-            ? { ...err }
-            : { error: String(err) }
-        
-        defaultLogger.error('Error fetching approved contributions', { errorMessage, errorDetails })
-      } else {
-        // Silently handle RLS errors - they're expected for public users
-        // The API fallback should have already been attempted above
-        // Set empty state for RLS errors (public users can't see contributions)
-        setTotalAmount(0)
-        setContributions([])
-        setError(null) // Don't show error for public users
-        setIsLoading(false)
-        return
-      }
-      
-      const message = err instanceof Error
-        ? err.message
-        : (err && typeof err === 'object' && 'message' in err)
-          ? String((err as { message: unknown }).message)
-          : 'Failed to fetch contributions'
-      setError(message)
+      setContributions(approvedContributions)
+      setTotalAmount(total)
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to fetch approved contributions')
+      logger.error('Error fetching approved contributions:', { error, caseId })
+      setError(error)
+      setContributions([])
+      setTotalAmount(0)
     } finally {
       setIsLoading(false)
     }
   }, [caseId])
 
   useEffect(() => {
-    // Only fetch if caseId is a valid UUID
-    if (isValidUUID(caseId)) {
-      fetchApprovedContributions()
-    } else {
-      // Set empty state for invalid UUIDs
-      setContributions([])
-      setTotalAmount(0)
-      setIsLoading(false)
-      setError(null)
-    }
-  }, [caseId, fetchApprovedContributions])
+    fetchApprovedContributions()
+  }, [fetchApprovedContributions])
 
   return {
     contributions,
     totalAmount,
     isLoading,
-    error,
-    refetch: fetchApprovedContributions
+    error
   }
-} 
+}
+
+<<<<<<< Current (Your changes)
+
+
+=======
+>>>>>>> Incoming (Background Agent changes)

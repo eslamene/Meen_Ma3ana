@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { createGetHandlerWithParams, createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { ApprovalService } from '@/lib/services/approvalService'
+import { ContributionService } from '@/lib/services/contributionService'
+import { CaseService } from '@/lib/services/caseService'
 
 async function getHandler(
   request: NextRequest,
@@ -12,22 +15,21 @@ async function getHandler(
   const { supabase, logger } = context
   const { id } = params
     
-    // Get the contribution approval status
-    const { data: approvalStatus, error } = await supabase
-      .from('contribution_approval_status')
-      .select(`
-        *,
-        contributions:contribution_id(*),
-        admin:admin_id(id, first_name, last_name, email)
-      `)
-      .eq('contribution_id', id)
-      .single()
+  try {
+    const approvalStatus = await ApprovalService.getByContributionId(supabase, id)
 
-    if (error) {
-      throw new ApiError('INTERNAL_SERVER_ERROR', error.message, 500)
+    if (!approvalStatus) {
+      throw new ApiError('NOT_FOUND', 'Approval status not found', 404)
     }
 
     return NextResponse.json(approvalStatus)
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching approval status:', error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', error instanceof Error ? error.message : 'Failed to fetch approval status', 500)
+  }
 }
 
 async function postHandler(
@@ -41,84 +43,54 @@ async function postHandler(
   const body = await request.json()
   const { status, rejection_reason, admin_comment, donor_reply, payment_proof_url } = body
 
-    // Check if approval status exists
-    const { data: existingStatus } = await supabase
-      .from('contribution_approval_status')
-      .select('*')
-      .eq('contribution_id', id)
-      .single()
+  try {
+    // Get existing approval status using ApprovalService
+    const existingStatus = await ApprovalService.getByContributionId(supabase, id)
 
-    let result
-
-    if (existingStatus) {
-      // Update existing status
-      const updateData: Record<string, unknown> = {
-        status,
-        updated_at: new Date().toISOString()
-      }
-
-      if (status === 'rejected') {
-        updateData.admin_id = user.id
-        updateData.rejection_reason = rejection_reason
-        updateData.admin_comment = admin_comment
-        updateData.resubmission_count = existingStatus.resubmission_count + 1
-      } else if (status === 'approved') {
-        updateData.admin_id = user.id
-        updateData.admin_comment = admin_comment
-      } else if (status === 'acknowledged') {
-        updateData.donor_reply = donor_reply
-        updateData.donor_reply_date = new Date().toISOString()
-      }
-
-      if (donor_reply) {
-        updateData.donor_reply = donor_reply
-        updateData.donor_reply_date = new Date().toISOString()
-      }
-
-      if (payment_proof_url) {
-        updateData.payment_proof_url = payment_proof_url
-      }
-
-      const { data, error } = await supabase
-        .from('contribution_approval_status')
-        .update(updateData)
-        .eq('contribution_id', id)
-        .select()
-        .single()
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      result = data
-    } else {
-      // Create new status
-      const newStatus = {
-        contribution_id: id,
-        status,
-        admin_id: status === 'rejected' || status === 'approved' ? user.id : null,
-        rejection_reason: status === 'rejected' ? rejection_reason : null,
-        admin_comment: status === 'rejected' || status === 'approved' ? admin_comment : null,
-        donor_reply: donor_reply || null,
-        donor_reply_date: donor_reply ? new Date().toISOString() : null,
-        payment_proof_url: payment_proof_url || null,
-        resubmission_count: 0
-      }
-
-      const { data, error } = await supabase
-        .from('contribution_approval_status')
-        .insert(newStatus)
-        .select()
-        .single()
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      result = data
+    // Prepare update data
+    const updateData: {
+      status: string
+      admin_id?: string | null
+      rejection_reason?: string | null
+      admin_comment?: string | null
+      donor_reply?: string | null
+      donor_reply_date?: string | null
+      payment_proof_url?: string | null
+      resubmission_count?: number
+    } = {
+      status
     }
 
+    if (status === 'rejected') {
+      updateData.admin_id = user.id
+      updateData.rejection_reason = rejection_reason
+      updateData.admin_comment = admin_comment
+      updateData.resubmission_count = existingStatus ? existingStatus.resubmission_count + 1 : 1
+    } else if (status === 'approved') {
+      updateData.admin_id = user.id
+      updateData.admin_comment = admin_comment
+    } else if (status === 'acknowledged') {
+      updateData.donor_reply = donor_reply
+      updateData.donor_reply_date = new Date().toISOString()
+    }
+
+    if (donor_reply) {
+      updateData.donor_reply = donor_reply
+      updateData.donor_reply_date = new Date().toISOString()
+    }
+
+    if (payment_proof_url) {
+      updateData.payment_proof_url = payment_proof_url
+    }
+
+    // Upsert approval status using ApprovalService
+    const result = await ApprovalService.upsert(supabase, id, {
+      contribution_id: id,
+      ...updateData
+    })
+
     // Update the main contribution status
+    // TODO: Refactor to use ContributionService.update() when available
     await supabase
       .from('contributions')
       .update({ status })
@@ -128,6 +100,7 @@ async function postHandler(
     if (status === 'approved' || status === 'rejected') {
       try {
         // Get contribution details including case_id and amount
+        // TODO: Refactor to use ContributionService.getById() when available
         const { data: contribution } = await supabase
           .from('contributions')
           .select('case_id, amount')
@@ -136,6 +109,7 @@ async function postHandler(
 
         if (contribution && contribution.case_id) {
           // Get current case amount
+          // TODO: Refactor to use CaseService.getById() when available
           const { data: caseData } = await supabase
             .from('cases')
             .select('current_amount')
@@ -168,6 +142,7 @@ async function postHandler(
             }
 
             // Update case current_amount
+            // TODO: Refactor to use CaseService.update() when available
             await supabase
               .from('cases')
               .update({ 
@@ -187,6 +162,7 @@ async function postHandler(
     if (status === 'approved' || status === 'rejected') {
       try {
         // Get contribution details for notification
+        // TODO: Refactor to use ContributionService.getById() when available
         const { data: contribution } = await supabase
           .from('contributions')
           .select(`

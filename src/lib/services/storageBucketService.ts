@@ -144,5 +144,91 @@ export class StorageBucketService {
       throw new Error(`Failed to delete bucket: ${error.message}`)
     }
   }
+
+  /**
+   * Get storage rules for all buckets
+   */
+  static async getStorageRules(): Promise<Array<{ bucket_name: string; max_file_size_mb?: number; allowed_extensions?: string[] }>> {
+    const supabase = this.getServiceClient()
+    
+    const { data, error } = await supabase
+      .from('storage_rules')
+      .select('*')
+
+    if (error) {
+      logger.error('Error fetching storage rules:', error)
+      throw new Error(`Failed to fetch storage rules: ${error.message}`)
+    }
+
+    return data || []
+  }
+
+  /**
+   * Get storage rule for a specific bucket
+   */
+  static async getStorageRule(bucketName: string): Promise<{ bucket_name: string; max_file_size_mb?: number; allowed_extensions?: string[] } | null> {
+    const supabase = this.getServiceClient()
+    
+    const { data, error } = await supabase
+      .from('storage_rules')
+      .select('*')
+      .eq('bucket_name', bucketName)
+      .maybeSingle()
+
+    if (error) {
+      logger.error('Error fetching storage rule:', error)
+      throw new Error(`Failed to fetch storage rule: ${error.message}`)
+    }
+
+    return data || null
+  }
+
+  /**
+   * Create or update storage rule for a bucket
+   */
+  static async upsertStorageRule(
+    bucketName: string,
+    rule: {
+      max_file_size_mb: number
+      allowed_extensions: string[]
+    }
+  ): Promise<{ bucket_name: string; max_file_size_mb?: number; allowed_extensions?: string[] }> {
+    const supabase = this.getServiceClient()
+
+    // Normalize extensions: lowercase, trim whitespace, remove duplicates
+    const normalizedExtensions = Array.from(
+      new Set(
+        rule.allowed_extensions
+          .map(ext => ext.toLowerCase().trim())
+          .filter(ext => ext.length > 0)
+      )
+    )
+
+    const { data, error } = await supabase
+      .from('storage_rules')
+      .upsert(
+        {
+          bucket_name: bucketName,
+          max_file_size_mb: rule.max_file_size_mb,
+          allowed_extensions: normalizedExtensions
+        },
+        {
+          onConflict: 'bucket_name'
+        }
+      )
+      .select()
+      .single()
+
+    if (error) {
+      logger.error('Error upserting storage rule:', error)
+      throw new Error(`Failed to update storage rule: ${error.message}`)
+    }
+
+    if (!data) {
+      throw new Error('Storage rule upsert returned no data')
+    }
+
+    return data
+  }
 }
 

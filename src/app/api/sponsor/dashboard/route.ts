@@ -5,71 +5,36 @@ import { ApiError } from '@/lib/utils/api-errors'
 async function handler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
 
-  // Fetch user's sponsorships with case info
-  const { data: sponsorships, error: sponsorshipsError } = await supabase
-    .from('sponsorships')
-    .select(`
-      id,
-      case_id,
-      amount,
-      status,
-      start_date,
-      end_date,
-      created_at,
-      case:cases(
-        title_en,
-        title_ar,
-        description_en,
-        description_ar,
-        target_amount,
-        current_amount,
-        status
-      )
-    `)
-    .eq('sponsor_id', user.id)
-    .order('created_at', { ascending: false })
+  try {
+    const { SponsorshipService } = await import('@/lib/services/sponsorshipService')
+    
+    // Get all sponsorships and filter by sponsor_id
+    const allSponsorships = await SponsorshipService.getAll(supabase)
+    const userSponsorships = allSponsorships.filter(s => s.sponsor_id === user.id)
 
-  if (sponsorshipsError) {
-    logger.error('Error fetching sponsorships:', sponsorshipsError)
-    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch sponsorships', 500)
-  }
-
-  // Transform the data to match the expected interface
-  interface SponsorshipItem {
-    id: string
-    case_id: string
-    amount: number | string
-    status: string
-    start_date: string | null
-    end_date: string | null
-    created_at: string
-    case?: Array<{ title_en?: string; title_ar?: string; description_en?: string; description_ar?: string; target_amount?: number | string; current_amount?: number | string; status?: string }> | { title_en?: string; title_ar?: string; description_en?: string; description_ar?: string; target_amount?: number | string; current_amount?: number | string; status?: string }
-  }
-  const transformedData = (sponsorships || []).map((item: SponsorshipItem) => {
-    // Normalize case - handle both array and single object cases
-    const caseData = Array.isArray(item.case)
-      ? item.case[0]
-      : item.case
-
-    return {
+    // Transform the data to match the expected interface
+    const transformedData = userSponsorships.map((item) => ({
       id: item.id,
       case_id: item.case_id,
-      amount: parseFloat(String(item.amount)),
+      amount: typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount)),
       status: item.status,
       start_date: item.start_date,
       end_date: item.end_date,
       created_at: item.created_at,
       case: {
-        title: caseData?.title_en || caseData?.title_ar || '',
-        description: caseData?.description_en || caseData?.description_ar || '',
-        target_amount: parseFloat(String(caseData?.target_amount || '0')),
-        current_amount: parseFloat(String(caseData?.current_amount || '0')),
-        status: caseData?.status || ''
+        title: item.case?.title_en || item.case?.title_ar || '',
+        description: item.case?.description_en || item.case?.description_ar || '',
+        target_amount: parseFloat(item.case?.target_amount || '0'),
+        current_amount: parseFloat(item.case?.current_amount || '0'),
+        status: item.case?.status || ''
       }
-    }
-  })
+    }))
 
-  return NextResponse.json({ sponsorships: transformedData })
+    return NextResponse.json({ sponsorships: transformedData })
+  } catch (error) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching sponsorships:', error)
+    throw new ApiError('INTERNAL_SERVER_ERROR', error instanceof Error ? error.message : 'Failed to fetch sponsorships', 500)
+  }
 }
 
 export const GET = createGetHandler(handler, { requireAuth: true, loggerContext: 'api/sponsor/dashboard' })

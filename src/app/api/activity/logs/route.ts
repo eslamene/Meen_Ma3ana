@@ -12,17 +12,9 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
   const { supabase, logger, user } = context
 
   try {
-    // Check if user is admin (simplified check - you may want to use your permission system)
-    const { data: userRoles } = await supabase
-      .from('admin_user_roles')
-      .select('admin_roles(name)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-
-    const isAdmin = userRoles?.some((ur: { admin_roles?: Array<{ name: string }> | { name: string } }) => {
-      const role = Array.isArray(ur.admin_roles) ? ur.admin_roles[0] : ur.admin_roles
-      return role && typeof role === 'object' && 'name' in role && (role.name === 'admin' || role.name === 'super_admin')
-    })
+    // Check if user is admin using AdminService
+    const { AdminService } = await import('@/lib/admin/service')
+    const isAdmin = await AdminService.hasAdminRole(user.id)
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams
