@@ -135,18 +135,9 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       if (mode === 'register') {
         setValidatingEmail(true)
         try {
-          // Check if email already exists
-          const { data: existingUser, error: checkError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', sanitizedEmail)
-            .maybeSingle()
-
-          if (checkError && checkError.code !== 'PGRST116') {
-            // Error other than "not found" - don't show error, just log
-            logger.error('Error checking email:', { error: checkError })
-            setEmailError('')
-          } else if (existingUser) {
+          const res = await fetch(`/api/auth/availability?email=${encodeURIComponent(sanitizedEmail)}`)
+          const data = (await res.json().catch(() => ({}))) as { emailExists?: boolean | null }
+          if (data.emailExists) {
             setEmailError(t('authErrorEmailAlreadyExists'))
           } else {
             setEmailError('')
@@ -215,21 +206,10 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
       if (mode === 'register') {
         setValidatingPhone(true)
         try {
-          // Normalize phone number with country code for database check
           const normalizedPhone = normalizePhoneNumber(trimmedPhone, countryCode)
-          
-          // Check if phone already exists
-          const { data: existingUser, error: checkError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('phone', normalizedPhone)
-            .maybeSingle()
-
-          if (checkError && checkError.code !== 'PGRST116') {
-            // Error other than "not found" - don't show error, just log
-            logger.error('Error checking phone:', { error: checkError })
-            setPhoneError('')
-          } else if (existingUser) {
+          const res = await fetch(`/api/auth/availability?phone=${encodeURIComponent(normalizedPhone)}`)
+          const data = (await res.json().catch(() => ({}))) as { phoneExists?: boolean | null }
+          if (data.phoneExists) {
             setPhoneError(t('phoneAlreadyExists'))
           } else {
             setPhoneError('')
@@ -472,32 +452,32 @@ export default function AuthForm({ mode, onSuccess, onError }: AuthFormProps) {
             ? normalizePhoneNumber(phone.trim(), countryCode)
             : null
 
-          const { error: userError } = await supabase
-            .from('users')
-            .upsert({
-              id: data.user.id,
-              email: sanitizedEmail,
-              first_name: firstName.trim(),
-              last_name: lastName.trim(),
-              phone: normalizedPhone,
-              role: 'donor',
-              language: localeParam
-            }, {
-              onConflict: 'id'
+          try {
+            const res = await fetch('/api/auth/profile', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: sanitizedEmail,
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                phone: normalizedPhone,
+                language: localeParam,
+              }),
             })
 
-          if (userError) {
-            // Check if error is due to duplicate phone number
-            if (userError.code === '23505' && userError.message.includes('phone')) {
-              setError(t('phoneAlreadyExists'))
-              setSuccess(false)
-              onError?.(t('phoneAlreadyExists'))
-              setLoading(false)
-              return
+            if (res.status === 400) {
+              const payload = await res.json().catch(() => ({}))
+              if (payload?.error?.toLowerCase?.().includes('phone')) {
+                setError(t('phoneAlreadyExists'))
+                setSuccess(false)
+                onError?.(t('phoneAlreadyExists'))
+                setLoading(false)
+                return
+              }
             }
-            
-            logger.error('Error creating user record:', { error: userError })
-            // Don't fail registration if user record creation fails - it might be handled by trigger
+          } catch (userErr) {
+            logger.error('Error creating user record:', { error: userErr })
           }
         }
 

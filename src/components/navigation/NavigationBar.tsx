@@ -10,7 +10,6 @@ import { formatNotificationCount } from '@/lib/utils'
 import Logo from '@/components/ui/Logo'
 import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
-import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useAdmin } from '@/lib/admin/hooks'
@@ -193,24 +192,30 @@ export default function NavigationBar() {
     return { dashboardItemFallback, contributionsItemFallback }
   }, [menuItems])
 
-  const fetchUnreadNotifications = useCallback(async (userId: string) => {
+  const fetchUnreadNotifications = useCallback(async () => {
     try {
-      const notificationService = createContributionNotificationService(supabase)
-      const count = await notificationService.getUnreadNotificationCount(userId)
+      const response = await fetch('/api/notifications/unread-count', {
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        setUnreadNotifications(0)
+        return
+      }
+      const data = await response.json()
+      const count = typeof data.unreadCount === 'number' ? data.unreadCount : data.count ?? 0
       setUnreadNotifications(count)
     } catch (error) {
       logger.error('Error fetching unread notifications:', { error: error })
-      // Don't set error state, just keep count at 0
       setUnreadNotifications(0)
     }
-  }, [supabase])
+  }, [])
 
   const fetchUserAndNotifications = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUser(user)
-        await fetchUnreadNotifications(user.id)
+        await fetchUnreadNotifications()
       }
     } catch (error) {
       logger.error('Error fetching user:', { error: error })
@@ -227,7 +232,7 @@ export default function NavigationBar() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user)
-        fetchUnreadNotifications(session.user.id)
+        fetchUnreadNotifications()
         // Permissions are handled automatically by useAdmin
       } else {
         setUser(null)

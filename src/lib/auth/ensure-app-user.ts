@@ -1,6 +1,6 @@
 import { db , users} from '@/lib/db'
 import { defaultLogger } from '@/lib/logger';
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@supabase/supabase-js'
 
 type AuthUser = { id: string; email: string | null }
 
@@ -14,7 +14,12 @@ export async function ensureAppUser(authUser: AuthUser): Promise<string> {
 
   // Preferred path: upsert via service role (no selects, bypasses RLS)
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const supa = createClient()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Missing Supabase service role configuration')
+    }
+    const supa = createClient(supabaseUrl, serviceRoleKey)
     await supa.from('users').upsert({ id: authUserId, email }, { onConflict: 'id' })
     return authUserId
   }

@@ -34,7 +34,8 @@ import {
   ExternalLink,
   ChevronDown,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { uploadFileViaApi } from '@/lib/client/uploadViaApi'
+import { removeStoragePathsViaApi } from '@/lib/client/removeStorageViaApi'
 import { usePrefetchStorageRules } from '@/hooks/use-prefetch-storage-rules'
 
 import { defaultLogger as logger } from '@/lib/logger'
@@ -115,6 +116,39 @@ export const FILE_CATEGORIES = {
 
 export type FileCategory = keyof typeof FILE_CATEGORIES
 
+type CaseFileApiRow = {
+  id: string
+  filename: string
+  original_filename: string | null
+  file_url: string
+  file_path: string | null
+  file_type: string | null
+  file_size: number | null
+  category: string | null
+  description: string | null
+  is_public: boolean | null
+  display_order: number | null
+  created_at: string | null
+  uploaded_by: string | null
+}
+
+function caseFileFromApiRow(row: CaseFileApiRow): CaseFile {
+  return {
+    id: row.id,
+    name: row.filename,
+    originalName: row.original_filename ?? row.filename,
+    url: row.file_url,
+    path: row.file_path ?? '',
+    size: row.file_size ?? 0,
+    type: row.file_type || 'application/octet-stream',
+    category: (row.category || 'other') as FileCategory,
+    uploadedAt: row.created_at ?? new Date().toISOString(),
+    uploadedBy: row.uploaded_by ?? 'current-user',
+    isPublic: row.is_public ?? false,
+    description: row.description ?? undefined,
+  }
+}
+
 export interface CaseFile extends GenericFile {
   name: string // Alias for originalName (for backward compatibility)
   path?: string // Storage path (may differ from display name)
@@ -161,8 +195,6 @@ export default function CaseFileManager({
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; fileId: string | null }>({ open: false, fileId: null })
-  
-  const supabase = createClient()
 
   // Prefetch storage rules using centralized hook
   const { prefetch } = usePrefetchStorageRules('case-files')
@@ -216,22 +248,16 @@ export default function CaseFileManager({
         // Sanitize filename for storage (remove Arabic chars, special chars, etc.)
         const sanitizedName = sanitizeFilename(file.name)
         
-        // Upload to Supabase Storage with sanitized filename
         const storagePath = `${caseId}/${category}/${fileId}-${sanitizedName}`
-        const { data, error } = await supabase.storage
-          .from('case-files')
-          .upload(storagePath, file)
-
-        if (error) {
-          logger.error('Upload error:', { error: error })
-          logger.error(`Failed to upload ${file.name}: ${error.message}`)
+        let publicUrl: string
+        try {
+          const uploaded = await uploadFileViaApi(file, 'case-files', storagePath)
+          publicUrl = uploaded.url
+        } catch (err) {
+          logger.error('Upload error:', { error: err })
+          logger.error(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : String(err)}`)
           continue
         }
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('case-files')
-          .getPublicUrl(storagePath)
 
         const newFile: CaseFile = {
           id: fileId,
@@ -267,119 +293,83 @@ export default function CaseFileManager({
           display_order: files.length + newFiles.indexOf(f)
         }))
 
-        // Log what we're trying to insert (for debugging)
-        logger.debug('Attempting to insert files', {
+        logger.debug('Attempting to save file metadata via API', {
           count: filesToInsert.length,
           caseId,
-          sample: filesToInsert[0] ? {
-            case_id: filesToInsert[0].case_id,
-            filename: filesToInsert[0].filename,
-            file_url: filesToInsert[0].file_url ? 'present' : 'missing',
-            file_type: filesToInsert[0].file_type
-          } : null
         })
 
-        // Verify case still exists before inserting (prevents 409 on deleted draft cases)
-        const { data: caseCheck, error: caseCheckError } = await supabase
-          .from('cases')
-          .select('id')
-          .eq('id', caseId)
-          .single()
+        const apiPayload = filesToInsert.map(
+          ({ case_id: _caseId, ...rest }) => rest
+        )
 
-        if (caseCheckError || !caseCheck) {
-          logger.error('Case not found before file insert', {
-            caseId,
-            error: caseCheckError
-          })
+        const pathsToCleanup = newFiles.map((f) => f.path).filter(Boolean) as string[]
+
+        const saveResponse = await fetch(`/api/cases/${caseId}/files`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: apiPayload }),
+        })
+
+        if (saveResponse.status === 404) {
           toast.error('Case Not Found', {
-            description: 'The case was deleted or does not exist. Files were uploaded to storage but could not be saved to the database.'
+            description:
+              'The case was deleted or does not exist. Uploaded files will be removed from storage.',
           })
-          // Clean up uploaded files from storage since we can't save them
-          for (const file of newFiles) {
-            if (file.path) {
-              await supabase.storage
-                .from('case-files')
-                .remove([file.path])
-                .catch(err => logger.warn('Failed to cleanup storage file:', err))
-            }
-          }
+          await removeStoragePathsViaApi('case-files', pathsToCleanup).catch((err) =>
+            logger.warn('Failed to cleanup storage after case missing', err)
+          )
           return
         }
 
-        const { data: insertData, error: insertError } = await supabase
-          .from('case_files')
-          .insert(filesToInsert)
-          .select()
-
-        if (insertError) {
-          // Better error serialization
-          const errorInfo = {
-            code: insertError.code || 'UNKNOWN',
-            message: insertError.message || 'No error message',
-            details: insertError.details || null,
-            hint: insertError.hint || null,
-            // Try to stringify the full error
-            errorString: JSON.stringify(insertError, Object.getOwnPropertyNames(insertError)),
-            // Log the data we tried to insert
-            attemptedInsert: {
-              count: filesToInsert.length,
-              firstFile: filesToInsert[0] ? {
-                case_id: filesToInsert[0].case_id,
-                filename: filesToInsert[0].filename,
-                has_url: !!filesToInsert[0].file_url,
-                file_type: filesToInsert[0].file_type
-              } : null
-            }
-          }
-          
-          logger.error('Error inserting files into database:', { error: errorInfo })
-          logger.error('Full error object:', { error: insertError })
-          
-          // More user-friendly error message based on error type
-          let userMessage = 'Files uploaded but failed to save to database.'
-          
-          // Handle HTTP 409 Conflict (from PostgREST)
-          if (insertError.code === 'PGRST409' || insertError.message?.includes('409') || insertError.message?.includes('conflict')) {
-            userMessage = 'Failed to save files: Conflict detected. The case may have been deleted or the files already exist. Please refresh and try again.'
-            // Clean up uploaded files from storage
-            for (const file of newFiles) {
-              if (file.path) {
-                await supabase.storage
-                  .from('case-files')
-                  .remove([file.path])
-                  .catch(err => logger.warn('Failed to cleanup storage file:', err))
-              }
-            }
-          } else if (insertError.code === '23503') {
-            userMessage = 'Failed to save files: Case not found. Please refresh the page and try again.'
-          } else if (insertError.code === '23505') {
-            userMessage = 'Failed to save files: Duplicate file detected. This file may already exist for this case.'
-          } else if (insertError.code === '42501') {
-            userMessage = 'Failed to save files: Permission denied. You may not have permission to add files to this case.'
-          } else if (insertError.message) {
-            userMessage = `Failed to save files: ${insertError.message}`
-          }
-          
-          toast.error('Database Error', { description: userMessage })
-        } else {
-          logger.info('Successfully inserted files', { count: insertData?.length || 0 })
+        if (saveResponse.status === 409) {
+          await removeStoragePathsViaApi('case-files', pathsToCleanup).catch((err) =>
+            logger.warn('Failed to cleanup storage after conflict', err)
+          )
+          toast.error('Database Error', {
+            description:
+              'Conflict saving files. The case may have changed or files already exist. Please refresh and try again.',
+          })
+          return
         }
+
+        if (!saveResponse.ok) {
+          let userMessage = 'Files uploaded but failed to save to database.'
+          try {
+            const errBody = (await saveResponse.json()) as { error?: string; errorCode?: string }
+            if (errBody.error) {
+              userMessage = errBody.error
+            }
+            if (errBody.errorCode === 'CONFLICT' || saveResponse.status === 409) {
+              await removeStoragePathsViaApi('case-files', pathsToCleanup).catch((err) =>
+                logger.warn('Failed to cleanup storage after error', err)
+              )
+            }
+          } catch {
+            /* use default message */
+          }
+          logger.error('Case files API save failed', { status: saveResponse.status })
+          toast.error('Database Error', { description: userMessage })
+          return
+        }
+
+        const saveJson = (await saveResponse.json()) as { files?: CaseFileApiRow[] }
+        const insertedRows = saveJson.files ?? []
+        logger.info('Successfully saved file records', { count: insertedRows.length })
+
+        const insertedCaseFiles = insertedRows.map(caseFileFromApiRow)
+        const updatedFiles = [...files, ...insertedCaseFiles]
+        setFiles(updatedFiles)
+        notifyParent(updatedFiles)
+
+        logger.info('Successfully uploaded files', { count: insertedCaseFiles.length })
+
+        toast.success('Files Uploaded', {
+          description: `Successfully uploaded ${insertedCaseFiles.length} file(s)`,
+        })
+
+        setShowUploadDialog(false)
       }
-
-      // Update files state
-      const updatedFiles = [...files, ...newFiles]
-      setFiles(updatedFiles)
-      
-      // Notify parent component
-      notifyParent(updatedFiles)
-
-      logger.info('Successfully uploaded files', { count: newFiles.length })
-      
-      toast.success('Files Uploaded', {
-        description: `Successfully uploaded ${newFiles.length} file(s)`
-      })
-
-      setShowUploadDialog(false)
     } catch (error) {
       // Log detailed error information
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -397,36 +387,6 @@ export default function CaseFileManager({
     }
   }
 
-  const updateCaseSupportingDocuments = async (updatedFiles: CaseFile[]) => {
-    try {
-      const { error } = await supabase
-        .from('cases')
-        .update({ 
-          supporting_documents: JSON.stringify(updatedFiles.map(f => ({
-            id: f.id,
-            name: f.name,
-            originalName: f.originalName,
-            url: f.url,
-            size: f.size,
-            type: f.type,
-            category: f.category,
-            description: f.description,
-            uploadedAt: f.uploadedAt,
-            uploadedBy: f.uploadedBy,
-            isPublic: f.isPublic
-          })))
-        })
-        .eq('id', caseId)
-
-      if (error) {
-        throw error
-      }
-    } catch (error) {
-      logger.error('Error updating case documents:', { error: error })
-      throw error
-    }
-  }
-
   const handleDeleteClick = (fileId: string) => {
     setDeleteDialog({ open: true, fileId })
   }
@@ -435,54 +395,30 @@ export default function CaseFileManager({
     if (!deleteDialog.fileId) return
 
     try {
-      const fileToDelete = files.find(f => f.id === deleteDialog.fileId)
-      if (!fileToDelete) {
+      if (!files.some((f) => f.id === deleteDialog.fileId)) {
         setDeleteDialog({ open: false, fileId: null })
         return
       }
 
-      // Delete from database first (unified case_files table)
-      const { error: dbError } = await supabase
-        .from('case_files')
-        .delete()
-        .eq('id', deleteDialog.fileId)
-        .eq('case_id', caseId)
+      const delResponse = await fetch(
+        `/api/cases/${caseId}/files/${encodeURIComponent(deleteDialog.fileId)}`,
+        { method: 'DELETE', credentials: 'include' }
+      )
 
-      if (dbError) {
-        // Properly serialize error for logging
-        const errorDetails = {
-          message: dbError.message || 'Unknown error',
-          code: dbError.code || 'unknown',
-          details: dbError.details || null,
-          hint: dbError.hint || null,
-          error: dbError
-        }
-        logger.error('Database delete error:', { error: JSON.stringify(errorDetails, null, 2) })
-        logger.error('Full error object:', { error: dbError })
-        toast.error('Delete Failed', {
-          description: `Failed to delete file: ${errorDetails.message}`
-        })
-        setDeleteDialog({ open: false, fileId: null })
-        return
-      }
-
-      // Delete from Supabase Storage
-      if (fileToDelete.path) {
-        const { error: storageError } = await supabase.storage
-          .from('case-files')
-          .remove([fileToDelete.path])
-
-        if (storageError) {
-          // Properly serialize error for logging
-          const errorDetails = {
-            message: storageError.message || 'Unknown error',
-            statusCode: (storageError as any).statusCode || null,
-            error: storageError
+      if (!delResponse.ok) {
+        let message = `Failed to delete file (${delResponse.status})`
+        try {
+          const errBody = (await delResponse.json()) as { error?: string }
+          if (errBody.error) {
+            message = errBody.error
           }
-          logger.warn('Storage delete warning:', JSON.stringify(errorDetails, null, 2))
-          logger.warn('Full storage error object:', storageError)
-          // Continue even if storage delete fails
+        } catch {
+          /* keep default */
         }
+        logger.error('Case file delete API error', { status: delResponse.status, message })
+        toast.error('Delete Failed', { description: message })
+        setDeleteDialog({ open: false, fileId: null })
+        return
       }
 
       // Update local state
@@ -743,8 +679,9 @@ export default function CaseFileManager({
               // Update in database
               const response = await fetch(url, {
                 method: 'PATCH',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
               })
 
               logger.debug('File update response', { 

@@ -48,6 +48,34 @@ const getNotificationColor = (type: string) => {
   }
 }
 
+function mapApiRowToCaseNotification(n: Record<string, unknown>): CaseNotification {
+  const data = n.data as Record<string, unknown> | null | undefined
+  const caseId =
+    data && typeof data.caseId === 'string' ? data.caseId : undefined
+  const rawType = String(n.type || 'case_update')
+  const allowed: CaseNotification['type'][] = [
+    'case_update',
+    'case_progress',
+    'case_contribution',
+    'case_milestone',
+  ]
+  const type = allowed.includes(rawType as CaseNotification['type'])
+    ? (rawType as CaseNotification['type'])
+    : 'case_update'
+
+  return {
+    id: String(n.id),
+    userId: String(n.recipient_id ?? ''),
+    type,
+    title: String(n.title_en ?? n.title ?? ''),
+    message: String(n.message_en ?? n.message ?? ''),
+    data: data as CaseNotification['data'],
+    isRead: Boolean(n.read),
+    createdAt: new Date(String(n.created_at)),
+    caseId,
+  }
+}
+
 const formatRelativeDate = (date: Date) => {
   const now = new Date()
   const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
@@ -81,7 +109,8 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
       const response = await fetch('/api/notifications')
       if (response.ok) {
         const data = await response.json()
-        setNotifications(data.notifications || [])
+        const rows = (data.notifications || []) as Record<string, unknown>[]
+        setNotifications(rows.map(mapApiRowToCaseNotification))
         setUnreadCount(data.unreadCount || 0)
       }
     } catch (error) {

@@ -13,8 +13,8 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
   try {
     // Check if user is admin using AdminService
-    const { AdminService } = await import('@/lib/admin/service')
-    const isAdmin = await AdminService.hasAdminRole(user.id)
+    const { adminService } = await import('@/lib/admin/service')
+    const isAdmin = await adminService.hasAnyRole(user.id, ['admin', 'super_admin'])
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams

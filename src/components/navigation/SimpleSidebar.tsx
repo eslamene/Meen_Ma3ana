@@ -20,7 +20,6 @@ import Logo from '@/components/ui/Logo'
 import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
 import { useAdmin } from '@/lib/admin/hooks'
-import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { User } from '@supabase/supabase-js'
 import { 
   X, 
@@ -96,22 +95,29 @@ export default function SimpleSidebar({
   // Menu items are already in tree structure from useAdmin hook
   // They are filtered by permissions and sorted by sort_order
 
-  const fetchUnreadNotifications = useCallback(async (userId: string) => {
+  const fetchUnreadNotifications = useCallback(async () => {
     try {
-      const notificationService = createContributionNotificationService(supabase)
-      const count = await notificationService.getUnreadNotificationCount(userId)
+      const response = await fetch('/api/notifications/unread-count', {
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        setNotificationCount(0)
+        return
+      }
+      const data = await response.json()
+      const count = typeof data.unreadCount === 'number' ? data.unreadCount : data.count ?? 0
       setNotificationCount(count)
     } catch (error) {
-      logger.error('Error fetching unread notifications:', { error: error })
+      logger.error('Error fetching unread notifications:', { error })
       setNotificationCount(0)
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     if (user) {
       // Defer async call to avoid setState in effect
       Promise.resolve().then(() => {
-        fetchUnreadNotifications(user.id)
+        fetchUnreadNotifications()
       })
     } else {
       // Defer state update to avoid setState in effect

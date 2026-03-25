@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createGetHandlerWithParams, createPutHandlerWithParams, createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { BeneficiaryDocumentsServerService } from '@/lib/services/beneficiaryDocumentsServerService'
 
 async function getHandler(
   request: NextRequest,
@@ -10,18 +11,16 @@ async function getHandler(
   const { supabase, logger } = context
   const { id } = params
 
-  const { data, error } = await supabase
-    .from('beneficiary_documents')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) {
-    if (error.code === 'PGRST116') {
-      throw new ApiError('NOT_FOUND', 'Document not found', 404)
-    }
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary document', { error })
+  let data: Record<string, unknown> | null
+  try {
+    data = await BeneficiaryDocumentsServerService.getById(supabase, id)
+  } catch (e) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary document', { error: e })
     throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch document', 500)
+  }
+
+  if (!data) {
+    throw new ApiError('NOT_FOUND', 'Document not found', 404)
   }
 
   return NextResponse.json({ document: data })
@@ -36,15 +35,11 @@ async function putHandler(
   const { id } = params
   const body = await request.json()
 
-  const { data: document, error } = await supabase
-    .from('beneficiary_documents')
-    .update(body)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating beneficiary document', { error })
+  let document: Record<string, unknown>
+  try {
+    document = await BeneficiaryDocumentsServerService.update(supabase, id, body)
+  } catch (e) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error updating beneficiary document', { error: e })
     throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to update document', 500)
   }
 
@@ -59,13 +54,10 @@ async function deleteHandler(
   const { supabase, logger } = context
   const { id } = params
 
-  const { error } = await supabase
-    .from('beneficiary_documents')
-    .delete()
-    .eq('id', id)
-
-  if (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary document', { error })
+  try {
+    await BeneficiaryDocumentsServerService.delete(supabase, id)
+  } catch (e) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error deleting beneficiary document', { error: e })
     throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to delete document', 500)
   }
 

@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { GenericFileManager, type GenericFile, type FileCategoryConfig } from '@/components/files'
 import { BeneficiaryDocumentService } from '@/lib/services/beneficiaryDocumentService'
 import { useAdmin } from '@/lib/admin/hooks'
-import { createClient } from '@/lib/supabase/client'
+import { removeStoragePathsViaApi } from '@/lib/client/removeStorageViaApi'
 import { FileText, Image as ImageIcon } from 'lucide-react'
 import type { BeneficiaryDocument, DocumentType } from '@/types/beneficiary'
 
@@ -120,6 +120,7 @@ export default function BeneficiaryFileManager({
         const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
+          credentials: 'include',
         })
 
         if (!uploadResponse.ok) {
@@ -181,13 +182,11 @@ export default function BeneficiaryFileManager({
     const file = files.find(f => f.id === fileId)
     if (!file) return
 
-    // Delete from storage
-    const supabase = createClient()
     const pathMatch = file.file_url.match(/beneficiaries\/(.+)$/)
     if (pathMatch) {
-      await supabase.storage
-        .from('beneficiaries')
-        .remove([pathMatch[1]])
+      await removeStoragePathsViaApi('beneficiaries', [pathMatch[1]]).catch((err) =>
+        logger.warn('Beneficiary storage remove failed', err)
+      )
     }
 
     // Delete from database

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createGetHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
+import {
+  createGetHandlerWithParams,
+  createPostHandlerWithParams,
+  ApiHandlerContext,
+} from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { BeneficiaryDocumentsServerService } from '@/lib/services/beneficiaryDocumentsServerService'
 
 async function getHandler(
   request: NextRequest,
@@ -10,22 +15,48 @@ async function getHandler(
   const { supabase, logger } = context
   const { id } = params
 
-  const { data, error } = await supabase
-    .from('beneficiary_documents')
-    .select('*')
-    .eq('beneficiary_id', id)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary documents', { error })
+  let data: Record<string, unknown>[]
+  try {
+    data = await BeneficiaryDocumentsServerService.listByBeneficiaryId(supabase, id)
+  } catch (e) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching beneficiary documents', { error: e })
     throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to fetch documents', 500)
   }
 
   return NextResponse.json({ documents: data || [] })
 }
 
-export const GET = createGetHandlerWithParams(getHandler, { 
-  requireAuth: true, 
-  loggerContext: 'api/beneficiaries/[id]/documents' 
+async function postHandler(
+  request: NextRequest,
+  context: ApiHandlerContext,
+  params: { id: string }
+) {
+  const { supabase, logger, user } = context
+  const { id: beneficiaryId } = params
+  const body = await request.json()
+
+  let document: Record<string, unknown>
+  try {
+    document = await BeneficiaryDocumentsServerService.create(supabase, {
+      ...body,
+      beneficiary_id: beneficiaryId,
+      uploaded_by: user.id,
+    })
+  } catch (e) {
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Error creating beneficiary document', { error: e })
+    throw new ApiError('INTERNAL_SERVER_ERROR', 'Failed to create document', 500)
+  }
+
+  return NextResponse.json({ document }, { status: 201 })
+}
+
+export const GET = createGetHandlerWithParams(getHandler, {
+  requireAuth: true,
+  loggerContext: 'api/beneficiaries/[id]/documents',
+})
+
+export const POST = createPostHandlerWithParams(postHandler, {
+  requireAuth: true,
+  loggerContext: 'api/beneficiaries/[id]/documents',
 })
 

@@ -7,8 +7,8 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
   try {
     // Get user's roles using AdminService to check for sponsor role
-    const { AdminService } = await import('@/lib/admin/service')
-    const { roles } = await AdminService.getUserRolesAndPermissions(supabase, user.id)
+    const { adminService } = await import('@/lib/admin/service')
+    const { roles } = await adminService.getUserRolesAndPermissions(user.id)
     
     // Check if user has sponsor role (check both role name and user role field)
     const hasSponsorRole = roles.some(r => r.name === 'sponsor')

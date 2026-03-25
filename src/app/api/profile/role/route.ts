@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
-import { AdminService } from '@/lib/admin/service'
+import { adminService } from '@/lib/admin/service'
 
 /**
  * GET /api/profile/role
  * Get current user's role and permission information
  */
 async function handler(request: NextRequest, context: ApiHandlerContext) {
-  const { supabase, logger, user } = context
+  const { logger, user } = context
 
   try {
     // Get user's roles and permissions using AdminService
-    const { roles, permissions } = await AdminService.getUserRolesAndPermissions(supabase, user.id)
+    const { roles, permissions } = await adminService.getUserRolesAndPermissions(user.id)
 
     return NextResponse.json({
       user: {

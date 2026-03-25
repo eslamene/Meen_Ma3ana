@@ -431,6 +431,95 @@ export class ContributionService {
   }
 
   /**
+   * Create an admin-recorded contribution (pre-paid), approved immediately.
+   */
+  static async createAdminContribution(
+    supabase: SupabaseClient,
+    data: {
+      caseId: string
+      donorId: string
+      amount: number
+      paymentMethodId: string
+      proofOfPayment?: string | null
+      anonymous?: boolean
+      notes?: string | null
+      adminId: string
+    }
+  ): Promise<{ contribution: NormalizedContribution; approvalStatusCreated: boolean }> {
+    const { data: caseData, error: caseError } = await supabase
+      .from('cases')
+      .select('id, title_en, title_ar, status')
+      .eq('id', data.caseId)
+      .single()
+
+    if (caseError || !caseData) {
+      throw new Error('Case not found')
+    }
+
+    const { data: contribution, error } = await supabase
+      .from('contributions')
+      .insert({
+        type: 'donation',
+        amount: data.amount.toString(),
+        payment_method_id: data.paymentMethodId,
+        status: 'approved',
+        proof_of_payment: data.proofOfPayment || null,
+        anonymous: data.anonymous || false,
+        donor_id: data.donorId,
+        case_id: data.caseId,
+        notes: data.notes || null,
+      })
+      .select(
+        `
+        *,
+        cases:case_id(title),
+        users:donor_id(id, email, first_name, last_name, phone)
+      `
+      )
+      .single()
+
+    if (error) {
+      defaultLogger.error('Error creating admin contribution:', error)
+      throw new Error(`Failed to create contribution: ${error.message}`)
+    }
+
+    let approvalStatusCreated = false
+    const { error: apprErr } = await supabase.from('contribution_approval_status').insert({
+      contribution_id: contribution.id,
+      status: 'approved',
+      admin_id: data.adminId,
+    })
+
+    if (apprErr) {
+      defaultLogger.error('Error creating approval status for admin contribution:', apprErr)
+    } else {
+      approvalStatusCreated = true
+    }
+
+    try {
+      const { data: currentCase } = await supabase
+        .from('cases')
+        .select('current_amount')
+        .eq('id', data.caseId)
+        .single()
+
+      if (currentCase) {
+        const newAmount = parseFloat(String(currentCase.current_amount || '0')) + data.amount
+        await supabase.from('cases').update({ current_amount: newAmount.toString() }).eq('id', data.caseId)
+      }
+    } catch (updateError) {
+      defaultLogger.warn('Error updating case amount after admin contribution:', updateError)
+    }
+
+    const full = await this.getById(supabase, contribution.id)
+    if (!full) {
+      throw new Error('Failed to load created contribution')
+    }
+
+    return { contribution: full, approvalStatusCreated }
+  }
+
+  /**
    * Calculate contribution statistics
    * @param supabase - Supabase client (server-side only)
    */
@@ -559,6 +648,23 @@ export class ContributionService {
       approvedTotal,
       contributorCount
     }
+  }
+
+  /**
+   * Sum all contribution amounts for a case (every row visible to the caller; RLS applies).
+   */
+  static async sumAmountsForCaseAllStatuses(supabase: SupabaseClient, caseId: string): Promise<number> {
+    const { data, error } = await supabase.from('contributions').select('amount').eq('case_id', caseId)
+
+    if (error) {
+      defaultLogger.error('Error summing contributions for case:', error)
+      throw new Error(`Failed to sum contributions: ${error.message}`)
+    }
+
+    return (data || []).reduce(
+      (sum, c) => sum + parseFloat(String((c as { amount?: string | number }).amount || 0)),
+      0
+    )
   }
 
   /**

@@ -183,12 +183,13 @@ export class ApprovalService {
 
     if (existing) {
       return await this.updateByContributionId(supabase, contributionId, data)
-    } else {
-      return await this.create(supabase, {
-        contribution_id: contributionId,
-        ...data
-      })
     }
+    const { contribution_id: _ignored, ...rest } = data as CreateApprovalStatusData &
+      Record<string, unknown>
+    return await this.create(supabase, {
+      contribution_id: contributionId,
+      ...(rest as Omit<CreateApprovalStatusData, 'contribution_id'>),
+    })
   }
 }
 

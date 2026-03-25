@@ -181,9 +181,3 @@ export function useApprovedContributions(caseId: string): UseApprovedContributio
     error
   }
 }
-
-<<<<<<< Current (Your changes)
-
-
-=======
->>>>>>> Incoming (Background Agent changes)

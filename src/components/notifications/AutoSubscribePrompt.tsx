@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useFCMNotifications } from '@/hooks/useFCMNotifications'
 import { useAuth } from '@/components/auth/AuthProvider'
-import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Bell, X } from 'lucide-react'
@@ -52,7 +51,6 @@ export function AutoSubscribePrompt({
   const [hasBeenPrompted, setHasBeenPrompted] = useState(false)
   const [isSubscribing, setIsSubscribing] = useState(false)
   const pathname = usePathname()
-  const supabase = createClient()
 
   useEffect(() => {
     // Only run on client side

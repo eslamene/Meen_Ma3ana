@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Upload, X, Image as ImageIcon, Trash2, Star, StarOff } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { uploadFileViaApi } from '@/lib/client/uploadViaApi'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -38,8 +38,6 @@ export default function ImageUpload({
   const [images, setImages] = useState<UploadedImage[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
-
-  const supabase = createClient()
 
   const validateFile = (file: File): string | null => {
     if (!acceptedTypes.includes(file.type)) {
@@ -158,65 +156,48 @@ export default function ImageUpload({
     
     try {
       const uploadedImages: UploadedImage[] = []
-      
-      // Get current user for uploaded_by field
-      const { data: { user } } = await supabase.auth.getUser()
-      
+
       for (let i = 0; i < images.length; i++) {
         const image = images[i]
-        
+
         if (image.uploaded) {
           uploadedImages.push(image)
           continue
         }
-        
+
         try {
-          // Upload to Supabase Storage - use case-files bucket
-          // Sanitize filename
           const sanitizedName = image.file.name
-            .replace(/[^\w\s.-]/g, '') // Remove special characters
-            .replace(/\s+/g, '-') // Replace spaces with hyphens
-            .replace(/--+/g, '-') // Replace multiple hyphens with single
+            .replace(/[^\w\s.-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/--+/g, '-')
             .toLowerCase()
-          
+
           const fileId = `${Date.now()}-${Math.random().toString(36).substring(2)}`
           const storagePath = `photos/${fileId}-${sanitizedName}`
-          
-          const { data, error } = await supabase.storage
-            .from('case-files')
-            .upload(storagePath, image.file, {
-              cacheControl: '3600',
-              upsert: false
-            })
-          
-          if (error) throw error
-          
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('case-files')
-            .getPublicUrl(storagePath)
-          
+
+          const { url } = await uploadFileViaApi(image.file, 'case-files', storagePath)
+
           uploadedImages.push({
             ...image,
             uploaded: true,
             uploadProgress: 100,
-            preview: urlData.publicUrl
+            preview: url,
           })
         } catch (error) {
           logger.error('Error uploading image:', { error: error })
           uploadedImages.push({
             ...image,
-            error: t('uploadError')
+            error: t('uploadError'),
           })
         }
       }
-      
+
       setImages(uploadedImages)
       onImagesChange(uploadedImages)
     } finally {
       setUploading(false)
     }
-  }, [images, supabase, onImagesChange, t])
+  }, [images, onImagesChange, t])
 
   return (
     <div className="space-y-4">

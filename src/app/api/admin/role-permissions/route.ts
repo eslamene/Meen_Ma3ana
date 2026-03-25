@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { env } from '@/config/env'
 import { createGetHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { LegacyRolePermissionService } from '@/lib/services/legacyRolePermissionService'
 
 async function handler(request: NextRequest, context: ApiHandlerContext) {
   const { logger } = context
@@ -16,36 +17,24 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
 
     logger.info('Fetching permissions for role:', roleId)
 
-    // Create admin client
     if (!env.SUPABASE_SERVICE_ROLE_KEY) {
       logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
       throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
     }
-    
-    const adminClient = createClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_SERVICE_ROLE_KEY
-    )
 
-    // Fetch role with permissions
-    const { data: role, error: roleError } = await adminClient
-      .from('roles')
-      .select(`
-        *,
-        role_permissions(
-          permissions(*)
-        )
-      `)
-      .eq('id', roleId)
-      .single()
+    const adminClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
 
-    if (roleError) {
-      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching role:', roleError)
-      throw roleError
+    let role: Record<string, unknown>
+    try {
+      role = await LegacyRolePermissionService.getRoleWithPermissions(adminClient, roleId)
+    } catch (e) {
+      logger.logStableError('INTERNAL_SERVER_ERROR', 'Error fetching role:', e)
+      throw new ApiError('INTERNAL_SERVER_ERROR', e instanceof Error ? e.message : 'Failed to fetch role', 500)
     }
 
-    logger.info('Role fetched successfully:', role.name)
-    logger.info('Permissions count:', role.role_permissions?.length || 0)
+    logger.info('Role fetched successfully:', (role as { name?: string }).name)
+    const rp = role.role_permissions as unknown[] | undefined
+    logger.info('Permissions count:', rp?.length || 0)
 
     return NextResponse.json({
       success: true,

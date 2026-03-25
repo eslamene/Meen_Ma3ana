@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
+import { useAuth } from '@/components/auth/AuthProvider'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,8 +13,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Repeat, AlertCircle, CheckCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-
-import { defaultLogger as logger } from '@/lib/logger'
 
 interface RecurringContributionFormProps {
   caseId?: string
@@ -41,7 +38,7 @@ export default function RecurringContributionForm({
   onCancel 
 }: RecurringContributionFormProps) {
   const t = useTranslations('contributions')
-  const [user, setUser] = useState<User | null>(null)
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -55,21 +52,6 @@ export default function RecurringContributionForm({
     autoProcess: true,
     notes: ''
   })
-
-  const supabase = createClient()
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser()
-      if (error) {
-        logger.error('Error getting user:', { error: error })
-        return
-      }
-      setUser(user)
-    }
-
-    getUser()
-  }, [supabase.auth])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

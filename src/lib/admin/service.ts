@@ -236,6 +236,29 @@ export class AdminService {
   }
 
   /**
+   * Roles (simplified) and permissions for the current user — used by profile and sponsor checks.
+   */
+  async getUserRolesAndPermissions(userId: string): Promise<{
+    roles: Pick<
+      AdminRole,
+      'id' | 'name' | 'display_name' | 'display_name_ar' | 'description' | 'level'
+    >[]
+    permissions: AdminPermission[]
+  }> {
+    const userRoles = await this.getUserRoles(userId)
+    const permissions = await this.getUserPermissions(userId)
+    const roles = userRoles.map(ur => ({
+      id: ur.role.id,
+      name: ur.role.name,
+      display_name: ur.role.display_name,
+      display_name_ar: ur.role.display_name_ar,
+      description: ur.role.description,
+      level: ur.role.level,
+    }))
+    return { roles, permissions }
+  }
+
+  /**
    * Check if user has permission
    */
   async hasPermission(userId: string, permissionName: string): Promise<boolean> {

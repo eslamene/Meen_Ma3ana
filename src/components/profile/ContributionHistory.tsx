@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calendar, DollarSign, Eye, Download, Heart, Target, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -26,6 +26,7 @@ interface Contribution {
 export default function ContributionHistory() {
   const router = useRouter()
   const params = useParams()
+  const { user, loading: authLoading } = useAuth()
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,16 +39,12 @@ export default function ContributionHistory() {
     hasPreviousPage: false
   })
 
-  const supabase = createClient()
-
   const fetchContributions = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      
-      if (authError || !user) {
+      if (!user) {
         setError('You must be logged in to view contributions')
         return
       }
@@ -70,11 +67,12 @@ export default function ContributionHistory() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, pagination.page, pagination.limit])
+  }, [user, pagination.page, pagination.limit])
 
   useEffect(() => {
+    if (authLoading) return
     fetchContributions()
-  }, [fetchContributions])
+  }, [authLoading, fetchContributions])
 
   const getStatusBadge = (status: string) => {
     switch (status) {

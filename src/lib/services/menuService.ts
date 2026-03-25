@@ -4,8 +4,27 @@
  * Server-side only - accepts Supabase client as parameter
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { defaultLogger } from '@/lib/logger'
+
+/** Server sidebar: modules with flat items (RSC → ClientLayout / ClientSidebarNavigation). */
+export interface TransformedMenuModule {
+  id: string
+  name: string
+  display_name: string
+  description?: string
+  icon: string
+  color: string
+  sort_order: number
+  items: Array<{
+    label: string
+    href: string
+    icon: string
+    description?: string
+    sortOrder: number
+    permission?: string
+  }>
+}
 
 export interface MenuItem {
   id: string
@@ -318,6 +337,65 @@ export class MenuService {
       defaultLogger.error('Error updating menu items:', errors)
       throw new Error(`Failed to update some menu items: ${errorMessages.join(', ')}`)
     }
+  }
+
+  /**
+   * Sidebar modules for a user (`get_user_menu_items` RPC + `admin_modules`).
+   * Server-only; used from `getMenuModules` in `@/lib/server/menu`.
+   */
+  static async getTransformedMenuModulesForUser(
+    supabase: SupabaseClient,
+    user: User | null
+  ): Promise<TransformedMenuModule[]> {
+    if (!user) {
+      return []
+    }
+
+    const { data: menuItems, error } = await supabase.rpc('get_user_menu_items', {
+      user_id: user.id,
+    })
+
+    if (error) {
+      defaultLogger.error('Error fetching menu items:', { error })
+      return []
+    }
+
+    const { data: modules } = await supabase
+      .from('admin_modules')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order')
+
+    if (!modules) {
+      return []
+    }
+
+    const modulesWithItems: TransformedMenuModule[] = modules.map((moduleData: Record<string, unknown>) => ({
+      id: moduleData.id as string,
+      name: moduleData.name as string,
+      display_name: moduleData.display_name as string,
+      description: moduleData.description as string | undefined,
+      icon: (moduleData.icon as string) || 'folder',
+      color: (moduleData.color as string) || 'blue',
+      sort_order: (moduleData.sort_order as number) || 0,
+      items: (menuItems || [])
+        .filter((item: { module_id?: string }) => item.module_id === moduleData.id)
+        .map((item: Record<string, unknown>) => ({
+          label: item.label as string,
+          href: item.href as string,
+          icon: (item.icon as string) || '',
+          description: item.description as string | undefined,
+          permission: item.permission_id as string | undefined,
+          sortOrder: (item.sort_order as number) || 0,
+        }))
+        .sort(
+          (a: { sortOrder: number }, b: { sortOrder: number }) => a.sortOrder - b.sortOrder
+        ),
+    }))
+
+    return modulesWithItems.filter(
+      (m) => m.items !== undefined && m.items.length > 0
+    )
   }
 }
 

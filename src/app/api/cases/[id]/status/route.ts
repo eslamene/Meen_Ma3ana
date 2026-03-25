@@ -107,7 +107,7 @@ async function checkAndCloseCaseIfFullyFunded(supabase: SupabaseClient, caseId: 
     })
 
     // Filter contributions for this case and sum amounts
-    const caseContributions = contributionsResult.contributions.filter(c => c.caseId === caseId || c.case_id === caseId)
+    const caseContributions = contributionsResult.contributions.filter(c => c.caseId === caseId)
     const totalAmount = caseContributions.reduce((sum, c) => {
       const amount = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0)
       return sum + amount

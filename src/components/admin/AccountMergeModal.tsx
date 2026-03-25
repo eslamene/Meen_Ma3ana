@@ -345,28 +345,47 @@ export function AccountMergeModal({ open, sourceUserId, onClose, onSuccess }: Ac
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        
-        // Log full error details for debugging
-        logger.error('Merge error details:', { error: error })
-        
-        // Provide helpful error message if migration is required
-        if (error.migration_required) {
+        const error = await response.json() as {
+          error?: string
+          errorCode?: string
+          details?: unknown
+        }
+
+        logger.error('Merge error details:', { error })
+
+        const detailsObj =
+          error.details && typeof error.details === 'object' && error.details !== null
+            ? (error.details as Record<string, unknown>)
+            : {}
+
+        const migrationRequired =
+          error.errorCode === 'MIGRATION_REQUIRED' || detailsObj.migration_required === true
+
+        if (migrationRequired) {
+          const headline =
+            error.error ||
+            'Backup system not initialized. Please run migration 078_create_user_merge_backup_system.sql first.'
           throw new Error(
-            error.error + '\n\n' + 
-            'Please run the database migration:\n' +
-            'supabase/migrations/078_create_user_merge_backup_system.sql\n\n' +
-            'Or contact your database administrator to apply this migration.'
+            `${headline}\n\n` +
+              'Please run the database migration:\n' +
+              'supabase/migrations/078_create_user_merge_backup_system.sql\n\n' +
+              'Or contact your database administrator to apply this migration.'
           )
         }
-        
-        // Show detailed error if available
+
         const errorMessage = error.error || 'Failed to merge accounts'
-        const details = error.details ? `\n\nDetails: ${error.details}` : ''
-        const hint = error.hint ? `\n\nHint: ${error.hint}` : ''
-        const errorCode = error.error_code ? `\n\nError Code: ${error.error_code}` : ''
-        
-        throw new Error(errorMessage + details + hint + errorCode)
+        const tech =
+          typeof detailsObj.technicalMessage === 'string'
+            ? detailsObj.technicalMessage
+            : typeof error.details === 'string'
+              ? error.details
+              : ''
+        const details = tech ? `\n\nDetails: ${tech}` : ''
+        const hint = typeof detailsObj.hint === 'string' ? `\n\nHint: ${detailsObj.hint}` : ''
+        const pgCode =
+          typeof detailsObj.postgresCode === 'string' ? `\n\nError Code: ${detailsObj.postgresCode}` : ''
+
+        throw new Error(errorMessage + details + hint + pgCode)
       }
 
       const data = await response.json()

@@ -12,7 +12,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Plus, Calendar, User, MessageSquare, AlertTriangle, Target, FileText, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 import { CaseUpdate } from '@/lib/case-updates'
-import { createClient } from '@/lib/supabase/client'
 import { useAdmin } from '@/lib/admin/hooks'
 import { cn } from '@/lib/utils'
 
@@ -106,7 +105,6 @@ export default function UpdatesTimeline({
   const [filterType, setFilterType] = useState<UpdateType | 'all'>('all')
   const [showPrivate, setShowPrivate] = useState(false)
 
-  const supabase = createClient()
   const { user: currentUser, hasRole } = useAdmin()
 
   const filteredUpdates = updates.filter(update => {
@@ -122,6 +120,7 @@ export default function UpdatesTimeline({
     try {
       const response = await fetch(`/api/cases/${caseId}/updates`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -165,6 +164,7 @@ export default function UpdatesTimeline({
     try {
       const response = await fetch(`/api/cases/${caseId}/updates/${updateId}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -194,6 +194,7 @@ export default function UpdatesTimeline({
     try {
       const response = await fetch(`/api/cases/${caseId}/updates/${updateId}`, {
         method: 'DELETE',
+        credentials: 'include',
       })
 
       if (response.ok) {

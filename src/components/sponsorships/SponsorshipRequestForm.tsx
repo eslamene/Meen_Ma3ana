@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
+import { useAuth } from '@/components/auth/AuthProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,7 +53,7 @@ export default function SponsorshipRequestForm({
   onCancel 
 }: SponsorshipRequestFormProps) {
   const t = useTranslations('sponsorships')
-  const [user, setUser] = useState<User | null>(null)
+  const { user } = useAuth()
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -76,46 +75,37 @@ export default function SponsorshipRequestForm({
     agreedToTerms: false
   })
 
-  const supabase = createClient()
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser()
-      if (error) {
-        logger.error('Error getting user:', { error: error })
-        return
-      }
-      setUser(user)
-    }
-
-    getUser()
-  }, [supabase.auth])
-
   const fetchCases = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('cases')
-        .select('id, title, description, target_amount, current_amount, status, category_id')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      // Map the data to match the Case interface
-      const mappedCases = (data || []).map((caseItem: any) => ({
+      const res = await fetch('/api/cases?status=published&limit=100', { credentials: 'include' })
+      if (!res.ok) {
+        throw new Error(`Failed to load cases (${res.status})`)
+      }
+      const json = (await res.json()) as {
+        cases: Array<{
+          id: string
+          title: string
+          description: string
+          target_amount: number
+          current_amount: number
+          status: string
+          category_id: string | null
+        }>
+      }
+      const mappedCases = (json.cases || []).map((caseItem) => ({
         id: caseItem.id,
         title: caseItem.title,
         description: caseItem.description,
         target_amount: caseItem.target_amount,
         current_amount: caseItem.current_amount,
         status: caseItem.status,
-        category: caseItem.category_id || '', // Map category_id to category
-        category_id: caseItem.category_id
+        category: caseItem.category_id || '',
       }))
       setCases(mappedCases)
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('Error fetching cases:', { error: err })
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     fetchCases()
@@ -142,40 +132,23 @@ export default function SponsorshipRequestForm({
       const endDate = new Date(startDate)
       endDate.setMonth(startDate.getMonth() + parseInt(formData.duration))
 
-      const { error: insertError } = await supabase
-        .from('sponsorships')
-        .insert({
-          sponsor_id: user.id,
+      const submitRes = await fetch('/api/sponsor/requests', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           case_id: formData.caseId,
           amount: parseFloat(formData.amount),
-          status: 'pending',
-          terms: formData.terms,
+          terms: formData.terms || null,
           start_date: formData.startDate,
           end_date: endDate.toISOString(),
-        })
+          commitment_type: formData.commitmentType,
+        }),
+      })
 
-      if (insertError) {
-        throw insertError
-      }
-
-      // Create notification for admins
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert({
-          type: 'sponsorship_request',
-          recipient_id: '00000000-0000-0000-0000-000000000000', // Admin user ID
-          title: 'New Sponsorship Request',
-          message: `A new sponsorship request has been submitted for case: ${cases.find(c => c.id === formData.caseId)?.title}`,
-          data: {
-            caseId: formData.caseId,
-            sponsorId: user.id,
-            amount: formData.amount,
-            commitmentType: formData.commitmentType
-          }
-        })
-
-      if (notificationError) {
-        logger.error('Error creating notification:', { error: notificationError })
+      if (!submitRes.ok) {
+        const errBody = (await submitRes.json().catch(() => ({}))) as { error?: string; message?: string }
+        throw new Error(errBody.error || errBody.message || `Request failed (${submitRes.status})`)
       }
 
       setSuccess(true)

@@ -62,8 +62,8 @@ async function getHandler(
         id: bucket.id,
         name: bucket.name,
         public: bucket.public,
-        created_at: bucket.created_at,
-        updated_at: bucket.updated_at,
+        created_at: bucket.created_at ?? new Date().toISOString(),
+        updated_at: bucket.updated_at ?? bucket.created_at ?? new Date().toISOString(),
         file_size_limit: rule?.max_file_size_mb,
         allowed_mime_types: rule?.allowed_extensions,
         object_count: objectCount

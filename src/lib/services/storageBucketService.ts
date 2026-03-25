@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 import { defaultLogger as logger } from '@/lib/logger'
+import type { StorageRule } from '@/lib/storage/types'
 
 export interface StorageBucket {
   id: string
@@ -148,7 +149,7 @@ export class StorageBucketService {
   /**
    * Get storage rules for all buckets
    */
-  static async getStorageRules(): Promise<Array<{ bucket_name: string; max_file_size_mb?: number; allowed_extensions?: string[] }>> {
+  static async getStorageRules(): Promise<StorageRule[]> {
     const supabase = this.getServiceClient()
     
     const { data, error } = await supabase
@@ -160,13 +161,13 @@ export class StorageBucketService {
       throw new Error(`Failed to fetch storage rules: ${error.message}`)
     }
 
-    return data || []
+    return (data || []) as StorageRule[]
   }
 
   /**
    * Get storage rule for a specific bucket
    */
-  static async getStorageRule(bucketName: string): Promise<{ bucket_name: string; max_file_size_mb?: number; allowed_extensions?: string[] } | null> {
+  static async getStorageRule(bucketName: string): Promise<StorageRule | null> {
     const supabase = this.getServiceClient()
     
     const { data, error } = await supabase
@@ -180,7 +181,7 @@ export class StorageBucketService {
       throw new Error(`Failed to fetch storage rule: ${error.message}`)
     }
 
-    return data || null
+    return (data as StorageRule) || null
   }
 
   /**
@@ -192,7 +193,7 @@ export class StorageBucketService {
       max_file_size_mb: number
       allowed_extensions: string[]
     }
-  ): Promise<{ bucket_name: string; max_file_size_mb?: number; allowed_extensions?: string[] }> {
+  ): Promise<StorageRule> {
     const supabase = this.getServiceClient()
 
     // Normalize extensions: lowercase, trim whitespace, remove duplicates
@@ -228,7 +229,7 @@ export class StorageBucketService {
       throw new Error('Storage rule upsert returned no data')
     }
 
-    return data
+    return data as StorageRule
   }
 }
 

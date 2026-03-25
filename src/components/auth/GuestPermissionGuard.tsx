@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useState, useEffect, useContext } from 'react'
+import { ReactNode, useState, useEffect, useContext, useRef } from 'react'
 import { useAdmin } from '@/lib/admin/hooks'
 import { AuthContext } from '@/components/auth/AuthProvider'
 import Link from 'next/link'
@@ -15,10 +15,15 @@ function useAuthSafe() {
   const context = useContext(AuthContext)
   const [fallbackUser, setFallbackUser] = useState<User | null>(null)
   const [fallbackLoading, setFallbackLoading] = useState(true)
-  const supabase = createClient()
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   
   useEffect(() => {
     if (context === undefined) {
+      if (!supabaseRef.current) {
+        supabaseRef.current = createClient()
+      }
+      const supabase = supabaseRef.current
+
       // No AuthProvider - use direct Supabase check
       const getUser = async () => {
         try {
@@ -39,7 +44,7 @@ function useAuthSafe() {
       
       return () => subscription.unsubscribe()
     }
-  }, [context, supabase])
+  }, [context])
   
   if (context !== undefined) {
     return { user: context.user, loading: context.loading }
@@ -82,7 +87,7 @@ export function GuestPermissionGuard({
   // Use safe auth hook that works with or without AuthProvider
   const { user, loading: authLoading } = useAuthSafe()
   
-  // useAdmin doesn't require AuthProvider - it uses Supabase directly
+  // useAdmin doesn't require AuthProvider (it loads via `/api/admin/context`)
   const { hasPermission, loading } = useAdmin()
 
   // Show loading state

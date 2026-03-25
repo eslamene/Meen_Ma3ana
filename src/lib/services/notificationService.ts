@@ -11,6 +11,7 @@ export interface Notification {
   id: string
   recipient_id: string
   type: string
+  data?: Record<string, unknown> | null
   title?: string | null
   title_en?: string | null
   title_ar?: string | null
@@ -34,6 +35,7 @@ export interface CreateNotificationData {
   message_en?: string
   message_ar?: string
   link?: string | null
+  data?: Record<string, unknown> | null
 }
 
 export interface NotificationSearchParams {
@@ -186,6 +188,7 @@ export class NotificationService {
         message_en: data.message_en || data.message || null,
         message_ar: data.message_ar || null,
         link: data.link || null,
+        ...(data.data !== undefined && data.data !== null ? { data: data.data } : {}),
         read: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

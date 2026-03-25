@@ -7,6 +7,20 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { defaultLogger } from '@/lib/logger'
 
+/** Payload for batch insert into `case_files` (API / CaseService.insertCaseFilesBatch). */
+export type CaseFileBatchInsertInput = {
+  filename: string
+  original_filename: string | null
+  file_url: string
+  file_path: string | null
+  file_type: string
+  file_size: number
+  category: string
+  description: string | null
+  is_public: boolean
+  display_order: number
+}
+
 export interface Case {
   id: string
   title_en: string
@@ -102,6 +116,31 @@ export interface CaseListResponse {
     totalCases: number
     activeCases: number
     totalRaised: number
+  }
+}
+
+export interface AdminCasesWithStatsParams {
+  status?: string[]
+  search?: string | null
+  page?: number
+  limit?: number
+  sortBy?: string
+}
+
+export interface AdminCasesWithStatsResponse {
+  cases: Record<string, unknown>[]
+  stats: {
+    total: number
+    published: number
+    completed: number
+    closed: number
+    under_review: number
+  }
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
   }
 }
 
@@ -306,7 +345,7 @@ export class CaseService {
     }
 
     return {
-      cases: (data || []) as Case[],
+      cases: (data || []) as unknown as Case[],
       pagination: {
         page,
         limit,
@@ -318,6 +357,182 @@ export class CaseService {
         activeCases,
         totalRaised
       }
+    }
+  }
+
+  /**
+   * Admin case list with dashboard stats, beneficiary/category/images, and contribution aggregates.
+   */
+  static async getCasesWithStats(
+    supabase: SupabaseClient,
+    params: AdminCasesWithStatsParams
+  ): Promise<AdminCasesWithStatsResponse> {
+    const page = params.page ?? 1
+    const limit = params.limit ?? 10
+    const sortBy = params.sortBy ?? 'created_at_desc'
+    const search = (params.search || '').trim()
+    const statuses = (params.status || []).filter(Boolean)
+
+    const applyListFilters = (q: any) => {
+      let next = q
+      if (statuses.length > 0) {
+        next = next.in('status', statuses)
+      }
+      if (search) {
+        next = next.or(
+          `title_en.ilike.%${search}%,title_ar.ilike.%${search}%,description_en.ilike.%${search}%,description_ar.ilike.%${search}%`
+        )
+      }
+      return next
+    }
+
+    const { data: statusRows, error: statusErr } = await applyListFilters(
+      supabase.from('cases').select('status')
+    )
+
+    if (statusErr) {
+      defaultLogger.error('Error fetching case stats:', statusErr)
+      throw new Error(`Failed to fetch case stats: ${statusErr.message}`)
+    }
+
+    const rows = statusRows || []
+    const stats = {
+      total: rows.length,
+      published: rows.filter((r: { status: string }) => r.status === 'published').length,
+      completed: rows.filter((r: { status: string }) => r.status === 'completed').length,
+      closed: rows.filter((r: { status: string }) => r.status === 'closed').length,
+      under_review: rows.filter((r: { status: string }) => r.status === 'under_review').length,
+    }
+
+    let query = supabase.from('cases').select(
+      `
+        id,
+        title_en,
+        title_ar,
+        description_en,
+        description_ar,
+        target_amount,
+        current_amount,
+        status,
+        type,
+        priority,
+        location,
+        beneficiary_id,
+        beneficiary_name,
+        beneficiary_contact,
+        created_at,
+        updated_at,
+        created_by,
+        category_id,
+        beneficiaries(id, name, name_ar, age, gender, mobile_number, email, city, governorate, risk_level, is_verified, total_cases, active_cases),
+        case_categories(id, name, icon, color),
+        case_images(image_url, is_primary, order_index)
+      `,
+      { count: 'exact' }
+    )
+
+    query = applyListFilters(query)
+
+    const ascending = sortBy === 'created_at_asc'
+    query = query.order('created_at', { ascending })
+
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    query = query.range(from, to)
+
+    const { data: casesRaw, error: casesErr, count } = await query
+
+    if (casesErr) {
+      defaultLogger.error('Error fetching admin cases:', casesErr)
+      throw new Error(`Failed to fetch cases: ${casesErr.message}`)
+    }
+
+    const caseIds = (casesRaw || []).map((c: { id: string }) => c.id)
+
+    type Agg = { approved_amount: number; total_contributions: number; donors: Set<string> }
+    const aggMap = new Map<string, Agg>()
+
+    const ensureAgg = (id: string): Agg => {
+      let a = aggMap.get(id)
+      if (!a) {
+        a = { approved_amount: 0, total_contributions: 0, donors: new Set() }
+        aggMap.set(id, a)
+      }
+      return a
+    }
+
+    if (caseIds.length > 0) {
+      const { data: contribs, error: cErr } = await supabase
+        .from('contributions')
+        .select(
+          'case_id, amount, donor_id, approval_status:contribution_approval_status!contribution_id(status)'
+        )
+        .in('case_id', caseIds)
+
+      if (cErr) {
+        defaultLogger.warn('Error loading contribution aggregates for admin cases list:', cErr)
+      } else {
+        for (const row of contribs || []) {
+          const cid = row.case_id as string | null
+          if (!cid) {
+            continue
+          }
+          const a = ensureAgg(cid)
+          const amt = parseFloat(String((row as { amount?: string | number }).amount || '0')) || 0
+          a.total_contributions += amt
+
+          const appr = (row as { approval_status?: unknown }).approval_status
+          const st = Array.isArray(appr)
+            ? (appr[0] as { status?: string } | undefined)?.status
+            : (appr as { status?: string } | null)?.status
+          if (st === 'approved') {
+            a.approved_amount += amt
+            const donorId = (row as { donor_id?: string | null }).donor_id
+            if (donorId) {
+              a.donors.add(donorId)
+            }
+          }
+        }
+      }
+    }
+
+    const cases = (casesRaw || []).map((c: Record<string, unknown>) => {
+      const id = c.id as string
+      let image_url: string | undefined
+      const imgs = c.case_images
+      if (Array.isArray(imgs) && imgs.length > 0) {
+        const primary = imgs.find((i: { is_primary?: boolean }) => i.is_primary) || imgs[0]
+        image_url = (primary as { image_url?: string })?.image_url
+      }
+
+      const ag = aggMap.get(id) || {
+        approved_amount: 0,
+        total_contributions: 0,
+        donors: new Set<string>(),
+      }
+
+      return {
+        ...c,
+        image_url,
+        target_amount: parseFloat(String(c.target_amount || '0')) || 0,
+        current_amount: parseFloat(String(c.current_amount || '0')) || 0,
+        approved_amount: ag.approved_amount,
+        total_contributions: ag.total_contributions,
+        contributor_count: ag.donors.size,
+      }
+    })
+
+    const total = count ?? 0
+
+    return {
+      cases,
+      stats,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: limit > 0 ? Math.ceil(total / limit) : 0,
+      },
     }
   }
 
@@ -359,7 +574,7 @@ export class CaseService {
       throw new Error(`Failed to fetch case: ${error.message}`)
     }
 
-    return data as Case
+    return data as unknown as Case
   }
 
   /**
@@ -476,6 +691,227 @@ export class CaseService {
     }
 
     return (data?.length || 0) > 0
+  }
+
+  /**
+   * List case_files rows for a case (API / UI)
+   */
+  static async listCaseFilesForCase(
+    supabase: SupabaseClient,
+    caseId: string
+  ): Promise<
+    Array<{
+      id: string
+      filename: string
+      original_filename: string | null
+      file_url: string
+      file_path: string | null
+      file_type: string | null
+      file_size: number | null
+      category: string | null
+      description: string | null
+      is_public: boolean | null
+      is_primary: boolean | null
+      display_order: number | null
+      created_at: string | null
+      uploaded_by: string | null
+    }>
+  > {
+    const { data, error } = await supabase
+      .from('case_files')
+      .select('*')
+      .eq('case_id', caseId)
+      .order('display_order', { ascending: true })
+
+    if (error) {
+      defaultLogger.error('Error listing case files:', error)
+      throw new Error(`Failed to fetch case files: ${error.message}`)
+    }
+
+    return (data || []) as Array<{
+      id: string
+      filename: string
+      original_filename: string | null
+      file_url: string
+      file_path: string | null
+      file_type: string | null
+      file_size: number | null
+      category: string | null
+      description: string | null
+      is_public: boolean | null
+      is_primary: boolean | null
+      display_order: number | null
+      created_at: string | null
+      uploaded_by: string | null
+    }>
+  }
+
+  /**
+   * Get one case_files row scoped to a case
+   */
+  static async getCaseFileForCase(
+    supabase: SupabaseClient,
+    caseId: string,
+    fileId: string
+  ): Promise<Record<string, unknown> | null> {
+    const { data, error } = await supabase
+      .from('case_files')
+      .select('*')
+      .eq('id', fileId)
+      .eq('case_id', caseId)
+      .maybeSingle()
+
+    if (error) {
+      defaultLogger.error('Error fetching case file:', error)
+      throw new Error(`Failed to fetch case file: ${error.message}`)
+    }
+
+    return data as Record<string, unknown> | null
+  }
+
+  /**
+   * Update a case_files row (metadata)
+   */
+  static async updateCaseFileRecord(
+    supabase: SupabaseClient,
+    caseId: string,
+    fileId: string,
+    updateData: Record<string, string | boolean>
+  ): Promise<Record<string, unknown>> {
+    const { data: updatedFile, error: updateError } = await supabase
+      .from('case_files')
+      .update(updateData)
+      .eq('id', fileId)
+      .eq('case_id', caseId)
+      .select()
+      .single()
+
+    if (updateError) {
+      defaultLogger.error('Error updating case file:', updateError)
+      throw new Error(`Failed to update file: ${updateError.message}`)
+    }
+
+    return updatedFile as Record<string, unknown>
+  }
+
+  /**
+   * Whether a case row exists (for file attach validation).
+   */
+  static async caseExists(supabase: SupabaseClient, caseId: string): Promise<boolean> {
+    const { data, error } = await supabase.from('cases').select('id').eq('id', caseId).maybeSingle()
+
+    if (error) {
+      defaultLogger.error('Error checking case exists:', error)
+      throw new Error(`Failed to verify case: ${error.message}`)
+    }
+
+    return !!data
+  }
+
+  /**
+   * Get case target amount by id.
+   */
+  static async getCaseTargetAmount(
+    supabase: SupabaseClient,
+    caseId: string
+  ): Promise<number | null> {
+    const { data, error } = await supabase
+      .from('cases')
+      .select('target_amount')
+      .eq('id', caseId)
+      .maybeSingle()
+
+    if (error) {
+      defaultLogger.error('Error fetching case target amount:', error)
+      throw new Error(`Failed to fetch case target amount: ${error.message}`)
+    }
+
+    if (!data) return null
+    return parseFloat(String(data.target_amount || '0')) || 0
+  }
+
+  /**
+   * Insert multiple case_files rows (RLS applies).
+   */
+  static async insertCaseFilesBatch(
+    supabase: SupabaseClient,
+    caseId: string,
+    rows: CaseFileBatchInsertInput[]
+  ): Promise<
+    Array<{
+      id: string
+      case_id: string
+      filename: string
+      original_filename: string | null
+      file_url: string
+      file_path: string | null
+      file_type: string | null
+      file_size: number | null
+      category: string | null
+      description: string | null
+      is_public: boolean | null
+      display_order: number | null
+      created_at: string | null
+      uploaded_by: string | null
+    }>
+  > {
+    if (!rows.length) {
+      return []
+    }
+
+    const payload = rows.map((r) => ({ ...r, case_id: caseId }))
+    const { data, error } = await supabase.from('case_files').insert(payload).select()
+
+    if (error) {
+      defaultLogger.error('Error inserting case files:', error)
+      const err = new Error(`Failed to insert case files: ${error.message}`) as Error & {
+        code?: string
+      }
+      err.code = error.code
+      throw err
+    }
+
+    return (data || []) as Array<{
+      id: string
+      case_id: string
+      filename: string
+      original_filename: string | null
+      file_url: string
+      file_path: string | null
+      file_type: string | null
+      file_size: number | null
+      category: string | null
+      description: string | null
+      is_public: boolean | null
+      display_order: number | null
+      created_at: string | null
+      uploaded_by: string | null
+    }>
+  }
+
+  /**
+   * Delete a case_files row scoped to case; returns removed file_path for storage cleanup.
+   */
+  static async deleteCaseFileForCase(
+    supabase: SupabaseClient,
+    caseId: string,
+    fileId: string
+  ): Promise<{ file_path: string | null } | null> {
+    const cleanId = fileId.replace(/^case-image-/, '')
+    const { data, error } = await supabase
+      .from('case_files')
+      .delete()
+      .eq('id', cleanId)
+      .eq('case_id', caseId)
+      .select('file_path')
+      .maybeSingle()
+
+    if (error) {
+      defaultLogger.error('Error deleting case file:', error)
+      throw new Error(`Failed to delete file: ${error.message}`)
+    }
+
+    return data as { file_path: string | null } | null
   }
 
   /**

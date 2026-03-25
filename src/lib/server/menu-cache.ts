@@ -5,7 +5,7 @@ import { User } from '@supabase/supabase-js'
 
 /**
  * Cached version of getMenuModules for better performance
- * This will cache the result for the duration of the request
+ * (request-scoped `cache()`). Delegates to `getMenuModules` → `MenuService.getTransformedMenuModulesForUser`.
  */
 export const getCachedMenuModules = cache(async () => {
   const supabase = await createClient()

@@ -104,14 +104,14 @@ async function handler(
     let approvalStatus: Array<{
       id?: string
       status: string
-      rejection_reason?: string
-      admin_comment?: string
-      donor_reply?: string
-      donor_reply_date?: string
-      payment_proof_url?: string
-      resubmission_count?: number
-      created_at?: string
-      updated_at?: string
+      rejection_reason?: string | null
+      admin_comment?: string | null
+      donor_reply?: string | null
+      donor_reply_date?: string | null
+      payment_proof_url?: string | null
+      resubmission_count?: number | null
+      created_at?: string | null
+      updated_at?: string | null
     }> = contribution.approval_status || []
     
     // Try to fetch fresh approval status if service didn't include it

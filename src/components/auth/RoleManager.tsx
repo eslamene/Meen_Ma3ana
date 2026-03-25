@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { createBrowserClient } from '@supabase/ssr'
 import { UserRole, userRoles, getRoleDisplayName, getRoleDescription } from '@/lib/rbac/types'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+
+import { defaultLogger as logger } from '@/lib/logger'
 
 interface RoleManagerProps {
   userId: string
@@ -19,11 +20,6 @@ export default function RoleManager({ userId, currentRole, onRoleChange }: RoleM
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
   const handleRoleChange = async () => {
     if (selectedRole === currentRole) return
     
@@ -32,16 +28,22 @@ export default function RoleManager({ userId, currentRole, onRoleChange }: RoleM
     setSuccess('')
 
     try {
-      // Update user metadata with new role
-      const { error } = await supabase.auth.admin.updateUserById(userId, {
-        user_metadata: { role: selectedRole }
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: selectedRole }),
       })
 
-      if (error) throw error
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
+        throw new Error(body.error || body.message || `Update failed (${res.status})`)
+      }
 
       setSuccess(t('roleUpdated'))
       onRoleChange?.(selectedRole)
     } catch (error) {
+      logger.error('RoleManager update failed', { error })
       const errorMessage = error instanceof Error ? error.message : t('unknownError')
       setError(errorMessage)
     } finally {

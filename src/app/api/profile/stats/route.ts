@@ -81,8 +81,8 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
       const normalizedLatestContribution = latestContributionData ? {
         id: latestContributionData.id,
         amount: parseAmount(latestContributionData.amount),
-        created_at: latestContributionData.createdAt || latestContributionData.created_at,
-        case_id: latestContributionData.caseId || latestContributionData.case_id || null,
+        created_at: latestContributionData.createdAt ?? '',
+        case_id: latestContributionData.caseId ?? null,
         status: latestContributionData.status,
         caseTitle: (latestContributionData as any).caseTitle,
         caseTitleAr: (latestContributionData as any).caseTitleAr

@@ -3,7 +3,12 @@ import { createClient } from '@/lib/supabase/server'
 import { createContributionNotificationService } from '@/lib/notifications/contribution-notifications'
 import { createGetHandlerWithParams, createPostHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
-import { ApprovalService } from '@/lib/services/approvalService'
+import {
+  ApprovalService,
+  type ApprovalStatus,
+  type CreateApprovalStatusData,
+  type UpdateApprovalStatusData,
+} from '@/lib/services/approvalService'
 import { ContributionService } from '@/lib/services/contributionService'
 import { CaseService } from '@/lib/services/caseService'
 
@@ -43,22 +48,24 @@ async function postHandler(
   const body = await request.json()
   const { status, rejection_reason, admin_comment, donor_reply, payment_proof_url } = body
 
+  const allowed: ApprovalStatus['status'][] = [
+    'pending',
+    'approved',
+    'rejected',
+    'acknowledged',
+    'revised',
+  ]
+  if (typeof status !== 'string' || !allowed.includes(status as ApprovalStatus['status'])) {
+    throw new ApiError('VALIDATION_ERROR', 'Invalid approval status', 400)
+  }
+
   try {
     // Get existing approval status using ApprovalService
     const existingStatus = await ApprovalService.getByContributionId(supabase, id)
 
     // Prepare update data
-    const updateData: {
-      status: string
-      admin_id?: string | null
-      rejection_reason?: string | null
-      admin_comment?: string | null
-      donor_reply?: string | null
-      donor_reply_date?: string | null
-      payment_proof_url?: string | null
-      resubmission_count?: number
-    } = {
-      status
+    const updateData: UpdateApprovalStatusData & Pick<CreateApprovalStatusData, 'status'> = {
+      status: status as ApprovalStatus['status'],
     }
 
     if (status === 'rejected') {
@@ -84,10 +91,11 @@ async function postHandler(
     }
 
     // Upsert approval status using ApprovalService
-    const result = await ApprovalService.upsert(supabase, id, {
-      contribution_id: id,
-      ...updateData
-    })
+    const result = await ApprovalService.upsert(
+      supabase,
+      id,
+      updateData as CreateApprovalStatusData & UpdateApprovalStatusData
+    )
 
     // Update the main contribution status
     // TODO: Refactor to use ContributionService.update() when available
@@ -207,6 +215,17 @@ async function postHandler(
     }
 
     return NextResponse.json(result)
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+    logger.logStableError('INTERNAL_SERVER_ERROR', 'Approval status error:', error)
+    throw new ApiError(
+      'INTERNAL_SERVER_ERROR',
+      error instanceof Error ? error.message : 'Failed to update approval status',
+      500
+    )
+  }
 }
 
 export const GET = createGetHandlerWithParams<{ id: string }>(getHandler, { requireAuth: true, loggerContext: 'api/contributions/[id]/approval-status' })

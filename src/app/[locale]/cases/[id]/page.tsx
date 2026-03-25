@@ -43,10 +43,8 @@ import {
   Info,
   ChevronDown
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import UpdatesTimeline from '@/components/cases/UpdatesTimeline'
 import CaseFileManager, { CaseFile, FileCategory } from '@/components/cases/CaseFileManager'
-import { realtimeCaseUpdates, CaseProgressUpdate } from '@/lib/realtime-case-updates'
 import { CaseUpdate } from '@/lib/case-updates'
 import { Tooltip } from '@heroui/react'
 import DynamicIcon from '@/components/ui/dynamic-icon'
@@ -145,12 +143,11 @@ export default function CaseDetailPage() {
     isValidUUID(caseId) ? caseId : ''
   )
   const [apiProgress, setApiProgress] = useState<{ approvedTotal: number; progressPercentage: number; contributorCount: number } | null>(null)
-  const { hasPermission } = useAdmin()
+  const { hasPermission, hasRole, loading: adminLoading } = useAdmin()
   const { user, loading: authLoading } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [activeTab, setActiveTab] = useState<'files' | 'contributions' | 'updates'>('files')
-  const [realTimeProgress, setRealTimeProgress] = useState<CaseProgressUpdate | null>(null)
   const [canCreateUpdates, setCanCreateUpdates] = useState(false)
   const [totalContributions, setTotalContributions] = useState(0)
   const [beneficiaryData, setBeneficiaryData] = useState<Beneficiary | null>(null)
@@ -331,32 +328,25 @@ export default function CaseDetailPage() {
   }, [caseId])
 
   const fetchTotalContributions = useCallback(async () => {
-    // Don't fetch if caseId is not a valid UUID
-    if (!isValidUUID(caseId)) {
+    if (!isValidUUID(caseId)) return
+    if (adminLoading) return
+    if (!hasPermission('contributions:read')) {
+      setTotalContributions(0)
       return
     }
     try {
-      const client = createClient()
-      const { data, error } = await client
-        .from('contributions')
-        .select('amount')
-        .eq('case_id', caseId)
-
-      if (error) {
-        logger.error('Error fetching total contributions:', { error: error })
+      const res = await fetch(`/api/cases/${caseId}/contributions-sum`, { credentials: 'include' })
+      if (res.status === 401 || res.status === 403) {
+        setTotalContributions(0)
         return
       }
-
-      // Calculate total of ALL contributions (including pending/rejected)
-      const total = (data || []).reduce((sum, contribution) => {
-        return sum + parseFloat(contribution.amount || 0)
-      }, 0)
-
-      setTotalContributions(total)
+      if (!res.ok) return
+      const data = await res.json()
+      setTotalContributions(typeof data.totalAmount === 'number' ? data.totalAmount : 0)
     } catch (error) {
-      logger.error('Error calculating total contributions:', { error: error })
+      logger.error('Error fetching total contributions:', { error: error })
     }
-  }, [caseId])
+  }, [caseId, adminLoading, hasPermission])
 
   const fetchBeneficiaryData = useCallback(async () => {
     if (!caseData?.beneficiary_name && !caseData?.beneficiary_contact) {
@@ -431,117 +421,26 @@ export default function CaseDetailPage() {
     }
   }, [caseId])
 
-  const checkUserPermissions = useCallback(async () => {
-    try {
-      const client = createClient()
-      const { data: { user } } = await client.auth.getUser()
-      if (user && caseData) {
-        // Check if user is admin or case creator
-        const { data: userProfile } = await client
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-
-        if (userProfile?.role === 'admin' || caseData.created_by === user.id) {
-          setCanCreateUpdates(true)
-        }
-      }
-    } catch (error) {
-      logger.error('Error checking user permissions:', { error: error })
-    }
-  }, [caseData])
-
-  const setupRealtimeSubscriptions = useCallback(() => {
-    // Don't setup subscriptions if caseId is not a valid UUID
-    if (!isValidUUID(caseId)) {
-      return
-    }
-    // Subscribe to case progress updates
-    realtimeCaseUpdates.subscribeToCaseProgress(
-      caseId,
-      (progressUpdate) => {
-        setRealTimeProgress(progressUpdate)
-        // Update case data with new progress
-        setCaseData(prev => prev ? {
-          ...prev,
-          current_amount: progressUpdate.currentAmount,
-          target_amount: progressUpdate.targetAmount
-        } : null)
-      },
-      (error) => {
-        logger.error('Realtime progress error:', { error: error })
-      }
-    )
-
-    // Subscribe to case updates
-    realtimeCaseUpdates.subscribeToCaseUpdates(
-      caseId,
-      (newUpdate) => {
-        // Convert CaseUpdateNotification to CaseUpdate format
-        const caseUpdate: CaseUpdate = {
-          id: newUpdate.id,
-          caseId: newUpdate.caseId,
-          title: newUpdate.title,
-          content: newUpdate.content,
-          updateType: newUpdate.updateType,
-          isPublic: true, // Assuming new updates are public
-          attachments: [],
-          createdBy: newUpdate.createdBy,
-          created_at: new Date(newUpdate.createdAt),
-          updated_at: new Date(newUpdate.createdAt),
-          createdByUser: {
-            first_name: newUpdate.createdByUser?.firstName,
-            last_name: newUpdate.createdByUser?.lastName
-          }
-        }
-        setUpdates(prev => [caseUpdate, ...prev])
-      },
-      (updatedUpdate) => {
-        // Handle update modifications
-        setUpdates(prev => prev.map(update => 
-          update.id === updatedUpdate.id 
-            ? {
-                ...update,
-                title: updatedUpdate.title,
-                content: updatedUpdate.content,
-                updateType: updatedUpdate.updateType,
-                updated_at: new Date(updatedUpdate.createdAt)
-              }
-            : update
-        ))
-      },
-      (deletedUpdateId) => {
-        // Handle update deletions
-        setUpdates(prev => prev.filter(update => update.id !== deletedUpdateId))
-      }
-    )
-
-    // Subscribe to contributions
-    realtimeCaseUpdates.subscribeToCaseContributions(
-      caseId,
-      (newContribution) => {
-        // TODO: Handle real-time contribution updates if needed
-        // Contributions are managed by useApprovedContributions hook
-        console.log('New contribution received:', newContribution)
-      }
-    )
-  }, [caseId])
-
   useEffect(() => {
+    if (!isValidUUID(caseId)) return
     fetchCaseDetails()
     fetchUpdates()
-    fetchTotalContributions()
-    fetchProgressFromAPI() // Fetch progress from API as fallback
-    setupRealtimeSubscriptions()
+    fetchProgressFromAPI()
+  }, [caseId, fetchCaseDetails, fetchUpdates, fetchProgressFromAPI])
 
-    return () => {
-      // Cleanup realtime subscriptions
-      realtimeCaseUpdates.unsubscribeFromCaseProgress(caseId)
-      realtimeCaseUpdates.unsubscribeFromCaseUpdates(caseId)
-      realtimeCaseUpdates.unsubscribeFromCaseContributions(caseId)
-    }
-  }, [caseId, fetchCaseDetails, fetchUpdates, fetchTotalContributions, fetchProgressFromAPI, setupRealtimeSubscriptions])
+  useEffect(() => {
+    void fetchTotalContributions()
+  }, [fetchTotalContributions])
+
+  useEffect(() => {
+    if (!isValidUUID(caseId)) return
+    const interval = setInterval(() => {
+      void fetchUpdates()
+      void fetchProgressFromAPI()
+      void fetchTotalContributions()
+    }, 20_000)
+    return () => clearInterval(interval)
+  }, [caseId, fetchUpdates, fetchProgressFromAPI, fetchTotalContributions])
 
   // Use API progress as fallback if hook fails or returns 0
   useEffect(() => {
@@ -550,12 +449,12 @@ export default function CaseDetailPage() {
     }
   }, [contributionsError, apiProgress])
 
-  // Check permissions after caseData is loaded
   useEffect(() => {
-    if (caseData) {
-      checkUserPermissions()
-    }
-  }, [caseData, checkUserPermissions])
+    if (!caseData || authLoading || adminLoading) return
+    const isCreator = Boolean(user?.id && caseData.created_by === user.id)
+    const isStaff = hasRole('admin') || hasRole('super_admin')
+    setCanCreateUpdates(isCreator || isStaff)
+  }, [caseData, user?.id, authLoading, adminLoading, hasRole])
 
   const handleBack = () => {
     router.push(`/${locale}/cases`)
@@ -1504,9 +1403,9 @@ export default function CaseDetailPage() {
                       </div>
                       <div className="text-left sm:text-right">
                         <div className="text-base sm:text-lg font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-                          {Math.round((getApprovedContributionsTotal() / Number(realTimeProgress?.targetAmount || caseData.target_amount)) * 100)}%
+                          {Math.round((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100)}%
                         </div>
-                        <div className="text-xs bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-medium">Target: {formatAmount(realTimeProgress?.targetAmount || caseData.target_amount)}</div>
+                        <div className="text-xs bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-medium">Target: {formatAmount(caseData.target_amount)}</div>
                       </div>
                     </div>
                     <div className="relative">
@@ -1514,7 +1413,7 @@ export default function CaseDetailPage() {
                         <div 
                           className="h-full rounded-full transition-all duration-1000 ease-out shadow-lg relative overflow-hidden"
                           style={{
-                            width: `${Math.min((getApprovedContributionsTotal() / Number(realTimeProgress?.targetAmount || caseData.target_amount)) * 100, 100)}%`,
+                            width: `${Math.min((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100, 100)}%`,
                             background: theme.gradients.progress
                           }}
                         >
@@ -1562,7 +1461,7 @@ export default function CaseDetailPage() {
                     <div className="flex items-center justify-between sm:flex-col sm:text-center p-2.5 sm:p-3 lg:p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg sm:rounded-xl border border-green-100 hover:shadow-md transition-all duration-200">
                       <div className="flex items-center justify-between w-full sm:flex-col sm:gap-0">
                         <div className="text-base sm:text-2xl lg:text-3xl font-bold text-green-600">
-                          {Math.round((getApprovedContributionsTotal() / Number(realTimeProgress?.targetAmount || caseData.target_amount)) * 100)}%
+                          {Math.round((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100)}%
                         </div>
                         <div className="text-xs sm:text-sm text-green-700 font-medium sm:mt-1">Complete</div>
                       </div>
@@ -1580,7 +1479,7 @@ export default function CaseDetailPage() {
                     <div className="flex items-center justify-between sm:flex-col sm:text-center p-2.5 sm:p-3 lg:p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-lg sm:rounded-xl border border-orange-100 hover:shadow-md transition-all duration-200">
                       <div className="flex items-center justify-between w-full sm:flex-col sm:gap-0">
                         <div className="text-base sm:text-2xl lg:text-3xl font-bold text-orange-600">
-                          {formatAmount(Number(realTimeProgress?.targetAmount || caseData.target_amount) - getApprovedContributionsTotal())}
+                          {formatAmount(Number(caseData.target_amount) - getApprovedContributionsTotal())}
                         </div>
                         <div className="text-xs sm:text-sm text-orange-700 font-medium sm:mt-1">Still Needed</div>
                       </div>
@@ -1596,9 +1495,9 @@ export default function CaseDetailPage() {
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm sm:text-base text-purple-800 mb-0.5 sm:mb-1">Progress Milestone</div>
                         <div className="text-xs sm:text-sm text-purple-600 leading-relaxed">
-                          {Math.round((getApprovedContributionsTotal() / Number(realTimeProgress?.targetAmount || caseData.target_amount)) * 100) >= 75 
+                          {Math.round((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100) >= 75 
                             ? "Almost there! Just a little more to reach the goal." 
-                            : Math.round((getApprovedContributionsTotal() / Number(realTimeProgress?.targetAmount || caseData.target_amount)) * 100) >= 50
+                            : Math.round((getApprovedContributionsTotal() / Number(caseData.target_amount)) * 100) >= 50
                             ? "Great progress! We're halfway to the goal."
                             : "Every contribution brings us closer to the goal."
                           }

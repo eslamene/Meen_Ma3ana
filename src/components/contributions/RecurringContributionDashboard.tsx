@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
+import { useAuth } from '@/components/auth/AuthProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -45,25 +44,10 @@ interface RecurringContribution {
 
 export default function RecurringContributionDashboard() {
   const t = useTranslations('contributions')
-  const [user, setUser] = useState<User | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [contributions, setContributions] = useState<RecurringContribution[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const supabase = createClient()
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser()
-      if (error) {
-        logger.error('Error getting user:', { error: error })
-        return
-      }
-      setUser(user)
-    }
-
-    getUser()
-  }, [supabase.auth])
 
   const fetchRecurringContributions = useCallback(async () => {
     if (!user?.id) return
@@ -88,10 +72,14 @@ export default function RecurringContributionDashboard() {
   }, [user?.id])
 
   useEffect(() => {
+    if (authLoading) return
     if (user) {
       fetchRecurringContributions()
+    } else {
+      setContributions([])
+      setLoading(false)
     }
-  }, [user, fetchRecurringContributions])
+  }, [authLoading, user, fetchRecurringContributions])
 
   const handleStatusChange = async (contributionId: string, newStatus: string) => {
     try {

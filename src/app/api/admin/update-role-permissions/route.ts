@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { env } from '@/config/env'
 import { createPostHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { LegacyRolePermissionService } from '@/lib/services/legacyRolePermissionService'
 
 async function handler(request: NextRequest, context: ApiHandlerContext) {
   const { logger } = context
@@ -17,48 +18,21 @@ async function handler(request: NextRequest, context: ApiHandlerContext) {
   logger.info('Updating permissions for role:', roleId)
   logger.info('New permissions:', permissionIds)
 
-  // Create admin client
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     logger.error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
     throw new ApiError('CONFIGURATION_ERROR', 'Service configuration error', 500)
   }
-  
-  const adminClient = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY
-  )
 
-  // First, remove all existing permissions for this role
-  const { error: deleteError } = await adminClient
-    .from('role_permissions')
-    .delete()
-    .eq('role_id', roleId)
+  const adminClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
 
-  if (deleteError) {
-    logger.error('Error removing existing permissions:', deleteError)
-    throw deleteError
+  try {
+    await LegacyRolePermissionService.replaceRolePermissions(adminClient, roleId, permissionIds)
+  } catch (e) {
+    logger.error('Error updating role permissions:', e)
+    throw new ApiError('INTERNAL_SERVER_ERROR', e instanceof Error ? e.message : 'Update failed', 500)
   }
 
-  logger.info('Removed existing permissions')
-
-  // Then, add the new permissions
-  if (permissionIds && permissionIds.length > 0) {
-    const rolePermissions = permissionIds.map((permissionId: string) => ({
-      role_id: roleId,
-      permission_id: permissionId
-    }))
-
-    const { error: insertError } = await adminClient
-      .from('role_permissions')
-      .insert(rolePermissions)
-
-    if (insertError) {
-      logger.error('Error inserting new permissions:', insertError)
-      throw insertError
-    }
-
-    logger.info('Added new permissions:', permissionIds.length)
-  }
+  logger.info('Role permissions updated')
 
   return NextResponse.json({
     success: true,

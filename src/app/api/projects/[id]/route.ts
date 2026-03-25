@@ -11,7 +11,7 @@ async function getHandler(
   context: ApiHandlerContext,
   params: { id: string }
 ) {
-  const { supabase, logger, user } = context
+  const { logger } = context
   const { id } = params
 
     const projectId = id
@@ -76,7 +76,7 @@ async function putHandler(
   context: ApiHandlerContext,
   params: { id: string }
 ) {
-  const { supabase, logger, user } = context
+  const { logger, user } = context
   const { id } = params
 
     const projectId = id
@@ -93,11 +93,10 @@ async function putHandler(
       throw new ApiError('NOT_FOUND', 'Project not found', 404)
     }
 
-    // Only project creator or admin can edit
     if (existingProject[0].created_by !== user.id) {
-      // Check if user is admin
-      const { data: userData } = await supabase.auth.getUser()
-      if (userData.user?.user_metadata?.role !== 'admin') {
+      const { adminService } = await import('@/lib/admin/service')
+      const isAdmin = await adminService.hasAnyRole(user.id, ['admin', 'super_admin'])
+      if (!isAdmin) {
         throw new ApiError('FORBIDDEN', 'Forbidden', 403)
       }
     }
@@ -128,7 +127,7 @@ async function deleteHandler(
   context: ApiHandlerContext,
   params: { id: string }
 ) {
-  const { supabase, logger, user } = context
+  const { logger, user } = context
   const { id } = params
 
     const projectId = id
@@ -144,11 +143,10 @@ async function deleteHandler(
       throw new ApiError('NOT_FOUND', 'Project not found', 404)
     }
 
-    // Only project creator or admin can delete
     if (existingProject[0].created_by !== user.id) {
-      // Check if user is admin
-      const { data: userData } = await supabase.auth.getUser()
-      if (userData.user?.user_metadata?.role !== 'admin') {
+      const { adminService } = await import('@/lib/admin/service')
+      const isAdmin = await adminService.hasAnyRole(user.id, ['admin', 'super_admin'])
+      if (!isAdmin) {
         throw new ApiError('FORBIDDEN', 'Forbidden', 403)
       }
     }

@@ -92,9 +92,9 @@ class ApiClient {
         }
       }
 
-      const response = data as ApiResponse<T>
+      const payload = data as ApiResponse<T>
       return {
-        ...response,
+        ...payload,
         success: true,
       }
     } catch (error) {

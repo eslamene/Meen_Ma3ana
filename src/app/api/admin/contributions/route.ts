@@ -151,6 +151,10 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
       paymentMethodId = paymentMethodData.id
     }
 
+    if (!paymentMethodId) {
+      throw new ApiError('VALIDATION_ERROR', 'Invalid payment method', 400)
+    }
+
     // Use ContributionService to create admin contribution
     const { ContributionService } = await import('@/lib/services/contributionService')
     const { contribution, approvalStatusCreated } = await ContributionService.createAdminContribution(supabase, {
@@ -175,7 +179,8 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
     // Send approval notification to donor
     try {
       const notificationService = createContributionNotificationService(supabase)
-      const caseTitle = caseData.title_en || caseData.title_ar || 'Unknown Case'
+      const caseTitle =
+        caseData?.title_en || caseData?.title_ar || 'Unknown Case'
       
       await notificationService.sendApprovalNotification(
         contribution.id,

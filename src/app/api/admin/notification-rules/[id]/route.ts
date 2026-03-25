@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createDeleteHandlerWithParams, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { ApiError } from '@/lib/utils/api-errors'
+import { NotificationRulesService } from '@/lib/services/notificationRulesService'
 
 async function deleteHandler(
   request: NextRequest,
@@ -11,18 +12,7 @@ async function deleteHandler(
   const { id: ruleId } = params
 
   try {
-    const configKey = `notification_rule_${ruleId}`
-
-    // Delete the rule using Supabase
-    const { error: deleteError } = await supabase
-      .from('system_config')
-      .delete()
-      .eq('config_key', configKey)
-      .eq('group_type', 'notification_rules')
-
-    if (deleteError) {
-      throw deleteError
-    }
+    await NotificationRulesService.deleteByRuleId(supabase, ruleId)
 
     logger.info('Notification rule deleted', {
       ruleId,
@@ -44,4 +34,3 @@ export const DELETE = createDeleteHandlerWithParams(deleteHandler, {
   requirePermissions: ['admin:settings'],
   loggerContext: 'api/admin/notification-rules/[id]',
 })
-
