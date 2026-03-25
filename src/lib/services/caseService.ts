@@ -35,6 +35,11 @@ export interface Case {
   location?: string | null
   beneficiary_name?: string | null
   beneficiary_contact?: string | null
+  beneficiary_id?: string | null
+  duration?: number | null
+  frequency?: string | null
+  start_date?: string | null
+  end_date?: string | null
   created_at: string
   updated_at: string
   created_by: string
@@ -557,9 +562,17 @@ export class CaseService {
         location,
         beneficiary_name,
         beneficiary_contact,
+        beneficiary_id,
+        duration,
+        frequency,
+        start_date,
+        end_date,
         created_at,
         updated_at,
         created_by,
+        assigned_to,
+        sponsored_by,
+        supporting_documents,
         category_id,
         case_categories(name, icon, color)
       `)

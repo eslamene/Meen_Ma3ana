@@ -74,11 +74,17 @@ export default function BeneficiariesPage() {
           setBeneficiaries(beneficiariesResponse.data)
           setFilteredBeneficiaries(beneficiariesResponse.data)
         } else {
-          logger.error('Error loading beneficiaries:', { error: beneficiariesResponse.error })
+          logger.error('Error loading beneficiaries', beneficiariesResponse.error, {
+            area: 'beneficiaries',
+            operation: 'loadData',
+          })
         }
         setCities(citiesData)
       } catch (error) {
-        logger.error('Error loading data:', { error: error })
+        logger.error('Error loading data', error, {
+          area: 'beneficiaries',
+          operation: 'loadData',
+        })
       } finally {
         setLoading(false)
       }
@@ -229,10 +235,17 @@ export default function BeneficiariesPage() {
         })
       } else if (error && typeof error === 'object') {
         // Log non-Error objects with their properties
-        logger.error('Unexpected error deleting beneficiary:', { error: error })
+        logger.error('Unexpected error deleting beneficiary', error, {
+          area: 'beneficiaries',
+          operation: 'handleDeleteBeneficiary',
+        })
       } else {
         // Log primitive errors
-        logger.error('Unexpected error deleting beneficiary:', { error: errorMessage })
+        logger.error('Unexpected error deleting beneficiary', undefined, {
+          area: 'beneficiaries',
+          operation: 'handleDeleteBeneficiary',
+          errorMessage,
+        })
       }
       
       toast.error('Delete Failed', {

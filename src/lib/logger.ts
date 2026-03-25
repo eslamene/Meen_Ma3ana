@@ -198,6 +198,20 @@ export class Logger {
 
   error(message: string, error?: Error | unknown, data?: unknown): void {
     try {
+      // Backward-compatible normalization:
+      // Many callsites pass logger.error('msg', { error }) instead of logger.error('msg', error, data)
+      // Detect and unwrap that shape to prevent empty "{}" logs in browser console.
+      if (
+        data === undefined &&
+        error &&
+        typeof error === 'object' &&
+        !Array.isArray(error) &&
+        'error' in (error as Record<string, unknown>) &&
+        Object.keys(error as Record<string, unknown>).length === 1
+      ) {
+        error = (error as Record<string, unknown>).error
+      }
+
       const logData: Record<string, unknown> = { ...this.formatMessage(message, data) }
       
       // Ensure logData always has at least a message
@@ -266,6 +280,18 @@ export class Logger {
             ...(hasRedactedData ? (redactedError as Record<string, unknown>) : {}),
           }
         }
+
+        // Flatten one nested "error" wrapper if it exists and has useful fields
+        if (
+          logData.error &&
+          typeof logData.error === 'object' &&
+          'error' in (logData.error as Record<string, unknown>)
+        ) {
+          const nested = (logData.error as Record<string, unknown>).error
+          if (nested && typeof nested === 'object' && Object.keys(nested as Record<string, unknown>).length > 0) {
+            logData.error = nested
+          }
+        }
       }
       
       // Remove empty error object if it exists
@@ -281,6 +307,14 @@ export class Logger {
       // Ensure logData is not empty before logging
       if (Object.keys(logData).length === 0) {
         logData.message = message || 'Unknown error'
+      }
+
+      // Guard against objects that serialize to effectively empty payloads
+      // (e.g. empty nested error wrappers).
+      const serialized = JSON.stringify(logData)
+      if (!serialized || serialized === '{}' || serialized === '{"error":{}}') {
+        logData.message = message || 'Unknown error'
+        logData.note = 'Empty error payload normalized'
       }
       
       // Final safety check: never log an empty object or object with only empty error

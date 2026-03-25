@@ -259,7 +259,10 @@ export default function DashboardPage() {
         })
       }
     } catch (error) {
-      logger.error('Error fetching dashboard stats:', { error: error })
+      logger.error('Error fetching dashboard stats', error, {
+        area: 'dashboard',
+        operation: 'fetchDashboardStats',
+      })
       // Don't show error to user, just log it
     } finally {
       setLoading(false)
@@ -294,7 +297,10 @@ export default function DashboardPage() {
         setRecentTransactions(transactions)
       }
     } catch (error) {
-      logger.error('Error fetching recent transactions:', { error: error })
+      logger.error('Error fetching recent transactions', error, {
+        area: 'dashboard',
+        operation: 'fetchRecentTransactions',
+      })
     } finally {
       setTransactionsLoading(false)
     }
@@ -317,7 +323,10 @@ export default function DashboardPage() {
       // Refresh admin data from the hook
       await refreshAdminData()
     } catch (error) {
-      logger.error('Error refreshing role:', { error: error })
+      logger.error('Error refreshing role', error, {
+        area: 'dashboard',
+        operation: 'refreshUserRole',
+      })
     } finally {
       setRefreshingRole(false)
     }

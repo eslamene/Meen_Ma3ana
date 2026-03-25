@@ -113,8 +113,22 @@ export default function CaseCard({
     }
   }
 
-  const getProgressPercentage = (current: number, target: number) => {
-    return Math.min((current / target) * 100, 100)
+  const toSafeNumber = (value: unknown): number => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : 0
+    }
+    return 0
+  }
+
+  const getProgressPercentage = (current: unknown, target: unknown) => {
+    const currentNum = toSafeNumber(current)
+    const targetNum = toSafeNumber(target)
+    if (targetNum <= 0) return 0
+    return Math.min((currentNum / targetNum) * 100, 100)
   }
 
   const getStatusColor = (status: string) => {
@@ -223,8 +237,9 @@ export default function CaseCard({
     }
   }
 
-  const formatAmount = (amount: number) => {
-    return `EGP ${amount.toLocaleString('en-US', {
+  const formatAmount = (amount: unknown) => {
+    const safeAmount = toSafeNumber(amount)
+    return `EGP ${safeAmount.toLocaleString('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     })}`
