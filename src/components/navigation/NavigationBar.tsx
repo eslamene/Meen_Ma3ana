@@ -20,11 +20,9 @@ import type { AdminMenuItem } from '@/lib/admin/types'
 import { ChevronDown, LogOut, UserCircle } from 'lucide-react'
 import {
   NavigationMenu,
-  NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
-  NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from '@/components/ui/navigation-menu'
 import {
@@ -354,73 +352,78 @@ export default function NavigationBar() {
                     const isHashLink = item.isHashLink
                     const hasChildren = item.children && item.children.length > 0
 
-                    const triggerSurface = cn(
-                      navigationMenuTriggerStyle(),
-                      getNavLinkClass(item.href),
-                      'h-auto gap-1.5 rounded-lg border-0 bg-transparent px-3 py-2 text-sm font-medium shadow-none hover:bg-[#6B8E7E]/10 xl:px-4 data-[state=open]:bg-gray-100/90'
-                    )
-
                     if (hasChildren) {
+                      const dropdownTriggerClass = cn(
+                        navigationMenuTriggerStyle(),
+                        getNavLinkClass(item.href),
+                        'h-auto gap-1.5 rounded-lg border-0 bg-transparent px-3 py-2 text-sm font-medium shadow-none hover:bg-[#6B8E7E]/10 xl:px-4 data-[state=open]:bg-gray-100/90'
+                      )
+
                       return (
                         <NavigationMenuItem key={item.key}>
-                          <NavigationMenuTrigger className={triggerSurface}>
-                            {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
-                            <span className="hidden xl:inline">{t(item.labelKey)}</span>
-                            <span className="xl:hidden">
-                              {t(item.labelKey).length > 10 ? t(item.labelKey).substring(0, 10) + '...' : t(item.labelKey)}
-                            </span>
-                          </NavigationMenuTrigger>
-                          <NavigationMenuContent>
-                            <ul className="m-0 min-w-[12rem] list-none gap-0.5 p-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button type="button" className={dropdownTriggerClass}>
+                                {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+                                <span className="hidden xl:inline">{t(item.labelKey)}</span>
+                                <span className="xl:hidden">
+                                  {t(item.labelKey).length > 10 ? t(item.labelKey).substring(0, 10) + '...' : t(item.labelKey)}
+                                </span>
+                                <ChevronDown className="h-3 w-3 opacity-70" aria-hidden />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="center" sideOffset={8} className="w-64 p-2 z-[120]">
                               {item.children?.map((child) => {
                                 const ChildIcon = child.icon
                                 const childIsHashLink = child.isHashLink
-                                const linkBlock = (
-                                  <NavigationMenuLink asChild>
-                                    <Link
-                                      href={child.href}
-                                      className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100"
-                                      onClick={
-                                        childIsHashLink
-                                          ? (e) => {
-                                              e.preventDefault()
-                                              if (child.href.includes('/landing')) {
-                                                router.push(child.href)
-                                                setTimeout(() => {
-                                                  const hash = child.href.split('#')[1]
-                                                  document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
-                                                }, 100)
-                                              } else {
-                                                const hash = child.href.replace('#', '')
+                                const linkElement = (
+                                  <Link
+                                    href={child.href}
+                                    className="flex items-center gap-2"
+                                    onClick={
+                                      childIsHashLink
+                                        ? (e) => {
+                                            e.preventDefault()
+                                            if (child.href.includes('/landing')) {
+                                              router.push(child.href)
+                                              setTimeout(() => {
+                                                const hash = child.href.split('#')[1]
                                                 document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
-                                              }
+                                              }, 100)
+                                            } else {
+                                              const hash = child.href.replace('#', '')
+                                              document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
                                             }
-                                          : undefined
-                                      }
-                                    >
-                                      {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                      {t(child.labelKey)}
-                                    </Link>
-                                  </NavigationMenuLink>
+                                          }
+                                        : undefined
+                                    }
+                                  >
+                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                    {t(child.labelKey)}
+                                  </Link>
                                 )
+                                if (child.requiresPermission) {
+                                  return (
+                                    <GuestPermissionGuard
+                                      key={child.key}
+                                      visitorPermissions={[child.requiresPermission]}
+                                      showLoading={false}
+                                      showAuthPrompt={false}
+                                    >
+                                      <DropdownMenuItem asChild className="cursor-pointer">
+                                        {linkElement}
+                                      </DropdownMenuItem>
+                                    </GuestPermissionGuard>
+                                  )
+                                }
                                 return (
-                                  <li key={child.key}>
-                                    {child.requiresPermission ? (
-                                      <GuestPermissionGuard
-                                        visitorPermissions={[child.requiresPermission]}
-                                        showLoading={false}
-                                        showAuthPrompt={false}
-                                      >
-                                        {linkBlock}
-                                      </GuestPermissionGuard>
-                                    ) : (
-                                      linkBlock
-                                    )}
-                                  </li>
+                                  <DropdownMenuItem key={child.key} asChild className="cursor-pointer">
+                                    {linkElement}
+                                  </DropdownMenuItem>
                                 )
                               })}
-                            </ul>
-                          </NavigationMenuContent>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </NavigationMenuItem>
                       )
                     }
@@ -493,44 +496,45 @@ export default function NavigationBar() {
                         const hasChildren = item.children && item.children.length > 0
                         const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
 
-                        const triggerSurface = cn(
-                          navigationMenuTriggerStyle(),
-                          getNavLinkClass(item.href),
-                          'h-auto gap-1.5 rounded-lg border-0 bg-transparent px-3 py-2 text-sm font-medium shadow-none hover:bg-[#6B8E7E]/10 xl:px-4 data-[state=open]:bg-gray-100/90'
-                        )
-
                         if (hasChildren) {
+                          const dropdownTriggerClass = cn(
+                            navigationMenuTriggerStyle(),
+                            getNavLinkClass(item.href),
+                            'h-auto gap-1.5 rounded-lg border-0 bg-transparent px-3 py-2 text-sm font-medium shadow-none hover:bg-[#6B8E7E]/10 xl:px-4 data-[state=open]:bg-gray-100/90'
+                          )
+
                           return (
                             <NavigationMenuItem key={item.id}>
-                              <NavigationMenuTrigger className={triggerSurface}>
-                                {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
-                                <span className="hidden xl:inline">{labelText}</span>
-                                <span className="xl:hidden">
-                                  {labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText}
-                                </span>
-                              </NavigationMenuTrigger>
-                              <NavigationMenuContent>
-                                <ul className="m-0 min-w-[12rem] list-none gap-0.5 p-2">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button type="button" className={dropdownTriggerClass}>
+                                    {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+                                    <span className="hidden xl:inline">{labelText}</span>
+                                    <span className="xl:hidden">
+                                      {labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText}
+                                    </span>
+                                    <ChevronDown className="h-3 w-3 opacity-70" aria-hidden />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="center" sideOffset={8} className="w-64 p-2 z-[120]">
                                   {item.children!.map((child) => {
                                     const ChildIcon = child.icon ? getIcon(child.icon) : undefined
                                     const childLabelText =
                                       locale === 'ar' && child.label_ar ? child.label_ar : child.label
                                     return (
-                                      <li key={child.id}>
-                                        <NavigationMenuLink asChild>
-                                          <Link
-                                            href={`/${locale}${child.href}`}
-                                            className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100"
-                                          >
-                                            {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                            {childLabelText}
-                                          </Link>
-                                        </NavigationMenuLink>
-                                      </li>
+                                      <DropdownMenuItem key={child.id} asChild className="cursor-pointer">
+                                        <Link
+                                          href={`/${locale}${child.href}`}
+                                          className="flex items-center gap-2"
+                                        >
+                                          {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                          {childLabelText}
+                                        </Link>
+                                      </DropdownMenuItem>
                                     )
                                   })}
-                                </ul>
-                              </NavigationMenuContent>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </NavigationMenuItem>
                           )
                         }
