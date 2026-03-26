@@ -38,8 +38,8 @@ messaging.onBackgroundMessage((payload) => {
         type: 'PUSH_NOTIFICATION',
         title: payload.notification?.title || payload.data?.title || 'Meen Ma3ana',
         body: payload.notification?.body || payload.data?.body || '',
-        icon: payload.notification?.icon || payload.data?.icon || '/logo.png',
-        badge: payload.notification?.badge || payload.data?.badge || '/logo.png',
+        icon: payload.notification?.icon || payload.data?.icon || '/assets/brand/logo.png',
+        badge: payload.notification?.badge || payload.data?.badge || '/assets/brand/logo.png',
         data: payload.data || {},
         tag: payload.data?.tag || payload.fcmMessageId || 'default',
       }
@@ -64,8 +64,8 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification?.title || 'Meen Ma3ana'
   const notificationOptions = {
     body: payload.notification?.body || '',
-    icon: payload.notification?.icon || '/logo.png',
-    badge: payload.notification?.badge || '/logo.png',
+    icon: payload.notification?.icon || '/assets/brand/logo.png',
+    badge: payload.notification?.badge || '/assets/brand/logo.png',
     image: payload.notification?.image,
     data: payload.data || {},
     tag: payload.data?.tag || payload.fcmMessageId || 'default',
@@ -196,8 +196,8 @@ self.addEventListener('push', (event) => {
           type: 'PUSH_NOTIFICATION',
           title: payload.notification?.title || payload.data?.title || 'Meen Ma3ana',
           body: payload.notification?.body || payload.data?.body || '',
-          icon: payload.notification?.icon || payload.data?.icon || '/logo.png',
-          badge: payload.notification?.badge || payload.data?.badge || '/logo.png',
+          icon: payload.notification?.icon || payload.data?.icon || '/assets/brand/logo.png',
+          badge: payload.notification?.badge || payload.data?.badge || '/assets/brand/logo.png',
           data: payload.data || {},
           tag: payload.data?.tag || payload.fcmMessageId || 'default',
         }
@@ -219,8 +219,8 @@ self.addEventListener('push', (event) => {
       const notificationTitle = payload.notification?.title || payload.data?.title || 'Meen Ma3ana'
       const notificationOptions = {
         body: payload.notification?.body || payload.data?.body || '',
-        icon: payload.notification?.icon || payload.data?.icon || '/logo.png',
-        badge: payload.notification?.badge || payload.data?.badge || '/logo.png',
+        icon: payload.notification?.icon || payload.data?.icon || '/assets/brand/logo.png',
+        badge: payload.notification?.badge || payload.data?.badge || '/assets/brand/logo.png',
         image: payload.notification?.image,
         data: payload.data || {},
         tag: payload.data?.tag || payload.fcmMessageId || 'default',

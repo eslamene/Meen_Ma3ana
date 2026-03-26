@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import Image from 'next/image'
+import { publicAssets } from '@/config/public-assets'
 
 export default function Hero() {
   const t = useTranslations('landing.hero')
@@ -14,7 +15,7 @@ export default function Hero() {
         <div className="absolute top-0 left-0 w-full h-full hidden md:block" style={{ animation: 'fadeInDown 1s ease-out 0s forwards', opacity: 0 }}>
           <div className="absolute top-0 opacity-50" style={{ left: '5vw', width: '40%', height: '35%' }}>
             <Image
-              src="/banner/svg/bg_top.svg"
+              src={publicAssets.marketing.bannerSvg('bg_top.svg')}
               alt=""
               fill
               className="object-contain object-left-top"
@@ -27,7 +28,7 @@ export default function Hero() {
         <div className="absolute top-0 left-0 w-full h-full hidden md:block" style={{ animation: 'fadeInLeft 1.2s ease-out 0.2s forwards', opacity: 0 }}>
           <div className="relative opacity-50 w-full h-full">
             <Image
-              src="/banner/svg/bg_left.svg"
+              src={publicAssets.marketing.bannerSvg('bg_left.svg')}
               alt=""
               fill
               className="object-contain object-left"
@@ -40,7 +41,7 @@ export default function Hero() {
         <div className="absolute top-0 right-0 w-full h-full hidden md:block" style={{ animation: 'fadeInRight 1.2s ease-out 0.4s forwards', opacity: 0 }}>
           <div className="absolute top-0 right-0 w-[60%] h-full opacity-50">
             <Image
-              src="/banner/svg/bg_right.svg"
+              src={publicAssets.marketing.bannerSvg('bg_right.svg')}
               alt=""
               fill
               className="object-contain"
@@ -54,7 +55,7 @@ export default function Hero() {
         <div className="absolute top-0 right-0 w-full h-full z-0" style={{ animation: 'fadeIn 1.5s ease-out 0.6s forwards', opacity: 0 }}>
           <div className="absolute top-1/2 -translate-y-1/2 w-[90%] h-[90%] left-1/2 -translate-x-1/2 md:w-[80%] md:h-full md:left-auto md:translate-x-0 md:right-[-2vw] opacity-50 relative">
             <Image
-              src="/banner/svg/bg_center.svg"
+              src={publicAssets.marketing.bannerSvg('bg_center.svg')}
               alt=""
               fill
               className="object-contain"
@@ -68,7 +69,7 @@ export default function Hero() {
         <div className="absolute top-1/2 right-0 -translate-y-1/2 w-full h-full z-10" style={{ animation: 'slideInRightScale 1.5s ease-out 0.8s forwards', opacity: 0 }}>
           <div className="absolute top-1/2 -translate-y-[55%] md:-translate-y-1/2 right-0 w-[70%] h-[90%] md:w-[50%] md:h-[80%]" style={{ right: '-2vw' }}>
             <Image
-              src="/banner/svg/bg_hand.svg"
+              src={publicAssets.marketing.bannerSvg('bg_hand.svg')}
               alt=""
               fill
               className="object-contain"
@@ -82,7 +83,7 @@ export default function Hero() {
         <div className="absolute bottom-0 right-0 w-full h-full hidden md:block" style={{ animation: 'fadeInUp 1.2s ease-out 1.0s forwards', opacity: 0 }}>
           <div className="absolute bottom-0 opacity-50" style={{ right: '40vw', width: '40%', height: '30%' }}>
             <Image
-              src="/banner/svg/bg_bottom.svg"
+              src={publicAssets.marketing.bannerSvg('bg_bottom.svg')}
               alt=""
               fill
               className="object-contain object-bottom-right"

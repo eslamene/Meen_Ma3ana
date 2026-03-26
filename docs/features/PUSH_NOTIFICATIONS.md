@@ -556,12 +556,13 @@ Server-side service for sending notifications:
 
 ```typescript
 import { fcmNotificationService } from '@/lib/notifications/fcm-notifications'
+import { publicAssets } from '@/config/public-assets'
 
 // Notify all users
 await fcmNotificationService.notifyAllUsers({
   title: 'Notification Title',
   body: 'Notification body',
-  icon: '/logo.png',
+  icon: publicAssets.brand.logo,
   data: { type: 'test' }
 })
 
@@ -571,7 +572,7 @@ await fcmNotificationService.notifyUsers(
   {
     title: 'Notification Title',
     body: 'Notification body',
-    icon: '/logo.png',
+    icon: publicAssets.brand.logo,
     data: { type: 'test' }
   }
 )

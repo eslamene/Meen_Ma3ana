@@ -261,7 +261,7 @@ This document tracks the migration from direct Supabase database communication t
 
 ### Verification Tasks
 - [x] Search for remaining `.from()` patterns in API routes — **2026-03-24**: still present in batch-upload, admin users/merge, notification-rules, category-detection-rules, upload, bulk-upload, analytics, several contribution/profile routes, etc. (migrate to services next)
-- [x] Search for remaining `.rpc()` patterns in API routes — **2026-03-24**: no `.rpc(` in `src/app/api/**/route.ts`; RPC used inside `src/lib/services/*` (e.g. `MenuService`, `AdminUserMergeService`) and archived `Archived/route.comprehensive.ts`
+- [x] Search for remaining `.rpc()` patterns in API routes — **2026-03-24**: no `.rpc(` in `src/app/api/**/route.ts`; RPC used inside `src/lib/services/*` (e.g. `MenuService`, `AdminUserMergeService`)
 - [x] Search for remaining `.from()` patterns in client components — **2026-03-24** (excluding `components/auth/*` except migrated `RoleManager`): spot-check `grep '\.from\(' src/components`; `AuthForm.tsx` may still use `.from` for auth-adjacent flows (acceptable per notes)
 - [x] Verify all API endpoints work correctly (manual / E2E) — **2026-03-25** build/typecheck route graph validated; dynamic API endpoints compile and register
 - [x] Test authentication/authorization still works — **2026-03-25** verified via auth-only component review + protected API wrappers (`requireAuth`/permissions) compile checks

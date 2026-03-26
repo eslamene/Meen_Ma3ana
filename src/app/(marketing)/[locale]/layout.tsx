@@ -6,6 +6,7 @@ import { Inter, Cairo } from 'next/font/google'
 import DirSetter from '@/components/marketing/DirSetter'
 
 import { defaultLogger as logger } from '@/lib/logger'
+import { publicAssets } from '@/config/public-assets'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -26,11 +27,11 @@ export const metadata: Metadata = {
   keywords: ['charity', 'donations', 'community support', 'charitable platform', 'giving'],
   icons: {
     icon: [
-      { url: '/icon.png', sizes: 'any' },
+      { url: publicAssets.brand.icon, sizes: 'any' },
       { url: '/favicon.ico', sizes: '32x32', type: 'image/x-icon' },
     ],
     apple: [
-      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: publicAssets.brand.appleTouchIcon, sizes: '180x180', type: 'image/png' },
     ],
   },
   openGraph: {
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
     alternateLocale: 'ar_EG',
     images: [
       {
-        url: '/opengraph-image.png',
+        url: publicAssets.brand.openGraphImage,
         width: 1200,
         height: 630,
         alt: 'Meen Ma3ana - Empowering Communities Through Compassionate Giving',
@@ -52,7 +53,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Meen Ma3ana - Empowering Communities Through Compassionate Giving',
     description: 'A comprehensive platform for managing charitable donations, connecting donors with beneficiaries.',
-    images: ['/opengraph-image.png'],
+    images: [publicAssets.brand.openGraphImage],
   },
   robots: {
     index: true,

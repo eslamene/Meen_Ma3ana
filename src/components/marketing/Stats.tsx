@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 
 import { defaultLogger as logger } from '@/lib/logger'
+import { publicAssets } from '@/config/public-assets'
 
 interface LandingStats {
   totalRaised: number
@@ -184,7 +185,7 @@ export default function Stats() {
           {/* Background image */}
           <div className="absolute inset-0">
             <Image 
-              src="/img/Child-Poverty-General.jpeg"
+              src={publicAssets.marketing.childPovertyGeneral}
               alt="Children in need"
               fill
               className="object-cover"

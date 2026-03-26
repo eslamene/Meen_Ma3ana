@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { fcmNotificationService } from '@/lib/notifications/fcm-notifications'
+import { publicAssets } from '@/config/public-assets'
 
 async function postHandler(request: NextRequest, context: ApiHandlerContext) {
   const { user, logger } = context
@@ -19,8 +20,8 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
       {
         title: 'Test Push Notification',
         body: 'This is a test push notification from Meen Ma3ana. If you see this, push notifications are working correctly!',
-        icon: '/logo.png',
-        badge: '/logo.png',
+        icon: publicAssets.brand.logo,
+        badge: publicAssets.brand.logo,
         data: {
           type: 'test',
           url: '/test-push',

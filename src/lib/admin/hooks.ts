@@ -15,6 +15,48 @@ import type {
   AdminMenuItem,
 } from './types'
 
+type AdminContextResponse = {
+  user: { id: string; email?: string } | null
+  roles: AdminRole[]
+  permissions: AdminPermission[]
+  menuItems: AdminMenuItem[]
+}
+
+let adminContextInFlight: Promise<AdminContextResponse> | null = null
+let adminContextCache: AdminContextResponse | null = null
+let adminContextCacheAt = 0
+const ADMIN_CONTEXT_CACHE_TTL_MS = 10_000
+
+async function fetchAdminContext(force = false): Promise<AdminContextResponse> {
+  const now = Date.now()
+  const cacheValid = !force && adminContextCache && now - adminContextCacheAt < ADMIN_CONTEXT_CACHE_TTL_MS
+  if (cacheValid && adminContextCache) {
+    return adminContextCache
+  }
+
+  if (!force && adminContextInFlight) {
+    return adminContextInFlight
+  }
+
+  adminContextInFlight = (async () => {
+    const res = await fetch('/api/admin/context', { credentials: 'include' })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      throw new Error(errText || `Admin context failed (${res.status})`)
+    }
+    const data = (await res.json()) as AdminContextResponse
+    adminContextCache = data
+    adminContextCacheAt = Date.now()
+    return data
+  })()
+
+  try {
+    return await adminContextInFlight
+  } finally {
+    adminContextInFlight = null
+  }
+}
+
 interface UseAdminReturn {
   user: User | null
   loading: boolean
@@ -35,22 +77,10 @@ export function useAdmin(): UseAdminReturn {
   const [permissions, setPermissions] = useState<AdminPermission[]>([])
   const [menuItems, setMenuItems] = useState<AdminMenuItem[]>([])
 
-  const fetchUserData = useCallback(async () => {
+  const fetchUserData = useCallback(async (force = false) => {
     try {
       setLoading(true)
-
-      const res = await fetch('/api/admin/context', { credentials: 'include' })
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '')
-        throw new Error(errText || `Admin context failed (${res.status})`)
-      }
-
-      const data = (await res.json()) as {
-        user: { id: string; email?: string } | null
-        roles: AdminRole[]
-        permissions: AdminPermission[]
-        menuItems: AdminMenuItem[]
-      }
+      const data = await fetchAdminContext(force)
 
       setUser(
         data.user
@@ -64,17 +94,7 @@ export function useAdmin(): UseAdminReturn {
       setPermissions(data.permissions || [])
       setMenuItems(buildMenuTree(data.menuItems || []))
 
-      if (data.user) {
-        defaultLogger.info('Fetched user roles:', {
-          userId: data.user.id,
-          rolesCount: (data.roles || []).length,
-          roles: (data.roles || []).map((r) => ({
-            name: r.name,
-            level: r.level,
-            display_name: r.display_name,
-          })),
-        })
-      }
+      // Intentionally avoid per-render role logs to keep the console signal clean.
     } catch (error) {
       // Handle both Error objects and other error types
       const errorMessage = error instanceof Error 
@@ -154,7 +174,7 @@ export function useAdmin(): UseAdminReturn {
     hasRole,
     hasAnyRole,
     hasAnyPermission,
-    refresh: fetchUserData,
+    refresh: () => fetchUserData(true),
   }
 }
 

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
 import { setupForegroundMessageHandler } from '@/lib/firebase'
+import { publicAssets } from '@/config/public-assets'
 
 interface PushNotification {
   id: string
@@ -63,8 +64,8 @@ export function PushNotificationStack() {
           id: `${Date.now()}-${Math.random()}`,
           title: event.data.title || 'Meen Ma3ana',
           body: event.data.body || '',
-          icon: event.data.icon || '/logo.png',
-          badge: event.data.badge || '/logo.png',
+          icon: event.data.icon || publicAssets.brand.logo,
+          badge: event.data.badge || publicAssets.brand.logo,
           data: event.data.data || {},
           timestamp: Date.now(),
         }
@@ -136,8 +137,8 @@ export function PushNotificationStack() {
           id: `${Date.now()}-${Math.random()}`,
           title: title,
           body: body,
-          icon: payload.notification?.icon || notificationData?.icon || '/logo.png',
-          badge: payload.notification?.badge || notificationData?.badge || '/logo.png',
+          icon: payload.notification?.icon || notificationData?.icon || publicAssets.brand.logo,
+          badge: payload.notification?.badge || notificationData?.badge || publicAssets.brand.logo,
           data: notificationData,
           timestamp: Date.now(),
         }

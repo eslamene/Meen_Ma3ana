@@ -110,7 +110,6 @@ export default function CasesPage() {
   const fetchCases = useCallback(async (page: number, limit: number) => {
     try {
       setLoading(true)
-      console.log('Fetching cases...')
 
       const params = new URLSearchParams({
         page: page.toString(),
@@ -148,19 +147,6 @@ export default function CasesPage() {
       }
 
       const data = await response.json()
-      console.log('Cases data:', data)
-      
-      // Debug: Log first case's language fields
-      if (data.cases && data.cases.length > 0) {
-        const firstCase = data.cases[0]
-        console.log('First case language fields:', {
-          titleEn: firstCase.titleEn,
-          titleAr: firstCase.titleAr,
-          descriptionEn: firstCase.descriptionEn,
-          descriptionAr: firstCase.descriptionAr,
-          locale: params.get('locale') || locale
-        })
-      }
       
       const newCases = data.cases || []
       
@@ -184,7 +170,6 @@ export default function CasesPage() {
       logger.error('Error fetching cases:', { error: error })
     } finally {
       setLoading(false)
-      console.log('Fetch completed, loading set to false')
     }
   }, [filters, locale])
 

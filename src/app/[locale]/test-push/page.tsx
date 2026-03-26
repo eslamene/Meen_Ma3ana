@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, XCircle, Loader2, Send, CheckCircle, AlertCircle, Bug, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { publicAssets } from '@/config/public-assets'
 
 export default function TestPushPage() {
   const { isSupported, isSubscribed, isLoading: loading } = useFCMNotifications()
@@ -236,8 +237,8 @@ export default function TestPushPage() {
                       type: 'PUSH_NOTIFICATION',
                       title: 'Test Push Notification',
                       body: 'This is a direct test notification. If you see this, the UI is working!',
-                      icon: '/logo.png',
-                      badge: '/logo.png',
+                      icon: publicAssets.brand.logo,
+                      badge: publicAssets.brand.logo,
                       data: {
                         type: 'test',
                         url: '/test-push',
@@ -252,8 +253,8 @@ export default function TestPushPage() {
                         type: 'PUSH_NOTIFICATION',
                         title: 'Test Push Notification (via SW)',
                         body: 'This notification came through the service worker!',
-                        icon: '/logo.png',
-                        badge: '/logo.png',
+                        icon: publicAssets.brand.logo,
+                        badge: publicAssets.brand.logo,
                         data: {
                           type: 'test',
                           url: '/test-push',
@@ -569,8 +570,8 @@ export default function TestPushPage() {
                     type: 'PUSH_NOTIFICATION',
                     title: 'Direct Test Notification',
                     body: 'This notification was triggered directly via postMessage. If you see this, the UI component is working!',
-                    icon: '/logo.png',
-                    badge: '/logo.png',
+                    icon: publicAssets.brand.logo,
+                    badge: publicAssets.brand.logo,
                     data: { type: 'test', url: '/test-push' },
                     tag: 'direct-test',
                   }, '*')

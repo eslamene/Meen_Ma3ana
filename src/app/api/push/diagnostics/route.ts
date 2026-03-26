@@ -3,6 +3,7 @@ import { withApiHandler, ApiHandlerContext } from '@/lib/utils/api-wrapper'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { env } from '@/config/env'
 import { PushSubscriptionService } from '@/lib/services/pushSubscriptionService'
+import { publicAssets } from '@/config/public-assets'
 
 async function getHandler(request: NextRequest, context: ApiHandlerContext) {
   const { user, logger } = context
@@ -106,8 +107,8 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
           notification: {
             title: 'Diagnostic Test',
             body: 'This is a diagnostic test notification',
-            icon: '/logo.png',
-            badge: '/logo.png'
+            icon: publicAssets.brand.logo,
+            badge: publicAssets.brand.logo
           },
           data: {
             type: 'diagnostic',

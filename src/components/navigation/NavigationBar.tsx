@@ -6,7 +6,7 @@ import { useParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { formatNotificationCount } from '@/lib/utils'
+import { formatNotificationCount, cn } from '@/lib/utils'
 import Logo from '@/components/ui/Logo'
 import LayoutToggle from '@/components/layout/LayoutToggle'
 import { createClient } from '@/lib/supabase/client'
@@ -17,6 +17,24 @@ import GuestPermissionGuard from '@/components/auth/GuestPermissionGuard'
 import { getPublicNavItems } from '@/lib/navigation/public-nav-config'
 import { getIcon } from '@/lib/icons/registry'
 import type { AdminMenuItem } from '@/lib/admin/types'
+import { ChevronDown, LogOut, UserCircle } from 'lucide-react'
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
+} from '@/components/ui/navigation-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -69,6 +87,7 @@ export default function NavigationBar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [publicNavItems, setPublicNavItems] = useState<Awaited<ReturnType<typeof getPublicNavItems>>>([])
   const [isRecoveryMode, setIsRecoveryMode] = useState(false)
+  const [viewportWidth, setViewportWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1440)
 
   const supabase = createClient()
   
@@ -102,6 +121,13 @@ export default function NavigationBar() {
   
   // Use the new admin hook
   const { menuItems, loading: modulesLoading } = useAdmin()
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth)
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   
   // Memoize filtered menu items for top navigation with smart prioritization
   const { topNavItems, overflowItems } = useMemo(() => {
@@ -141,16 +167,17 @@ export default function NavigationBar() {
     // Combine: priority items first, then others
     const allItems = [...priorityItems, ...otherItems]
     
-    // For responsive design: show first 3-4 items, rest go to "More" dropdown
-    // Priority items always show, then up to 2 more items
-    const visibleItems = allItems.slice(0, Math.max(priorityItems.length, 4))
+    // Keep top nav single-line across laptop widths:
+    // move more items into "More" when horizontal space is tight.
+    const maxVisibleItems = viewportWidth < 1280 ? 3 : 4
+    const visibleItems = allItems.slice(0, Math.max(priorityItems.length, maxVisibleItems))
     const overflow = allItems.slice(visibleItems.length)
     
     return {
       topNavItems: visibleItems,
       overflowItems: overflow
     }
-  }, [menuItems])
+  }, [menuItems, viewportWidth])
   
   // Memoize Dashboard and My Contributions lookups to prevent unnecessary re-renders
   const { dashboardItemFallback, contributionsItemFallback } = useMemo(() => {
@@ -314,269 +341,294 @@ export default function NavigationBar() {
         <div className="flex justify-between items-center h-16 md:h-16 gap-2 overflow-visible">
           {/* Logo and Brand */}
           <div className="flex items-center flex-shrink-0 min-w-0">
-            <Logo size="lg" />
+            <Logo size="md" />
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-0.5 xl:space-x-1 flex-1 justify-center max-w-5xl mx-2 xl:mx-4 overflow-visible">
             {!user || isRecoveryMode || (isResetPasswordPage && !isRecoveryMode) ? (
-              // Public user navigation - uses database with config fallback
-              <>
-                {publicNavItems.slice(0, 4).map((item) => {
-                  const Icon = item.icon
-                  const isHashLink = item.isHashLink
-                  const hasChildren = item.children && item.children.length > 0
-                  
-                  // Render parent item with dropdown if it has children
-                  if (hasChildren) {
-                    return (
-                      <div key={item.key} className="relative group overflow-visible">
-                        <button
-                          className={`${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 flex items-center gap-1.5 whitespace-nowrap`}
-                        >
-                          {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
-                          <span className="hidden xl:inline">{t(item.labelKey)}</span>
-                          <span className="xl:hidden">{t(item.labelKey).length > 10 ? t(item.labelKey).substring(0, 10) + '...' : t(item.labelKey)}</span>
-                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {item.children && item.children.length > 0 && (
-                          <div className="absolute top-full left-0 pt-1 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
-                            <div className="bg-white rounded-md shadow-lg border border-gray-200 py-1">
-                              {item.children.map((child) => {
+              <NavigationMenu className="mx-auto max-w-none flex-1 justify-center">
+                <NavigationMenuList className="flex flex-nowrap items-center justify-center gap-0.5 space-x-0 xl:gap-1">
+                  {publicNavItems.slice(0, 4).map((item) => {
+                    const Icon = item.icon
+                    const isHashLink = item.isHashLink
+                    const hasChildren = item.children && item.children.length > 0
+
+                    const triggerSurface = cn(
+                      navigationMenuTriggerStyle(),
+                      getNavLinkClass(item.href),
+                      'h-auto gap-1.5 rounded-lg border-0 bg-transparent px-3 py-2 text-sm font-medium shadow-none hover:bg-[#6B8E7E]/10 xl:px-4 data-[state=open]:bg-gray-100/90'
+                    )
+
+                    if (hasChildren) {
+                      return (
+                        <NavigationMenuItem key={item.key}>
+                          <NavigationMenuTrigger className={triggerSurface}>
+                            {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+                            <span className="hidden xl:inline">{t(item.labelKey)}</span>
+                            <span className="xl:hidden">
+                              {t(item.labelKey).length > 10 ? t(item.labelKey).substring(0, 10) + '...' : t(item.labelKey)}
+                            </span>
+                          </NavigationMenuTrigger>
+                          <NavigationMenuContent>
+                            <ul className="m-0 min-w-[12rem] list-none gap-0.5 p-2">
+                              {item.children?.map((child) => {
                                 const ChildIcon = child.icon
                                 const childIsHashLink = child.isHashLink
-                                const childLinkContent = (
-                                  <Link
-                                    key={child.key}
-                                    href={child.href}
-                                    className={`block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 ${childIsHashLink ? 'cursor-pointer' : ''}`}
-                                    onClick={childIsHashLink ? (e) => {
-                                      e.preventDefault()
-                                      if (child.href.includes('/landing')) {
-                                        router.push(child.href)
-                                        setTimeout(() => {
-                                          const hash = child.href.split('#')[1]
-                                          const element = document.getElementById(hash)
-                                          element?.scrollIntoView({ behavior: 'smooth' })
-                                        }, 100)
-                                      } else {
-                                        const hash = child.href.replace('#', '')
-                                        const element = document.getElementById(hash)
-                                        element?.scrollIntoView({ behavior: 'smooth' })
+                                const linkBlock = (
+                                  <NavigationMenuLink asChild>
+                                    <Link
+                                      href={child.href}
+                                      className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100"
+                                      onClick={
+                                        childIsHashLink
+                                          ? (e) => {
+                                              e.preventDefault()
+                                              if (child.href.includes('/landing')) {
+                                                router.push(child.href)
+                                                setTimeout(() => {
+                                                  const hash = child.href.split('#')[1]
+                                                  document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
+                                                }, 100)
+                                              } else {
+                                                const hash = child.href.replace('#', '')
+                                                document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
+                                              }
+                                            }
+                                          : undefined
                                       }
-                                    } : undefined}
-                                  >
-                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                    {t(child.labelKey)}
-                                  </Link>
-                                )
-
-                                if (child.requiresPermission) {
-                                  return (
-                                    <GuestPermissionGuard
-                                      key={child.key}
-                                      visitorPermissions={[child.requiresPermission]}
-                                      showLoading={false}
-                                      showAuthPrompt={false}
                                     >
-                                      {childLinkContent}
-                                    </GuestPermissionGuard>
+                                      {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                      {t(child.labelKey)}
+                                    </Link>
+                                  </NavigationMenuLink>
+                                )
+                                return (
+                                  <li key={child.key}>
+                                    {child.requiresPermission ? (
+                                      <GuestPermissionGuard
+                                        visitorPermissions={[child.requiresPermission]}
+                                        showLoading={false}
+                                        showAuthPrompt={false}
+                                      >
+                                        {linkBlock}
+                                      </GuestPermissionGuard>
+                                    ) : (
+                                      linkBlock
+                                    )}
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </NavigationMenuContent>
+                        </NavigationMenuItem>
+                      )
+                    }
+
+                    const linkClass = isHashLink
+                      ? 'px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 text-gray-800 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200 whitespace-nowrap'
+                      : `${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 whitespace-nowrap`
+
+                    const linkInner = (
+                      <NavigationMenuLink
+                        asChild
+                        className={cn(
+                          navigationMenuTriggerStyle(),
+                          linkClass,
+                          'h-auto justify-start gap-1.5 rounded-lg border-0 bg-transparent shadow-none'
+                        )}
+                      >
+                        <Link
+                          href={item.href}
+                          className="flex w-full items-center gap-1.5"
+                          onClick={
+                            isHashLink
+                              ? (e) => {
+                                  e.preventDefault()
+                                  if (item.href.includes('/landing')) {
+                                    router.push(item.href)
+                                    setTimeout(() => {
+                                      const hash = item.href.split('#')[1]
+                                      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
+                                    }, 100)
+                                  } else {
+                                    const hash = item.href.replace('#', '')
+                                    document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
+                                  }
+                                }
+                              : undefined
+                          }
+                        >
+                          {Icon && <Icon className="h-4 w-4" />}
+                          {t(item.labelKey)}
+                        </Link>
+                      </NavigationMenuLink>
+                    )
+
+                    return (
+                      <NavigationMenuItem key={item.key}>
+                        {item.requiresPermission ? (
+                          <GuestPermissionGuard
+                            visitorPermissions={[item.requiresPermission]}
+                            showLoading={false}
+                            showAuthPrompt={false}
+                          >
+                            {linkInner}
+                          </GuestPermissionGuard>
+                        ) : (
+                          linkInner
+                        )}
+                      </NavigationMenuItem>
+                    )
+                  })}
+                </NavigationMenuList>
+              </NavigationMenu>
+            ) : (
+              <>
+                {!modulesLoading && (
+                  <NavigationMenu className="mx-auto max-w-none flex-1 justify-center">
+                    <NavigationMenuList className="flex flex-nowrap items-center justify-center gap-0.5 space-x-0 xl:gap-1">
+                      {topNavItems.map((item) => {
+                        const Icon = item.icon ? getIcon(item.icon) : undefined
+                        const hasChildren = item.children && item.children.length > 0
+                        const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
+
+                        const triggerSurface = cn(
+                          navigationMenuTriggerStyle(),
+                          getNavLinkClass(item.href),
+                          'h-auto gap-1.5 rounded-lg border-0 bg-transparent px-3 py-2 text-sm font-medium shadow-none hover:bg-[#6B8E7E]/10 xl:px-4 data-[state=open]:bg-gray-100/90'
+                        )
+
+                        if (hasChildren) {
+                          return (
+                            <NavigationMenuItem key={item.id}>
+                              <NavigationMenuTrigger className={triggerSurface}>
+                                {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+                                <span className="hidden xl:inline">{labelText}</span>
+                                <span className="xl:hidden">
+                                  {labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText}
+                                </span>
+                              </NavigationMenuTrigger>
+                              <NavigationMenuContent>
+                                <ul className="m-0 min-w-[12rem] list-none gap-0.5 p-2">
+                                  {item.children!.map((child) => {
+                                    const ChildIcon = child.icon ? getIcon(child.icon) : undefined
+                                    const childLabelText =
+                                      locale === 'ar' && child.label_ar ? child.label_ar : child.label
+                                    return (
+                                      <li key={child.id}>
+                                        <NavigationMenuLink asChild>
+                                          <Link
+                                            href={`/${locale}${child.href}`}
+                                            className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-100 focus:bg-gray-100"
+                                          >
+                                            {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                            {childLabelText}
+                                          </Link>
+                                        </NavigationMenuLink>
+                                      </li>
+                                    )
+                                  })}
+                                </ul>
+                              </NavigationMenuContent>
+                            </NavigationMenuItem>
+                          )
+                        }
+
+                        return (
+                          <NavigationMenuItem key={item.id}>
+                            <NavigationMenuLink
+                              asChild
+                              className={cn(
+                                navigationMenuTriggerStyle(),
+                                getNavLinkClass(item.href),
+                                'h-auto justify-start gap-1.5 rounded-lg border-0 bg-transparent px-3 py-2 text-sm font-medium shadow-none xl:px-4'
+                              )}
+                            >
+                              <Link
+                                href={`/${locale}${item.href}`}
+                                className="flex w-full items-center gap-1.5"
+                              >
+                                {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+                                <span className="hidden xl:inline">{labelText}</span>
+                                <span className="xl:hidden">
+                                  {labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText}
+                                </span>
+                              </Link>
+                            </NavigationMenuLink>
+                          </NavigationMenuItem>
+                        )
+                      })}
+
+                      {overflowItems.length > 0 && (
+                        <NavigationMenuItem>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className={cn(
+                                  navigationMenuTriggerStyle(),
+                                  getNavLinkClass(''),
+                                  'h-auto gap-1.5 rounded-lg border-0 bg-transparent px-3 py-2 text-sm font-medium shadow-none xl:px-4 data-[state=open]:bg-gray-100/90'
+                                )}
+                              >
+                                <span>{locale === 'ar' ? 'المزيد' : 'More'}</span>
+                                <ChevronDown className="h-3 w-3 opacity-70" aria-hidden />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="center" sideOffset={8} className="w-64 p-2 z-[120]">
+                              {overflowItems.map((item) => {
+                                const Icon = item.icon ? getIcon(item.icon) : undefined
+                                const hasNested = item.children && item.children.length > 0
+                                const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
+
+                                if (hasNested) {
+                                  return (
+                                    <div key={item.id} className="py-1">
+                                      <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        {labelText}
+                                      </div>
+                                      <div className="space-y-0.5">
+                                        {item.children!.map((child) => {
+                                          const ChildIcon = child.icon ? getIcon(child.icon) : undefined
+                                          const childLabelText =
+                                            locale === 'ar' && child.label_ar ? child.label_ar : child.label
+                                          return (
+                                            <DropdownMenuItem key={child.id} asChild className="cursor-pointer">
+                                              <Link
+                                                href={`/${locale}${child.href}`}
+                                                className="flex items-center gap-2"
+                                              >
+                                                {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                                {childLabelText}
+                                              </Link>
+                                            </DropdownMenuItem>
+                                          )
+                                        })}
+                                      </div>
+                                      <DropdownMenuSeparator className="mt-1" />
+                                    </div>
                                   )
                                 }
 
-                                return childLinkContent
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  }
-                  
-                  // Regular item without children
-                  const linkClass = isHashLink
-                    ? 'px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 text-gray-800 hover:text-[#6B8E7E] hover:bg-[#6B8E7E]/10 transition-all duration-200 whitespace-nowrap'
-                    : `${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 whitespace-nowrap`
-                  
-                  const linkContent = (
-                    <Link
-                      key={item.key}
-                      href={item.href}
-                      className={`${linkClass} ${Icon ? 'flex items-center gap-1.5' : ''}`}
-                      onClick={isHashLink ? (e) => {
-                        e.preventDefault()
-                        // If href already includes landing page, just scroll
-                        if (item.href.includes('/landing')) {
-                          router.push(item.href)
-                          // Wait for navigation then scroll
-                          setTimeout(() => {
-                            const hash = item.href.split('#')[1]
-                            const element = document.getElementById(hash)
-                            element?.scrollIntoView({ behavior: 'smooth' })
-                          }, 100)
-                        } else {
-                          // On landing page, just scroll
-                          const hash = item.href.replace('#', '')
-                          const element = document.getElementById(hash)
-                          element?.scrollIntoView({ behavior: 'smooth' })
-                        }
-                      } : undefined}
-                    >
-                      {Icon && <Icon className="h-4 w-4" />}
-                      {t(item.labelKey)}
-                    </Link>
-                  )
-
-                  // Wrap with permission guard if required
-                  if (item.requiresPermission) {
-                    return (
-                      <GuestPermissionGuard
-                        key={item.key}
-                        visitorPermissions={[item.requiresPermission]}
-                        showLoading={false}
-                        showAuthPrompt={false}
-                      >
-                        {linkContent}
-                      </GuestPermissionGuard>
-                    )
-                  }
-
-                  return linkContent
-                })}
-              </>
-            ) : (
-              // Authenticated user navigation - uses menuItems from useAdmin()
-              <>
-                {!modulesLoading && (
-                  <>
-                    {/* Visible navigation items */}
-                    {topNavItems.map((item) => {
-                      const Icon = item.icon ? getIcon(item.icon) : undefined
-                      const hasChildren = item.children && item.children.length > 0
-                      const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
-                      
-                      // Render parent item with dropdown if it has children
-                      if (hasChildren) {
-                        return (
-                          <div key={item.id} className="relative group overflow-visible">
-                            <button
-                              className={`${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 flex items-center gap-1.5 whitespace-nowrap`}
-                            >
-                              {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
-                              <span className="hidden xl:inline">{labelText}</span>
-                              <span className="xl:hidden">{labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText}</span>
-                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                            {item.children && item.children.length > 0 && (
-                              <div className="absolute top-full left-0 pt-1 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
-                                <div className="bg-white rounded-md shadow-lg border border-gray-200 py-1">
-                                  {item.children.map((child) => {
-                                    const ChildIcon = child.icon ? getIcon(child.icon) : undefined
-                                    const childLabelText = locale === 'ar' && child.label_ar ? child.label_ar : child.label
-                                    return (
-                                      <Link
-                                        key={child.id}
-                                        href={`/${locale}${child.href}`}
-                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                      >
-                                        {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                        {childLabelText}
-                                      </Link>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      }
-                      
-                      // Regular item without children
-                      const linkContent = (
-                        <Link
-                          key={item.id}
-                          href={`/${locale}${item.href}`}
-                          className={`${getNavLinkClass(item.href)} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 whitespace-nowrap ${Icon ? 'flex items-center gap-1.5' : ''}`}
-                        >
-                          {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
-                          <span className="hidden xl:inline">{labelText}</span>
-                          <span className="xl:hidden">{labelText.length > 10 ? labelText.substring(0, 10) + '...' : labelText}</span>
-                        </Link>
-                      )
-                      
-                      // Wrap with permission guard if item has permission requirement
-                      if (item.permission_id) {
-                        // We need to check permission - but we don't have permission name here
-                        // The useAdmin hook already filters by permissions, so items here should be accessible
-                        // But we can add an extra check if needed
-                        return linkContent
-                      }
-                      
-                      return linkContent
-                    })}
-                    
-                    {/* More dropdown for overflow items */}
-                    {overflowItems.length > 0 && (
-                      <div className="relative group overflow-visible">
-                        <button
-                          className={`${getNavLinkClass('')} px-3 xl:px-4 py-2 text-sm font-medium rounded-lg mx-0.5 xl:mx-1 flex items-center gap-1.5 whitespace-nowrap`}
-                        >
-                          <span>{locale === 'ar' ? 'المزيد' : 'More'}</span>
-                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        <div className="absolute top-full right-0 pt-1 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
-                          <div className="bg-white rounded-md shadow-lg border border-gray-200 py-1">
-                            {overflowItems.map((item) => {
-                              const Icon = item.icon ? getIcon(item.icon) : undefined
-                              const hasChildren = item.children && item.children.length > 0
-                              const labelText = locale === 'ar' && item.label_ar ? item.label_ar : item.label
-                              
-                              if (hasChildren) {
                                 return (
-                                  <div key={item.id} className="px-2 py-1">
-                                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                  <DropdownMenuItem key={item.id} asChild className="cursor-pointer">
+                                    <Link
+                                      href={`/${locale}${item.href}`}
+                                      className="flex items-center gap-2"
+                                    >
+                                      {Icon && <Icon className="h-4 w-4" />}
                                       {labelText}
-                                    </div>
-                                    {item.children?.map((child) => {
-                                      const ChildIcon = child.icon ? getIcon(child.icon) : undefined
-                                      const childLabelText = locale === 'ar' && child.label_ar ? child.label_ar : child.label
-                                      return (
-                                        <Link
-                                          key={child.id}
-                                          href={`/${locale}${child.href}`}
-                                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                        >
-                                          {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                          {childLabelText}
-                                        </Link>
-                                      )
-                                    })}
-                                  </div>
+                                    </Link>
+                                  </DropdownMenuItem>
                                 )
-                              }
-                              
-                              return (
-                                <Link
-                                  key={item.id}
-                                  href={`/${locale}${item.href}`}
-                                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                >
-                                  {Icon && <Icon className="h-4 w-4" />}
-                                  {labelText}
-                                </Link>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
+                              })}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </NavigationMenuItem>
+                      )}
+                    </NavigationMenuList>
+                  </NavigationMenu>
                 )}
               </>
             )}
@@ -606,86 +658,85 @@ export default function NavigationBar() {
                 </Link>
 
                 {/* User Menu */}
-                <div className="relative group overflow-visible">
-                  <Button variant="ghost" size="sm" className="flex items-center space-x-3 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-all duration-200 rounded-lg px-3 py-2">
-                    <div className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#5A7A6B] rounded-full flex items-center justify-center shadow-md">
-                      <span className="text-white text-sm font-semibold">
-                        {user.email?.charAt(0).toUpperCase() || 'U'}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex items-center gap-3 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-all duration-200 rounded-lg px-3 py-2 outline-none data-[state=open]:bg-gray-100/80"
+                    >
+                      <div className="w-10 h-10 bg-gradient-to-br from-[#6B8E7E] to-[#5A7A6B] rounded-full flex items-center justify-center shadow-md">
+                        <span className="text-white text-sm font-semibold">
+                          {user.email?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                      <span className="hidden lg:inline text-sm text-gray-800 font-medium max-w-[160px] truncate">
+                        {user.email}
                       </span>
-                    </div>
-                    <span className="hidden lg:block text-sm text-gray-800 font-medium">
-                      {user.email}
-                    </span>
-                    <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </Button>
-
-                  {/* Dropdown Menu */}
-                  <div className="absolute right-0 pt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none group-hover:pointer-events-auto">
-                    <div className="bg-white rounded-xl shadow-xl py-2 border border-gray-100">
-                    {/* Dashboard */}
-                    <Link 
-                      href={`/${locale}${dashboardItemFallback.href}`}
-                      className="block px-4 py-3 text-sm text-gray-800 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors mx-2 rounded-lg"
-                      onClick={closeMobileMenu}
-                    >
-                      <div className="flex items-center space-x-3">
-                        {dashboardItemFallback.icon && (() => {
-                          const DashboardIcon = getIcon(dashboardItemFallback.icon)
-                          return DashboardIcon ? <DashboardIcon className="w-4 h-4" /> : null
-                        })()}
-                        <span>{locale === 'ar' && dashboardItemFallback.label_ar ? dashboardItemFallback.label_ar : dashboardItemFallback.label}</span>
-                      </div>
-                    </Link>
-                    
-                    {/* My Contributions */}
-                    <Link 
-                      href={`/${locale}${contributionsItemFallback.href}`}
-                      className="block px-4 py-3 text-sm text-gray-800 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors mx-2 rounded-lg"
-                      onClick={closeMobileMenu}
-                    >
-                      <div className="flex items-center space-x-3">
-                        {contributionsItemFallback.icon && (() => {
-                          const ContributionsIcon = getIcon(contributionsItemFallback.icon)
-                          return ContributionsIcon ? <ContributionsIcon className="w-4 h-4" /> : null
-                        })()}
-                        <span>{locale === 'ar' && contributionsItemFallback.label_ar ? contributionsItemFallback.label_ar : contributionsItemFallback.label}</span>
-                      </div>
-                    </Link>
-                    
-                    {/* Divider */}
-                    <div className="border-t border-gray-200 my-2"></div>
-                    
-                    {/* Profile */}
-                    <Link 
-                      href={`/${locale}/profile`}
-                      className="block px-4 py-3 text-sm text-gray-800 hover:bg-[#6B8E7E]/10 hover:text-[#6B8E7E] transition-colors mx-2 rounded-lg"
-                      onClick={closeMobileMenu}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 z-[100]" sideOffset={8}>
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem asChild className="cursor-pointer">
+                        <Link
+                          href={`/${locale}${dashboardItemFallback.href}`}
+                          className="flex items-center gap-3"
+                          onClick={closeMobileMenu}
+                        >
+                          {dashboardItemFallback.icon && (() => {
+                            const DashboardIcon = getIcon(dashboardItemFallback.icon)
+                            return DashboardIcon ? <DashboardIcon className="h-4 w-4 shrink-0" /> : null
+                          })()}
+                          <span>
+                            {locale === 'ar' && dashboardItemFallback.label_ar
+                              ? dashboardItemFallback.label_ar
+                              : dashboardItemFallback.label}
+                          </span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild className="cursor-pointer">
+                        <Link
+                          href={`/${locale}${contributionsItemFallback.href}`}
+                          className="flex items-center gap-3"
+                          onClick={closeMobileMenu}
+                        >
+                          {contributionsItemFallback.icon && (() => {
+                            const ContributionsIcon = getIcon(contributionsItemFallback.icon)
+                            return ContributionsIcon ? <ContributionsIcon className="h-4 w-4 shrink-0" /> : null
+                          })()}
+                          <span>
+                            {locale === 'ar' && contributionsItemFallback.label_ar
+                              ? contributionsItemFallback.label_ar
+                              : contributionsItemFallback.label}
+                          </span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link
+                        href={`/${locale}/profile`}
+                        className="flex items-center gap-3"
+                        onClick={closeMobileMenu}
+                      >
+                        <UserCircle className="h-4 w-4 shrink-0" />
                         <span>{t('profile')}</span>
-                      </div>
-                    </Link>
-                    
-                    {/* Logout */}
-                    <button
-                      onClick={handleSignOut}
-                      className="block w-full text-left px-4 py-3 text-sm text-gray-800 hover:bg-red-50 hover:text-red-700 transition-colors mx-2 rounded-lg"
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-700"
+                      onSelect={() => {
+                        void handleSignOut()
+                      }}
                     >
-                      <div className="flex items-center space-x-3">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        <span>{t('logout')}</span>
-                      </div>
-                    </button>
-                    </div>
-                  </div>
-                </div>
+                      <span className="flex items-center gap-3">
+                        <LogOut className="h-4 w-4 shrink-0" />
+                        {t('logout')}
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : (
               <div className="flex items-center space-x-3">

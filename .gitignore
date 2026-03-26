@@ -62,9 +62,10 @@ scripts/set-firebase-secret.sh
 next-env.d.ts
 
 
+# Database dumps (large, sensitive — keep out of git)
+/db_dumps/
+
 # Cleanup patterns
-
-
 
 
 

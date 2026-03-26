@@ -6,6 +6,7 @@
 import { env } from '@/config/env'
 import { defaultLogger as logger } from '@/lib/logger'
 import { defaultLocale } from '@/i18n/request'
+import { publicAssets } from '@/config/public-assets'
 
 interface FCMNotificationPayload {
   title: string
@@ -209,8 +210,8 @@ export class FCMNotificationService {
       await this.notifyAllUsers({
         title: 'New Case Available',
         body: caseTitle || caseTitleAr || 'A new case has been created',
-        icon: '/logo.png',
-        badge: '/logo.png',
+        icon: publicAssets.brand.logo,
+        badge: publicAssets.brand.logo,
         data: {
           type: 'case_created',
           caseId,
@@ -232,8 +233,8 @@ export class FCMNotificationService {
       await this.notifyAllUsers({
         title: 'Case Completed! 🎉',
         body: `${caseTitle || caseTitleAr || 'A case'} has been completed. Thank you to everyone who contributed!`,
-        icon: '/logo.png',
-        badge: '/logo.png',
+        icon: publicAssets.brand.logo,
+        badge: publicAssets.brand.logo,
         data: {
           type: 'case_completed',
           caseId,
@@ -266,8 +267,8 @@ export class FCMNotificationService {
       await this.notifyUsers(contributorUserIds, {
         title: `Case Update: ${caseTitle || caseTitleAr || 'Case'}`,
         body: updateTitle,
-        icon: '/logo.png',
-        badge: '/logo.png',
+        icon: publicAssets.brand.logo,
+        badge: publicAssets.brand.logo,
         data: {
           type: 'case_updated',
           caseId,
@@ -325,8 +326,8 @@ export class FCMNotificationService {
       await this.notifyUsers(allUserIds, {
         title: `Case Status Changed: ${caseTitle || caseTitleAr || 'Case'}`,
         body: `Status changed from ${oldStatusName} to ${newStatusName}`,
-        icon: '/logo.png',
-        badge: '/logo.png',
+        icon: publicAssets.brand.logo,
+        badge: publicAssets.brand.logo,
         data: {
           type: 'case_status_changed',
           caseId,

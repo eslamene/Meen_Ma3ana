@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { defaultLogger } from '@/lib/logger'
 import { createBilingualNotification, NOTIFICATION_TEMPLATES } from './bilingual-helpers'
 import { fcmNotificationService } from './fcm-notifications'
+import { publicAssets } from '@/config/public-assets'
 
 export interface ContributionNotification {
   id: string
@@ -75,8 +76,8 @@ export class ContributionNotificationService {
           {
             title: content.title_en,
             body: content.message_en,
-            icon: '/logo.png',
-            badge: '/logo.png',
+            icon: publicAssets.brand.logo,
+            badge: publicAssets.brand.logo,
             data: {
               type: 'contribution_approved',
               contribution_id: contributionId,
@@ -172,8 +173,8 @@ export class ContributionNotificationService {
           {
             title: content.title_en,
             body: content.message_en,
-            icon: '/logo.png',
-            badge: '/logo.png',
+            icon: publicAssets.brand.logo,
+            badge: publicAssets.brand.logo,
             data: {
               type: 'contribution_rejected',
               contribution_id: contributionId,

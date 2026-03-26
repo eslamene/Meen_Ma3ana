@@ -206,8 +206,8 @@ async function sendV1Message(
       notification: {
         title: notification.title,
         body: notification.body,
-        icon: notification.icon || '/logo.png',
-        badge: notification.badge || '/logo.png',
+        icon: notification.icon || '/assets/brand/logo.png',
+        badge: notification.badge || '/assets/brand/logo.png',
         requireInteraction: notification.requireInteraction,
       },
       fcm_options: {

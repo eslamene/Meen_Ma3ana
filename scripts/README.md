@@ -14,8 +14,7 @@ scripts/
 ├── utilities/           # General utility scripts
 ├── setup/               # Infrastructure setup scripts
 ├── maintenance/         # Ongoing maintenance tasks
-├── i18n/                # Internationalization scripts
-└── Archived/            # Deprecated scripts
+└── i18n/                # Internationalization scripts
 ```
 
 ## Script Categories
@@ -180,10 +179,6 @@ npm run i18n:unused
 - **apply-email-templates.js** - Apply email templates
 - **update-pages-layout.js** - Update pages layout
 - **set-firebase-secret.sh** - Set Firebase secret in Supabase
-
-## Archived Scripts
-
-One-time use scripts, temporary documentation, and SQL check files have been moved to `scripts/Archived/`. See `scripts/Archived/README.md` for details.
 
 ## Environment Requirements
 
