@@ -995,7 +995,7 @@ export default function CaseEditPage() {
         </Card>
       </div>
     }>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
+      <div className="min-h-screen bg-background">
         <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
           {/* Header */}
           <EditPageHeader
@@ -1034,7 +1034,7 @@ export default function CaseEditPage() {
           )}
 
           {/* Quick Admin Controls - Status, Category, Priority */}
-          <Card className="mb-6 border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 shadow-sm">
+          <Card className="mb-6 border-border bg-card shadow-sm">
             <CardHeader className="border-b border-indigo-200/50 pb-3">
               <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
                 <div className="p-1.5 rounded-lg bg-indigo-100">
@@ -1281,7 +1281,7 @@ export default function CaseEditPage() {
 
           {/* Progress Card - Quick Overview */}
           {(case_.target_amount && case_.target_amount > 0) ? (
-            <Card className="mb-6 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm">
+            <Card className="mb-6 border-border bg-card shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -1294,7 +1294,7 @@ export default function CaseEditPage() {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
                   <div 
-                    className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-300"
+                    className="h-2.5 rounded-full bg-primary transition-all duration-300"
                     style={{ width: `${Math.min((approvedContributionsTotal / case_.target_amount) * 100, 100)}%` }}
                   />
                 </div>
@@ -1336,7 +1336,7 @@ export default function CaseEditPage() {
                   <div className="space-y-6">
             {/* Basic Information */}
             <Card className="border-2 border-blue-100 shadow-sm">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+              <CardHeader className="border-b bg-muted/50">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Type className="h-5 w-5 text-blue-600" />
                   {t('basicInformation')}
@@ -1670,7 +1670,7 @@ export default function CaseEditPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Case Details */}
               <Card className="shadow-lg border border-purple-100 hover:shadow-xl transition-shadow duration-200">
-                <CardHeader className="bg-gradient-to-r from-purple-50 via-purple-50/80 to-pink-50 border-b border-purple-200/50 pb-4">
+                <CardHeader className="border-b border-border bg-muted/40 pb-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle className="flex items-center gap-2.5 text-xl font-semibold text-gray-900 mb-1.5">
@@ -1758,7 +1758,7 @@ export default function CaseEditPage() {
 
               {/* Beneficiary Information */}
               <Card className="shadow-lg border border-green-100 hover:shadow-xl transition-shadow duration-200">
-                <CardHeader className="bg-gradient-to-r from-green-50 via-emerald-50/80 to-green-50 border-b border-green-200/50 pb-4">
+                <CardHeader className="border-b border-border bg-muted/40 pb-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle className="flex items-center gap-2.5 text-xl font-semibold text-gray-900 mb-1.5">

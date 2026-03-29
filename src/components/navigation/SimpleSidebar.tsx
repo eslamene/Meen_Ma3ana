@@ -61,13 +61,12 @@ import {
   Columns,
   Search,
   MoreVertical,
-  Globe,
 } from 'lucide-react'
-import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { locales } from '@/i18n/request'
 import { useLayoutOptional } from '@/components/layout/LayoutProvider'
 import type { AdminMenuItem } from '@/lib/admin/types'
 import { getIcon } from '@/lib/icons/registry'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -616,7 +615,7 @@ function LayoutPickerInline({
   layoutContext: NonNullable<ReturnType<typeof useLayoutOptional>>
 }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-sidebar-border bg-muted/40 p-1.5">
+    <div className="grid grid-cols-2 gap-1 rounded-md border border-sidebar-border bg-muted p-1">
       {(['full', 'boxed'] as const).map((variant) => {
         const Icon = variant === 'full' ? Maximize2 : Columns
         const active = layoutContext.containerVariant === variant
@@ -628,12 +627,12 @@ function LayoutPickerInline({
             type="button"
             onClick={() => layoutContext.setContainerVariant(variant)}
             className={cn(
-              'h-8 flex-1 px-3',
-              active ? 'bg-[#6B8E7E] text-white hover:bg-[#5a7a6b]' : ''
+              'h-8 justify-start gap-2 rounded-md px-2 text-sm',
+              active && 'shadow-sm'
             )}
           >
-            <Icon className="h-4 w-4" />
-            <span className="ms-1.5 text-xs font-semibold">
+            <Icon className="h-3.5 w-3.5" />
+            <span className="truncate font-semibold">
               {variant === 'full' ? 'Full' : 'Boxed'}
             </span>
           </Button>
@@ -645,7 +644,7 @@ function LayoutPickerInline({
 
 function LanguagePickerInline({ pathname }: { pathname: string }) {
   return (
-    <div className="flex overflow-hidden rounded-lg border border-sidebar-border bg-muted/40">
+    <div className="grid grid-cols-2 gap-1 rounded-md border border-sidebar-border bg-muted p-1">
       {locales.map((loc) => {
         const currentLoc = pathname.split('/')[1] || 'en'
         const active = currentLoc === loc
@@ -657,8 +656,8 @@ function LanguagePickerInline({ pathname }: { pathname: string }) {
               window.location.href = hrefForLocale(pathname, loc)
             }}
             className={cn(
-              'flex flex-1 items-center justify-center gap-2 px-4 py-2 text-sm font-semibold transition-colors',
-              active ? 'bg-[#E74C3C] text-white' : 'text-muted-foreground hover:bg-background'
+              'flex h-8 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold transition-colors',
+              active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-background'
             )}
           >
             <span className="text-lg leading-none">{loc === 'en' ? '🇬🇧' : '🇪🇬'}</span>
@@ -706,7 +705,7 @@ function SidebarFooterContent({
         align="end"
         side={dropdownSide}
         sideOffset={8}
-        className="z-[100] w-64 rounded-xl border border-sidebar-border bg-background p-2 shadow-xl"
+        className="z-[100] w-64 p-2"
       >
         <DropdownMenuLabel className="px-3 py-2 text-xs font-semibold">
           {t('settings')}
@@ -733,7 +732,7 @@ function SidebarFooterContent({
         <DropdownMenuItem
           onClick={handleSignOut}
           disabled={!stableUser}
-          className="mx-1 my-1 cursor-pointer rounded-lg px-3 py-2.5 font-semibold text-red-600 focus:bg-red-50 focus:text-red-700"
+          className="mx-1 my-1 cursor-pointer rounded-lg px-3 py-2.5 font-semibold text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/20"
         >
           <LogOut className="me-2.5 h-4 w-4" />
           <span>{t('signOut')}</span>
@@ -744,94 +743,9 @@ function SidebarFooterContent({
 
   return (
     <SidebarMenu className="gap-1.5">
-      {layoutContext ? (
-        <>
-          <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
-            <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/30 p-2">
-              <LayoutToggle />
-            </div>
-          </SidebarMenuItem>
-          <SidebarMenuItem className="hidden group-data-[collapsible=icon]:flex">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton tooltip={t('pageLayout')}>
-                  <Columns className="h-4 w-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-56"
-                side={dropdownSide}
-                align="start"
-                sideOffset={4}
-              >
-                <DropdownMenuLabel>{t('pageLayout')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {(['full', 'boxed'] as const).map((variant) => {
-                  const Icon = variant === 'full' ? Maximize2 : Columns
-                  const active = layoutContext.containerVariant === variant
-                  return (
-                    <DropdownMenuItem
-                      key={variant}
-                      onClick={() => layoutContext.setContainerVariant(variant)}
-                      className={cn('gap-2', active && 'bg-sidebar-accent')}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {variant === 'full' ? 'Full' : 'Boxed'}
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </>
-      ) : null}
-
-      <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
-        <div className="flex justify-center rounded-xl border border-sidebar-border bg-sidebar-accent/30 p-2">
-          <LanguageSwitcher />
-        </div>
-      </SidebarMenuItem>
-      <SidebarMenuItem className="hidden group-data-[collapsible=icon]:flex">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton tooltip={t('language')}>
-              <Globe className="h-4 w-4" />
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="min-w-48"
-            side={dropdownSide}
-            align="start"
-            sideOffset={4}
-          >
-            <DropdownMenuLabel>{t('language')}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {locales.map((loc) => {
-              const currentLoc = pathname.split('/')[1] || 'en'
-              const active = currentLoc === loc
-              return (
-                <DropdownMenuItem
-                  key={loc}
-                  onClick={() => {
-                    window.location.href = hrefForLocale(pathname, loc)
-                  }}
-                  className={cn('gap-2', active && 'bg-sidebar-accent')}
-                >
-                  <span className="text-base leading-none">{loc === 'en' ? '🇬🇧' : '🇪🇬'}</span>
-                  <span className="font-semibold">{loc === 'en' ? 'English' : 'العربية'}</span>
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-
       <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
         <div
-          className={cn(
-            'rounded-xl border border-sidebar-border bg-gradient-to-br from-sidebar-accent/40 to-sidebar p-3',
-            locale === 'ar' && 'text-end'
-          )}
+          className={cn('rounded-md border border-sidebar-border bg-sidebar-accent p-2', locale === 'ar' && 'text-end')}
         >
           <div
             className={cn(
@@ -843,10 +757,14 @@ function SidebarFooterContent({
               <>
                 <Link
                   href={dashboardHref}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#6B8E7E] to-[#6B8E7E]/80 shadow-md ring-2 ring-sidebar"
+                  className="shrink-0"
                   onClick={() => isMobile && setOpenMobile(false)}
                 >
-                  <UserIcon className="h-5 w-5 text-white" />
+                  <Avatar className="h-10 w-10 ring-2 ring-sidebar">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      <UserIcon className="h-5 w-5" />
+                    </AvatarFallback>
+                  </Avatar>
                 </Link>
                 <Link
                   href={dashboardHref}
@@ -880,9 +798,9 @@ function SidebarFooterContent({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               tooltip={stableUser?.email?.split('@')[0] || t('profile')}
-              className="!h-10 !w-10 overflow-hidden rounded-full bg-gradient-to-br from-[#6B8E7E] to-[#6B8E7E]/80 p-0 ring-2 ring-sidebar data-[state=open]:ring-sidebar-ring"
+              className="!h-10 !w-10 overflow-hidden rounded-full bg-primary p-0 ring-2 ring-sidebar data-[state=open]:ring-sidebar-ring"
             >
-              <UserIcon className="h-5 w-5 text-white" />
+              <UserIcon className="h-5 w-5 text-primary-foreground" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -921,13 +839,13 @@ function SidebarFooterContent({
         </DropdownMenu>
       </SidebarMenuItem>
 
-      <SidebarMenuItem className="group-data-[collapsible=icon]:hidden px-2">
+      <SidebarMenuItem className="group-data-[collapsible=icon]:hidden px-1">
         <Button
           variant="outline"
           type="button"
           onClick={handleSignOut}
           disabled={!stableUser}
-          className="w-full border-red-200/60 bg-background hover:border-red-300 hover:text-[#E74C3C]"
+          className="h-8 w-full rounded-md border-red-200/60 bg-background px-2 text-sm hover:border-red-300 hover:text-[#E74C3C]"
         >
           <LogOut className="me-2 h-4 w-4" />
           {t('signOut')}

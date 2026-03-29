@@ -929,7 +929,7 @@ export default function CreateCasePage() {
         </Card>
       </div>
     }>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-[#6B8E7E]/5 to-gray-50">
+      <div className="min-h-screen bg-background">
         <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
           {/* Header */}
           <EditPageHeader
@@ -959,7 +959,7 @@ export default function CreateCasePage() {
 
           {/* Quick Admin Controls - Status, Category, Priority - Only show when case type is selected */}
           {caseType && (
-            <Card className="mb-6 border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 shadow-sm">
+            <Card className="mb-6 border-border bg-card shadow-sm">
               <CardHeader className="border-b border-indigo-200/50 pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
                   <div className="p-1.5 rounded-lg bg-indigo-100">
@@ -1218,7 +1218,7 @@ export default function CreateCasePage() {
                   <Card 
                     className={`group cursor-pointer transition-all duration-300 hover:shadow-lg border-2 ${
                       caseType === 'one-time' 
-                        ? 'ring-2 ring-[#6B8E7E] border-[#6B8E7E] bg-gradient-to-br from-[#6B8E7E]/10 to-[#6B8E7E]/5 shadow-lg' 
+                        ? 'border-[#6B8E7E] bg-[#6B8E7E]/10 shadow-lg ring-2 ring-[#6B8E7E]' 
                         : 'border-gray-200 hover:border-[#6B8E7E]/50'
                     }`}
                     onClick={() => {
@@ -1247,7 +1247,7 @@ export default function CreateCasePage() {
                   <Card 
                     className={`group cursor-pointer transition-all duration-300 hover:shadow-lg border-2 ${
                       caseType === 'recurring' 
-                        ? 'ring-2 ring-[#6B8E7E] border-[#6B8E7E] bg-gradient-to-br from-[#6B8E7E]/10 to-[#6B8E7E]/5 shadow-lg' 
+                        ? 'border-[#6B8E7E] bg-[#6B8E7E]/10 shadow-lg ring-2 ring-[#6B8E7E]' 
                         : 'border-gray-200 hover:border-[#6B8E7E]/50'
                     }`}
                     onClick={() => {
@@ -1395,7 +1395,7 @@ export default function CreateCasePage() {
                   <div className="space-y-6">
                     {/* Basic Information */}
                     <Card className="border-2 border-blue-100 shadow-sm">
-                      <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                      <CardHeader className="border-b bg-muted/50">
                         <CardTitle className="flex items-center gap-2 text-lg">
                           <Type className="h-5 w-5 text-blue-600" />
                           {t('basicInformation')}
@@ -1698,7 +1698,7 @@ export default function CreateCasePage() {
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Case Details */}
                         <Card className="shadow-lg border border-purple-100 hover:shadow-xl transition-shadow duration-200">
-                          <CardHeader className="bg-gradient-to-r from-purple-50 via-purple-50/80 to-pink-50 border-b border-purple-200/50 pb-4">
+                          <CardHeader className="border-b border-border bg-muted/40 pb-4">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <CardTitle className="flex items-center gap-2.5 text-xl font-semibold text-gray-900 mb-1.5">
@@ -1780,7 +1780,7 @@ export default function CreateCasePage() {
 
                         {/* Beneficiary Information */}
                         <Card className="shadow-lg border border-green-100 hover:shadow-xl transition-shadow duration-200">
-                          <CardHeader className="bg-gradient-to-r from-green-50 via-emerald-50/80 to-green-50 border-b border-green-200/50 pb-4">
+                          <CardHeader className="border-b border-border bg-muted/40 pb-4">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <CardTitle className="flex items-center gap-2.5 text-xl font-semibold text-gray-900 mb-1.5">

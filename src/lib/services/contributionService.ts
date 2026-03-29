@@ -8,6 +8,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { defaultLogger } from '@/lib/logger'
 import type { ContributionRow, NormalizedContribution } from '@/types/contribution'
 
+const CASE_EMBED_SELECT = 'cases:case_id(title_en, title_ar)'
+
 export interface ContributionSearchParams {
   status?: string | null
   search?: string | null
@@ -152,9 +154,9 @@ export class ContributionService {
       .from('contributions')
       .select(`
         *,
-        cases:case_id(title),
+        ${CASE_EMBED_SELECT},
         users:donor_id(id, email, first_name, last_name, phone),
-        approval_status:contribution_approval_status!contribution_id(status, rejection_reason, admin_comment, donor_reply, resubmission_count, created_at, updated_at)
+        approval_status:contribution_approval_status!contribution_id(id, status, rejection_reason, admin_comment, donor_reply, resubmission_count, created_at, updated_at)
       `, { count: 'exact' })
 
     // Filter by user if not admin
@@ -242,8 +244,8 @@ export class ContributionService {
     let filteredContributions = contributions || []
     if (search && search.trim()) {
       const searchLower = search.toLowerCase()
-      filteredContributions = filteredContributions.filter((c: any) => {
-        const caseTitle = Array.isArray(c.cases) ? c.cases[0]?.title : c.cases?.title || ''
+      filteredContributions = filteredContributions.filter((c: ContributionRow & { users?: { first_name?: string | null; last_name?: string | null; email?: string | null } }) => {
+        const caseTitle = ContributionService.resolveCaseTitle(c)
         const donorName = c.users ? 
           `${c.users.first_name || ''} ${c.users.last_name || ''}`.trim() || c.users.email || '' : ''
         return (
@@ -286,6 +288,52 @@ export class ContributionService {
   }
 
   /**
+   * Normalize embedded or flat approval rows for API consumers.
+   */
+  private static normalizeApprovalStatus(c: ContributionRow): NormalizedContribution['approval_status'] {
+    const raw = c.approval_status
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw.map(row => ({
+        id: row.id,
+        status: row.status || 'pending',
+        rejection_reason: row.rejection_reason ?? null,
+        admin_comment: row.admin_comment ?? null,
+        donor_reply: row.donor_reply ?? null,
+        resubmission_count: row.resubmission_count ?? null,
+        created_at: row.created_at ?? null,
+        updated_at: row.updated_at ?? null,
+      }))
+    }
+    if (typeof raw === 'string' && raw) {
+      return [
+        {
+          status: raw,
+          rejection_reason: c.approval_rejection_reason ?? null,
+          admin_comment: c.approval_admin_comment ?? null,
+          donor_reply: c.approval_donor_reply ?? null,
+          resubmission_count: c.approval_resubmission_count ?? null,
+          created_at: c.approval_created_at ?? null,
+          updated_at: c.approval_updated_at ?? null,
+        },
+      ]
+    }
+    return []
+  }
+
+  /**
+   * Case title from flat RPC field or embedded `cases` join (title_en / title_ar).
+   */
+  private static resolveCaseTitle(c: ContributionRow): string {
+    if (c.case_title?.trim()) return c.case_title.trim()
+    const rel = c.cases
+    if (!rel) return ''
+    const row = Array.isArray(rel) ? rel[0] : rel
+    if (!row) return ''
+    const t = row.title_en || row.title_ar || row.title || ''
+    return typeof t === 'string' ? t.trim() : ''
+  }
+
+  /**
    * Normalize contribution data
    */
   private static normalizeContribution(c: ContributionRow): NormalizedContribution {
@@ -304,7 +352,7 @@ export class ContributionService {
       createdAt: c.created_at || null,
       updatedAt: c.updated_at || null,
       caseId: c.case_id || null,
-      caseTitle: c.case_title || '',
+      caseTitle: this.resolveCaseTitle(c),
       donorName,
       donorId: c.donor_id || null,
       donorEmail: c.donor_email || null,
@@ -312,15 +360,7 @@ export class ContributionService {
       donorLastName: c.donor_last_name || null,
       donorPhone: c.donor_phone || null,
       proofUrl: c.proof_url || c.proof_of_payment || null,
-      approval_status: c.approval_status ? [{
-        status: c.approval_status,
-        rejection_reason: c.approval_rejection_reason || null,
-        admin_comment: c.approval_admin_comment || null,
-        donor_reply: c.approval_donor_reply || null,
-        resubmission_count: c.approval_resubmission_count || null,
-        created_at: c.approval_created_at || null,
-        updated_at: c.approval_updated_at || null
-      }] : []
+      approval_status: this.normalizeApprovalStatus(c),
     }
   }
 
@@ -333,9 +373,9 @@ export class ContributionService {
       .from('contributions')
       .select(`
         *,
-        cases:case_id(title),
+        ${CASE_EMBED_SELECT},
         users:donor_id(id, email, first_name, last_name, phone),
-        approval_status:contribution_approval_status!contribution_id(status, rejection_reason, admin_comment, donor_reply, resubmission_count, created_at, updated_at)
+        approval_status:contribution_approval_status!contribution_id(id, status, rejection_reason, admin_comment, donor_reply, resubmission_count, created_at, updated_at)
       `)
       .eq('id', id)
       .single()
@@ -398,7 +438,7 @@ export class ContributionService {
       })
       .select(`
         *,
-        cases:case_id(title),
+        ${CASE_EMBED_SELECT},
         users:donor_id(id, email, first_name, last_name, phone)
       `)
       .single()
@@ -472,7 +512,7 @@ export class ContributionService {
       .select(
         `
         *,
-        cases:case_id(title),
+        ${CASE_EMBED_SELECT},
         users:donor_id(id, email, first_name, last_name, phone)
       `
       )

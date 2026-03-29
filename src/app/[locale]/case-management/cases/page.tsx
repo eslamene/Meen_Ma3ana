@@ -18,7 +18,8 @@ import { toast } from 'sonner'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import { useInfiniteScrollPagination } from '@/hooks/useInfiniteScrollPagination'
-import { theme, brandColors } from '@/lib/theme'
+import { cn } from '@/lib/utils'
+import { brandColors } from '@/lib/theme'
 import { defaultLogger as logger } from '@/lib/logger'
 import { AdminContributionModal } from '@/components/admin/AdminContributionModal'
 import { useAdmin } from '@/lib/admin/hooks'
@@ -270,7 +271,7 @@ export default function AdminCasesPage() {
         )
       case 'under_review':
         return (
-          <Badge variant="outline" style={{ background: theme.gradients.brandSubtle, color: brandColors.meen[800], borderColor: brandColors.meen[200] }}>
+          <Badge variant="outline" className="border-[var(--meen-200)] bg-muted text-[var(--meen-800)]">
             <Clock className="h-3 w-3 mr-1" />
             Under Review
           </Badge>
@@ -712,7 +713,7 @@ export default function AdminCasesPage() {
   return (
     <ProtectedRoute>
       <PermissionGuard permission="cases:manage">
-        <div className="min-h-screen overflow-x-hidden" style={{ background: theme.gradients.brandSubtle }}>
+        <div className="min-h-screen overflow-x-hidden bg-background">
           <Container variant={containerVariant} className="py-3 sm:py-4 lg:py-6 px-4 sm:px-6">
             {/* Header */}
             <div className="mb-3 sm:mb-4">
@@ -723,7 +724,7 @@ export default function AdminCasesPage() {
                   className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 text-sm sm:text-base"
                 >
                   <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="hidden sm:inline">Back to overview</span>
                   <span className="sm:hidden">Back</span>
                 </Button>
               </div>
@@ -735,17 +736,7 @@ export default function AdminCasesPage() {
                 <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   onClick={() => router.push(`/${params.locale}/case-management/create`)}
-                  className="w-full sm:w-auto text-sm sm:text-base text-white"
-                  style={{
-                    background: theme.gradients.primary,
-                    boxShadow: theme.shadows.primary
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = theme.gradients.primary
-                  }}
+                  className="w-full sm:w-auto bg-[var(--meen-600)] text-sm text-white hover:bg-[var(--meen-700)] sm:text-base"
                 >
                   <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Create New Case</span>
@@ -766,7 +757,7 @@ export default function AdminCasesPage() {
 
             {/* Statistics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-4">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
@@ -780,7 +771,7 @@ export default function AdminCasesPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
@@ -794,7 +785,7 @@ export default function AdminCasesPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
@@ -808,14 +799,14 @@ export default function AdminCasesPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300" style={{ boxShadow: theme.shadows.primary }}>
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Under Review</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.under_review}</p>
                     </div>
-                    <div className="p-2 sm:p-3 rounded-full flex-shrink-0 ml-2" style={{ background: theme.gradients.brandSubtle }}>
+                    <div className="ml-2 flex-shrink-0 rounded-full bg-muted p-2 sm:p-3">
                       <Clock className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: brandColors.meen[600] }} />
                     </div>
                   </div>
@@ -824,7 +815,7 @@ export default function AdminCasesPage() {
             </div>
 
             {/* Filters */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-3 sm:mb-4" style={{ boxShadow: theme.shadows.primary }}>
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mb-3 sm:mb-4">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                   <div className="flex-1 min-w-0">
@@ -979,7 +970,7 @@ export default function AdminCasesPage() {
                 <p className="text-gray-600 mt-4">Loading cases...</p>
               </div>
             ) : filteredCases.length === 0 ? (
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg" style={{ boxShadow: theme.shadows.primary }}>
+              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
                   <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">No cases found</h3>
@@ -991,17 +982,7 @@ export default function AdminCasesPage() {
                   </p>
                   <Button
                     onClick={() => router.push(`/${params.locale}/case-management/create`)}
-                    className="text-white"
-                    style={{
-                      background: theme.gradients.primary,
-                      boxShadow: theme.shadows.primary
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = theme.gradients.primary
-                    }}
+                    className="bg-[var(--meen-600)] text-white hover:bg-[var(--meen-700)]"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Create First Case
@@ -1036,7 +1017,7 @@ export default function AdminCasesPage() {
                     const beneficiaryName = beneficiary?.name || case_.beneficiary_name || null
                     
                     return (
-                    <Card key={case_.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden" style={{ boxShadow: theme.shadows.primary }}>
+                    <Card key={case_.id} className="bg-white/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden">
                       <CardContent className="p-0">
                         <div className="flex flex-col md:flex-row">
                           {/* Case Image */}
@@ -1116,12 +1097,11 @@ export default function AdminCasesPage() {
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 overflow-hidden">
                                 <div
-                                  className="h-2 sm:h-3 rounded-full transition-all duration-500 shadow-sm"
-                                  style={{ 
+                                  className="h-2 rounded-full bg-[var(--meen-500)] transition-all duration-500 sm:h-3"
+                                  style={{
                                     width: `${getProgressPercentage(case_.approved_amount || 0, case_.target_amount)}%`,
-                                    background: theme.gradients.progress
                                   }}
-                                ></div>
+                                />
                               </div>
                             </div>
 
@@ -1145,7 +1125,9 @@ export default function AdminCasesPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-lg border min-w-0" style={{ background: theme.gradients.brandSubtle, borderColor: brandColors.meen[200] }}>
+                              <div
+                                className="flex min-w-0 items-center gap-1.5 rounded-lg border border-[var(--meen-200)] bg-muted p-2 sm:gap-2 sm:p-3"
+                              >
                                 <Users className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" style={{ color: brandColors.meen[600] }} />
                                 <div className="min-w-0 flex-1">
                                   <p className="text-xs text-gray-600">Contributors</p>
@@ -1309,21 +1291,7 @@ export default function AdminCasesPage() {
                     <Button
                       onClick={pagination.handleLoadMore}
                       disabled={pagination.state.isLoadingMore}
-                      className="text-white min-w-[120px]"
-                      style={{
-                        background: theme.gradients.primary,
-                        boxShadow: theme.shadows.primary
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!pagination.state.isLoadingMore) {
-                          e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.meen[600]} 0%, ${brandColors.meen[700]} 100%)`
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!pagination.state.isLoadingMore) {
-                          e.currentTarget.style.background = theme.gradients.primary
-                        }
-                      }}
+                      className="min-w-[120px] bg-[var(--meen-600)] text-white hover:bg-[var(--meen-700)] disabled:opacity-60"
                     >
                       {pagination.state.isLoadingMore ? (
                         <>
@@ -1346,7 +1314,7 @@ export default function AdminCasesPage() {
 
                 {/* Pagination Controls - Hidden on mobile, shown on desktop */}
                 {pagination.state.totalPages > 1 && (
-                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-4 sm:mt-6 hidden sm:block" style={{ boxShadow: theme.shadows.primary }}>
+                  <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg mt-4 sm:mt-6 hidden sm:block">
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
                         <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center sm:justify-start">
@@ -1390,32 +1358,12 @@ export default function AdminCasesPage() {
                                   variant={pagination.state.currentPage === page ? "default" : "outline"}
                                   size="sm"
                                   onClick={() => handlePageChange(page as number)}
-                                  className="min-w-[32px] sm:min-w-[40px] h-7 sm:h-8 px-1 sm:px-2 text-xs sm:text-sm"
-                                  style={
+                                  className={cn(
+                                    'h-7 min-w-[32px] px-1 text-xs sm:h-8 sm:min-w-[40px] sm:px-2 sm:text-sm',
                                     pagination.state.currentPage === page
-                                      ? {
-                                          background: theme.gradients.primary,
-                                          boxShadow: theme.shadows.primary,
-                                          color: 'white',
-                                          borderColor: 'transparent'
-                                        }
-                                      : {
-                                          borderColor: brandColors.meen[200],
-                                          color: brandColors.meen[700]
-                                        }
-                                  }
-                                  onMouseEnter={(e) => {
-                                    if (pagination.state.currentPage !== page) {
-                                      e.currentTarget.style.borderColor = brandColors.meen[500]
-                                      e.currentTarget.style.backgroundColor = brandColors.meen[50]
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (pagination.state.currentPage !== page) {
-                                      e.currentTarget.style.borderColor = brandColors.meen[200]
-                                      e.currentTarget.style.backgroundColor = 'transparent'
-                                    }
-                                  }}
+                                      ? 'border-transparent bg-[var(--meen-600)] text-white hover:bg-[var(--meen-700)]'
+                                      : 'border-[var(--meen-200)] text-[var(--meen-700)] hover:border-[var(--meen-500)] hover:bg-[var(--meen-50)]'
+                                  )}
                                 >
                                   {page}
                                 </Button>

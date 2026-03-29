@@ -1,8 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  Suspense,
+  useSyncExternalStore,
+} from 'react'
 import { useTranslations } from 'next-intl'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, usePathname, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
@@ -10,12 +17,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target, XCircle, AlertTriangle, RefreshCw, Copy, ChevronDown, ChevronRight, ExternalLink, Eye, Download, Search, Filter, X, ChevronLeft, ChevronRight as ChevronRightIcon, Loader2 } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { Separator } from '@/components/ui/separator'
+import { Bell, Check, CheckCheck, MessageSquare, TrendingUp, DollarSign, Target, XCircle, AlertTriangle, RefreshCw, Copy, ExternalLink, Eye, Download, Search, Filter, X, FolderKanban } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { theme, brandColors } from '@/lib/theme'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -26,6 +46,12 @@ import {
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
 import { cn } from '@/lib/utils'
 import Pagination from '@/components/ui/pagination'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -44,17 +70,488 @@ interface Notification {
   recipient_id: string
 }
 
-export default function NotificationsPage() {
+function notificationTitle(n: Notification, locale: string) {
+  return locale === 'ar'
+    ? (n.title_ar || n.title || '')
+    : (n.title_en || n.title || '')
+}
+
+function notificationMessage(n: Notification, locale: string) {
+  return locale === 'ar'
+    ? (n.message_ar || n.message || '')
+    : (n.message_en || n.message || '')
+}
+
+const LIST_SUMMARY_SEP = ' · '
+
+function truncateListText(s: string, max: number): string {
+  const trimmed = s.trim()
+  if (trimmed.length <= max) return trimmed
+  return `${trimmed.slice(0, Math.max(0, max - 1))}…`
+}
+
+function strFromData(v: unknown): string {
+  if (v == null) return ''
+  if (typeof v === 'string') return v.trim()
+  return String(v).trim()
+}
+
+function numFromData(v: unknown): number | null {
+  if (v == null) return null
+  const n = typeof v === 'number' ? v : parseFloat(String(v))
+  return Number.isFinite(n) ? n : null
+}
+
+function formatListEgp(amount: number, locale: string): string {
+  const loc = locale === 'ar' ? 'ar-EG' : 'en-US'
+  return `${amount.toLocaleString(loc)} EGP`
+}
+
+/** Extra line under the title in the list: structured fields from `data`, else message excerpt. */
+function notificationListSecondary(
+  n: Notification,
+  locale: string,
+  t: (key: string) => string,
+  truncateId: (id: string) => string
+): string | null {
+  const d = (n.data || {}) as Record<string, unknown>
+  const parts: string[] = []
+  const loc = locale === 'ar' ? 'ar-EG' : 'en-US'
+
+  const pushAmt = (v: unknown) => {
+    const a = numFromData(v)
+    if (a != null) parts.push(formatListEgp(a, locale))
+  }
+
+  switch (n.type) {
+    case 'contribution_approved':
+    case 'contribution_rejected':
+    case 'contribution_pending': {
+      pushAmt(d.amount)
+      const caseTitle = strFromData(d.case_title)
+      if (caseTitle) parts.push(truncateListText(caseTitle, 48))
+      const tx =
+        strFromData(d.new_contribution_id) || strFromData(d.contribution_id)
+      if (tx) parts.push(`${t('tx')} ${truncateId(tx)}`)
+      const parent = strFromData(d.original_contribution_id)
+      if (!tx && parent) parts.push(`${t('parent')} ${truncateId(parent)}`)
+      if (n.type === 'contribution_rejected') {
+        const reason = strFromData(d.rejection_reason)
+        if (reason) parts.push(truncateListText(reason, 44))
+      }
+      break
+    }
+    case 'contribution_revised': {
+      const newAmt = numFromData(d.new_amount)
+      const oldAmt = numFromData(d.original_amount)
+      if (oldAmt != null && newAmt != null && oldAmt !== newAmt) {
+        parts.push(
+          `${oldAmt.toLocaleString(loc)} → ${newAmt.toLocaleString(loc)} EGP`
+        )
+      } else {
+        if (newAmt != null) pushAmt(newAmt)
+        else if (oldAmt != null) pushAmt(oldAmt)
+      }
+      const newId = strFromData(d.new_contribution_id)
+      const origId = strFromData(d.original_contribution_id)
+      if (newId) parts.push(`${t('tx')} ${truncateId(newId)}`)
+      if (origId) parts.push(`${t('parent')} ${truncateId(origId)}`)
+      const caseId = strFromData(d.case_id)
+      if (caseId) parts.push(`${t('case')} ${truncateId(caseId)}`)
+      const expl = strFromData(d.revision_explanation)
+      if (expl) parts.push(truncateListText(expl, 52))
+      break
+    }
+    case 'case_contribution': {
+      const donor =
+        strFromData(d.donorName) || strFromData(d.donor_name)
+      if (donor) parts.push(truncateListText(donor, 36))
+      pushAmt(d.amount)
+      const caseTitle =
+        strFromData(d.case_title) || strFromData(d.caseTitle)
+      const caseId = strFromData(d.caseId) || strFromData(d.case_id)
+      if (caseTitle) parts.push(truncateListText(caseTitle, 40))
+      else if (caseId) parts.push(`${t('case')} ${truncateId(caseId)}`)
+      const contr =
+        strFromData(d.contributionId) || strFromData(d.contribution_id)
+      if (contr) parts.push(`${t('tx')} ${truncateId(contr)}`)
+      break
+    }
+    case 'case_progress':
+    case 'case_milestone': {
+      const milestone = strFromData(d.milestone)
+      if (milestone) parts.push(milestone)
+      const cur =
+        numFromData(d.currentAmount) ?? numFromData(d.current_amount)
+      const tgt =
+        numFromData(d.targetAmount) ?? numFromData(d.target_amount)
+      if (cur != null && tgt != null) {
+        parts.push(
+          `${cur.toLocaleString(loc)} / ${tgt.toLocaleString(loc)} EGP`
+        )
+      } else {
+        if (cur != null) pushAmt(cur)
+        if (tgt != null) pushAmt(tgt)
+      }
+      const caseId = strFromData(d.caseId) || strFromData(d.case_id)
+      if (caseId) parts.push(`${t('case')} ${truncateId(caseId)}`)
+      break
+    }
+    case 'case_update': {
+      const updateType =
+        strFromData(d.updateType) || strFromData(d.update_type)
+      if (updateType) parts.push(truncateListText(updateType, 36))
+      const caseId = strFromData(d.caseId) || strFromData(d.case_id)
+      if (caseId) parts.push(`${t('case')} ${truncateId(caseId)}`)
+      const updateId = strFromData(d.updateId) || strFromData(d.update_id)
+      if (updateId && !updateType) parts.push(truncateId(updateId))
+      break
+    }
+    default:
+      break
+  }
+
+  const structured = parts.filter(Boolean).join(LIST_SUMMARY_SEP)
+  if (structured) return structured
+
+  const msg = notificationMessage(n, locale)
+  if (msg?.trim()) {
+    return truncateListText(msg.replace(/\s+/g, ' '), 130)
+  }
+  return null
+}
+
+type DetailPanelProps = {
+  notification: Notification
+  locale: string
+  t: (key: string) => string
+  notificationTypes: { value: string; label: string }[]
+  getNotificationColor: (type: string) => string
+  getNotificationIcon: (type: string) => React.ReactNode
+  truncateId: (id: string) => string
+  getTimeAgo: (date: string) => string
+  onClose?: () => void
+  showHeaderBar: boolean
+  onOpenContribution: (n: Notification) => void
+  onViewProof: (contributionId: string) => void
+  onCopyId: (text: string) => void
+}
+
+function NotificationDetailPanel({
+  notification,
+  locale,
+  t,
+  notificationTypes,
+  getNotificationColor,
+  getNotificationIcon,
+  truncateId,
+  getTimeAgo,
+  onClose,
+  showHeaderBar,
+  onOpenContribution,
+  onViewProof,
+  onCopyId,
+}: DetailPanelProps) {
+  const txId =
+    (notification.data?.new_contribution_id as string) ||
+    (notification.data?.contribution_id as string)
+  const parentId = notification.data?.original_contribution_id as string
+  const amount = notification.data?.amount as number
+  const caseTitle = notification.data?.case_title as string
+  const rejectionReason = notification.data?.rejection_reason as string
+  const title = notificationTitle(notification, locale)
+  const message = notificationMessage(notification, locale)
+  const typeLabel =
+    notificationTypes.find(nt => nt.value === notification.type)?.label ||
+    notification.type.replace(/_/g, ' ')
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      {showHeaderBar && (
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
+          <span className="text-sm font-medium text-muted-foreground">
+            {t('detailPanelTitle')}
+          </span>
+          <div className="flex items-center gap-1">
+            {(txId || parentId) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-primary"
+                onClick={() => onOpenContribution(notification)}
+              >
+                {t('openContribution')}
+                <ExternalLink className="ms-1 h-3.5 w-3.5" />
+              </Button>
+            )}
+            {onClose && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={onClose}
+                aria-label={t('hideDetails')}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-start gap-3">
+          <div
+            className={cn(
+              'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border',
+              getNotificationColor(notification.type)
+            )}
+          >
+            {getNotificationIcon(notification.type)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold leading-snug text-foreground">{title}</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className={cn('text-xs font-normal', getNotificationColor(notification.type))}>
+                {typeLabel}
+              </Badge>
+              <Badge variant="outline" className="text-xs font-normal">
+                {notification.read ? t('read') : t('unread')}
+              </Badge>
+              {notification.type === 'contribution_pending' && (
+                <Badge
+                  variant="outline"
+                  className="border-ma3ana-200 bg-ma3ana-50 text-xs text-ma3ana-800 dark:border-ma3ana-800 dark:bg-ma3ana-950/40 dark:text-ma3ana-200"
+                >
+                  {t('new')}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted p-4">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{message}</p>
+        </div>
+
+        <Separator className="my-5" />
+
+        <h3 className="mb-3 text-sm font-semibold text-foreground">{t('details')}</h3>
+        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          {amount != null && Number.isFinite(amount) && (
+            <>
+              <dt className="text-muted-foreground">{t('amount')}</dt>
+              <dd className="font-medium">{amount} EGP</dd>
+            </>
+          )}
+          {caseTitle && (
+            <>
+              <dt className="text-muted-foreground">{t('case')}</dt>
+              <dd className="font-medium">{caseTitle}</dd>
+            </>
+          )}
+          {txId && (
+            <>
+              <dt className="text-muted-foreground">{t('transactionId')}</dt>
+              <dd className="flex items-center gap-2 font-mono text-xs">
+                {truncateId(txId)}
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => onCopyId(txId)}
+                  aria-label={t('copyId')}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </dd>
+            </>
+          )}
+          {parentId && (
+            <>
+              <dt className="text-muted-foreground">{t('parentTransaction')}</dt>
+              <dd className="flex items-center gap-2 font-mono text-xs">
+                {truncateId(parentId)}
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => onCopyId(parentId)}
+                  aria-label={t('copyId')}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </dd>
+            </>
+          )}
+          {rejectionReason && (
+            <>
+              <dt className="col-span-full text-muted-foreground">{t('rejectionReason')}</dt>
+              <dd className="col-span-full font-medium text-destructive">{rejectionReason}</dd>
+            </>
+          )}
+          <dt className="text-muted-foreground">{t('created')}</dt>
+          <dd className="font-medium">{new Date(notification.created_at).toLocaleString()}</dd>
+          <dt className="text-muted-foreground">{t('columnWhen')}</dt>
+          <dd className="font-medium">{getTimeAgo(notification.created_at)}</dd>
+        </dl>
+
+        {(txId || parentId) && (
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => onOpenContribution(notification)}
+            >
+              <ExternalLink className="me-2 h-4 w-4" />
+              {t('viewDetails')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 border-primary/30 text-primary hover:bg-primary/5"
+              onClick={() => onViewProof(txId || parentId)}
+            >
+              <Eye className="me-2 h-4 w-4" />
+              {t('viewProof')}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function mapApiNotification(row: Record<string, unknown>): Notification {
+  return row as unknown as Notification
+}
+
+function NotificationListTableSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell className="w-12">
+            <Skeleton className="mx-auto h-9 w-9 rounded-md" />
+          </TableCell>
+          <TableCell>
+            <div className="flex flex-col gap-1.5 py-0.5">
+              <Skeleton className="h-4 w-[min(280px,60vw)] max-w-full" />
+              <Skeleton className="h-3 w-[min(220px,50vw)] max-w-full" />
+            </div>
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-6 w-24 rounded-full" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-6 w-16 rounded-full" />
+          </TableCell>
+          <TableCell className="text-end">
+            <Skeleton className="ms-auto h-3 w-20" />
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
+  )
+}
+
+function NotificationDetailPanelSkeleton() {
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-background p-4 sm:p-5">
+      <div className="mb-4 flex gap-3">
+        <Skeleton className="h-11 w-11 shrink-0 rounded-lg" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-6 w-64 max-w-full" />
+          <div className="flex gap-2">
+            <Skeleton className="h-5 w-20 rounded-full" />
+            <Skeleton className="h-5 w-14 rounded-full" />
+          </div>
+        </div>
+      </div>
+      <Skeleton className="mb-5 h-24 w-full rounded-lg" />
+      <Skeleton className="mb-3 h-4 w-24" />
+      <div className="grid grid-cols-2 gap-3">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-40" />
+      </div>
+      <div className="mt-6 flex gap-2">
+        <Skeleton className="h-9 flex-1 rounded-md" />
+        <Skeleton className="h-9 flex-1 rounded-md" />
+      </div>
+    </div>
+  )
+}
+
+function NotificationsPageFallback() {
+  const t = useTranslations('notifications')
+  const params = useParams()
+  const locale = params.locale as string
+  const { containerVariant } = useLayout()
+  return (
+    <div className="min-h-screen bg-background">
+      <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
+        <DetailPageHeader
+          backUrl={`/${locale}/dashboard`}
+          icon={Bell}
+          title={t('title') || 'Notifications'}
+          description={t('subtitle') || ''}
+        />
+        <Card className="overflow-hidden border border-border shadow-sm">
+          <CardHeader className="border-b pb-4">
+            <Skeleton className="h-7 w-48" />
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="min-h-[320px] p-4">
+              <Skeleton className="mb-4 h-10 w-full" />
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Container>
+    </div>
+  )
+}
+
+function NotificationsPageContent() {
   const t = useTranslations('notifications')
   const params = useParams()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const locale = params.locale as string
   const { containerVariant } = useLayout()
-  
+
+  const isDesktop = useSyncExternalStore(
+    cb => {
+      const mq = window.matchMedia('(min-width: 1024px)')
+      mq.addEventListener('change', cb)
+      return () => mq.removeEventListener('change', cb)
+    },
+    () => window.matchMedia('(min-width: 1024px)').matches,
+    () => false
+  )
+
+  const selectedNotificationId = searchParams.get('id')
+
+  const updateSelectionInUrl = useCallback(
+    (id: string | null) => {
+      const p = new URLSearchParams(searchParams.toString())
+      if (id) p.set('id', id)
+      else p.delete('id')
+      const qs = p.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    },
+    [pathname, router, searchParams]
+  )
+
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [expandedNotifications, setExpandedNotifications] = useState<Set<string>>(new Set())
   const [showProofModal, setShowProofModal] = useState(false)
   const [proofData, setProofData] = useState<{
     proofUrl?: string
@@ -75,7 +572,6 @@ export default function NotificationsPage() {
   const [readStatusFilter, setReadStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('created_at')
   const [sortOrder, setSortOrder] = useState<string>('desc')
-
   const supabase = createClient()
 
   const fetchNotifications = useCallback(async () => {
@@ -126,66 +622,164 @@ export default function NotificationsPage() {
     setPage(1)
   }, [searchQuery, typeFilter, readStatusFilter, sortBy, sortOrder])
 
-  const handleNotificationClick = async (notification: Notification) => {
-    if (notification.read) return
+  const selectedFromList = useMemo(
+    () =>
+      selectedNotificationId
+        ? notifications.find(n => n.id === selectedNotificationId) ?? null
+        : null,
+    [notifications, selectedNotificationId]
+  )
 
-    try {
-      
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          notificationId: notification.id,
-          action: 'markAsRead'
-        })
-      })
+  const [fetchedDetail, setFetchedDetail] = useState<Notification | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-        )
-        setUnreadCount(prev => Math.max(0, prev - 1))
-      }
-    } catch (error) {
-      logger.error('Error marking notification as read:', { error: error })
-    } finally {
-      // Mark as read completed
+  useEffect(() => {
+    if (!selectedNotificationId) {
+      setFetchedDetail(null)
+      setDetailLoading(false)
+      return
     }
-  }
+    if (selectedFromList || loading) {
+      if (selectedFromList) setFetchedDetail(null)
+      setDetailLoading(false)
+      return
+    }
+    let cancelled = false
+    setDetailLoading(true)
+    void (async () => {
+      try {
+        const response = await fetch(`/api/notifications/${selectedNotificationId}`)
+        if (!response.ok) {
+          if (response.status === 404) {
+            updateSelectionInUrl(null)
+            toast.error(t('noNotificationsFound'))
+          }
+          if (!cancelled) setDetailLoading(false)
+          return
+        }
+        const data = await response.json()
+        if (!cancelled && data?.notification) {
+          setFetchedDetail(mapApiNotification(data.notification as Record<string, unknown>))
+        }
+      } catch (e) {
+        logger.error('Failed to load notification detail', { error: e })
+      } finally {
+        if (!cancelled) setDetailLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedNotificationId, selectedFromList, loading, updateSelectionInUrl, t])
+
+  const selectedNotification = selectedFromList ?? fetchedDetail
+
+  const markAsReadOptimistic = useCallback(
+    (notification: Notification) => {
+      if (notification.read) return
+      const id = notification.id
+      const prevList = notifications
+      const prevUnread = unreadCount
+      setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)))
+      setUnreadCount(u => Math.max(0, u - 1))
+
+      void (async () => {
+        try {
+          const response = await fetch('/api/notifications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notificationId: id, action: 'markAsRead' }),
+          })
+          if (response.ok) {
+            const data = await response.json()
+            if (data.notification) {
+              const updated = mapApiNotification(data.notification as Record<string, unknown>)
+              setNotifications(prev =>
+                prev.map(n => (n.id === updated.id ? { ...n, ...updated } : n))
+              )
+              setFetchedDetail(prev =>
+                prev?.id === updated.id ? { ...prev, ...updated } : prev
+              )
+            }
+            if (typeof data.unreadCount === 'number') {
+              setUnreadCount(data.unreadCount)
+            }
+          } else {
+            setNotifications(prevList)
+            setUnreadCount(prevUnread)
+          }
+        } catch (error) {
+          logger.error('Error marking notification as read:', { error })
+          setNotifications(prevList)
+          setUnreadCount(prevUnread)
+        }
+      })()
+    },
+    [notifications, unreadCount]
+  )
+
+  const handleSelectRow = useCallback(
+    (notification: Notification) => {
+      updateSelectionInUrl(notification.id)
+      markAsReadOptimistic(notification)
+    },
+    [updateSelectionInUrl, markAsReadOptimistic]
+  )
+
+  useEffect(() => {
+    if (!isDesktop || !selectedNotificationId) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        updateSelectionInUrl(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isDesktop, selectedNotificationId, updateSelectionInUrl])
+
+  /**
+   * Deep-linked or programmatic selection: mark read when the row is on the current page.
+   * Row clicks already call markAsReadOptimistic in handleSelectRow; this no-ops once read is true.
+   */
+  useEffect(() => {
+    if (!selectedNotificationId || detailLoading) return
+    const n = notifications.find(x => x.id === selectedNotificationId)
+    if (!n || n.read) return
+    markAsReadOptimistic(n)
+  }, [selectedNotificationId, notifications, detailLoading, markAsReadOptimistic])
+
+  useEffect(() => {
+    if (!selectedNotificationId || detailLoading || !fetchedDetail || fetchedDetail.read) return
+    if (notifications.some(x => x.id === selectedNotificationId)) return
+    markAsReadOptimistic(fetchedDetail)
+  }, [selectedNotificationId, fetchedDetail, detailLoading, notifications, markAsReadOptimistic])
 
   const handleMarkAllAsRead = async () => {
+    const prevList = notifications
+    const prevUnread = unreadCount
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setUnreadCount(0)
     try {
       const response = await fetch('/api/notifications', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'markAllAsRead'
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markAllAsRead' }),
       })
-
       if (response.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-        setUnreadCount(0)
+        const data = await response.json()
+        if (typeof data.unreadCount === 'number') {
+          setUnreadCount(data.unreadCount)
+        }
+      } else {
+        setNotifications(prevList)
+        setUnreadCount(prevUnread)
       }
     } catch (error) {
-      logger.error('Error marking all notifications as read:', { error: error })
+      logger.error('Error marking all notifications as read:', { error })
+      setNotifications(prevList)
+      setUnreadCount(prevUnread)
     }
-  }
-
-  const toggleExpanded = (notificationId: string) => {
-    setExpandedNotifications(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(notificationId)) {
-        newSet.delete(notificationId)
-      } else {
-        newSet.add(notificationId)
-      }
-      return newSet
-    })
   }
 
   const handleViewTransactionDetails = (notification: Notification) => {
@@ -246,7 +840,7 @@ export default function NotificationsPage() {
       case 'contribution_revised':
         return 'bg-meen-100 text-meen-800 border-meen-200'
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return 'bg-muted text-foreground/80 border-border'
     }
   }
 
@@ -349,8 +943,158 @@ export default function NotificationsPage() {
 
   const hasActiveFilters = searchQuery || (typeFilter && typeFilter !== 'all') || (readStatusFilter && readStatusFilter !== 'all') || sortBy !== 'created_at' || sortOrder !== 'desc'
 
+  function NotificationListPane({ className }: { className?: string }) {
+    return (
+      <div
+        className={cn('flex min-h-0 flex-1 flex-col bg-card', className)}
+      >
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+          <Table className="w-max min-w-full">
+            <TableHeader className="sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_0_hsl(var(--border))]">
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableHead className="w-12 min-w-12 text-center text-muted-foreground" aria-hidden />
+                <TableHead className="min-w-[200px] whitespace-nowrap text-muted-foreground">
+                  {t('columnSummary')}
+                </TableHead>
+                <TableHead className="min-w-[140px] whitespace-nowrap text-muted-foreground">
+                  {t('type')}
+                </TableHead>
+                <TableHead className="min-w-[100px] whitespace-nowrap text-muted-foreground">
+                  {t('status')}
+                </TableHead>
+                <TableHead className="min-w-[120px] whitespace-nowrap text-end text-muted-foreground">
+                  {t('columnWhen')}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <NotificationListTableSkeleton rows={10} />
+              ) : (
+                notifications.map(notification => (
+                  <TableRow
+                    key={notification.id}
+                    data-state={selectedNotificationId === notification.id ? 'selected' : undefined}
+                    className={cn(
+                      'cursor-pointer',
+                      !notification.read && 'bg-primary/[0.04]',
+                      selectedNotificationId === notification.id && 'bg-muted'
+                    )}
+                    onClick={() => handleSelectRow(notification)}
+                  >
+                    <TableCell className="w-12 min-w-12 align-middle">
+                      <div
+                        className={cn(
+                          'mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-md border',
+                          getNotificationColor(notification.type)
+                        )}
+                      >
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-[200px] max-w-[min(480px,60vw)] align-middle">
+                      <div className="flex flex-col gap-1 py-0.5">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="font-medium text-foreground">
+                            {notificationTitle(notification, locale)}
+                          </span>
+                          {!notification.read && (
+                            <span className="inline-flex shrink-0 items-center gap-1 text-xs text-primary">
+                              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                              {t('unread')}
+                            </span>
+                          )}
+                        </div>
+                        {(() => {
+                          const secondary = notificationListSecondary(
+                            notification,
+                            locale,
+                            t,
+                            truncateId
+                          )
+                          return secondary ? (
+                            <p
+                              className="text-xs leading-snug text-muted-foreground line-clamp-2 break-words"
+                              title={secondary}
+                            >
+                              {secondary}
+                            </p>
+                          ) : null
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-middle whitespace-nowrap">
+                      <Badge
+                        variant="outline"
+                        className={cn('shrink-0 text-xs font-normal', getNotificationColor(notification.type))}
+                      >
+                        {notificationTypes.find(nt => nt.value === notification.type)?.label ||
+                          notification.type.replace(/_/g, ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="align-middle whitespace-nowrap">
+                      <Badge variant="secondary" className="shrink-0 text-xs font-normal">
+                        {notification.read ? t('read') : t('unread')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-end text-xs text-muted-foreground align-middle">
+                      {getTimeAgo(notification.created_at)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {totalPages > 1 && (
+          <div className="shrink-0 border-t px-3 py-3 sm:px-4">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              limit={limit}
+              onPageChange={setPage}
+              loading={loading}
+              showItemCount={true}
+              itemName="notifications"
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const detailBody = detailLoading ? (
+    <NotificationDetailPanelSkeleton />
+  ) : selectedNotification ? (
+    <NotificationDetailPanel
+      notification={selectedNotification}
+      locale={locale}
+      t={t}
+      notificationTypes={notificationTypes}
+      getNotificationColor={getNotificationColor}
+      getNotificationIcon={getNotificationIcon}
+      truncateId={truncateId}
+      getTimeAgo={getTimeAgo}
+      showHeaderBar={false}
+      onOpenContribution={handleViewTransactionDetails}
+      onViewProof={handleViewProof}
+      onCopyId={copyToClipboard}
+    />
+  ) : selectedNotificationId ? (
+    <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
+      <Bell className="h-10 w-10 opacity-40" />
+      <p className="max-w-xs text-sm">{t('failedToLoadNotifications')}</p>
+    </div>
+  ) : (
+    <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
+      <Bell className="h-10 w-10 opacity-40" />
+      <p className="max-w-xs text-sm">{t('selectNotificationHint')}</p>
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
+    <div className="min-h-screen bg-background">
       <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
         {/* Header */}
         <DetailPageHeader
@@ -361,7 +1105,7 @@ export default function NotificationsPage() {
           badge={unreadCount > 0 ? {
             label: `${unreadCount} ${t('unread')}`,
             variant: 'secondary',
-            className: 'bg-amber-100 text-amber-700 border-amber-200'
+            className: 'border border-meen-200 bg-meen-100 font-semibold text-meen-800 dark:border-meen-800 dark:bg-meen-950/50 dark:text-meen-200'
           } : undefined}
           menuActions={unreadCount > 0 ? [
             {
@@ -373,12 +1117,12 @@ export default function NotificationsPage() {
         />
 
         {/* Search and Filters */}
-        <Card className="mb-6 border border-gray-200 shadow-sm">
+        <Card className="mb-6 border border-border shadow-sm">
           <CardContent className="p-4 sm:p-6">
             <div className="space-y-4">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={t('searchPlaceholder')}
                   value={searchQuery}
@@ -439,13 +1183,13 @@ export default function NotificationsPage() {
               {/* Active Filters */}
               {hasActiveFilters && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-gray-500">{t('activeFilters')}:</span>
+                  <span className="text-xs text-muted-foreground">{t('activeFilters')}:</span>
                   {searchQuery && (
                     <Badge variant="outline" className="text-xs">
                       {t('search')}: {searchQuery}
                       <button
                         onClick={() => setSearchQuery('')}
-                        className="ml-1.5 hover:text-red-600"
+                        className="ms-1.5 hover:text-destructive"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -456,7 +1200,7 @@ export default function NotificationsPage() {
                       {t('type')}: {notificationTypes.find(t => t.value === typeFilter)?.label}
                       <button
                         onClick={() => setTypeFilter('all')}
-                        className="ml-1.5 hover:text-red-600"
+                        className="ms-1.5 hover:text-destructive"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -467,7 +1211,7 @@ export default function NotificationsPage() {
                       {t('status')}: {readStatusFilter === 'read' ? t('read') : t('unread')}
                       <button
                         onClick={() => setReadStatusFilter('all')}
-                        className="ml-1.5 hover:text-red-600"
+                        className="ms-1.5 hover:text-destructive"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -487,263 +1231,106 @@ export default function NotificationsPage() {
           </CardContent>
         </Card>
 
-        {/* Notifications List */}
-        <Card className="border border-gray-200 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
+        {/* Notifications: full-width table; detail opens as overlay sheet */}
+        <Card className="overflow-hidden border border-border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Bell className="h-5 w-5 text-indigo-600" />
+              <Bell className="h-5 w-5 text-primary" />
               {t('notifications')}
               {total > 0 && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge
+                  variant="outline"
+                  className="border-meen-200 bg-meen-50 text-xs font-medium text-meen-900 dark:border-meen-800 dark:bg-meen-950/40 dark:text-meen-200"
+                >
                   {total} {total === 1 ? t('notification') : t('notificationsCount')}
                 </Badge>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mx-auto mb-4" />
-                  <p className="text-sm text-gray-600">{t('loadingNotifications')}</p>
-                </div>
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="text-center py-12 px-4">
-                <Bell className="h-16 w-16 text-gray-400 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            {!loading && notifications.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <Bell className="mx-auto mb-4 h-16 w-16 text-muted-foreground opacity-50" />
+                <h3 className="mb-2 text-lg font-semibold text-foreground">
                   {hasActiveFilters ? t('noNotificationsFound') : t('noNotificationsYet')}
                 </h3>
-                <p className="text-gray-500 text-sm">
-                  {hasActiveFilters 
-                    ? t('tryAdjustingFilters')
-                    : t('notificationsWillAppear')}
+                <p className="text-sm text-muted-foreground">
+                  {hasActiveFilters ? t('tryAdjustingFilters') : t('notificationsWillAppear')}
                 </p>
                 {hasActiveFilters && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="mt-4"
-                  >
+                  <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4">
                     {t('clearFilters')}
                   </Button>
                 )}
               </div>
+            ) : isDesktop ? (
+              selectedNotificationId ? (
+                <ResizablePanelGroup
+                  direction="horizontal"
+                  className={cn(
+                    'min-h-[min(560px,calc(100vh-12rem))] h-[calc(100vh-12rem)] max-h-[min(900px,calc(100vh-10rem))]',
+                    locale === 'ar' && 'flex-row-reverse'
+                  )}
+                  defaultLayout={{ list: 40, detail: 60 }}
+                >
+                  <ResizablePanel id="list" minSize="22%" className="min-w-0">
+                    <NotificationListPane className="h-full" />
+                  </ResizablePanel>
+                  <ResizableHandle withHandle className="w-1.5 bg-border" />
+                  <ResizablePanel id="detail" minSize="28%" className="min-w-0">
+                    <div className="flex h-full min-h-0 flex-col bg-background">
+                      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3 sm:px-5">
+                        <FolderKanban className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                        <h2 className="min-w-0 flex-1 text-base font-semibold text-foreground">
+                          {t('detailPanelTitle')}
+                        </h2>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => updateSelectionInUrl(null)}
+                          aria-label={t('hideDetails')}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="min-h-0 flex-1 overflow-y-auto">{detailBody}</div>
+                    </div>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              ) : (
+                <div className="min-h-[min(560px,calc(100vh-12rem))] h-[calc(100vh-12rem)] max-h-[min(900px,calc(100vh-10rem))]">
+                  <NotificationListPane className="h-full" />
+                </div>
+              )
             ) : (
               <>
-                <div className="space-y-3 p-4 sm:p-6">
-                  {notifications.map((notification) => {
-                const isExpanded = expandedNotifications.has(notification.id)
-                const txId = (notification.data?.new_contribution_id as string) || (notification.data?.contribution_id as string)
-                const parentId = notification.data?.original_contribution_id as string
-                const amount = notification.data?.amount as number
-                const caseTitle = notification.data?.case_title as string
-                const rejectionReason = notification.data?.rejection_reason as string
-
-                return (
-                    <Card
-                      key={notification.id}
-                      className={cn(
-                        "border transition-all hover:shadow-md",
-                        !notification.read 
-                          ? "bg-indigo-50/50 border-indigo-200 shadow-sm" 
-                          : "bg-white border-gray-200"
-                      )}
-                    >
-                      <CardContent className="p-4 sm:p-5">
-                        <div
-                          className="cursor-pointer"
-                          onClick={() => handleNotificationClick(notification)}
-                        >
-                          <div className="flex items-start gap-3 sm:gap-4">
-                            <div className={cn(
-                              "p-2 sm:p-2.5 rounded-lg flex-shrink-0",
-                              getNotificationColor(notification.type)
-                            )}>
-                              {getNotificationIcon(notification.type)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <h4 className="font-semibold text-sm sm:text-base text-gray-900">
-                                  {locale === 'ar' 
-                                    ? (notification.title_ar || notification.title || '')
-                                    : (notification.title_en || notification.title || '')
-                                  }
-                                </h4>
-                                {!notification.read && (
-                                  <div className="h-2 w-2 rounded-full bg-indigo-600 flex-shrink-0 mt-1.5" />
-                                )}
-                              </div>
-                              <p className="text-sm text-gray-600 mb-3 leading-relaxed">
-                                {locale === 'ar'
-                                  ? (notification.message_ar || notification.message || '')
-                                  : (notification.message_en || notification.message || '')
-                                }
-                              </p>
-                              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                            {(() => {
-                              // Show transaction ids when available
-                              if (txId || parentId) {
-                                return (
-                                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                                    {txId && (
-                                      <span className="font-mono">{t('tx')}: {truncateId(txId)}</span>
-                                    )}
-                                    {parentId && (
-                                      <span className="font-mono">{t('parent')}: {truncateId(parentId)}</span>
-                                    )}
-                                    {(txId || parentId) && (
-                                      <button
-                                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          copyToClipboard(txId || parentId)
-                                        }}
-                                        aria-label={t('copyId')}
-                                        title={t('copyTransactionId')}
-                                      >
-                                        <Copy className="h-3.5 w-3.5" />
-                                      </button>
-                                    )}
-                                  </div>
-                                )
-                              }
-                              return null
-                            })()}
-                                <span className="text-xs text-gray-500">{getTimeAgo(notification.created_at)}</span>
-                                <Badge variant="outline" className={cn("text-xs", getNotificationColor(notification.type))}>
-                                  {notificationTypes.find(nt => nt.value === notification.type)?.label || notification.type.replace(/_/g, ' ')}
-                                </Badge>
-                                {notification.type === 'contribution_pending' && (
-                                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">
-                                    {t('new')}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleExpanded(notification.id)
-                              }}
-                              className="p-1.5 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
-                              aria-label={isExpanded ? t('hideDetails') : t('showDetails')}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-gray-500" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-gray-500" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </CardContent>
-                      
-                      {/* Expandable Details Section */}
-                      {isExpanded && (
-                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 border-t border-gray-200 bg-gray-50/50">
-                          <div className="pt-4 space-y-3">
-                            <h5 className="text-sm font-semibold text-gray-900 mb-3">{t('details')}</h5>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                            {amount && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">{t('amount')}:</span>
-                                <span className="font-medium">{amount} EGP</span>
-                              </div>
-                            )}
-                            {caseTitle && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">{t('case')}:</span>
-                                <span className="font-medium">{caseTitle}</span>
-                              </div>
-                            )}
-                            {txId && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">{t('transactionId')}:</span>
-                                <span className="font-mono text-xs">{truncateId(txId)}</span>
-                              </div>
-                            )}
-                            {parentId && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">{t('parentTransaction')}:</span>
-                                <span className="font-mono text-xs">{truncateId(parentId)}</span>
-                              </div>
-                            )}
-                            {rejectionReason && (
-                              <div className="flex justify-between col-span-full">
-                                <span className="text-gray-600">{t('rejectionReason')}:</span>
-                                <span className="font-medium text-red-600">{rejectionReason}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">{t('created')}:</span>
-                              <span className="font-medium">{new Date(notification.created_at).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">{t('status')}:</span>
-                              <span className={`font-medium ${
-                                notification.read ? 'text-meen' : 'text-ma3ana'
-                              }`}>
-                                {notification.read ? t('read') : t('unread')}
-                              </span>
-                            </div>
-                          </div>
-                          
-                            {/* Action Buttons */}
-                            {(txId || parentId) && (
-                              <div className="pt-3 border-t border-gray-200">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  <Button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleViewTransactionDetails(notification)
-                                    }}
-                                    variant="outline"
-                                    size="sm"
-                                    className="flex items-center justify-center gap-2 h-9"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                    {t('viewDetails')}
-                                  </Button>
-                                  <Button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleViewProof(txId || parentId)
-                                    }}
-                                    variant="outline"
-                                    size="sm"
-                                    className="flex items-center justify-center gap-2 h-9 text-indigo-600 border-indigo-300 hover:bg-indigo-50"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                    {t('viewProof')}
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </Card>
-                  )
-                })}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="border-t border-gray-200 px-4 sm:px-6 py-4">
-                    <Pagination
-                      page={page}
-                      totalPages={totalPages}
-                      total={total}
-                      limit={limit}
-                      onPageChange={setPage}
-                      loading={loading}
-                      showItemCount={true}
-                      itemName="notifications"
-                    />
-                  </div>
-                )}
+                <NotificationListPane />
+                <Sheet
+                  open={Boolean(selectedNotificationId)}
+                  onOpenChange={open => {
+                    if (!open) updateSelectionInUrl(null)
+                  }}
+                >
+                  <SheetContent
+                    side={locale === 'ar' ? 'left' : 'right'}
+                    dir={locale === 'ar' ? 'rtl' : 'ltr'}
+                    className={cn(
+                      'flex h-full max-h-screen w-full flex-col gap-0 border-border bg-background p-0 shadow-2xl',
+                      'max-w-full sm:max-w-md lg:max-w-lg xl:max-w-xl'
+                    )}
+                    onCloseAutoFocus={e => e.preventDefault()}
+                  >
+                    <SheetHeader className="space-y-0 border-b border-border px-4 py-3 text-start sm:px-5 sm:py-4 pe-14">
+                      <SheetTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+                        <FolderKanban className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                        {t('detailPanelTitle')}
+                      </SheetTitle>
+                    </SheetHeader>
+                    <div className="min-h-0 flex-1 overflow-y-auto">{detailBody}</div>
+                  </SheetContent>
+                </Sheet>
               </>
             )}
           </CardContent>
@@ -752,10 +1339,13 @@ export default function NotificationsPage() {
         {/* Payment Proof Modal */}
         {showProofModal && proofData && (
           <Dialog open={showProofModal} onOpenChange={setShowProofModal}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+            <DialogContent
+              className="max-h-[90vh] max-w-4xl overflow-hidden"
+              aria-describedby={undefined}
+            >
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
+                  <Eye className="h-5 w-5 text-primary" />
                   {t('paymentProof')}
                 </DialogTitle>
               </DialogHeader>
@@ -783,7 +1373,7 @@ export default function NotificationsPage() {
               </div>
               {proofData.contributionId && (
                 <div className="flex justify-between items-center pt-4 border-t">
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-muted-foreground">
                     <p><strong>{t('contributionId')}:</strong> {truncateId(proofData.contributionId)}</p>
                     {proofData.amount && <p><strong>{t('amount')}:</strong> {proofData.amount} EGP</p>}
                     {proofData.caseTitle && <p><strong>{t('case')}:</strong> {proofData.caseTitle}</p>}
@@ -816,4 +1406,12 @@ export default function NotificationsPage() {
       </Container>
     </div>
   )
-} 
+}
+
+export default function NotificationsPage() {
+  return (
+    <Suspense fallback={<NotificationsPageFallback />}>
+      <NotificationsPageContent />
+    </Suspense>
+  )
+}

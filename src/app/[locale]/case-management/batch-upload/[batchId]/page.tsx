@@ -281,7 +281,7 @@ export default function BatchDetailsPage() {
                       variant="default"
                       onClick={handleProcessBatch}
                       disabled={processingBatchId === batchId}
-                      className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       {processingBatchId === batchId ? (
                         <>
@@ -459,7 +459,7 @@ export default function BatchDetailsPage() {
                       variant="default"
                       onClick={handleProcessBatch}
                       disabled={processingBatchId === batchId}
-                      className="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white"
+                      className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       {processingBatchId === batchId ? (
                         <>

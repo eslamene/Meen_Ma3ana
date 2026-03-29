@@ -9,7 +9,6 @@ import { useLayout } from '@/components/layout/LayoutProvider'
 import BatchCaseUploadModal from '@/components/cases/BatchCaseUploadModal'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Upload, Trash2, Loader2, CheckCircle2, XCircle, Clock, AlertCircle, MapPin, Play, RotateCcw } from 'lucide-react'
-import { theme } from '@/lib/theme'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -212,11 +211,7 @@ export default function BatchUploadPage() {
               <Button
                 onClick={() => setBatchUploadModalOpen(true)}
                 size="lg"
-                className="text-white"
-                style={{
-                  background: theme.gradients.primary,
-                  boxShadow: theme.shadows.primary
-                }}
+                className="bg-[var(--meen-600)] text-white hover:bg-[var(--meen-700)]"
               >
                 <Upload className="h-5 w-5 mr-2" />
                 New Batch Upload
@@ -288,7 +283,7 @@ export default function BatchUploadPage() {
                                   size="sm"
                                   onClick={() => handleProcessBatch(batch.id)}
                                   disabled={processingBatchId === batch.id}
-                                  className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white"
+                                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                                 >
                                   {processingBatchId === batch.id ? (
                                     <>

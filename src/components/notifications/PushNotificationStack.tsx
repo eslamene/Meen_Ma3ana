@@ -47,46 +47,46 @@ export function PushNotificationStack() {
     }
 
     const handleMessage = (event: MessageEvent) => {
-      // Filter out React DevTools messages and other noise
-      if (event.data && (
-        event.data.source === 'react-devtools-content-script' ||
-        event.data.source === 'react-devtools-backend-manager' ||
-        event.data.source === 'react-devtools-bridge'
-      )) {
-        return // Ignore React DevTools messages
+      const data = event.data
+      // window.postMessage receives traffic from extensions, devtools, and other frames — only handle our push types.
+      if (data == null || typeof data !== 'object') {
+        return
       }
-      
-      console.log('📨 Message received in PushNotificationStack:', event.data)
-      
-      if (event.data && event.data.type === 'PUSH_NOTIFICATION') {
-        console.log('✅ Processing PUSH_NOTIFICATION message:', event.data)
+      const src = (data as { source?: string }).source
+      if (
+        src === 'react-devtools-content-script' ||
+        src === 'react-devtools-backend-manager' ||
+        src === 'react-devtools-bridge'
+      ) {
+        return
+      }
+
+      const type = (data as { type?: unknown }).type
+      if (type === 'PUSH_NOTIFICATION') {
+        const p = data as {
+          title?: string
+          body?: string
+          icon?: string
+          badge?: string
+          data?: PushNotification['data']
+        }
         const notification: PushNotification = {
           id: `${Date.now()}-${Math.random()}`,
-          title: event.data.title || 'Meen Ma3ana',
-          body: event.data.body || '',
-          icon: event.data.icon || publicAssets.brand.logo,
-          badge: event.data.badge || publicAssets.brand.logo,
-          data: event.data.data || {},
+          title: p.title || 'Meen Ma3ana',
+          body: p.body || '',
+          icon: p.icon || publicAssets.brand.logo,
+          badge: p.badge || publicAssets.brand.logo,
+          data: p.data || {},
           timestamp: Date.now(),
         }
-        
-        console.log('📬 Adding notification to stack:', notification)
-        setNotifications((prev) => {
-          const updated = [...prev, notification]
-          console.log('📋 Total notifications after add:', updated.length)
-          return updated
-        })
-      } else if (event.data && event.data.type === 'NAVIGATE') {
-        // Handle navigation from service worker
-        console.log('🧭 Navigation message received:', event.data.url)
-        if (event.data.url) {
-          routerRef.current.push(event.data.url)
-        }
-      } else if (event.data && event.data.source) {
-        // Silently ignore messages with source (React DevTools, etc.)
+        setNotifications((prev) => [...prev, notification])
         return
-      } else {
-        console.log('⚠️ Unknown message type:', event.data)
+      }
+      if (type === 'NAVIGATE') {
+        const url = (data as { url?: string }).url
+        if (url) {
+          routerRef.current.push(url)
+        }
       }
     }
 

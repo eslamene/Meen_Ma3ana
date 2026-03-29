@@ -42,7 +42,8 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
 
   if (action === 'markAllAsRead') {
     await NotificationService.markAllAsRead(supabase, user.id)
-    return NextResponse.json({ success: true })
+    const unreadCount = await NotificationService.getUnreadCount(supabase, user.id)
+    return NextResponse.json({ success: true, unreadCount })
   }
 
   if (action === 'markAsRead') {
@@ -53,8 +54,9 @@ async function postHandler(request: NextRequest, context: ApiHandlerContext) {
     if (!existing || existing.recipient_id !== user.id) {
       throw new ApiError('NOT_FOUND', 'Notification not found', 404)
     }
-    await NotificationService.markAsRead(supabase, notificationId)
-    return NextResponse.json({ success: true })
+    const notification = await NotificationService.markAsRead(supabase, notificationId)
+    const unreadCount = await NotificationService.getUnreadCount(supabase, user.id)
+    return NextResponse.json({ success: true, notification, unreadCount })
   }
 
   throw new ApiError('VALIDATION_ERROR', 'Invalid action', 400)

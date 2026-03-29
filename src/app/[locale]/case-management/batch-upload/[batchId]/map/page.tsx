@@ -405,7 +405,7 @@ export default function BatchMappingPage() {
                       onClick={handleProcess}
                       disabled={processing}
                       size="lg"
-                      className="text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       {processing ? (
                         <>
@@ -589,7 +589,7 @@ export default function BatchMappingPage() {
                       onClick={handleProcess}
                       disabled={processing}
                       size="lg"
-                      className="text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       {processing ? (
                         <>

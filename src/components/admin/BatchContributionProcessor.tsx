@@ -6,6 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { CheckCircle, ListChecks, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { defaultLogger as logger } from '@/lib/logger'
@@ -170,16 +178,34 @@ export default function BatchContributionProcessor({ contributions, onRefresh }:
       <CardContent>
         {selectedContributions.length > 0 && (
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <select
-                value={bulkAction}
-                onChange={(e) => setBulkAction(e.target.value as 'approve' | 'reject' | '')}
-                className="border rounded-md px-3 py-2"
+            <div className="flex flex-wrap items-center gap-4">
+              <Select
+                value={bulkAction || undefined}
+                onValueChange={(v) =>
+                  setBulkAction(v as 'approve' | 'reject')
+                }
               >
-                <option value="">{t('selectAction')}</option>
-                <option value="approve">{t('approveSelected')}</option>
-                <option value="reject">{t('rejectSelected')}</option>
-              </select>
+                <SelectTrigger className="w-full min-w-[200px] border bg-background sm:w-56">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <ListChecks className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <SelectValue placeholder={t('selectAction')} />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="approve">
+                    <span className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-600" aria-hidden />
+                      {t('approveSelected')}
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="reject">
+                    <span className="flex items-center gap-2">
+                      <XCircle className="h-4 w-4 text-red-600" aria-hidden />
+                      {t('rejectSelected')}
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
               {bulkAction === 'reject' && (
                 <input

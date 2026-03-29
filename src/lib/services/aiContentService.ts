@@ -51,6 +51,7 @@ export async function generateContent(
   try {
     const response = await fetch('/api/ai/generate-content', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -68,7 +69,10 @@ export async function generateContent(
         const error = await response.json()
         errorMessage = error.error || error.message || `Content generation failed with status ${response.status}`
       } catch {
-        if (response.status === 500) {
+        if (response.status === 401) {
+          errorMessage =
+            'You must be signed in to generate content. Please sign in and try again.'
+        } else if (response.status === 500) {
           errorMessage = 'AI service error. Please try again later.'
         } else if (response.status === 400) {
           errorMessage = 'Invalid request. Please check your inputs.'

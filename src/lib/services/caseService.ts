@@ -429,8 +429,8 @@ export class CaseService {
         updated_at,
         created_by,
         category_id,
-        beneficiaries(id, name, name_ar, age, gender, mobile_number, email, city, governorate, risk_level, is_verified, total_cases, active_cases),
-        case_categories(id, name, icon, color),
+        beneficiaries:beneficiary_id(id, name, name_ar, age, gender, mobile_number, email, city, governorate, risk_level, is_verified, total_cases, active_cases),
+        case_categories:category_id(id, name, icon, color),
         case_images(image_url, is_primary, order_index)
       `,
       { count: 'exact' }

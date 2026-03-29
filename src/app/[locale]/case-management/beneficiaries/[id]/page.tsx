@@ -166,7 +166,7 @@ export default function BeneficiaryDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30">
+    <div className="min-h-screen bg-background">
       <Container variant={containerVariant} className="py-6 sm:py-8 lg:py-10">
       {/* Header */}
         <DetailPageHeader
@@ -212,81 +212,76 @@ export default function BeneficiaryDetailPage() {
 
       {/* Statistics Section - At Top */}
       <div className="mb-8">
-        <Card className="border-gray-200/60 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-600 border-b-0 pb-4">
-            <CardTitle className="flex items-center gap-3 text-2xl text-white">
-              <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
-                <Calendar className="h-6 w-6 text-white" />
+        <Card className="overflow-hidden border-border shadow-md">
+          <CardHeader className="border-b bg-muted/50 pb-4">
+            <CardTitle className="flex items-center gap-3 text-xl">
+              <div className="rounded-lg bg-primary/10 p-2.5">
+                <Calendar className="h-6 w-6 text-primary" />
               </div>
               {t('statistics') || 'Statistics'}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/30">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {/* Total Cases */}
-              <div className="group relative overflow-hidden bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-lg shadow-md">
-                      <FileText className="h-5 w-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-blue-100 uppercase tracking-wider">{t('totalCases') || 'Total Cases'}</p>
-                    <p className="text-3xl font-bold text-white">{beneficiary.total_cases || 0}</p>
-                  </div>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-border bg-muted/30 p-5">
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-md bg-background">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
                 </div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t('totalCases') || 'Total Cases'}
+                </p>
+                <p className="text-3xl font-bold text-foreground">{beneficiary.total_cases || 0}</p>
               </div>
-
-              {/* Active Cases */}
-              <div className="group relative overflow-hidden bg-gradient-to-br from-green-500 via-emerald-600 to-teal-600 rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-lg shadow-md">
-                      <FileText className="h-5 w-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-green-100 uppercase tracking-wider">{t('activeCases') || 'Active Cases'}</p>
-                    <p className="text-3xl font-bold text-white">{beneficiary.active_cases || 0}</p>
-                  </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-5">
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-md bg-background">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
                 </div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t('activeCases') || 'Active Cases'}
+                </p>
+                <p className="text-3xl font-bold text-foreground">{beneficiary.active_cases || 0}</p>
               </div>
-
-              {/* Created Date */}
-              <div className="group relative overflow-hidden bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-600 rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-lg shadow-md">
-                      <Clock className="h-5 w-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-purple-100 uppercase tracking-wider">{t('created') || 'Created'}</p>
-                    <p className="text-sm font-semibold text-white leading-tight">{new Date(beneficiary.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                    <p className="text-xs text-purple-100">{new Date(beneficiary.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-5">
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-md bg-background">
+                  <Clock className="h-5 w-5 text-muted-foreground" />
                 </div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t('created') || 'Created'}
+                </p>
+                <p className="text-sm font-semibold leading-tight text-foreground">
+                  {new Date(beneficiary.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(beneficiary.created_at).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
               </div>
-
-              {/* Last Updated */}
-              <div className="group relative overflow-hidden bg-gradient-to-br from-orange-500 via-amber-600 to-orange-600 rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-lg shadow-md">
-                      <Clock className="h-5 w-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-orange-100 uppercase tracking-wider">{t('lastUpdated') || 'Last Updated'}</p>
-                    <p className="text-sm font-semibold text-white leading-tight">{new Date(beneficiary.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                    <p className="text-xs text-orange-100">{new Date(beneficiary.updated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-5">
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-md bg-background">
+                  <Clock className="h-5 w-5 text-muted-foreground" />
                 </div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t('lastUpdated') || 'Last Updated'}
+                </p>
+                <p className="text-sm font-semibold leading-tight text-foreground">
+                  {new Date(beneficiary.updated_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(beneficiary.updated_at).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -299,10 +294,10 @@ export default function BeneficiaryDetailPage() {
         <div className="space-y-6">
           {/* Basic Information */}
           <Card className="border-gray-200/60 shadow-md hover:shadow-lg transition-shadow duration-200">
-            <CardHeader className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 border-b border-gray-200/60">
+            <CardHeader className="border-b border-border bg-muted/50">
               <CardTitle className="flex items-center gap-2 text-xl">
-                <div className="p-2 bg-blue-500 rounded-lg">
-                  <User className="h-5 w-5 text-white" />
+                <div className="rounded-lg bg-primary p-2 text-primary-foreground">
+                  <User className="h-5 w-5" />
                 </div>
                 {t('basicInformation') || 'Basic Information'}
               </CardTitle>
@@ -347,10 +342,10 @@ export default function BeneficiaryDetailPage() {
 
           {/* Contact Information */}
           <Card className="border-gray-200/60 shadow-md hover:shadow-lg transition-shadow duration-200">
-            <CardHeader className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-b border-gray-200/60">
+            <CardHeader className="border-b border-border bg-muted/50">
               <CardTitle className="flex items-center gap-2 text-xl">
-                <div className="p-2 bg-green-500 rounded-lg">
-                  <Phone className="h-5 w-5 text-white" />
+                <div className="rounded-lg bg-primary p-2 text-primary-foreground">
+                  <Phone className="h-5 w-5" />
                 </div>
                 {t('contactInformation') || 'Contact Information'}
               </CardTitle>
@@ -407,10 +402,10 @@ export default function BeneficiaryDetailPage() {
 
           {/* Identification */}
           <Card className="border-gray-200/60 shadow-md hover:shadow-lg transition-shadow duration-200">
-            <CardHeader className="bg-gradient-to-r from-purple-50/50 to-pink-50/50 border-b border-gray-200/60">
+            <CardHeader className="border-b border-border bg-muted/50">
               <CardTitle className="flex items-center gap-2 text-xl">
-                <div className="p-2 bg-purple-500 rounded-lg">
-                  <IdCard className="h-5 w-5 text-white" />
+                <div className="rounded-lg bg-primary p-2 text-primary-foreground">
+                  <IdCard className="h-5 w-5" />
                 </div>
                 {t('identification') || 'Identification'}
               </CardTitle>
@@ -450,10 +445,10 @@ export default function BeneficiaryDetailPage() {
           {/* Additional Information */}
           {(beneficiary.address || beneficiary.medical_condition || beneficiary.notes) && (
             <Card className="border-gray-200/60 shadow-md hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="bg-gradient-to-r from-amber-50/50 to-orange-50/50 border-b border-gray-200/60">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <div className="p-2 bg-amber-500 rounded-lg">
-                    <FileText className="h-5 w-5 text-white" />
+              <CardHeader className="border-b border-border bg-muted/50">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <div className="rounded-lg bg-primary p-2 text-primary-foreground">
+                    <FileText className="h-5 w-5" />
                   </div>
                   {t('additionalInformation') || 'Additional Information'}
                 </CardTitle>

@@ -36,6 +36,7 @@ import {
   List,
   Plus,
   Trash2,
+  Key,
 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -1306,6 +1307,13 @@ export default function AISettingsPage() {
             icon={Sparkles}
             title="AI Content Generation Settings"
             description="Configure AI rules and parameters for generating case titles and descriptions"
+            menuActions={[
+              {
+                label: 'API Keys',
+                onClick: () => router.push(`/${locale}/admin/settings/api-keys`),
+                icon: Key,
+              },
+            ]}
             badge={stats.totalRules > 0 ? {
               label: `${stats.activeRules}/${stats.totalRules} active rules`,
               variant: 'secondary'

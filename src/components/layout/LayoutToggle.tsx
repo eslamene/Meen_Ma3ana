@@ -38,7 +38,7 @@ export default function LayoutToggle() {
   
   return (
     <TooltipProvider>
-      <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-1 shadow-sm">
+      <div className="flex items-center gap-1 rounded-md border border-sidebar-border bg-muted p-1">
         {variants.map((variant) => {
           const config = variantConfig[variant]
           const Icon = config.icon
@@ -51,15 +51,15 @@ export default function LayoutToggle() {
                   variant={isActive ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setContainerVariant(variant)}
-                  className={`h-8 px-3 ${
+                  className={`h-8 rounded-md px-2 text-sm ${
                     isActive
                       ? 'bg-[#6B8E7E] text-white hover:bg-[#5a7a6b]'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                      : 'text-muted-foreground hover:bg-background hover:text-foreground'
                   }`}
                   aria-label={config.tooltip}
                 >
                   <Icon className="h-4 w-4" />
-                  <span className="ml-1.5 text-xs font-medium hidden sm:inline">
+                  <span className="ml-1.5 hidden text-sm font-medium sm:inline">
                     {config.label}
                   </span>
                 </Button>

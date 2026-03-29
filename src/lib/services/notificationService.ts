@@ -213,7 +213,6 @@ export class NotificationService {
       .from('notifications')
       .update({
         read: true,
-        read_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -237,7 +236,6 @@ export class NotificationService {
       .from('notifications')
       .update({
         read: true,
-        read_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('recipient_id', recipientId)

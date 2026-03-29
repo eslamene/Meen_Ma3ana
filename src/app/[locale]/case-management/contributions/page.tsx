@@ -15,7 +15,6 @@ import ContributionsList from '@/components/contributions/ContributionsList'
 import Container from '@/components/layout/Container'
 import { useLayout } from '@/components/layout/LayoutProvider'
 import DetailPageHeader from '@/components/crud/DetailPageHeader'
-import { theme, brandColors } from '@/lib/theme'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -848,7 +847,7 @@ export default function AdminContributionsPage() {
   return (
     <ProtectedRoute>
       <PermissionGuard permission="contributions:manage">
-        <div className="min-h-screen" style={{ background: theme.gradients.brandSubtle }}>
+        <div className="min-h-screen bg-background">
           <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
             {/* Enhanced Header */}
             <DetailPageHeader
@@ -856,7 +855,7 @@ export default function AdminContributionsPage() {
               icon={Heart}
               title={t('title') || 'Contribution Management'}
               description={t('description') || 'Review and manage all contributions'}
-              backLabel="Back to Dashboard"
+              backLabel="Back to overview"
               badge={{
                 label: `${pagination.total} ${pagination.total === 1 ? 'contribution' : 'contributions'}`,
                 variant: 'secondary',
@@ -874,7 +873,6 @@ export default function AdminContributionsPage() {
                   <Card 
                     key={widget.key}
                     className="bg-white/90 backdrop-blur-sm border-0 shadow-lg transition-all duration-300 group"
-                    style={{ boxShadow: theme.shadows.primary }}
                   >
                     <CardContent className="p-4 sm:p-6">
                       <div className="flex items-center justify-between">
@@ -977,7 +975,7 @@ export default function AdminContributionsPage() {
                       </div>
                       <div className="w-full bg-slate-700/50 rounded-full h-2 overflow-hidden">
                         <div 
-                          className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300 ease-out"
+                          className="h-2 rounded-full bg-primary transition-all duration-300 ease-out"
                           style={{ 
                             width: `${Math.min(100, (bulkActionProgress.current / bulkActionProgress.total) * 100)}%` 
                           }}

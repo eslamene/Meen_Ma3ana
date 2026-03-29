@@ -97,7 +97,7 @@ export default function DetailPageHeader({
   return (
     <div className="mb-6 sm:mb-8">
       {/* Enhanced Header with Background */}
-      <div className="bg-gradient-to-r from-white via-indigo-50/30 to-white rounded-xl border border-gray-200/60 shadow-sm p-4 sm:p-6">
+      <div className="rounded-xl border border-border bg-card bg-gradient-to-br from-meen-50/50 via-card to-ma3ana-50/40 shadow-sm p-4 sm:p-6 dark:from-meen-950/20 dark:via-card dark:to-ma3ana-950/20">
         <div className="flex flex-col gap-4">
           {/* Top Row: Back Button */}
           <div className="flex items-center justify-between gap-4">
@@ -106,7 +106,7 @@ export default function DetailPageHeader({
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push(backUrl)}
-                className="flex items-center gap-2 hover:bg-white hover:shadow-sm transition-all duration-200 -ml-2"
+                className="-ms-2 flex items-center gap-2 transition-all duration-200 hover:bg-muted hover:shadow-sm"
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span className="hidden sm:inline font-medium">{backLabel}</span>
@@ -118,17 +118,17 @@ export default function DetailPageHeader({
           <div className="flex items-start gap-4">
             {/* Icon with Enhanced Styling */}
             <div className="relative shrink-0">
-              <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
-                <Icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+              <div className="rounded-xl bg-gradient-meen p-3 shadow-lg">
+                <Icon className="h-6 w-6 text-white sm:h-7 sm:w-7" aria-hidden />
               </div>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-400 rounded-full border-2 border-white"></div>
+              <div className="absolute -bottom-1 -right-1 size-4 rounded-full border-2 border-card bg-ma3ana" />
             </div>
 
             {/* Title and Description */}
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-4 mb-2 flex-wrap">
                 <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold text-foreground sm:text-3xl lg:text-4xl">
                   {title}
                 </h1>
                 {badge && (
@@ -146,9 +146,9 @@ export default function DetailPageHeader({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 hover:bg-gray-100"
+                        className="h-8 w-8 p-0 hover:bg-muted"
                       >
-                        <MoreVertical className="h-4 w-4 text-gray-600" />
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
                         <span className="sr-only">Open menu</span>
                       </Button>
                     </DropdownMenuTrigger>
@@ -167,7 +167,7 @@ export default function DetailPageHeader({
                               disabled={action.disabled}
                               className={`cursor-pointer ${
                                 isDestructive
-                                  ? 'text-red-600 focus:text-red-700 focus:bg-red-50'
+                                  ? 'text-destructive focus:bg-destructive/10 focus:text-destructive'
                                   : ''
                               }`}
                             >
@@ -188,7 +188,7 @@ export default function DetailPageHeader({
               </div>
               
               {description && (
-                <p className="text-sm sm:text-base text-gray-600 mb-2">
+                <p className="mb-2 text-sm text-muted-foreground sm:text-base">
                   {description}
                 </p>
               )}

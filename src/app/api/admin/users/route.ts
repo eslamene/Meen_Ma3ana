@@ -27,6 +27,8 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
     const roleFilter = searchParams.get('role') || ''
     const sortBy = searchParams.get('sortBy') || 'created_at'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const noPhoneRaw = (searchParams.get('noPhone') || '').toLowerCase()
+    const noPhone = ['1', 'true', 'yes'].includes(noPhoneRaw)
 
     if (page < 1) {
       throw new ApiError('VALIDATION_ERROR', 'Page must be greater than 0', 400)
@@ -42,7 +44,7 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
       'admin_users_access',
       'user',
       undefined,
-      { endpoint: '/api/admin/users', page, limit, search, roleFilter },
+      { endpoint: '/api/admin/users', page, limit, search, roleFilter, noPhone },
       ipAddress,
       userAgent
     )
@@ -66,7 +68,7 @@ async function getHandler(request: NextRequest, context: ApiHandlerContext) {
     const result = await AdminUserManagementService.listUsers(
       supabase,
       serviceRoleClient,
-      { page, limit, search, roleFilter, sortBy, sortOrder },
+      { page, limit, search, roleFilter, sortBy, sortOrder, noPhone },
       logger
     )
 

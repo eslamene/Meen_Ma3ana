@@ -16,6 +16,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
@@ -85,6 +87,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [filterMissingPhone, setFilterMissingPhone] = useState(false)
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
     limit: 20,
@@ -116,7 +119,8 @@ export default function AdminUsersPage() {
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         ...(searchTerm && { search: searchTerm }),
-        ...(roleFilter && roleFilter !== 'all' && { role: roleFilter })
+        ...(roleFilter && roleFilter !== 'all' && { role: roleFilter }),
+        ...(filterMissingPhone && { noPhone: 'true' })
       })
 
       const usersRes = await safeFetch(`/api/admin/users?${params.toString()}`)
@@ -138,7 +142,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [pagination.page, pagination.limit, searchTerm, roleFilter, toast])
+  }, [pagination.page, pagination.limit, searchTerm, roleFilter, filterMissingPhone, toast])
 
   useEffect(() => {
     fetchUsers()
@@ -147,7 +151,7 @@ export default function AdminUsersPage() {
   // Reset to page 1 when search or filter changes
   useEffect(() => {
     setPagination(prev => ({ ...prev, page: 1 }))
-  }, [searchTerm, roleFilter])
+  }, [searchTerm, roleFilter, filterMissingPhone])
 
   // Fetch available roles for filter dropdown and role assignment
   const fetchRoles = useCallback(async () => {
@@ -381,30 +385,42 @@ export default function AdminUsersPage() {
           </CardHeader>
           <CardContent>
             {/* Search and Filter */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search users by email or name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 text-sm sm:text-base"
-                />
-              </div>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="no-roles">No Roles</SelectItem>
+            <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users by email or name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 text-sm sm:text-base"
+                  />
+                </div>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Filter by role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="no-roles">No Roles</SelectItem>
                     {availableRoles.map(role => (
-                    <SelectItem key={role.id} value={role.name}>
-                      {role.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                      <SelectItem key={role.id} value={role.name}>
+                        {role.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="filter-missing-phone"
+                  checked={filterMissingPhone}
+                  onCheckedChange={v => setFilterMissingPhone(v === true)}
+                />
+                <Label htmlFor="filter-missing-phone" className="text-sm font-normal cursor-pointer">
+                  Without phone number
+                </Label>
+              </div>
             </div>
 
             {/* Users Table */}
@@ -412,7 +428,7 @@ export default function AdminUsersPage() {
               <div className="text-center py-8 text-muted-foreground">Loading users...</div>
             ) : users.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {searchTerm || roleFilter !== 'all' 
+                {searchTerm || roleFilter !== 'all' || filterMissingPhone
                   ? 'No users found matching your criteria' 
                   : 'No users found'
                 }

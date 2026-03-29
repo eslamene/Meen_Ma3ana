@@ -33,16 +33,16 @@ interface PaymentMethod {
 }
 
 interface ApprovalStatus {
-  id: string
+  id?: string
   status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
   rejection_reason?: string
   admin_comment?: string
   donor_reply?: string
   donor_reply_date?: string
   payment_proof_url?: string
-  resubmission_count: number
-  created_at: string
-  updated_at: string
+  resubmission_count?: number
+  created_at?: string
+  updated_at?: string
 }
 
 interface Contribution {

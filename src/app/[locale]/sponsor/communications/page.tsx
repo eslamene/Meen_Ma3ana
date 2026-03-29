@@ -12,7 +12,22 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertCircle, Send, MessageSquare, User as UserIcon, Calendar, Plus } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  AlertCircle,
+  Send,
+  MessageSquare,
+  User as UserIcon,
+  Calendar,
+  Plus,
+  FolderKanban,
+} from 'lucide-react'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -286,21 +301,39 @@ export default function SponsorCommunicationsPage() {
           
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Recipient</label>
-              <select
-                className="w-full mt-1 p-2 border border-gray-300 rounded-md"
-                value={newMessage.recipient_id}
-                onChange={(e) => setNewMessage(prev => ({ ...prev, recipient_id: e.target.value }))}
+              <label className="mt-1 block text-sm font-medium">Recipient</label>
+              <Select
+                value={newMessage.recipient_id || undefined}
+                onValueChange={(v) =>
+                  setNewMessage((prev) => ({ ...prev, recipient_id: v }))
+                }
               >
-                <option value="">Select recipient...</option>
-                <option value="admin">Administrator</option>
-                {/* Add more recipients based on sponsorships */}
-                {sponsorships.map((sponsorship) => (
-                  <option key={sponsorship.id} value={`case_${sponsorship.case_id}`}>
-                    Case: {sponsorship.case.title}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 w-full border-gray-300 bg-background">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <UserIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <SelectValue placeholder="Select recipient..." />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">
+                    <span className="flex items-center gap-2">
+                      <UserIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                      Administrator
+                    </span>
+                  </SelectItem>
+                  {sponsorships.map((sponsorship) => (
+                    <SelectItem
+                      key={sponsorship.id}
+                      value={`case_${sponsorship.case_id}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <FolderKanban className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                        Case: {sponsorship.case.title}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

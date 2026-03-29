@@ -321,10 +321,10 @@ export default function BeneficiariesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-indigo-600"></div>
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary sm:h-10 sm:w-10"></div>
           </div>
         </Container>
       </div>
@@ -332,27 +332,21 @@ export default function BeneficiariesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Container variant={containerVariant} className="py-4 sm:py-6 lg:py-8">
-      {/* Enhanced Header */}
+      {/* Header */}
       <div className="mb-6 sm:mb-8">
-        <div className="bg-gradient-to-r from-white via-indigo-50/30 to-white rounded-xl border border-gray-200/60 shadow-sm p-4 sm:p-6">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4 flex-1 min-w-0">
-              {/* Icon */}
-              <div className="relative shrink-0">
-                <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
-                  <Users className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-400 rounded-full border-2 border-white"></div>
+            <div className="flex min-w-0 flex-1 items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm sm:h-14 sm:w-14">
+                <Users className="h-6 w-6 sm:h-7 sm:w-7" />
               </div>
-
-              {/* Title and Description */}
-              <div className="flex-1 min-w-0">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
                   {t('title') || 'Beneficiaries'}
                 </h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">
+                <p className="mt-1 text-sm text-muted-foreground sm:text-base">
                   {t('subtitle') || 'Manage beneficiary profiles and documents'}
                 </p>
               </div>
@@ -367,9 +361,9 @@ export default function BeneficiariesPage() {
                 <span className="hidden sm:inline">Bulk Upload</span>
                 <span className="sm:hidden">Upload</span>
               </Button>
-            <Button 
+            <Button
                 onClick={() => router.push(`/${locale}/case-management/beneficiaries/create`)} 
-              className="bg-blue-600 hover:bg-blue-700 text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-10 flex-shrink-0"
+              className="text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-10 flex-shrink-0"
             >
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
               <span className="hidden sm:inline">{t('addBeneficiary') || 'Add Beneficiary'}</span>
@@ -391,11 +385,11 @@ export default function BeneficiariesPage() {
         <CardContent className="p-3 sm:p-4 pt-2 sm:pt-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div className="sm:col-span-2 lg:col-span-1">
-              <label className="text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2 block">
+              <label className="mb-1.5 block text-xs font-medium text-foreground sm:mb-2 sm:text-sm">
                 {t('search') || 'Search'}
               </label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:h-4 sm:w-4" />
                 <Input
                   placeholder={t('searchPlaceholder') || 'Search by name, mobile, ID...'}
                   value={searchQuery}
@@ -406,7 +400,7 @@ export default function BeneficiariesPage() {
             </div>
             
             <div>
-              <label className="text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2 block">
+              <label className="mb-1.5 block text-xs font-medium text-foreground sm:mb-2 sm:text-sm">
                 {t('city') || 'City'}
               </label>
               <Select value={cityFilter} onValueChange={setCityFilter}>
@@ -425,7 +419,7 @@ export default function BeneficiariesPage() {
             </div>
 
             <div>
-              <label className="text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2 block">
+              <label className="mb-1.5 block text-xs font-medium text-foreground sm:mb-2 sm:text-sm">
                 {t('riskLevel') || 'Risk Level'}
               </label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -461,7 +455,7 @@ export default function BeneficiariesPage() {
 
       {/* Summary */}
       {filteredBeneficiaries.length > 0 && (
-        <div className="mb-3 sm:mb-4 text-xs sm:text-sm text-gray-600">
+        <div className="mb-3 text-xs text-muted-foreground sm:mb-4 sm:text-sm">
           Showing {filteredBeneficiaries.length} {filteredBeneficiaries.length === 1 ? 'beneficiary' : 'beneficiaries'}
           {searchQuery || cityFilter !== 'all' || statusFilter !== 'all' ? ' (filtered)' : ''}
                   </div>
@@ -473,46 +467,46 @@ export default function BeneficiariesPage() {
           <CardContent className="p-0">
             {sortedKeys.length === 0 ? (
               <div className="text-center py-12">
-                <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <User className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                <h3 className="mb-2 text-lg font-medium text-foreground">
                   {t('noBeneficiaries') || 'No beneficiaries found'}
                 </h3>
-                <p className="text-gray-600 mb-4">
+                <p className="mb-4 text-muted-foreground">
                   {searchQuery || cityFilter !== 'all' || statusFilter !== 'all'
                     ? t('noBeneficiariesFiltered') || 'Try adjusting your filters'
                     : t('noBeneficiariesDescription') || 'Get started by adding your first beneficiary'
                   }
                 </p>
-                <Button onClick={() => router.push(`/${locale}/beneficiaries/create`)}>
+                <Button onClick={() => router.push(`/${locale}/case-management/beneficiaries/create`)}>
                   <Plus className="h-4 w-4 mr-2" />
                   {t('addFirstBeneficiary') || 'Add First Beneficiary'}
                 </Button>
               </div>
             ) : (
-              <div className="divide-y divide-gray-200 max-h-[calc(100vh-300px)] overflow-y-auto">
+              <div className="max-h-[calc(100vh-300px)] divide-y divide-border overflow-y-auto">
                 {sortedKeys.map((letter) => (
                   <div key={letter} id={`letter-${letter}`}>
                     {/* Letter Header */}
-                    <div className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 px-4 sm:px-6 py-2 sm:py-2.5 border-b-2 border-gray-300 shadow-sm">
-                      <h2 className="text-sm sm:text-base font-bold text-gray-800 tracking-wide">{letter}</h2>
+                    <div className="sticky top-0 z-10 border-b-2 border-border bg-muted/80 px-4 py-2 shadow-sm backdrop-blur-sm sm:px-6 sm:py-2.5">
+                      <h2 className="text-sm font-bold tracking-wide text-foreground sm:text-base">{letter}</h2>
                     </div>
                   
                   {/* Beneficiaries in this letter group */}
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-border/70">
                     {groups[letter].map((beneficiary) => (
                       <div
                         key={beneficiary.id}
-                        className="group relative bg-white border-b border-gray-100 hover:bg-gray-50/50 transition-colors"
+                        className="group relative border-b border-border/60 bg-card transition-colors hover:bg-muted/40"
                       >
                         <div className="flex items-start justify-between gap-3 p-3 sm:p-4">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
                           {/* Avatar with Initials */}
-                            <div className="relative flex-shrink-0">
-                              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-xs sm:text-sm shadow-sm ring-2 ring-gray-100 group-hover:ring-indigo-200 transition-all">
+                              <div className="relative flex-shrink-0">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-sm ring-2 ring-border transition-all group-hover:ring-ring sm:h-11 sm:w-11 sm:text-sm">
                               {getInitials(beneficiary.name)}
                   </div>
                               {beneficiary.is_verified && (
-                                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-background bg-emerald-500">
                                   <CheckCircle className="h-2 w-2 text-white" />
                                 </div>
                               )}
@@ -521,7 +515,7 @@ export default function BeneficiariesPage() {
                           {/* Name and Info */}
                           <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">
+                                <h3 className="truncate text-sm font-semibold text-foreground sm:text-base">
                                 {beneficiary.name}
                               </h3>
                                 <Badge className={`${getRiskLevelColor(beneficiary.risk_level)} text-[9px] sm:text-[10px] font-medium py-0 px-1.5 flex-shrink-0`}>
@@ -529,7 +523,7 @@ export default function BeneficiariesPage() {
                 </Badge>
               </div>
             
-                              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-600">
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:gap-3 sm:text-sm">
                 {beneficiary.mobile_number && (
                                   <div className="flex items-center gap-1">
                                     <Phone className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
@@ -565,7 +559,7 @@ export default function BeneficiariesPage() {
                               variant="ghost"
                   size="sm"
                   onClick={() => handleViewBeneficiary(beneficiary)}
-                              className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                              className="h-7 w-7 p-0 hover:bg-muted hover:text-primary sm:h-8 sm:w-8"
                               title={t('view') || 'View'}
                 >
                               <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -574,7 +568,7 @@ export default function BeneficiariesPage() {
                               variant="ghost"
                   size="sm"
                   onClick={() => handleEditBeneficiary(beneficiary)}
-                              className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-indigo-50 hover:text-indigo-600"
+                              className="h-7 w-7 p-0 hover:bg-muted hover:text-primary sm:h-8 sm:w-8"
                               title={t('edit') || 'Edit'}
                 >
                               <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -586,7 +580,7 @@ export default function BeneficiariesPage() {
                     setSelectedBeneficiary(beneficiary)
                     setIsDeleteDialogOpen(true)
                   }}
-                              className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 sm:h-8 sm:w-8"
                               title={t('delete') || 'Delete'}
                 >
                               <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -606,7 +600,7 @@ export default function BeneficiariesPage() {
         {/* Quick Navigation Sidebar - Only show if many letters */}
         {sortedKeys.length > 5 && (
           <div className="fixed right-4 top-1/2 -translate-y-1/2 z-20 hidden lg:block">
-            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-2">
+            <div className="rounded-lg border border-border bg-card p-2 shadow-lg">
               <div className="flex flex-col gap-1 max-h-[400px] overflow-y-auto">
                 {sortedKeys.map((letter) => (
                   <button
@@ -618,7 +612,7 @@ export default function BeneficiariesPage() {
                         element.scrollIntoView({ behavior: 'smooth', block: 'start' })
                       }
                     }}
-                    className="text-xs font-semibold text-gray-600 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors text-center min-w-[24px]"
+                    className="min-w-[24px] rounded px-2 py-1 text-center text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
                     title={`Jump to ${letter}`}
                   >
                     {letter}
@@ -643,13 +637,13 @@ export default function BeneficiariesPage() {
             <DialogTitle>{t('deleteBeneficiary') || 'Delete Beneficiary'}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               {t('deleteConfirmation') || 'Are you sure you want to delete this beneficiary? This action cannot be undone.'}
             </p>
             {selectedBeneficiary && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <div className="mt-4 rounded-lg bg-muted/50 p-3">
                 <p className="font-medium">{selectedBeneficiary.name}</p>
-                <p className="text-sm text-gray-600">{selectedBeneficiary.mobile_number}</p>
+                <p className="text-sm text-muted-foreground">{selectedBeneficiary.mobile_number}</p>
               </div>
             )}
             {assignedCases.length > 0 && (
@@ -659,8 +653,8 @@ export default function BeneficiariesPage() {
                 </p>
                 <ul className="space-y-1 max-h-32 overflow-y-auto">
                   {assignedCases.map((caseItem) => (
-                    <li key={caseItem.id} className="text-xs text-gray-700 flex items-start gap-2">
-                      <span className="text-gray-500 font-mono">#{caseItem.id.slice(0, 8)}</span>
+                    <li key={caseItem.id} className="flex items-start gap-2 text-xs text-foreground">
+                      <span className="font-mono text-muted-foreground">#{caseItem.id.slice(0, 8)}</span>
                       <span className="truncate">{caseItem.title}</span>
                     </li>
                   ))}

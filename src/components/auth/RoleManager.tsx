@@ -4,6 +4,14 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { UserRole, userRoles, getRoleDisplayName, getRoleDescription } from '@/lib/rbac/types'
 import PermissionGuard from '@/components/auth/PermissionGuard'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Shield } from 'lucide-react'
 
 import { defaultLogger as logger } from '@/lib/logger'
 
@@ -58,20 +66,27 @@ export default function RoleManager({ userId, currentRole, onRoleChange }: RoleM
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
               {t('selectRole')}
             </label>
-            <select
+            <Select
               value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              onValueChange={(v) => setSelectedRole(v as UserRole)}
             >
-              {userRoles.map((role) => (
-                <option key={role} value={role}>
-                  {getRoleDisplayName(role)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full border-gray-300 bg-white">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <Shield className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <SelectValue placeholder={t('selectRole')} />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {userRoles.map((role) => (
+                  <SelectItem key={role} value={role}>
+                    {getRoleDisplayName(role)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {selectedRole !== currentRole && (

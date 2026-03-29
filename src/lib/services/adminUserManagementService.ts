@@ -25,6 +25,8 @@ export interface AdminUserListParams {
   roleFilter: string
   sortBy: string
   sortOrder: string
+  /** When true, only users with no profile phone (null/empty/whitespace). */
+  noPhone?: boolean
 }
 
 export interface AdminUserListRow {
@@ -188,7 +190,7 @@ export class AdminUserManagementService {
       hasPrevPage: boolean
     }
   }> {
-    const { page, limit, search, roleFilter, sortBy, sortOrder } = params
+    const { page, limit, search, roleFilter, sortBy, sortOrder, noPhone } = params
 
     const allUsers = await this.fetchAllAuthUsers(serviceRole, logger)
 
@@ -306,6 +308,12 @@ export class AdminUserManagementService {
       } else {
         sanitizedUsers = sanitizedUsers.filter(user => user.roles.some(r => r.name === roleFilter))
       }
+    }
+
+    if (noPhone) {
+      sanitizedUsers = sanitizedUsers.filter(
+        user => !user.phone || !String(user.phone).trim()
+      )
     }
 
     sanitizedUsers.sort((a, b) => {

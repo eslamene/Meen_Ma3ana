@@ -38,7 +38,7 @@ interface Contribution {
   donorPhone?: string
   notes?: string
   approval_status?: Array<{
-    id: string
+    id?: string
     status: 'pending' | 'approved' | 'rejected' | 'acknowledged'
     rejection_reason?: string
     admin_comment?: string
@@ -502,8 +502,14 @@ export default function ContributionDetailsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {contribution.approval_status.map((status) => (
-                      <div key={status.id} className="border-l-4 border-gray-200 pl-4 py-3 bg-gray-50 rounded-r-lg">
+                    {contribution.approval_status.map((status, index) => (
+                      <div
+                        key={
+                          status.id ??
+                          `approval-${status.created_at ?? ''}-${status.updated_at ?? ''}-${index}`
+                        }
+                        className="border-l-4 border-gray-200 pl-4 py-3 bg-gray-50 rounded-r-lg"
+                      >
                         <div className="flex items-center gap-2 mb-2">
                           {getStatusBadge(status.status)}
                           <span className="text-xs text-gray-500">
