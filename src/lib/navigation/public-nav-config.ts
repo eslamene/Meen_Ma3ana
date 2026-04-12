@@ -3,16 +3,14 @@
  * Centralized configuration for unauthenticated user navigation items
  */
 
-import { Heart, Mail } from 'lucide-react'
-import { LucideIcon } from 'lucide-react'
-
 import { defaultLogger as logger } from '@/lib/logger'
 
+/** Keys from `@/lib/icons/registry` ICON_REGISTRY — required for reliable SSR/production bundling */
 export interface PublicNavItemConfig {
   key: string
   labelKey: string // Translation key
   href: string | ((locale: string) => string)
-  icon?: LucideIcon
+  icon?: string
   showOnLanding?: boolean // Show on landing page
   showOnOtherPages?: boolean // Show on other pages
   requiresPermission?: string // Permission required (e.g., "cases:view_public")
@@ -23,7 +21,7 @@ export interface PublicNavItem {
   key: string
   labelKey: string // Translation key
   href: string // Always a string after processing
-  icon?: LucideIcon
+  icon?: string
   showOnLanding?: boolean // Show on landing page
   showOnOtherPages?: boolean // Show on other pages
   requiresPermission?: string // Permission required (e.g., "cases:view_public")
@@ -40,6 +38,7 @@ export const PUBLIC_NAV_ITEMS: PublicNavItemConfig[] = [
     key: 'home',
     labelKey: 'home',
     href: (locale) => `/${locale}/landing`,
+    icon: 'Home',
     showOnLanding: true,
     showOnOtherPages: true,
   },
@@ -47,6 +46,7 @@ export const PUBLIC_NAV_ITEMS: PublicNavItemConfig[] = [
     key: 'features',
     labelKey: 'features',
     href: '#features',
+    icon: 'Star',
     showOnLanding: true,
     showOnOtherPages: true,
     isHashLink: true,
@@ -55,7 +55,7 @@ export const PUBLIC_NAV_ITEMS: PublicNavItemConfig[] = [
     key: 'cases',
     labelKey: 'cases',
     href: (locale) => `/${locale}/cases`,
-    icon: Heart,
+    icon: 'Heart',
     showOnLanding: true,
     showOnOtherPages: true,
     requiresPermission: 'cases:view',
@@ -64,7 +64,7 @@ export const PUBLIC_NAV_ITEMS: PublicNavItemConfig[] = [
     key: 'contact',
     labelKey: 'contact',
     href: '#contact',
-    icon: Mail,
+    icon: 'Mail',
     showOnLanding: true,
     showOnOtherPages: true,
     isHashLink: true,

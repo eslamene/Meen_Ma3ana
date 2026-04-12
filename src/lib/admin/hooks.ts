@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { User } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { defaultLogger } from '@/lib/logger'
 import type {
   AdminRole,
@@ -28,6 +29,12 @@ let adminContextCacheAt = 0
 const ADMIN_CONTEXT_CACHE_TTL_MS = 10_000
 
 async function fetchAdminContext(force = false): Promise<AdminContextResponse> {
+  if (force) {
+    adminContextInFlight = null
+    adminContextCache = null
+    adminContextCacheAt = 0
+  }
+
   const now = Date.now()
   const cacheValid = !force && adminContextCache && now - adminContextCacheAt < ADMIN_CONTEXT_CACHE_TTL_MS
   if (cacheValid && adminContextCache) {
@@ -124,8 +131,38 @@ export function useAdmin(): UseAdminReturn {
     }
   }, [])
 
+  /**
+   * Wait for Supabase session hydration before the first /api/admin/context call.
+   * Otherwise getUser() on the server often sees no session → guest-only menu gets cached,
+   * and the sidebar shows a few public items with no profile until a manual refresh.
+   */
   useEffect(() => {
-    fetchUserData()
+    const supabase = createClient()
+    let cancelled = false
+
+    void supabase.auth.getSession().then(() => {
+      if (!cancelled) {
+        void fetchUserData(true)
+      }
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (
+        event === 'SIGNED_IN' ||
+        event === 'SIGNED_OUT' ||
+        event === 'TOKEN_REFRESHED' ||
+        event === 'USER_UPDATED'
+      ) {
+        void fetchUserData(true)
+      }
+    })
+
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [fetchUserData])
 
   const hasPermission = useCallback((permissionName: string): boolean => {

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, decimal, boolean, integer, jsonb, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, uuid, decimal, boolean, integer, jsonb, varchar, inet, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
 // User roles enum
@@ -123,21 +123,6 @@ export const cases = pgTable('cases', {
   beneficiary_id: uuid('beneficiary_id').references(() => beneficiaries.id, { onDelete: 'set null' }),
   supporting_documents: text('supporting_documents'), // JSON array of document URLs (legacy, use case_files instead)
   batch_id: uuid('batch_id').references((): AnyPgColumn => batchUploads.id, { onDelete: 'set null' }), // Reference to batch upload if created from batch
-  created_at: timestamp('created_at').notNull().defaultNow(),
-  updated_at: timestamp('updated_at').notNull().defaultNow(),
-})
-
-// Case images table
-export const caseImages = pgTable('case_images', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  case_id: uuid('case_id').references(() => cases.id).notNull(),
-  image_path: text('image_path').notNull(),
-  image_url: text('image_url').notNull(),
-  file_name: text('file_name').notNull(),
-  file_size: integer('file_size'),
-  mime_type: text('mime_type'),
-  is_primary: boolean('is_primary').notNull().default(false),
-  order_index: integer('order_index').notNull().default(0),
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 })
@@ -604,6 +589,101 @@ export const nicknameMappings = pgTable('nickname_mappings', {
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 })
 
+// Audit logs table
+export const auditLogs = pgTable('audit_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  action: varchar('action', { length: 50 }).notNull(),
+  table_name: varchar('table_name', { length: 100 }).notNull(),
+  record_id: uuid('record_id').notNull(),
+  user_id: uuid('user_id').references(() => users.id),
+  details: jsonb('details'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+// Landing page contact form submissions
+export const landingContacts = pgTable('landing_contacts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  message: text('message').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+// User merge backup records
+export const userMergeBackups = pgTable('user_merge_backups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  merge_id: uuid('merge_id').notNull().unique(),
+  from_user_id: uuid('from_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  to_user_id: uuid('to_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  admin_user_id: uuid('admin_user_id').notNull().references(() => users.id),
+  delete_source: boolean('delete_source').notNull().default(false),
+  backup_data: jsonb('backup_data').notNull(),
+  status: text('status').notNull().default('pending'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  completed_at: timestamp('completed_at', { withTimezone: true }),
+  rolled_back_at: timestamp('rolled_back_at', { withTimezone: true }),
+  total_records_backed_up: integer('total_records_backed_up').default(0),
+  total_records_migrated: integer('total_records_migrated').default(0),
+  errors: jsonb('errors'),
+  ip_address: inet('ip_address'),
+  user_agent: text('user_agent'),
+  notes: text('notes'),
+})
+
+// Web push subscriptions (VAPID)
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  user_id: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  user_agent: text('user_agent'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// Firebase Cloud Messaging tokens
+export const fcmTokens = pgTable('fcm_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  user_id: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  fcm_token: text('fcm_token').notNull(),
+  device_id: text('device_id'),
+  platform: text('platform'),
+  user_agent: text('user_agent'),
+  active: boolean('active').notNull().default(true),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// AI rules table
+export const aiRules = pgTable('ai_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  rule_key: text('rule_key').notNull().unique(),
+  instruction: text('instruction').notNull(),
+  scope: text('scope').notNull().default('global'),
+  scope_reference: text('scope_reference'),
+  priority: integer('priority').notNull().default(100),
+  version: integer('version').notNull().default(1),
+  is_active: boolean('is_active').notNull().default(true),
+  metadata: jsonb('metadata'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  created_by: uuid('created_by').references(() => users.id),
+  updated_by: uuid('updated_by').references(() => users.id),
+  lang: text('lang'),
+  group_id: uuid('group_id'),
+})
+
+// AI rule parameters table
+export const aiRuleParameters = pgTable('ai_rule_parameters', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  rule_key: text('rule_key').notNull().references(() => aiRules.rule_key, { onDelete: 'cascade' }),
+  parameter_key: text('parameter_key').notNull(),
+  parameter_value: text('parameter_value').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   cases: many(cases),
@@ -642,20 +722,12 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
     fields: [cases.beneficiary_id],
     references: [beneficiaries.id],
   }),
-  images: many(caseImages),
   files: many(caseFiles),
   statusHistory: many(caseStatusHistory),
   updates: many(caseUpdates),
   contributions: many(contributions),
   recurringContributions: many(recurringContributions),
   sponsorships: many(sponsorships),
-}))
-
-export const caseImagesRelations = relations(caseImages, ({ one }) => ({
-  case: one(cases, {
-    fields: [caseImages.case_id],
-    references: [cases.id],
-  }),
 }))
 
 export const caseStatusHistoryRelations = relations(caseStatusHistory, ({ one }) => ({
@@ -894,7 +966,6 @@ export const schema = {
   caseCategories,
   categoryDetectionRules,
   cases,
-  caseImages,
   caseFiles,
   caseStatusHistory,
   projects,
@@ -904,6 +975,7 @@ export const schema = {
   sponsorships,
   communications,
   localization,
+  notifications,
   landingStats,
   systemConfig,
   systemContent,
@@ -922,4 +994,13 @@ export const schema = {
   batchUploads,
   batchUploadItems,
   nicknameMappings,
+  auditLogs,
+  landingContacts,
+  userMergeBackups,
+  pushSubscriptions,
+  fcmTokens,
+  aiRules,
+  aiRuleParameters,
+  paymentMethodsTable,
+  caseUpdates,
 }

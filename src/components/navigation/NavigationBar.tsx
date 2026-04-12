@@ -348,7 +348,7 @@ export default function NavigationBar() {
               <NavigationMenu className="mx-auto max-w-none flex-1 justify-center">
                 <NavigationMenuList className="flex flex-nowrap items-center justify-center gap-0.5 space-x-0 xl:gap-1">
                   {publicNavItems.slice(0, 4).map((item) => {
-                    const Icon = item.icon
+                    const Icon = item.icon ? getIcon(item.icon) : undefined
                     const isHashLink = item.isHashLink
                     const hasChildren = item.children && item.children.length > 0
 
@@ -374,7 +374,7 @@ export default function NavigationBar() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="center" sideOffset={8} className="w-64 p-2 z-[120]">
                               {item.children?.map((child) => {
-                                const ChildIcon = child.icon
+                                const ChildIcon = child.icon ? getIcon(child.icon) : undefined
                                 const childIsHashLink = child.isHashLink
                                 const linkElement = (
                                   <Link
@@ -798,7 +798,7 @@ export default function NavigationBar() {
                 // Public user mobile navigation - uses database with config fallback
                 <>
                   {publicNavItems.map((item) => {
-                    const Icon = item.icon
+                    const Icon = item.icon ? getIcon(item.icon) : undefined
                     const isHashLink = item.isHashLink
                     const hasChildren = item.children && item.children.length > 0
                     
@@ -813,7 +813,7 @@ export default function NavigationBar() {
                           {item.children && (
                             <div className="pl-4 space-y-1">
                               {item.children.map((child) => {
-                                const ChildIcon = child.icon
+                                const ChildIcon = child.icon ? getIcon(child.icon) : undefined
                                 const childIsHashLink = child.isHashLink
                                 const childLinkClass = childIsHashLink
                                   ? 'block px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors'
